@@ -3,13 +3,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite dev --port 3000",
     "build": "vite build",
+    "dev": "vite dev --port 3000",
+    "format": "oxfmt --write",
+    "lint": "oxlint",
+    "lint-type-aware": "oxlint --type-aware --type-check",
     "preview": "vite preview",
     "test": "vitest run",
-    "lint": "eslint",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx}\"",
-    "check": "prettier --check \"**/*.{ts,tsx,js,jsx}\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -44,6 +44,9 @@
     "@vitejs/plugin-react": "^6",
     "eslint": "^9",
     "jsdom": "^28",
+    "oxfmt": "^0.61.0",
+    "oxlint": "^1.76.0",
+    "oxlint-tsgolint": "^7.0.2001",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "typescript": "^6",

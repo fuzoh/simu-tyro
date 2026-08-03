@@ -1,0 +1,74 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "eslint",
+    "typescript",
+    "unicorn",
+    "react",
+    "react-perf",
+    "import",
+    "oxc",
+    "jsdoc",
+    "jsx-a11y",
+    "promise",
+    "vitest"
+  ],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "import/no-cycle": ["error", { "maxDepth": 3 }],
+    "jsx-a11y/prefer-tag-over-role": "off"
+  },
+  "settings": {
+    "jsx-a11y": {
+      "components": {},
+      "attributes": {}
+    },
+    "next": {
+      "rootDir": []
+    },
+    "react": {
+      "formComponents": [],
+      "linkComponents": [],
+      "componentWrapperFunctions": []
+    },
+    "jsdoc": {
+      "ignorePrivate": false,
+      "ignoreInternal": false,
+      "ignoreReplacesDocs": true,
+      "overrideReplacesDocs": true,
+      "augmentsExtendsReplacesDocs": false,
+      "implementsReplacesDocs": false,
+      "exemptDestructuredRootsFromChecks": false,
+      "tagNamePreference": {}
+    },
+    "vitest": {
+      "typecheck": false
+    }
+  },
+  "env": {
+    "builtin": true
+  },
+  "globals": {},
+  "ignorePatterns": [
+    "dist/**",
+    "coverage/**",
+    "vendor/**",
+    "docs/**",
+    "old_app/**",
+    "test/snapshots/**",
+    "src/routeTree.gen.ts",
+    "src/vite-env.d.ts",
+    "src/reportWebVitals.ts",
+    "src/components/ui/**",
+    "packages/ui/src/components/**",
+    "dev-dist/**",
+    "CHANGELOG.md",
+    "src/routeTree.gen.ts",
+    ".claude/**",
+    ".agents/**",
+    ".turbo/**",
+    ".junie/**"
+  ]
+}
