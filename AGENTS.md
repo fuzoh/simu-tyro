@@ -10,14 +10,14 @@ shadcn/ui on Base UI primitives · Vite 8 · Vitest.
 
 ## Commands
 
-Package manager is **bun** (`bun.lock`). Ignore the `pnpm` value in `.cta.json`.
+Package manager is **bun** (`bun.lock`).
 
 ```
 bun run dev        # vite dev, port 3000
 bun run test       # vitest run
-bun run lint       # eslint (@tanstack/eslint-config)
+bun run lint-type-aware # Oxlint
 bun run typecheck  # tsc --noEmit
-bun run format     # prettier --write
+bun run format     # oxfmt
 ```
 
 Run `typecheck` + `lint` before declaring work done.
