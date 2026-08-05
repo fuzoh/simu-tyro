@@ -6,7 +6,7 @@ Blocked by: 06 (04, 05 resolved)
 Map: [Zip-line simulator v1](../map.md)
 Reads: [ticket 04](./04-span-and-rigging-parameter-model.md) — the field table is the state to
 serialise, plus two display preferences that also persist: the force unit (daN/kN/kgf) and the
-active Tightness Spec mode. Note that `L`/`h` are *inputs* in manual mode and *derived* in GPX
+active Tightness Spec mode. Note that `L`/`h` are _inputs_ in manual mode and _derived_ in GPX
 mode, so what the URL carries differs by terrain source.
 
 ## Question
@@ -35,7 +35,7 @@ Settle:
    breakage and say so.
 4. **GPX and the URL.** A track is far too big for a query string, so a shared link
    necessarily loses the terrain. Decide the behaviour: does the link carry the anchor
-   *placements* and fall back to flat ground, or does it refuse to encode a GPX-derived
+   _placements_ and fall back to flat ground, or does it refuse to encode a GPX-derived
    geometry at all? Decide what the recipient sees — silently different terrain is the worst
    answer available.
 5. **localStorage.** What is stored, under what key, and how it interacts with the URL when

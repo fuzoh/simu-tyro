@@ -2,7 +2,7 @@
 
 Type: task
 Status: open
-Blocked by: 07
+Blocked by: — (07 resolved; measurements already taken, see Measurements below)
 Map: [Zip-line simulator v1](../map.md)
 
 ## Question
@@ -45,3 +45,31 @@ closure.
 If it lands on "main thread": the coarse-live/fine-on-release fallback stays unbuilt, and the
 hazard that ruled it out (a coarse sweep can miss the worst clearance point and flash a green
 verdict) is worth carrying into the spec as a warning against reintroducing it casually.
+
+## Measurements — already taken (2026-08-05, ticket 07 session)
+
+Steps 1–4 are **done**; this ticket is now only step 5, recording the decision. Taken in the
+ticket-07 prototype in-browser (Chromium/V8, CachyOS desktop), 40 runs per cell, `p95` of one
+full `sweep()` **plus** `evaluateClearance` — the pair, since both run on a parameter change:
+
+| `SWEEP_STEPS` | 1000 m quasi tendu (near-taut) | 1000 m très mou (deep slack) | 1500 m long |
+| --- | --- | --- | --- |
+| 100 | 1,20 ms | 1,30 ms | 0,80 ms |
+| **240** | **1,10 ms** | **1,30 ms** | **1,30 ms** |
+| 500 | 2,30 ms | 2,10 ms | 2,00 ms |
+
+`sweep()` alone: p95 ≤ 0,6 ms in every cell. The clearance reducer is the larger half
+(p95 ≤ 1,7 ms) and scales with `steps × samplesPerStep`, not with the solver — the interesting
+fact for anyone later tempted to raise either.
+
+Drag cost, driving the rider one index per animation frame for 120 frames at 1500 m:
+**frame p50 16,70 ms / p95 18,40 ms** against a 16,7 ms vsync interval — vsync-bound, not
+compute-bound, because the slider is an index lookup plus one `sampleCable(200)`.
+
+Caveats to state when recording the answer: one machine, one browser, and a fast desktop CPU;
+`performance.now()` in Chromium is clamped to ~0,1 ms, which is why several cells read equal.
+The margin against 8 ms is ~4× at 240 steps and ~3,5× at 500, so the conclusion survives a
+considerably slower device — but the *measurement* is single-machine.
+
+Reproduce: `bun run dev`, `/prototype/profile-view?variant=D&scenario=taut`, then the
+`bench ×40` and `auto-drag` buttons on the perf chip (bottom-left).

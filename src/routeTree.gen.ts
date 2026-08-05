@@ -10,33 +10,43 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PrototypeProfileViewRouteImport } from './routes/prototype.profile-view'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrototypeProfileViewRoute = PrototypeProfileViewRouteImport.update({
+  id: '/prototype/profile-view',
+  path: '/prototype/profile-view',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/prototype/profile-view': typeof PrototypeProfileViewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/prototype/profile-view': typeof PrototypeProfileViewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/prototype/profile-view': typeof PrototypeProfileViewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/prototype/profile-view'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/prototype/profile-view'
+  id: '__root__' | '/' | '/prototype/profile-view'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  PrototypeProfileViewRoute: typeof PrototypeProfileViewRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +58,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/prototype/profile-view': {
+      id: '/prototype/profile-view'
+      path: '/prototype/profile-view'
+      fullPath: '/prototype/profile-view'
+      preLoaderRoute: typeof PrototypeProfileViewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  PrototypeProfileViewRoute: PrototypeProfileViewRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

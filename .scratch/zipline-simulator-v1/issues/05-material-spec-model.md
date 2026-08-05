@@ -82,11 +82,11 @@ decision below follows from that split, including why override is a steel-only c
 `MBF` is clean — `K` is a discrete pick, so `MBF = K·d²·R₀/1000` has no range. The whole
 §13.1 range problem collapses onto **one number, `EA`**:
 
-| Quantité | Formule | Bas | Haut | Étendue |
-| --- | --- | --- | --- | --- |
-| `MBF` | `K·d²·R₀/1000` | 90,74 kN | 90,74 kN | **aucune** |
-| `EA` | `E_app·C·d²` | 5,53 MN | 8,41 MN | **×1,52** |
-| `μ` | `W·d²/100` | 0,517 kg/m | 0,576 kg/m | ×1,11 |
+| Quantité | Formule        | Bas        | Haut       | Étendue    |
+| -------- | -------------- | ---------- | ---------- | ---------- |
+| `MBF`    | `K·d²·R₀/1000` | 90,74 kN   | 90,74 kN   | **aucune** |
+| `EA`     | `E_app·C·d²`   | 5,53 MN    | 8,41 MN    | **×1,52**  |
+| `μ`      | `W·d²/100`     | 0,517 kg/m | 0,576 kg/m | ×1,11      |
 
 (12 mm 6×19 âme métallique 1770.) That `EA` spread moves `H` by ~5 % and sag by **~0,3 m**
 on a 200 m span at 3 % flèche — 0,3 m of garde au sol, and it grows as the line tightens.
@@ -109,20 +109,20 @@ to design, not an engine change.
 
 ### 2. Ligne › Câble acier (§13.1)
 
-| Champ (FR) | Symbole | Unité | Affordance | Dur | Avertissement | Initial |
-| --- | --- | --- | --- | --- | --- | --- |
-| Diamètre nominal | `d` | mm | numérique | `> 0` | ∉ [6, 26] mm | → [ticket 14](./14-first-run-scenario-and-defaults.md) |
-| Grade | `R₀` | N/mm² | select : 1770 / 1960 | requis | — | 1770 |
-| Construction | — | — | select : 6×19 âme textile (`K = 0.330`) / 6×19 âme métallique (`K = 0.356`) | requis | — | âme métallique |
+| Champ (FR)       | Symbole | Unité | Affordance                                                                  | Dur    | Avertissement | Initial                                                |
+| ---------------- | ------- | ----- | --------------------------------------------------------------------------- | ------ | ------------- | ------------------------------------------------------ |
+| Diamètre nominal | `d`     | mm    | numérique                                                                   | `> 0`  | ∉ [6, 26] mm  | → [ticket 14](./14-first-run-scenario-and-defaults.md) |
+| Grade            | `R₀`    | N/mm² | select : 1770 / 1960                                                        | requis | —             | 1770                                                   |
+| Construction     | —       | —     | select : 6×19 âme textile (`K = 0.330`) / 6×19 âme métallique (`K = 0.356`) | requis | —             | âme métallique                                         |
 
 **Valeurs déduites** (each independently overridable — see §5):
 
-| Valeur | Formule | Défaut à 12 mm IWRC 1770 |
-| --- | --- | --- |
-| `MBF` | `K·d²·R₀/1000` | 90,74 kN (9074 daN) |
-| `EA` | `E_app·C·d²` | 6,90 MN |
-| `μ` | `W·d²/100` | 0,5465 kg/m |
-| `w` | `μ·g` (ticket 04) | 5,361 N/m |
+| Valeur | Formule           | Défaut à 12 mm IWRC 1770 |
+| ------ | ----------------- | ------------------------ |
+| `MBF`  | `K·d²·R₀/1000`    | 90,74 kN (9074 daN)      |
+| `EA`   | `E_app·C·d²`      | 6,90 MN                  |
+| `μ`    | `W·d²/100`        | 0,5465 kg/m              |
+| `w`    | `μ·g` (ticket 04) | 5,361 N/m                |
 
 **`E_app` and `C` are not fields.** The spec pins them at `E_app = 115 GPa` and
 `C = 0.4165` — midpoints of §13.1's ranges — stated in the popover text so the number is
@@ -148,19 +148,19 @@ standards range.
 
 ### 3. Ligne › Corde textile (§13.2)
 
-| Champ (FR) | Symbole | Unité | Affordance | Dur | Avertissement | Initial |
-| --- | --- | --- | --- | --- | --- | --- |
-| Classe de corde | — | — | select : HMPE 12 torons / Polyamide EN 1891 type A / Polyester semi-statique | requis | — | HMPE |
-| Charge de rupture | `MBL` | daN *(sélecteur global)* | numérique | `> 0` | — | → ticket 14 |
-| Masse linéique | `μ` | kg/m | numérique | `> 0` | — | → ticket 14 |
-| Raideur relative `EA/MBL` | `k` | — | numérique | `> 0`, requis | ⚠ non confirmé + hors bande | **22** / **1,5** / *aucun* |
+| Champ (FR)                | Symbole | Unité                    | Affordance                                                                   | Dur           | Avertissement               | Initial                    |
+| ------------------------- | ------- | ------------------------ | ---------------------------------------------------------------------------- | ------------- | --------------------------- | -------------------------- |
+| Classe de corde           | —       | —                        | select : HMPE 12 torons / Polyamide EN 1891 type A / Polyester semi-statique | requis        | —                           | HMPE                       |
+| Charge de rupture         | `MBL`   | daN _(sélecteur global)_ | numérique                                                                    | `> 0`         | —                           | → ticket 14                |
+| Masse linéique            | `μ`     | kg/m                     | numérique                                                                    | `> 0`         | —                           | → ticket 14                |
+| Raideur relative `EA/MBL` | `k`     | —                        | numérique                                                                    | `> 0`, requis | ⚠ non confirmé + hors bande | **22** / **1,5** / _aucun_ |
 
 **Valeur déduite**: `EA = k·MBL`, plus `w = μ·g`.
 
 **Diamètre is dropped.** Nothing in the v1 scope consumes it: §13.2 has no `MBL(d)`, sheave
 `D/d` is §13.1 and unused by the Verdict, and §12 dynamics are out of scope. A decorative
 field would still reach ticket 09's URL schema and ticket 14's defaults while affecting
-nothing. A free-text rope *désignation* is ruled out of scope on the map.
+nothing. A free-text rope _désignation_ is ruled out of scope on the map.
 
 **Classe de corde drives exactly two things**: the `k` default, and the termination
 whitelist of §6. Not creep grade — §9 is out of scope.
@@ -176,12 +176,12 @@ The decisive finding of this session. §13.2 indexes `k` by working load — 22 
 31 @ 30 % MBL. **A zip line never enters that band.** Computed on a 200 m level span,
 120 kg rider, 6 m target flèche (illustrative `MBL`/`μ`, not shipped defaults):
 
-| Classe | `k` | `EA` | `H` à vide | `H` chargé | Flèche chargée |
-| --- | --- | --- | --- | --- | --- |
-| HMPE, `MBL` 100 kN, `μ` 0,075 | 22 | 2200 kN | 61,4 daN — **0,6 % MBL** | 626 daN — **6,3 % MBL** | 9,99 m |
-| | 31 | 3100 kN | 61,4 daN | 669 daN — 6,7 % MBL | 9,35 m |
-| PA, `MBL` 30 kN, `μ` 0,078 | 1,5 | 45 kN | 63,0 daN — 2,1 % MBL | 222 daN — 7,4 % MBL | **28,24 m** |
-| | 18 *(R1, refuté)* | 540 kN | 63,8 daN | 451 daN — 15,0 % MBL | **13,91 m** |
+| Classe                        | `k`               | `EA`    | `H` à vide               | `H` chargé              | Flèche chargée |
+| ----------------------------- | ----------------- | ------- | ------------------------ | ----------------------- | -------------- |
+| HMPE, `MBL` 100 kN, `μ` 0,075 | 22                | 2200 kN | 61,4 daN — **0,6 % MBL** | 626 daN — **6,3 % MBL** | 9,99 m         |
+|                               | 31                | 3100 kN | 61,4 daN                 | 669 daN — 6,7 % MBL     | 9,35 m         |
+| PA, `MBL` 30 kN, `μ` 0,078    | 1,5               | 45 kN   | 63,0 daN — 2,1 % MBL     | 222 daN — 7,4 % MBL     | **28,24 m**    |
+|                               | 18 _(R1, refuté)_ | 540 kN  | 63,8 daN                 | 451 daN — 15,0 % MBL    | **13,91 m**    |
 
 Three readings:
 
@@ -191,7 +191,7 @@ Three readings:
 3. **The operative regime is below the published band.** Textile highlines are strength-sized
    for shock and rescue, not standing tension, so they run an order of magnitude under the
    mooring loads §13.2 was measured at. And since the elongation rows (0,46 / 0,70 / 0,96 %
-   at 10 / 20 / 30 % MBL) put the bedding-in toe in the *first* 10 %, the true secant `k`
+   at 10 / 20 / 30 % MBL) put the bedding-in toe in the _first_ 10 %, the true secant `k`
    below 10 % MBL is **lower than 22** — the mildest attested value is already optimistic here.
 
 Therefore `k` is a **plain editable numeric with a per-class default**, and the honesty
@@ -210,7 +210,7 @@ like a calibrated selection.
 
 Rejected: auto-iteration on `k(%MBL)`. It extrapolates a two-point table backwards past its
 lowest point and dresses the result as convergence — the exact fabricated-precision failure
-§14 rules against. It also has no defensible answer to *which* tension selects `k`, since the
+§14 rules against. It also has no defensible answer to _which_ tension selects `k`, since the
 rider swings tension ~10× between standing and loaded.
 
 **Consequence for ticket 08**: this warning is a **standing condition of textile use**, not
@@ -249,15 +249,15 @@ legislated against when it refused the silent family auto-switch. Clearing the o
 discards datasheet numbers; keeping it silently leaves a 16 mm rope reporting a 12 mm
 breaking force, and `MBF` drives the Verdict, so that is the worst thing to hide.
 
-**Provenance mapping**, including the case where override *removes* provenance:
+**Provenance mapping**, including the case where override _removes_ provenance:
 
-| Valeur déduite | Provenance | Pastille |
-| --- | --- | --- |
-| `MBF` acier | `[STD-ATTESTED]` facteurs `K` | **aucune** |
-| `EA` acier | plages `E_app`, `C` `[CONVENTION]` | toujours |
-| `μ` acier | plage `W` `[STD-ATTESTED]`, milieu choisi par nous | toujours — « milieu de plage » |
-| `EA` textile | `k` `[DATASHEET]`, hors bande | toujours |
-| `η_t` | `[CONVENTION]` sauf manchon 1,00 `[STD-ATTESTED]` | toutes sauf manchon |
+| Valeur déduite | Provenance                                         | Pastille                       |
+| -------------- | -------------------------------------------------- | ------------------------------ |
+| `MBF` acier    | `[STD-ATTESTED]` facteurs `K`                      | **aucune**                     |
+| `EA` acier     | plages `E_app`, `C` `[CONVENTION]`                 | toujours                       |
+| `μ` acier      | plage `W` `[STD-ATTESTED]`, milieu choisi par nous | toujours — « milieu de plage » |
+| `EA` textile   | `k` `[DATASHEET]`, hors bande                      | toujours                       |
+| `η_t`          | `[CONVENTION]` sauf manchon 1,00 `[STD-ATTESTED]`  | toutes sauf manchon            |
 
 `MBF` is the only derived value shipping **attested**, so overriding it **downgrades**
 provenance: a typed `MBF` gains a «valeur saisie» pastille and **enters** ticket 08's
@@ -276,18 +276,18 @@ separately per Sweep Step, so:
 requires it configurable). The Verdict checks worst `T_A` against `η_A·MBF/k` and worst
 `T_B` against `η_B·MBF/k` — strictly more correct than `min(η)` against `max(T)`, and free.
 
-| Famille | Terminaison | `η_t` défaut | Tag |
-| --- | --- | --- | --- |
-| Acier | Manchon métal/résine (EN 13411-4) | 1,00 | `[STD-ATTESTED]` |
-| | Cosse à sertir / œil Flamand (−3) | 0,90 | `[STD-ATTESTED]` |
-| | Épissure (−2) | 0,80 | `[STD-ATTESTED]` |
-| | Manchon à coin (−6) | 0,80 | `[CONVENTION]` |
-| | Serre-câbles étrier (−5) | 0,80 | `[CONVENTION]` + refus `[REGULATOR]` |
-| Textile | Œil cousu / épissuré | **0,90** | `[CONVENTION]` |
-| | Épissure longue HMPE | 0,90 | `[DATASHEET/CONVENTION]` |
-| | Nœud de huit (PA) | **0,60** | `[CONVENTION]`, plage 0,60–0,80 |
-| | Nœud de chaise (PA) | **0,55** | `[CONVENTION]`, plage 0,55–0,70 |
-| | Nœuds sur HMPE | — | **désactivé** |
+| Famille | Terminaison                       | `η_t` défaut | Tag                                  |
+| ------- | --------------------------------- | ------------ | ------------------------------------ |
+| Acier   | Manchon métal/résine (EN 13411-4) | 1,00         | `[STD-ATTESTED]`                     |
+|         | Cosse à sertir / œil Flamand (−3) | 0,90         | `[STD-ATTESTED]`                     |
+|         | Épissure (−2)                     | 0,80         | `[STD-ATTESTED]`                     |
+|         | Manchon à coin (−6)               | 0,80         | `[CONVENTION]`                       |
+|         | Serre-câbles étrier (−5)          | 0,80         | `[CONVENTION]` + refus `[REGULATOR]` |
+| Textile | Œil cousu / épissuré              | **0,90**     | `[CONVENTION]`                       |
+|         | Épissure longue HMPE              | 0,90         | `[DATASHEET/CONVENTION]`             |
+|         | Nœud de huit (PA)                 | **0,60**     | `[CONVENTION]`, plage 0,60–0,80      |
+|         | Nœud de chaise (PA)               | **0,55**     | `[CONVENTION]`, plage 0,55–0,70      |
+|         | Nœuds sur HMPE                    | —            | **désactivé**                        |
 
 Every range takes its conservative end (§10.3, §14 row 13): 0,90 not 0,95; 0,60 not 0,80.
 
@@ -297,12 +297,12 @@ Every range takes its conservative end (§10.3, §14 row 13): 0,90 not 0,95; 0,6
 > If no number exists, **disable** the option and show the reason.
 
 - **Serre-câbles étrier — selectable, Verdict refuses.** `η_t = 0,80` is attested; "shall not
-  be used where the rope supports persons" is `[REGULATOR]`, i.e. *regulatory, not physical*.
+  be used where the rope supports persons" is `[REGULATOR]`, i.e. _regulatory, not physical_.
   Ticket 04 already fixed that `H_target ≥ MBF` is not an input error — it solves and the
   Verdict says rupture. Grips are the same shape. This is what lets a user model the
   non-compliant installation they have been sent to inspect and be told exactly why it fails.
 - **Nœuds sur HMPE — disabled with the reason shown**, exactly ticket 04's §10.4 pattern.
-  Not because it is forbidden, but because §10.3's 0,25–0,50 describes a knot that *slips*:
+  Not because it is forbidden, but because §10.3's 0,25–0,50 describes a knot that _slips_:
   there is no efficiency to multiply by, so no honest number to compute with.
 
 ```
@@ -319,8 +319,8 @@ plausible-looking result for an illegal rig, relying on the Verdict to carry the
 ### 7. Family switching — both specs retained
 
 Ticket 04 fixed the Usage side: textile disabled-with-reason under `PERMANENTE`, and
-switching *to* `PERMANENTE` with textile configured is a blocking error with a one-click
-«Passer à l'acier», reasoned as *"would discard the Material Spec the user just built"*.
+switching _to_ `PERMANENTE` with textile configured is a blocking error with a one-click
+«Passer à l'acier», reasoned as _"would discard the Material Spec the user just built"_.
 
 **The app holds both Material Specs at once.** The family selector chooses which is active;
 the inactive one — overrides and terminations included — is retained, so flipping back
@@ -333,7 +333,7 @@ Three consequences:
 
 - **Refines ticket 04's fix**: «Passer à l'acier» restores a prior steel spec if one exists,
   defaults otherwise. An elaboration, not a contradiction.
-- **Retention is session state, not a URL guarantee.** Ticket 09 carries only the *active*
+- **Retention is session state, not a URL guarantee.** Ticket 09 carries only the _active_
   family's spec; a shared URL described one line, so landing on it and flipping gives
   defaults.
 - **A textile→steel flip can raise `invalid-input{field:"L0"}`.** §5.4's bound is
@@ -357,7 +357,7 @@ rule, a 90,74 kN datasheet is typed as **9074 daN**.
 **Strict global wins.** Rejected: carving breaking loads out to always-kN. That puts two
 force units on screen simultaneously — «MBF 90,7 kN» above «tension 437 daN» — and a user
 eyeballing whether 437 sits safely under 90,7 is wrong by a factor of 100. Worse error class
-than the typo, and *unavoidable*, whereas the typo has a clean escape: switch the selector to
+than the typo, and _unavoidable_, whereas the typo has a clean escape: switch the selector to
 kN and every field converts losslessly, including the one about to be typed. The remedy for
 wanting kN is the global control doing its job.
 
@@ -368,14 +368,14 @@ numbers — the comparison the user needs should not require reading four digits
 
 ### 9. What this hands forward
 
-| Ticket | Obligation created here |
-| --- | --- |
+| Ticket                                              | Obligation created here                                                                                                                                                                                                                                                        |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [08](./08-results-panel-and-provenance-warnings.md) | out-of-band `k` warning as ambient state, not an alarm · per-end allowable (`T_A` vs `η_A`, `T_B` vs `η_B`) · grips ⇒ Verdict non-conformity `[REGULATOR]` · overridden `MBF` enters the aggregate list · Verdict as ratio/% of allowable · optional `EA` sensitivity read-out |
-| [09](./09-url-state-schema-and-persistence.md) | active family's spec only · steel `(d, R₀, construction)` + three optional overrides · textile `(classe, MBL, μ, k)`, **no diamètre** · `η_A`, `η_B` |
-| [11](./11-validation-and-error-state-ux.md) | `invalid-input{field:"L0"}` reachable by family flip · stale-badge presentation · disabled-with-reason for HMPE knots |
-| [14](./14-first-run-scenario-and-defaults.md) | initial `d`, `R₀`, construction, `MBL`, `μ`, terminations · `k` defaults 22 / 1,5 / *blank* · polyester is unusable without a datasheet |
-| [10](./10-assemble-the-v1-build-spec.md) | carry ticket 04's obligation: `solveSpan`'s pre-check enforces §5.4's chord bound as `invalid-input{field:"L0"}` |
+| [09](./09-url-state-schema-and-persistence.md)      | active family's spec only · steel `(d, R₀, construction)` + three optional overrides · textile `(classe, MBL, μ, k)`, **no diamètre** · `η_A`, `η_B`                                                                                                                           |
+| [11](./11-validation-and-error-state-ux.md)         | `invalid-input{field:"L0"}` reachable by family flip · stale-badge presentation · disabled-with-reason for HMPE knots                                                                                                                                                          |
+| [14](./14-first-run-scenario-and-defaults.md)       | initial `d`, `R₀`, construction, `MBL`, `μ`, terminations · `k` defaults 22 / 1,5 / _blank_ · polyester is unusable without a datasheet                                                                                                                                        |
+| [10](./10-assemble-the-v1-build-spec.md)            | carry ticket 04's obligation: `solveSpan`'s pre-check enforces §5.4's chord bound as `invalid-input{field:"L0"}`                                                                                                                                                               |
 
 **Amended `docs/simulation-theory.md` §16** with a new gap entry: HMPE `k` is attested only
 at 10–30 % MBL while zip lines operate at ~0,5–7 % MBL, where the bedding-in toe puts the
-true secant `k` *below* 22. Distinct from §16-6, which is PA *above* the CE band.
+true secant `k` _below_ 22. Distinct from §16-6, which is PA _above_ the CE band.

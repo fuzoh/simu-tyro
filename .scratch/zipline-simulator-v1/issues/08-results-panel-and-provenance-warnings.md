@@ -4,7 +4,7 @@ Type: grilling
 Status: open
 Blocked by: — (04, 05 resolved)
 Map: [Zip-line simulator v1](../map.md)
-Reads: [ticket 04](./04-span-and-rigging-parameter-model.md) — Régime de sécurité is a *panel*
+Reads: [ticket 04](./04-span-and-rigging-parameter-model.md) — Régime de sécurité is a _panel_
 field with no default (this ticket owns the regimes' contents: `k`, `η_t`, provenance); the
 aggregate Unconfirmed-Defaults disclosure lives here; and the solve-dependent warnings
 (> 30 % MBL, flèche < 3 % de la portée) are this ticket's, not the form's.
@@ -35,7 +35,7 @@ Settle:
    labelled with its provenance. Decide the picker, the default, and how the unresolved
    ACCT conflict is presented rather than papered over.
 4. **The verdict itself.** `T_allow = η_t·MBF/k` (§10.1) — termination efficiency multiplies
-   MBF *before* the factor. Decide what pass/fail looks like, what the margin read-out is,
+   MBF _before_ the factor. Decide what pass/fail looks like, what the margin read-out is,
    and whether a near-miss gets its own state. Decide whether the WorkSafe two-criteria
    regime shows two verdicts or one combined.
 5. **Provenance UI.** The map's binding rule: `[PAYWALLED]`, `[CONVENTION]` and

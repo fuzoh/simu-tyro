@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 07 (05 resolved)
+Blocked by: — (05, 07 resolved)
 Map: [Zip-line simulator v1](../map.md)
 
 ## Question
@@ -19,7 +19,7 @@ Settle:
 
 1. **The scenario numbers.** Portée, dénivelé, hauteur d'ancrage A and B, the default
    Tightness Spec mode and its target value, and the default Material Spec. They must form a
-   *coherent, solvable, green-verdict* line — the first thing a user sees cannot be an error
+   _coherent, solvable, green-verdict_ line — the first thing a user sees cannot be an error
    state or a rupture warning.
 2. **Worked example.** Does a named reference scenario ship (a «charger un exemple» action),
    and if so which? Candidates with real provenance: the SSF Vercors 1109 m instrumented
