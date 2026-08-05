@@ -1,0 +1,121 @@
+# Zip-line simulator v1 — wayfinder map
+
+Label: `wayfinder:map`
+Effort slug: `zipline-simulator-v1`
+Tickets: `.scratch/zipline-simulator-v1/issues/`
+
+## Destination
+
+A **build-ready spec** for Scoutech v1: a single-page, fully offline, French-language
+zip-line simulator — parametric inputs on the left, live profile chart on the right, a
+slider that moves the rider quasi-statically along the line, and GPX terrain import with
+anchor placement on the imported profile. Physics scope is core statics plus safety
+verdict, exactly as fixed in `docs/simulation-theory.md` §4–§7, §10, §11.
+
+The map is done when every decision below the destination is resolved and the spec can be
+handed to `/implement` — no app code written along the way except throwaway prototypes.
+
+## Notes
+
+**Domain.** Zip-line (tyrolienne) statics for spans 50 m – ~2000 m. The physics is
+**already settled** in [docs/simulation-theory.md](../../docs/simulation-theory.md) —
+861 lines, consolidated from four French reference reports and two deep-research runs,
+with verified numerical fixtures (§15) cross-validated against MoorPy 1.3.0. Treat it as
+the contract. Never re-derive a formula and never invent a constant
+(`docs/conventions/simulation.md`). Vocabulary FR↔EN is fixed in §1 — use it.
+
+**Skills every session should consult.** `/grilling` and `/domain-modeling` by default;
+`/prototype` for the prototype tickets; `/research` for the research tickets.
+
+**Binding provenance rule** (from `docs/simulation-theory.md` §0.2 and
+`docs/conventions/simulation.md`): any coefficient tagged `[PAYWALLED]`, `[CONVENTION]`
+or `[UNVERIFIED:R1]` may appear in the UI only as a **labelled, configurable default
+carrying a warning** — never as a silent constant, never presented as normative. This is a
+UI design constraint, not just an engine one.
+
+**Stack constraints** (`AGENTS.md`). bun · TanStack Start (SSR, file-based router) ·
+React 19 · Tailwind v4 (CSS-vars theme, no JS config) · shadcn/ui on Base UI · Vitest 4 +
+jsdom. Never edit `src/routeTree.gen.ts` or hand-write `src/components/ui/**`. Gate on
+`bun run typecheck` and `bun run lint-type-aware`.
+
+**Never commit.** The agent does not make git commits in this repo.
+
+### Scope decisions fixed while charting
+
+These came out of the charting grill and are not up for re-litigation inside a ticket.
+
+| Decision | Value |
+| --- | --- |
+| Destination artifact | A spec plus ticket set, ready to build. Planning, not execution. |
+| Physics scope | Core statics (§4–§7) + ground clearance (§11) + safety verdict (§10). |
+| Rider slider | Position only, quasi-static. Slider = trolley material coordinate `s_D` (§6.2). No velocity, no time axis. |
+| Persistence | URL search params for shareable state + localStorage for the last session. GPX stays local. |
+| Families | Both — steel wire rope (A) and textile rope (B), gated by the §10.4 use-class rule (`PERMANENT` ⇒ steel only, hard validation). Separate code paths. |
+| Terrain baseline | Flat ground at anchor-base level before any GPX. Terrain is one concept with two sources. |
+| GPX elevation | Required. A file without `<ele>` is rejected with an error. No network calls — the app is genuinely offline. |
+| UI language | French UI, English code identifiers and comments (§1 vocabulary). No i18n framework; strings inline. |
+| Material data | Formula-derived with raw override. Steel: MBF/EA/mass from diameter, grade and construction via the EN 12385-4 K-factors (§13.1). Textile: `EA = k·MBL` with user-supplied `MBL` and `k` (§13.2). **Zero shipped product presets** — every product row in the references is compromised. |
+
+## Decisions so far
+
+<!-- one line per resolved ticket: gist + link -->
+
+- [GPX parsing in the browser — library or DOMParser?](./issues/01-gpx-parsing-in-the-browser.md)
+  — plain `DOMParser` plus a hand-written ~50-line mapper; no GPX library. `gpxparser` runs
+  `jsdom-global()` at import and would poison SSR; `gpx-parse` is dead and needs Node
+  builtins. `<ele>` is optional *per trackpoint* in both GPX schemas, and `DOMParser` never
+  throws on malformed XML — both facts force explicit validation.
+- [Profile chart rendering — surveying the options for an extreme aspect ratio](./issues/02-profile-chart-rendering-approach.md)
+  — hand-rolled SVG in React with `d3-shape` for paths and a hand-written affine scale per
+  axis; no charting library (every packaged option has an SSR wrinkle, and independent
+  mismatched x/y scales are the natural case for two plain functions). Vertical scale
+  auto-fits per render and is always disclosed with a live **"Éch. verticale ×N"** label
+  plus printed numeric read-outs. Runner-up `visx` primitives, recorded as the fallback.
+- [Engine API, execution model and module layout](./issues/03-engine-api-execution-model-and-module-layout.md)
+  — one `solveSpan(input)` with `loads: PointLoad[]` (empty = unloaded, since §6.1 keeps the
+  unknowns at `(H, V₀)` either way); §7 modes resolve to `L₀` in a `resolveL0` adapter above
+  it, making `L₀` first-class state. Results are scalars only — `SpanState` plus analytic
+  `sampleCable(state, n)`, never a stored polyline — so §11 clearance is a *reducer* over the
+  sweep and the solver stays terrain-free. Sweep precomputed (240 uniform steps + geometric
+  end tails, endpoints excluded, deterministic from `(L₀, n)`); the slider is an index lookup,
+  never a solve. Engine is **synchronous and pure forever**, with async confined to a
+  `useSweep` seam that stale-while-recomputing needs anyway; the worker question gets a
+  measurable 8 ms p95 criterion instead of an opinion, and terrain crosses as cloneable data
+  to keep that door open. Failures are a union of three real kinds — `invalid-input`,
+  `no-convergence`, `slack-limit` — because most of §5.4 is internal remedies that *succeed*,
+  and exceeding `MBF` is a safety verdict rather than a solve failure; ground contact surfaces
+  in clearance, and a partial sweep carries `coverage` so a green verdict can't lie. Layout is
+  `src/lib/sim/` by concept, with the A/B separation placed at `materials/steel.ts` vs
+  `materials/textile.ts` (no shared base) rather than duplicating the material-blind catenary.
+  Wrote [CONTEXT.md](../../CONTEXT.md) (app vocabulary) and the file/fixture layout section of
+  [docs/conventions/testing.md](../../docs/conventions/testing.md).
+
+## Not yet specified
+
+Fog: in scope, heading toward the destination, not yet sharp enough to ticket.
+
+- **First-run experience and default scenario.** What numbers are in the form before the
+  user touches anything, and whether a worked example ships. Needs the parameter model.
+- **Responsive and narrow-screen layout.** The left-params / right-chart split has no
+  obvious phone answer. Sharpens after the visualisation prototype exists to react to.
+
+## Out of scope
+
+Ruled beyond this destination. These never graduate; they would need the destination
+redrawn as a fresh effort.
+
+- **Intermediate supports / multi-span lines.** v1 is one span, anchor to anchor.
+- **Multiple simultaneous riders.** The §6.1 solver handles `n` point loads; the UI
+  exposes exactly one rider.
+- **Wind, lateral blow-out, 3-D.** Already out of v1 per `docs/simulation-theory.md` §8.4
+  — the model stays 2-D in the vertical plane. Confirmed here.
+- **Curved or winding GPX tracks, and any map view.** Straight-line tracks only; no
+  projection of a winding track onto a chord, no plan-view map.
+- **Rider dynamics, speed and braking** (§12). Follows from the position-only slider
+  decision. Rules out drag, trolley friction, eddy brakes and terminal velocity.
+- **Thermal change of state, creep, DAF and load combinations** (§8, §9). The engine
+  parameterises on `L₀`, so these can be added later as `ΔL₀` without redesign — but not
+  in this effort.
+- **Resolving the §16 gap register.** Buying paywalled standards, contacting SSF for the
+  Vercors dataset, re-pulling product datasheets. The provenance rule above is how v1
+  copes with the gaps instead.
