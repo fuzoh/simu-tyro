@@ -1,7 +1,7 @@
 # Profile visualisation prototype
 
 Type: prototype
-Status: open
+Status: claimed (wayfinder session 2026-08-05)
 Blocked by: — (02, 03 resolved)
 Map: [Zip-line simulator v1](../map.md)
 

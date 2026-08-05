@@ -113,6 +113,33 @@ These came out of the charting grill and are not up for re-litigation inside a t
   `invalid-input{field:"L0"}` rather than being re-derived in the UI. Régime de sécurité is a
   panel field with **no default**. Initial *scenario* values deliberately deferred.
 
+- [Material spec model — deriving MBF, EA and mass for steel and textile](./issues/05-material-spec-model.md)
+  — the two **Ligne** blocks, resting on one asymmetry: **steel derives from geometry, textile
+  transcribes from a datasheet**. Steel takes `(d, R₀, construction)` through the §13.1
+  K-factors to `MBF`/`EA`/`μ`, each independently overridable; `E_app = 115 GPa` and
+  `C = 0.4165` are pinned in popover prose, never fields, because they only ever appear as a
+  product and two knobs for one number is two ways to be wrong. Textile takes
+  `(classe, MBL, μ, k)` with `EA = k·MBL` as its only read-out — **diamètre dropped, no
+  consumer in v1 scope** — and polyester ships `k` blank-and-required because nobody published
+  it. Range-valued factors give **point values, never bands**: an interval would re-litigate
+  ticket 03, and `[5.53 ; 8.41] MN` is the union of two handbook ranges, not a confidence
+  interval. The session's key finding: **a zip line never enters §13.2's attested `k` band** —
+  0.6 % MBL standing, 6.3 % loaded, against a table measured at 10–30 % — so `k` is a plain
+  field whose out-of-band warning is *ambient state, not an alarm*; a band selector would
+  dress three extrapolations as a calibrated choice and auto-iteration would dress backwards
+  extrapolation as convergence. Terminations get **one picker per end** judged against `T_A`
+  and `T_B` separately (free — ticket 03 already reports both), under one inherited rule:
+  **defensible number ⇒ compute and let the Verdict judge** (grips solve, Verdict refuses on
+  `[REGULATOR]` grounds), **no number ⇒ disable with reason** (knots on HMPE *slip*, so no
+  `η_t` exists). Override is steel-only, per value, and survives a `d` change with a **stale
+  badge** rather than being cleared or silently kept — and because `MBF` is the one derived
+  value shipping `[STD-ATTESTED]`, overriding it *downgrades* provenance into ticket 08's
+  aggregate. Both Material Specs are **retained across a family flip** (ticket 04 already
+  ruled discarding one worth a blocking error), which makes textile→steel able to raise
+  `invalid-input{field:"L0"}` since `T_break/EA` is ≈ 0.013 steel vs ≈ 0.67 PA. `MBF` obeys
+  the global force unit strictly — a kN carve-out would put 90,7 kN beside 437 daN and invite
+  a 100× misread. Amended `docs/simulation-theory.md` §16 with gap **6b**.
+
 ## Not yet specified
 
 Fog: in scope, heading toward the destination, not yet sharp enough to ticket.
@@ -137,6 +164,11 @@ redrawn as a fresh effort.
 - **Thermal change of state, creep, DAF and load combinations** (§8, §9). The engine
   parameterises on `L₀`, so these can be added later as `ΔL₀` without redesign — but not
   in this effort.
+- **Product identity fields — rope/cable désignation, model name, manufacturer.** Ruled out
+  while resolving [Material spec model](./issues/05-material-spec-model.md): purely
+  decorative, no consumer in the v1 physics, and every such field still costs surface in
+  ticket 09's URL schema and ticket 14's defaults. Consistent with the map's zero-product-
+  presets decision — the app describes a rope by its numbers, not its name.
 - **Resolving the §16 gap register.** Buying paywalled standards, contacting SSF for the
   Vercors dataset, re-pulling product datasheets. The provenance rule above is how v1
   copes with the gaps instead.

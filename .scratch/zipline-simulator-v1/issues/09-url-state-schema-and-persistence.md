@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 05, 06 (04 resolved)
+Blocked by: 06 (04, 05 resolved)
 Map: [Zip-line simulator v1](../map.md)
 Reads: [ticket 04](./04-span-and-rigging-parameter-model.md) — the field table is the state to
 serialise, plus two display preferences that also persist: the force unit (daN/kN/kgf) and the

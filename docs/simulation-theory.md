@@ -833,6 +833,17 @@ Per `docs/conventions/simulation.md`: these stay open — no value gets invented
 
 6. PA (EN 1891) stiffness at highline working loads ≫ CE band; multi-point
    load–elongation curves (bilinear/cubic fit coefficients) [R2 B11].
+6b. **HMPE `k` is attested only *above* the operative band.** §13.2 quotes `k ≈ 22 @ 10 %
+   MBL` / `≈ 31 @ 30 % MBL`, but a zip line is strength-sized for shock and rescue, not
+   standing tension: a 200 m span on 100 kN-MBL HMPE with a 120 kg rider runs at **≈ 0.6 %
+   MBL standing and ≈ 6.3 % MBL loaded** (computed 2026-08-05, illustrative `μ = 0.075 kg/m`,
+   6 m target sag). Since the elongation rows (0.46 / 0.70 / 0.96 % at 10 / 20 / 30 % MBL)
+   put the bedding-in toe in the *first* 10 % MBL, the true secant `k` below 10 % MBL is
+   **lower than 22** — so `k = 22` over-stiffens the model at zip-line loads. Sub-10 % MBL
+   load–elongation data not found in open access. Distinct from item 6: that is PA *above*
+   its band, this is HMPE *below* its band. Engine copes by shipping `k` as an editable
+   field with a permanent out-of-band warning driven by the computed `%MBL`
+   (ticket 05 of `.scratch/zipline-simulator-v1/`).
 7. Real validation dataset: SSF/CVT Vercors numeric series (tension log, theodolite sag
    points) — contact SSF; R1's table is unusable (ledger #7). Also GHTyro's built-in
    "Pierre Rias" dataset as a cross-solver case [R2 §6].

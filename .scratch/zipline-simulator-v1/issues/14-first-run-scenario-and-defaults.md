@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 05, 07
+Blocked by: 07 (05 resolved)
 Map: [Zip-line simulator v1](../map.md)
 
 ## Question
