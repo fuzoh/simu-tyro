@@ -4,6 +4,9 @@ Type: grilling
 Status: open
 Blocked by: 08
 Map: [Zip-line simulator v1](../map.md)
+Reads: [ticket 04](./04-span-and-rigging-parameter-model.md) §7 — the two-tier split is fixed
+(form owns non-physical checks, engine owns physics), including which rules land in which tier.
+This ticket owns only how each state *renders*, plus the §10.4 blocking-error path.
 
 ## Question
 

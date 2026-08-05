@@ -2,7 +2,7 @@
 
 Type: prototype
 Status: open
-Blocked by: 02, 03
+Blocked by: — (02, 03 resolved)
 Map: [Zip-line simulator v1](../map.md)
 
 ## Question

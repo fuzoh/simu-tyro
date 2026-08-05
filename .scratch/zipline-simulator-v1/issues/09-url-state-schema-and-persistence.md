@@ -2,8 +2,12 @@
 
 Type: grilling
 Status: open
-Blocked by: 04, 05, 06
+Blocked by: 05, 06 (04 resolved)
 Map: [Zip-line simulator v1](../map.md)
+Reads: [ticket 04](./04-span-and-rigging-parameter-model.md) — the field table is the state to
+serialise, plus two display preferences that also persist: the force unit (daN/kN/kgf) and the
+active Tightness Spec mode. Note that `L`/`h` are *inputs* in manual mode and *derived* in GPX
+mode, so what the URL carries differs by terrain source.
 
 ## Question
 

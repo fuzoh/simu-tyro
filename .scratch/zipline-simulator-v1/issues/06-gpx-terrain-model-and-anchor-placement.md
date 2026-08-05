@@ -2,8 +2,11 @@
 
 Type: grilling
 Status: open
-Blocked by: — (01 resolved)
+Blocked by: — (01, 04 resolved)
 Map: [Zip-line simulator v1](../map.md)
+Reads: [ticket 04](./04-span-and-rigging-parameter-model.md) §1 — anchors are placed as
+(station, height above profile), `L`/`h` become read-outs, and manual terrain already emits
+the 2-point `profile` case.
 
 ## Question
 

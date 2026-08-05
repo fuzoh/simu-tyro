@@ -89,13 +89,34 @@ These came out of the charting grill and are not up for re-litigation inside a t
   `materials/textile.ts` (no shared base) rather than duplicating the material-blind catenary.
   Wrote [CONTEXT.md](../../CONTEXT.md) (app vocabulary) and the file/fixture layout section of
   [docs/conventions/testing.md](../../docs/conventions/testing.md).
+- [Span and rigging parameter model, and the three parameterisation modes](./issues/04-span-and-rigging-parameter-model.md)
+  — the full field table (label, unit, hard range, warning threshold) in five groups: Usage
+  (type d'installation, régime de sécurité), Géométrie, Ligne, Tension de la ligne, Passager,
+  plus read-only **Valeurs déduites**. Manual mode types `L` and `h` **directly** while GPX mode
+  places anchors as (station, height above profile) with `L`/`h` as read-outs — two framings
+  deliberately, because `solveSpan` wants exactly `(L, h)` and forcing the GPX framing onto
+  manual mode would make every metre of dénivelé come from tower height. Manual ground is the
+  **straight line between the two anchor bases** from two hauteur-d'ancrage fields, so §11
+  clearance is live from first launch; it emits the 2-point case of ticket 03's existing
+  `profile` terrain, needing no engine change — but it **amended CONTEXT.md's Terrain entry**
+  away from "flat baseline". Tightness Spec is a segmented control with exactly one editable
+  field and the other two as deduced read-outs (three editable fields with a driver radio
+  rejected: every keystroke can flip the model's meaning). §10.4 shows textile **disabled with
+  its reason** under `PERMANENTE`, and the switch path is a blocking error with a one-click fix,
+  never a silent auto-switch that would discard the Material Spec. Forces get a **global,
+  persisted unit selector** (daN default / kN / kgf) that **converts the quantity** on switch —
+  provably physics-neutral, which is what kills the 10× input-error class; `G = 9.81` fixed and
+  unexposed, `KGF = 9.80665`, the 0.03 % gap disclosed. Unconfirmed Defaults carry a «non
+  confirmé» chip with the provenance in a popover, and editing one flips the chip but never
+  clears the aggregate entry. Validation splits in **two tiers with one source of truth each**:
+  the form checks only what needs no physics, and §5.4's chord bound stays in the engine as
+  `invalid-input{field:"L0"}` rather than being re-derived in the UI. Régime de sécurité is a
+  panel field with **no default**. Initial *scenario* values deliberately deferred.
 
 ## Not yet specified
 
 Fog: in scope, heading toward the destination, not yet sharp enough to ticket.
 
-- **First-run experience and default scenario.** What numbers are in the form before the
-  user touches anything, and whether a worked example ships. Needs the parameter model.
 - **Responsive and narrow-screen layout.** The left-params / right-chart split has no
   obvious phone answer. Sharpens after the visualisation prototype exists to react to.
 

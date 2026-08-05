@@ -2,7 +2,7 @@
 
 Type: task
 Status: open
-Blocked by: 04, 05, 06, 07, 08, 09, 11, 12, 13 (03 resolved)
+Blocked by: 05, 06, 07, 08, 09, 11, 12, 13, 14 (03, 04 resolved)
 Map: [Zip-line simulator v1](../map.md)
 
 ## Question

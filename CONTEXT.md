@@ -30,9 +30,15 @@ textile are separate specs, never variants of one.
 _Avoid_: cable spec, rope config, product
 
 **Terrain**:
-The ground beneath the line. One concept with two sources: a flat baseline at anchor-base
-level, or a profile imported from a GPX track. The simulation never distinguishes them.
+The ground beneath the line. One concept with two sources: a straight ground line joining the
+two anchor bases, or a profile imported from a GPX track. The simulation never distinguishes
+them — the straight line is just the two-point case.
 _Avoid_: ground profile, elevation data, topography
+
+**Anchor Height**:
+How far an anchor stands above the ground beneath it. Feeds the Terrain only, never the
+statics — the solve takes span and elevation difference, which are measured anchor to anchor.
+_Avoid_: pole height, tower height, offset
 
 ### What the simulation produces
 

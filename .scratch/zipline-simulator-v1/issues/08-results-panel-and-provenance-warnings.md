@@ -2,8 +2,12 @@
 
 Type: grilling
 Status: open
-Blocked by: 04, 05
+Blocked by: 05 (04 resolved)
 Map: [Zip-line simulator v1](../map.md)
+Reads: [ticket 04](./04-span-and-rigging-parameter-model.md) — Régime de sécurité is a *panel*
+field with no default (this ticket owns the regimes' contents: `k`, `η_t`, provenance); the
+aggregate Unconfirmed-Defaults disclosure lives here; and the solve-dependent warnings
+(> 30 % MBL, flèche < 3 % de la portée) are this ticket's, not the form's.
 
 ## Question
 
