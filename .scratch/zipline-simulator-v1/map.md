@@ -8,9 +8,10 @@ Tickets: `.scratch/zipline-simulator-v1/issues/`
 
 A **build-ready spec** for Scoutech v1: a single-page, fully offline, French-language
 zip-line simulator — parametric inputs on the left, live profile chart on the right, a
-slider that moves the rider quasi-statically along the line, and GPX terrain import with
-anchor placement on the imported profile. Physics scope is core statics plus safety
-verdict, exactly as fixed in `docs/simulation-theory.md` §4–§7, §10, §11.
+slider that moves the rider quasi-statically along the line, and **profile-CSV terrain
+import** (`Distance;Altitude`, the Swiss geoportal profile export) with anchor placement on
+the imported profile. Physics scope is core statics plus safety verdict, exactly as fixed in
+`docs/simulation-theory.md` §4–§7, §10, §11.
 
 The map is done when every decision below the destination is resolved and the spec can be
 handed to `/implement` — no app code written along the way except throwaway prototypes.
@@ -49,10 +50,10 @@ These came out of the charting grill and are not up for re-litigation inside a t
 | Destination artifact | A spec plus ticket set, ready to build. Planning, not execution.                                                                                                                                                                                                                         |
 | Physics scope        | Core statics (§4–§7) + ground clearance (§11) + safety verdict (§10).                                                                                                                                                                                                                    |
 | Rider slider         | Position only, quasi-static. Slider = trolley material coordinate `s_D` (§6.2). No velocity, no time axis.                                                                                                                                                                               |
-| Persistence          | URL search params for shareable state + localStorage for the last session. GPX stays local.                                                                                                                                                                                              |
+| Persistence          | URL search params for shareable state + localStorage for the last session. The imported trace stays local.                                                                                                                                                                                |
 | Families             | Both — steel wire rope (A) and textile rope (B), gated by the §10.4 use-class rule (`PERMANENT` ⇒ steel only, hard validation). Separate code paths.                                                                                                                                     |
-| Terrain baseline     | Flat ground at anchor-base level before any GPX. Terrain is one concept with two sources.                                                                                                                                                                                                |
-| GPX elevation        | Required. A file without `<ele>` is rejected with an error. No network calls — the app is genuinely offline.                                                                                                                                                                             |
+| Terrain baseline     | A straight ground line between the two anchor bases before any import (amended by ticket 04). Terrain is one concept with two sources.                                                                                                                                                   |
+| Terrain import       | **Profile CSV** — `Distance;Altitude` plus optional coordinates, the Swiss geoportal profile export. Elevation is required by construction: every row carries it. No network calls — the app is genuinely offline. **Amended 2026-08-05, was GPX** (ticket 06).                            |
 | UI language          | French UI, English code identifiers and comments (§1 vocabulary). No i18n framework; strings inline.                                                                                                                                                                                     |
 | Material data        | Formula-derived with raw override. Steel: MBF/EA/mass from diameter, grade and construction via the EN 12385-4 K-factors (§13.1). Textile: `EA = k·MBL` with user-supplied `MBL` and `k` (§13.2). **Zero shipped product presets** — every product row in the references is compromised. |
 
@@ -61,7 +62,12 @@ These came out of the charting grill and are not up for re-litigation inside a t
 <!-- one line per resolved ticket: gist + link -->
 
 - [GPX parsing in the browser — library or DOMParser?](./issues/01-gpx-parsing-in-the-browser.md)
-  — plain `DOMParser` plus a hand-written ~50-line mapper; no GPX library. `gpxparser` runs
+  — ⚠ **SUPERSEDED 2026-08-05** by the CSV pivot in
+  [CSV profile import and anchor placement](./issues/06-csv-profile-import-and-anchor-placement.md).
+  GPX is now out of scope for v1, so nothing below gets built. Kept because the route was
+  walked: the survey is what made the pivot cheap, and it is the reference if GPX ever returns
+  as a fresh effort. Its answer was —
+  plain `DOMParser` plus a hand-written ~50-line mapper; no GPX library. `gpxparser` runs
   `jsdom-global()` at import and would poison SSR; `gpx-parse` is dead and needs Node
   builtins. `<ele>` is optional _per trackpoint_ in both GPX schemas, and `DOMParser` never
   throws on malformed XML — both facts force explicit validation.
@@ -169,6 +175,45 @@ These came out of the charting grill and are not up for re-litigation inside a t
   steps against the 8 ms criterion, and dragging is vsync-bound (frame p50 16,7 ms) — ticket 12
   is now arithmetic.
 
+- [CSV profile import and anchor placement](./issues/06-csv-profile-import-and-anchor-placement.md)
+  — **the terrain source changed here**: GPX out, profile CSV in
+  (`Distance;Altitude` + optional coordinates, the geoportal export), so this ticket was
+  retitled and its GPX question set preserved as superseded. Measuring the two real traces
+  first is what settled it, and three of the original sub-questions dissolved on contact with
+  the facts. **`Distance` is horizontal** — 183.4 reported against a 183.42 planimetric chord
+  and a 263.9 m 3-D surface length, so reading it as surface distance would have inflated
+  every `L` by 44 % on broken ground. The traces are **straight to 7–9 mm** because they are
+  *drawn* lines DEM-sampled, not GPS recordings, which kills the haversine-vs-chord question
+  and the smoothing question outright. But the exporter emits a **fixed 200 points, not a fixed
+  pitch**, so spacing is `length/199` — 0.92 m at 183 m, **7.5 m at 1500 m** — coarsest exactly
+  where spans are longest; resampling to a uniform grid was rejected for inventing zero terrain
+  knowledge while making a coarse import indistinguishable from a fine one, so the app **uses
+  the file's own samples and discloses the measured spacing**, warning above ~5 m. Contract is
+  **columns by name** (min `Distance` + `Altitude`, delimiter and decimal mark auto-detected,
+  **no positional fallback** — that alone makes a swapped `Altitude;Distance` file
+  unrepresentable). The profile is stored **immutably in file coordinates** and `Terrain` is
+  derived at one seam (subtract `d_A`, slice to `[0, L]`, **insert interpolated endpoints** so
+  `zGroundAt` never extrapolates where the anchors are) — which keeps ticket 03's type
+  unchanged and the original file recoverable. Anchors are four fields plus draggable markers,
+  reusing ticket 07's snap-on-drag / exact-on-type rule and ticket 04's existing
+  `hauteur d'ancrage` fields; **import spans the whole trace** and manual `L`/`h` are retained
+  and restored on removal (ticket 05's retain-across-flip rule). Both charts share **one x
+  domain** — span + 5 % margin — because ticket 07's scrub track *is* the clearance curve
+  aligned under the profile, so "show the whole trace" would have broken the mechanism the
+  layout exists for; the clearance curve being undefined outside `[0, L]` marks the span for
+  free. Degenerate placements **block with a one-click « Inverser A et B »** rather than
+  auto-swapping, which would flip `h`'s sign — and a structural catch: ticket 04 hung its hard
+  ranges on *fields*, but `L`/`h` are derived here, so those checks must run on derived values
+  and attribute the error to a station field or `L = 0` returns
+  `invalid-input{field:"L"}` pointing at something uneditable. Malformed rows **reject the whole
+  file with a line number** (a skipped row is a lost bump). Two findings that outlive the
+  ticket: vertex-only clearance evaluation is safe because the convexity miss is the cable's own
+  sag across one segment, **≈5 mm** at 1500 m — so nobody should densify that scan and spend the
+  8 ms budget on millimetres; and the straightness check the original ticket called unavailable
+  is **one pass over `Easting`/`Northing`**, catching the single modelling error the format
+  permits (a bent polyline, where `Distance` follows the bend while the line is the chord).
+  Amended CONTEXT.md's `Terrain` entry and added Trace / Station / Anchor Placement.
+
 ## Not yet specified
 
 Fog: in scope, heading toward the destination, not yet sharp enough to ticket.
@@ -178,11 +223,26 @@ Fog: in scope, heading toward the destination, not yet sharp enough to ticket.
 once [Profile visualisation prototype](./issues/07-profile-visualisation-prototype.md) fixed
 the spine there was something to reflow.
 
+The GPX→CSV pivot added no fog: it *removed* questions (resampling, smoothing, chord
+projection, partial elevation) rather than opening new ones, and the single question it did
+raise was sharp enough to ticket immediately —
+[Profile CSV export — can it exceed 200 points?](./issues/16-profile-export-point-count.md).
+
 ## Out of scope
 
 Ruled beyond this destination. These never graduate; they would need the destination
 redrawn as a fresh effort.
 
+- **GPX import.** Ruled out while resolving
+  [CSV profile import and anchor placement](./issues/06-csv-profile-import-and-anchor-placement.md):
+  v1 imports profile CSV instead, so GPX is deferred past this destination rather than
+  unspecified. It would need the destination redrawn as a fresh effort — at which point
+  [GPX parsing in the browser](./issues/01-gpx-parsing-in-the-browser.md), now superseded, is
+  the reference to start from. Note the two formats differ in kind, not just syntax: a GPX
+  track is *recorded* (noisy, irregularly spaced, curved, elevation optional per point) where a
+  profile CSV is *drawn and DEM-sampled* (straight, monotonic, elevation always present) — so a
+  GPX path would resurrect the resampling, smoothing and chord-projection questions this ticket
+  got to delete, not merely add a second parser.
 - **Intermediate supports / multi-span lines.** v1 is one span, anchor to anchor.
 - **Multiple simultaneous riders.** The §6.1 solver handles `n` point loads; the UI
   exposes exactly one rider.

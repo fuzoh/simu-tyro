@@ -31,9 +31,27 @@ _Avoid_: cable spec, rope config, product
 
 **Terrain**:
 The ground beneath the line. One concept with two sources: a straight ground line joining the
-two anchor bases, or a profile imported from a GPX track. The simulation never distinguishes
+two anchor bases, or a profile read from an imported Trace. The simulation never distinguishes
 them — the straight line is just the two-point case.
 _Avoid_: ground profile, elevation data, topography
+
+**Trace**:
+An imported profile file — distance and altitude columns sampled along a line drawn on a map.
+The Trace is held exactly as imported, in its own coordinates, and is never modified: Terrain
+is derived from it. Never resampled or smoothed, so its sample spacing is a disclosed property.
+_Avoid_: track, GPX, elevation profile, path
+
+**Station**:
+A distance along the Trace, measured from the Trace's own start. Distinct from `x`, which is
+horizontal distance from Anchor A — converting between them is the one translation the import
+performs.
+_Avoid_: offset, position, distance along track
+
+**Anchor Placement**:
+Where an anchor sits on a Trace: a Station plus an Anchor Height above the profile at that
+Station. The two Placements are what the user edits once a Trace is loaded; Span and Elevation
+Difference are then derived, not entered.
+_Avoid_: anchor position, pin, marker
 
 **Anchor Height**:
 How far an anchor stands above the ground beneath it. Feeds the Terrain only, never the

@@ -53,3 +53,21 @@ plot area** (ticket 07 §1 — occlusion), vertical exaggeration stays **auto-fi
 that proposes dropping a chart.
 
 Tailwind v4 conventions: `docs/conventions/ui.md`. No new dependency for layout.
+
+**Inherited from [CSV profile import](./06-csv-profile-import-and-anchor-placement.md)** — the
+two charts share **one x domain** (span + 5 % margin, clamped to the trace extent), because
+ticket 07's scrub track *is* the clearance curve aligned under the profile. That makes the shared
+domain a hard constraint on any reflow proposed here, alongside ticket 07 §7's: a layout that
+stacks the two charts must keep their x axes **pixel-aligned**, and one that puts them
+side by side breaks the mechanism outright.
+
+Two smaller additions to the reflow surface:
+
+- **Four more fields** in the Géométrie group when a trace is loaded — station A/B alongside the
+  existing `hauteur d'ancrage` A/B — plus `L`, `h` and both base altitudes moving into
+  **Valeurs déduites**. The panel is denser in imported mode than in manual mode, so whichever
+  narrow-screen treatment is chosen has to hold the denser case.
+- **Draggable anchor markers on the profile chart**, in addition to ticket 07's rider marker.
+  Three drag targets on one chart is a touch-target question at narrow widths, and the anchor
+  markers sit at the domain's edges where they are most likely to collide with axis labels or the
+  viewport boundary.

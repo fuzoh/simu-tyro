@@ -38,9 +38,18 @@ the parse path, plus the failure taxonomy the app will need to render.
 
 ## Context
 
-Consumed by [GPX terrain model and anchor placement](./06-gpx-terrain-model-and-anchor-placement.md),
+Consumed by [CSV profile import and anchor placement](./06-csv-profile-import-and-anchor-placement.md),
 which decides how these trackpoints become `z_ground(x)`. Stay out of that question — this
 ticket ends at a validated array of trackpoints.
+
+> ⚠ **SUPERSEDED 2026-08-05.** That consumer pivoted from GPX to profile CSV, and **GPX is now
+> out of scope for v1** (see the map). Nothing in this ticket gets built: v1 contains no
+> `DOMParser`, no GPX mapper and no `parsererror` check. It is kept because the route was walked
+> — the survey is what made the pivot cheap — and because it is the reference to start from if
+> GPX ever returns as a fresh effort. Two of its findings did carry over in spirit rather than in
+> code: absence must never collapse to `0` (the CSV parser's `Number.isFinite` guard per cell),
+> and a parser that does not throw is not a parser that succeeded (the CSV taxonomy is likewise
+> all explicit checks).
 
 Constraints: bun, Vite 8, TypeScript 6 with `verbatimModuleSyntax`, no backend, no network
 at runtime.
@@ -96,7 +105,9 @@ must render.
 - **Reject on *any* point missing `<ele>`, or only when *all* points lack it?** Neither
   this ticket nor the map settles it, and the code sketch provisionally takes the strict
   any-point reading. This is a real decision and it is handed to
-  [GPX terrain model and anchor placement](./06-gpx-terrain-model-and-anchor-placement.md).
+  [ticket 06](./06-csv-profile-import-and-anchor-placement.md). **Moot as of the CSV pivot** —
+  every row of a profile CSV carries an altitude, so the partial-elevation case has no analogue;
+  ticket 06 §8 replaced it with a row-level parse policy (reject the whole file, name the line).
 - No measured parse time for a large (~20 MB) GPX.
 - No real sample `.gpx` was obtained from Garmin, Strava, Komoot or IGN — vendor
   documentation only, no inspected files. IGN's own GPX export documentation: not found.

@@ -2,12 +2,12 @@
 
 Type: grilling
 Status: open
-Blocked by: 06 (04, 05 resolved)
+Blocked by: — (04, 05, 06 resolved)
 Map: [Zip-line simulator v1](../map.md)
 Reads: [ticket 04](./04-span-and-rigging-parameter-model.md) — the field table is the state to
 serialise, plus two display preferences that also persist: the force unit (daN/kN/kgf) and the
-active Tightness Spec mode. Note that `L`/`h` are _inputs_ in manual mode and _derived_ in GPX
-mode, so what the URL carries differs by terrain source.
+active Tightness Spec mode. Note that `L`/`h` are _inputs_ in manual mode and _derived_ in
+imported mode, so what the URL carries differs by terrain source.
 
 ## Question
 
@@ -15,7 +15,7 @@ What exactly goes in the URL, what goes in localStorage, and what happens to a s
 whose terrain came from a file on someone else's disk?
 
 The map fixes the approach — URL search params for shareable state, localStorage for the
-last session, GPX stays local. This ticket designs it.
+last session, the imported trace stays local. This ticket designs it.
 
 Settle:
 
@@ -33,15 +33,19 @@ Settle:
 3. **Schema versioning.** A shared link outlives the schema that made it. Decide whether a
    version key ships in v1 and what the upgrade path looks like, or explicitly accept
    breakage and say so.
-4. **GPX and the URL.** A track is far too big for a query string, so a shared link
-   necessarily loses the terrain. Decide the behaviour: does the link carry the anchor
-   _placements_ and fall back to flat ground, or does it refuse to encode a GPX-derived
-   geometry at all? Decide what the recipient sees — silently different terrain is the worst
-   answer available.
+4. **The trace and the URL.** **Ticket 06 measured it: 10.4 KB / 200 rows**, so a trace cannot
+   ride in a search param — a shared link necessarily loses the terrain unless something else
+   carries it. Decide the behaviour: does the link carry the anchor _placements_ and fall back
+   to the straight anchor-base ground line, does it embed the trace compressed, or does it
+   refuse to encode an import-derived geometry at all? Decide what the recipient sees —
+   silently different terrain is the worst answer available, and it is worse here than it looks:
+   ticket 06 makes `L` and `h` *derived* from the trace, so losing the terrain silently changes
+   the span itself, not just the ground under it.
 5. **localStorage.** What is stored, under what key, and how it interacts with the URL when
    both are present. Precedence matters: a user clicking a shared link should see the link's
-   scenario, not their own last session. Decide whether the GPX track itself is cached
-   there, and how big a track is allowed to be before that is a bad idea.
+   scenario, not their own last session. Decide whether the trace itself is cached there
+   (10.4 KB is trivially within quota — the question is staleness and privacy, not size), and
+   how big a trace is allowed to be before that changes.
 6. **The write side.** When does the URL update — on every keystroke, on blur, debounced?
    Every keystroke pollutes browser history; debounced risks a stale link when the user
    copies the address bar. Decide, including whether updates replace or push history
@@ -54,5 +58,20 @@ Read `docs/conventions/routing.md` — TanStack Start with SSR and file-based ro
 committing to a design; do not rely on remembered API shapes.
 
 Depends on the parameter and material tickets for the field list, and on
-[GPX terrain model and anchor placement](./06-gpx-terrain-model-and-anchor-placement.md)
+[CSV profile import and anchor placement](./06-csv-profile-import-and-anchor-placement.md)
 for how a placement is expressed once terrain exists.
+
+**Inherited from ticket 06** (§3, §9) — the state shape is already fixed, and it was chosen
+partly to keep this ticket's options open:
+
+```ts
+profile = { d: Float64Array, z: Float64Array }   // file coordinates, immutable
+anchorA = { station, height }
+anchorB = { station, height }
+// L, h and the engine's Terrain are all derived — never stored
+```
+
+Because the profile is kept in **file coordinates** rather than translated, all three options
+in sub-question 4 remain available: the original bytes are always recoverable, so the trace can
+be re-serialised, hashed for a reference, or dropped without corrupting anything. Had the
+import translated and sliced eagerly, only the lossy option would have survived.

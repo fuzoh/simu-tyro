@@ -2,7 +2,7 @@
 
 Type: task
 Status: open
-Blocked by: 06, 08, 09, 11, 12, 13, 14, 15 (03, 04, 05, 07 resolved)
+Blocked by: 08, 09, 11, 12, 13, 14, 15, 16 (03, 04, 05, 06, 07 resolved)
 Map: [Zip-line simulator v1](../map.md)
 
 ## Question
@@ -23,8 +23,11 @@ The spec must carry:
    rules, merged from
    [Span and rigging parameter model](./04-span-and-rigging-parameter-model.md) and
    [Material spec model](./05-material-spec-model.md).
-4. The terrain and GPX pipeline from
-   [GPX terrain model and anchor placement](./06-gpx-terrain-model-and-anchor-placement.md).
+4. The terrain and CSV import pipeline from
+   [CSV profile import and anchor placement](./06-csv-profile-import-and-anchor-placement.md).
+   Note the terrain source changed mid-effort — **GPX is out of scope** and
+   [ticket 01](./01-gpx-parsing-in-the-browser.md) is superseded, so the spec must describe the
+   CSV path only and must not inherit anything from that research.
 5. The visualisation spec, with the prototype linked as the reference artifact, from
    [Profile visualisation prototype](./07-profile-visualisation-prototype.md).
 6. The outputs, safety verdict and provenance mechanism from
@@ -41,8 +44,10 @@ Also, while assembling: update `CONTEXT.md` with the app-layer ubiquitous langua
 produced (`docs/simulation-theory.md` §1 covers the physics vocabulary; the app-layer terms
 invented across these tickets do not live anywhere yet), and offer an ADR only where the
 `/domain-modeling` bar is met — hard to reverse, surprising without context, and the result
-of a genuine trade-off. The engine execution model and the GPX terrain model are the two
-plausible candidates.
+of a genuine trade-off. The engine execution model and the terrain model are the two plausible
+candidates — and for terrain the trade-off worth recording is *use the file's own samples and
+disclose the spacing* over *resample to a uniform grid*, which is the kind of decision that looks
+arbitrary later and gets "fixed" by someone who does not know it was deliberate.
 
 Finally, sweep the map's **Not yet specified** section. Anything still fogged when
 everything else has resolved either graduates into a ticket now or is recorded in the spec

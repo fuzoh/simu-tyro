@@ -47,3 +47,23 @@ Already fixed by [ticket 04](./04-span-and-rigging-parameter-model.md) and **not
 
 Read the field table in ticket 04 §2 before choosing values, and honour the §3 validity range
 (50–2000 m) so the default scenario raises no warning of its own.
+
+**Inherited from [CSV profile import](./06-csv-profile-import-and-anchor-placement.md)** — the
+first run has **no imported trace**, so the opening state is manual geometry: typed `L` and `h`
+plus the two `hauteur d'ancrage` fields, with terrain as the straight line between the anchor
+bases. Two consequences for the scenario chosen here:
+
+- **Garde au sol must be meaningful on first launch.** Ticket 04 made manual terrain a real
+  2-point profile precisely so §11 clearance is live before any import — so the default
+  `hauteur d'ancrage` pair has to produce a clearance figure worth looking at. A scenario whose
+  clearance is either comfortably huge or already violated wastes the app's central read-out on
+  first contact.
+- **The default `h` and the anchor heights interact.** `h` is typed directly in manual mode
+  (ticket 04 rejected deriving it from tower heights, since that would make every metre of
+  dénivelé come from a tower), so the two are independent inputs that jointly decide where the
+  ground sits relative to the cable. Pick them together, not separately.
+
+Ticket 06's example traces (`docs/references/example-profile-trace1.csv`, 183 m with a 68 m
+mid-span dip; `…-trace2.csv`, 224 m) are realistic geometry to sanity-check the chosen defaults
+against — a default scenario that looks sensible but that no real trace resembles would be a
+poor first impression.

@@ -237,7 +237,7 @@ slider is an index lookup plus one `sampleCable(200)` and a path string, never a
 | [11 Validation UX](./11-validation-and-error-state-ux.md) | The verdict banner is where clearance failure speaks; a failed *solve* is a different state and must not reuse it. `coverage < 100 %` has to reach that same banner area. |
 | [12 Worker decision](./12-sweep-performance-and-worker-decision.md) | §10's table — that ticket is now arithmetic plus recording the coarse-live/fine-on-release warning. |
 | [14 First-run scenario](./14-first-run-scenario-and-defaults.md) | The seven prototype scenarios are illustrative, never defaults. But the fabricated failing case shows a first-run scenario must not be one where `h_min < 0`, and ×1,2…×4,7 is the auto-fit visual budget any default should land inside. |
-| [06 GPX terrain](./06-gpx-terrain-model-and-anchor-placement.md) | Terrain is consumed as `{ xs, zs }`, sampled 60× per sweep step through `zGroundAt`'s binary search — so a 3000-point GPX profile is not a performance problem. |
+| [06 CSV terrain](./06-csv-profile-import-and-anchor-placement.md) | Terrain is consumed as `{ xs, zs }`, sampled 60× per sweep step through `zGroundAt`'s binary search — so even a 3000-point profile is not a performance problem. *Resolved: the real export is 200 points, an order of magnitude inside that budget — and ticket 06 inherited this chart's snap-on-drag / exact-on-type rule for anchor stations, plus its scrub-track alignment as a hard constraint on the shared x domain.* |
 
 ### 12. The prototype itself
 

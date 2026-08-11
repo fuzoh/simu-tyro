@@ -50,3 +50,44 @@ user at all, or are they diagnostics for a dev-only panel?
 Failure taxonomy: ticket 03's answer, §6. Theory §4.3, §5.4, §10.4, §11.
 The provenance-warning language lands in the results panel — ticket 08 — so match its tone
 rather than inventing a second warning idiom.
+
+**Inherited from [CSV profile import](./06-csv-profile-import-and-anchor-placement.md)** —
+three things, one of them a structural problem this ticket has to solve.
+
+**1. The derived-value attribution problem (§7).** Ticket 04 hung every hard range on a
+**field**: `L > 0` finite, `h` finite. But in imported mode `L` and `h` are *derived read-outs*
+— so those checks have nothing to attach to, and yet they must still run. They have to be
+evaluated on the derived values and **attributed back to whichever station field can fix them**.
+Concretely: `station B = station A` yields `L = 0`, reaches `solveSpan`, and returns
+`invalid-input{field:"L"}` pointing at a field the user cannot edit. Ticket 04's two-tier split
+(form checks what needs no physics; the engine owns §5.4's chord bound) survives intact — but
+tier one now needs a notion of *which input is culpable for a derived value*, which it did not
+before. This generalises past terrain: any read-out under **Valeurs déduites** can go
+out of range while every editable field is individually valid.
+
+**2. Blocking errors carrying a one-click fix.** Ticket 06 chose
+`⛔ L doit être > 0 — l'ancrage B est avant l'ancrage A.  [ Inverser A et B ]` over silently
+auto-normalising, because auto-swapping A and B flips `h`'s sign — the same
+no-silent-reinterpretation rule ticket 04 applied at the §10.4 family gate. Ticket 04 also gave
+the family switch a one-click fix. That is now **two instances**, so this ticket should decide
+whether a fix-action is a general affordance of the error component or an ad-hoc addition per
+error.
+
+**3. The import failure taxonomy**, which needs a home in whatever error surface this ticket
+designs — it is a file-level failure, so it belongs to neither the form nor the engine:
+
+| Kind | French copy |
+| --- | --- |
+| `colonnes-manquantes` | « Colonnes Distance et Altitude introuvables. » |
+| `aucune-donnée` | « Le fichier ne contient aucune ligne de données. » |
+| `trop-peu-de-points` | « Au moins 2 points sont nécessaires. » |
+| `valeur-non-numérique` | « Valeur illisible ligne 47, colonne Altitude. » |
+| `distance-non-croissante` | « La distance décroît à la ligne 112. » |
+| `distance-dupliquée` | « Deux altitudes à la même distance, ligne 88. » |
+| `lecture-impossible` | « Impossible de lire le fichier. » |
+| *(non-blocking)* | « ⚠ Distances peut-être en km plutôt qu'en mètres ? » |
+
+Also settled there and not re-openable: a typed station outside the trace **blocks**, while a
+dragged marker **clamps** — so the same constraint has a blocking presentation on one input path
+and no error state at all on the other. Worth checking that this ticket's error model can express
+that asymmetry, since ticket 07 established the same split for rider position.

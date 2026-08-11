@@ -61,3 +61,35 @@ and 19, and §16.
 Depends on [Span and rigging parameter model](./04-span-and-rigging-parameter-model.md) and
 [Material spec model](./05-material-spec-model.md) — the verdict consumes `MBF`/`MBL`, `η_t`
 and the installation type those two define.
+
+**Inherited from [CSV profile import](./06-csv-profile-import-and-anchor-placement.md)** — a
+**terrain provenance block** to place in this panel. It is provenance in the map's exact sense:
+the imported ground is only as trustworthy as its sampling, and the panel is where that gets
+disclosed rather than assumed.
+
+```
+Profil importé · 200 points · pas max 7,5 m
+⚠ Résolution du terrain grossière (pas > 5 m) — un relief entre deux
+  points de mesure n'est pas vu par le calcul de garde au sol.
+⚠ Tracé non rectiligne (écart max 34 m sur 220 m). La portée L est
+  mesurée le long du tracé, pas en ligne droite — elle est surestimée.
+ℹ Rectitude non vérifiable (coordonnées absentes).
+```
+
+Three things this adds to sub-question 5's mechanism design, which was scoped around
+coefficient trust tags and now has to stretch one step further:
+
+- The point count and max spacing are **always shown**, warning or not — a fine import earns its
+  disclosure as much as a coarse one, otherwise the absence of a warning is ambiguous.
+- The straightness line has **three states, not two**: verified straight, verified bent, and
+  *unverifiable* (a hand-made two-column file carries no coordinates). The third is the
+  interesting one for this ticket's vocabulary — it is not a warning about a value, it is a
+  warning about the **absence of a check**, and the map's provenance rule has no existing idiom
+  for that.
+- Spacing and straightness are properties of **input data**, not of a coefficient from a
+  reference. If sub-question 5's mechanism is built purely around `[PAYWALLED]`-style tags it
+  will not fit these; deciding whether they share the badge vocabulary or get their own is part
+  of this ticket.
+
+Related, already decided elsewhere and *not* re-openable here: ticket 07 put `h_rider`'s
+« non confirmé » chip on the envelope-contact verdict itself.
