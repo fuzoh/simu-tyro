@@ -67,3 +67,16 @@ Ticket 06's example traces (`docs/references/example-profile-trace1.csv`, 183 m 
 mid-span dip; `…-trace2.csv`, 224 m) are realistic geometry to sanity-check the chosen defaults
 against — a default scenario that looks sensible but that no real trace resembles would be a
 poor first impression.
+
+**Inherited from [Results panel](./08-results-panel-and-provenance-warnings.md)** — one more
+forced initial value, and one deliberate non-value.
+
+- **`Coefficient dynamique` = 1,2** is pre-filled and **not** this ticket's to choose: §8.2's
+  `[FIELD:SSF]` measured ceiling for a controlled step-off. Unlike the other two pre-filled
+  values it is **not** an Unconfirmed Default and carries **no « non confirmé » chip** — it is the
+  best-attested constant in the reference, merely editable.
+- **`Régime de sécurité` stays unset** (« — choisir — »). Three of the five regimes are
+  `[CONVENTION]`/`[UNVERIFIED:R1]` and the choice multiplies into every margin, so shipping a
+  default regime would pick the user's safety framework for them. The first-run scenario therefore
+  opens with **no verdict at all** — a consequence this ticket should confirm it is happy with: the
+  first screen shows geometry and clearance, and the verdict appears only after a deliberate choice.

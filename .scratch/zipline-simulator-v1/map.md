@@ -214,6 +214,48 @@ These came out of the charting grill and are not up for re-litigation inside a t
   permits (a bent polyline, where `Distance` follows the bend while the line is the chord).
   Amended CONTEXT.md's `Terrain` entry and added Trace / Station / Anchor Placement.
 
+- [Results panel — safety verdict and provenance warnings](./issues/08-results-panel-and-provenance-warnings.md)
+  — the ticket's own name is wrong and the spec drops it: **there is no results panel**. Ticket 07's
+  spine has four regions, the prototype's rail was already squatting on these aggregates, and a
+  right-hand column would steal the width tickets 02 and 07 bought the layout for — so the **rail
+  becomes one scrolling column with an input half and an output half**
+  (`Paramètres → Valeurs déduites → Résultats → Provenance → Ce que cet outil ne calcule pas`),
+  which forced ticket 04's two competing read-out lists into one, split on **whether the rider is
+  involved**. Thirteen reported values, four headline, **no accordion** — `flèche/portée` is a
+  *validity* read-out, not a nicety. The session's load-bearing finding is that the disclosure
+  question and the numbers question have the **same answer five times over**: every place the
+  provenance mechanism had to stretch, the honest presentation was a *distinct state*, not a note on
+  an existing one — hence **five verdict states**, each mapping to a different user action
+  (`Dans les limites` · `Marge faible` at `FS_eff < 1,1·k` · `Hors limites` ·
+  **`Refusé — usage interdit`** · **`Indéterminé`**). `Refusé` exists because §10.2's grips
+  prohibition **survives an ample margin** — `FS effectif 8,0` against `k = 3` and still refused, so
+  it is neither a limits failure nor a warning above a pass; `Indéterminé` **suppresses** the verdict
+  rather than degrading it, because the steps that fail to converge are the ill-conditioned ones and
+  a verdict on the solved 87 % is biased optimistic *by construction*. Found a hole no ticket owned:
+  **ticket 04's field table had no DAF field**, yet the verdict must judge an amplified envelope —
+  so `Coefficient dynamique` joins the Passager group at **1,2 `[FIELD:SSF]`** and the verdict judges
+  `T_vide + DAF·(T_chargé − T_vide)` per step, which is exactly §8.2 and needs nothing from §8.3's
+  paywalled combination; it deliberately does **not** touch clearance. A regime is a **rule set**, not
+  a `k` — WorkSafe's two criteria bite on different quantities and *which one binds* is information —
+  with the 2× proof test as an **uncomputable obligation**, the ACCT 5:1/10:1 conflict as **two
+  adjacent picker entries** (one entry with a toggle would imply somebody knows which is right), and
+  **no free `k` anywhere** since §10 is not tunable and a typed `k` is blending with extra steps.
+  Margin reads as **`FS effectif` against the required `k`**, never percentage utilisation — that
+  recruits the "80 % is fine" heuristic into a tool sized on paywalled constants. Provenance keeps
+  **two idioms and two chip levels** (the chip covers exactly the three tags the binding rule groups;
+  §0.2's seven live in the popover), gains a **fourth case** in DAF — well-attested *and* editable,
+  so no chip — and a **three-tier warning ladder** whose ambient tier is ticket 05's out-of-band `k`,
+  fired always and therefore never an alarm. The aggregate list **pins the regime first**: three of
+  five regimes are unconfirmed, and a regime is not one input among six, it multiplies into every
+  margin. Terrain quality is disclosed in **manual mode too** (« ligne droite entre les pieds
+  d'ancrage ») — ticket 06's own argument that a missing warning is ambiguous makes a missing block
+  ambiguous. And sub-question 7 is solved **in the grammar**: the verdict never says
+  « conforme »/« non conforme » and always names the chosen regime inside the sentence, so the claim
+  is about the rule the user picked rather than about the law — with a standing
+  « Ce que cet outil ne calcule pas » block whose popover carries [R1]'s unapplied load-combination
+  formula, because printed on the surface someone applies those γ-factors by hand and believes the
+  result. **Amended ticket 04** twice (the DAF field; the Valeurs déduites split).
+
 ## Not yet specified
 
 Fog: in scope, heading toward the destination, not yet sharp enough to ticket.
@@ -227,6 +269,14 @@ The GPX→CSV pivot added no fog: it *removed* questions (resampling, smoothing,
 projection, partial elevation) rather than opening new ones, and the single question it did
 raise was sharp enough to ticket immediately —
 [Profile CSV export — can it exceed 200 points?](./issues/16-profile-export-point-count.md).
+
+[Results panel](./issues/08-results-panel-and-provenance-warnings.md) added no fog either, and
+opened no new ticket: everything it surfaced landed as an obligation on a ticket that already
+exists (four of them) or as an amendment to
+[Span and rigging parameter model](./issues/04-span-and-rigging-parameter-model.md). It also
+*closed* two of [Validation and error-state UX](./issues/11-validation-and-error-state-ux.md)'s
+own sub-questions outright — the `coverage` threshold (there is none) and whether a fix-action is
+a general affordance (three instances now, so yes).
 
 ## Out of scope
 

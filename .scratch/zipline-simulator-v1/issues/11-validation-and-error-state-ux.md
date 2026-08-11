@@ -2,7 +2,7 @@
 
 Type: grilling
 Status: open
-Blocked by: 08
+Blocked by: — (08 resolved 2026-08-11)
 Map: [Zip-line simulator v1](../map.md)
 Reads: [ticket 04](./04-span-and-rigging-parameter-model.md) §7 — the two-tier split is fixed
 (form owns non-physical checks, engine owns physics), including which rules land in which tier.
@@ -91,3 +91,46 @@ Also settled there and not re-openable: a typed station outside the trace **bloc
 dragged marker **clamps** — so the same constraint has a blocking presentation on one input path
 and no error state at all on the other. Worth checking that this ticket's error model can express
 that asymmetry, since ticket 07 established the same split for rider position.
+
+**Inherited from [Results panel](./08-results-panel-and-provenance-warnings.md)** — four things,
+two of which *close* questions this ticket was asking.
+
+**1. Item 6 is answered, not this ticket's to decide.** `coverage < 1` yields a fifth verdict
+state, **« Indéterminé — 209 des 240 pas résolus »**, which **suppresses** the verdict instead of
+degrading it — so the "threshold below which no verdict is offered" question dissolves: there is
+no threshold, any `coverage < 1` is indeterminate. The reasoning is worth carrying: the steps
+that fail to converge are the ill-conditioned ones, which is where the worst tension lives, so a
+verdict on the solved 87 % is biased optimistic *by construction*. It is also explicitly **not**
+routed here as a solve failure — a partial sweep is a complete solve of an incomplete traverse —
+so this ticket renders it as a *verdict* state, styled as neither pass nor fail, with the
+converged margins still shown under the traverse-scope caveat.
+
+**2. Item 2 of this ticket's §2 is answered too.** Regime-disabled-by-`Type d'installation` is now
+a **third** blocking-error-with-one-click-fix instance (after ticket 04's family gate and ticket
+06's `Inverser A et B`). Three instances settles it: the fix-action is a **general affordance of
+the error component**, not an ad-hoc addition per error.
+
+**3. Five verdict states to render**, and the banner is one sentence naming the governing
+criterion:
+
+| État | Action de l'utilisateur |
+| --- | --- |
+| Dans les limites | rien |
+| Marge faible (`FS_eff < 1,1·k`) | augmenter la marge |
+| Hors limites | changer la conception |
+| **Refusé — usage interdit** | changer la quincaillerie |
+| Indéterminé | aucun chiffre disponible |
+
+`Refusé` is the one to be careful with: it is **§10.2's grips prohibition surviving an ample
+margin** — `FS effectif 8,0` against `k = 3` and still refused — so it is neither `Hors limites`
+(nothing about limits is at issue) nor a loud warning above a pass. The three passing/failing
+states must be visually distinct from each other; `Marge faible` is **not** green with a note.
+
+**4. The warning ladder is three tiers and thinner than this ticket's item list implies** —
+`ambiant` (plain text, no ⚠: textile `k` out of band, which fires *always* on zip lines, so an
+alarm would mean nothing) · `avertissement` (⚠ inline on the row: > 30 % MBL, `flèche/portée`
+< 3 %) · `verdict` (the banner). Of sub-question 6's original six items, span-outside-50–2000 m is
+ticket 04's form warning, HMPE knots never reach a warning (ticket 05 disables the option), and
+only the solver failure modes are this ticket's. Match the tone: the verdict never says
+« conforme »/« non conforme » and always names the chosen regime inside the sentence — a second
+error idiom that claimed conformity anywhere would undo that.

@@ -71,3 +71,15 @@ Two smaller additions to the reflow surface:
   Three drag targets on one chart is a touch-target question at narrow widths, and the anchor
   markers sit at the domain's edges where they are most likely to collide with axis labels or the
   viewport boundary.
+
+**Inherited from [Results panel](./08-results-panel-and-provenance-warnings.md)** — the rail this
+ticket has to reflow is materially larger than the input rail it was scoped against.
+
+It is now **one scrolling column with an input half and an output half**, five sections:
+`Paramètres → Valeurs déduites → Résultats → Provenance → Ce que cet outil ne calcule pas`. A
+right-hand results column was rejected there precisely because the chart needs the width, so the
+narrow-screen treatment cannot fall back on "move the results elsewhere" — there is nowhere else.
+Two specifics that bite at narrow widths: `Résultats` carries four headline values plus ~nine
+detail rows under a scope header (« sur toute la traversée ») whose distinction from the strip's
+« à la position du passager » must survive any reflow that brings the two closer together; and
+`Provenance` holds an always-visible terrain block plus an expandable aggregate list.

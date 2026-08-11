@@ -2,7 +2,7 @@
 
 Type: task
 Status: open
-Blocked by: 08, 09, 11, 12, 13, 14, 15, 16 (03, 04, 05, 06, 07 resolved)
+Blocked by: 09, 11, 12, 13, 14, 15, 16 (03, 04, 05, 06, 07, 08 resolved)
 Map: [Zip-line simulator v1](../map.md)
 
 ## Question
@@ -52,3 +52,18 @@ arbitrary later and gets "fixed" by someone who does not know it was deliberate.
 Finally, sweep the map's **Not yet specified** section. Anything still fogged when
 everything else has resolved either graduates into a ticket now or is recorded in the spec
 as a decision deferred to implementation. Nothing stays vague by accident.
+
+**Inherited from [Results panel](./08-results-panel-and-provenance-warnings.md)** — one naming
+correction and three things to carry.
+
+- **Drop the term "results panel".** There is no such region: ticket 07's spine has four, and the
+  aggregates live in the rail's output half. The spec describes a rail with five sections.
+- Carry the **criteria × ends verdict grid** — a regime is a rule set, `T adm` is per end because
+  `η_t` is, and WorkSafe's suspended-load criterion is not per-end at all, so cells are legitimately
+  empty — and the **five verdict states** with the user action each implies.
+- Engine consequence: `T_DAF = T_vide + DAF·(T_chargé − T_vide)` needs `T_vide` alongside the loaded
+  sweep. `solveSpan` already produces it, so this is a reporting requirement, not an engine change.
+- Add to the trade-offs-worth-recording list: **the verdict grammar**. Never « conforme », always
+  naming the chosen regime inside the sentence. It reads like a copy choice and is in fact the
+  mechanism that stops the app implying a compliance certificate — exactly the kind of decision
+  someone later "fixes" without knowing it was deliberate.

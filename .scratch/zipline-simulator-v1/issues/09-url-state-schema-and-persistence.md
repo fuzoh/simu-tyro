@@ -75,3 +75,18 @@ Because the profile is kept in **file coordinates** rather than translated, all 
 in sub-question 4 remain available: the original bytes are always recoverable, so the trace can
 be re-serialised, hashed for a reference, or dropped without corrupting anything. Had the
 import translated and sliced eagerly, only the lossy option would have survived.
+
+**Inherited from [Results panel](./08-results-panel-and-provenance-warnings.md)** — two new pieces
+of state, one of them with an unusual absence semantic.
+
+- **`Régime de sécurité`** — one of five enumerated entries (EN 15567-1 · WorkSafe QLD 2019 ·
+  ACCT 10:1 · ANSI/ACCT 03-2019 5:1 · Secours textile 10:1). There is **no free `k`**, so this
+  serialises as an enum, never a number. It has **no default** (ticket 04), which makes it the one
+  field whose *absence from a URL is legitimate state* — « — choisir — », not a fallback to be
+  filled in. A shared link that omits it must not silently acquire a regime.
+- **`Coefficient dynamique`** (`DAF`, default 1,2) — a plain number, new to ticket 04's field
+  table.
+
+Also note ticket 08 §5's availability coupling: *Secours textile 10:1* is invalid under steel or
+`PERMANENTE`. A URL carrying that combination is a restorable-but-invalid state, the same class of
+problem as ticket 05's retained-across-flip material specs.

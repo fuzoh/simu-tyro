@@ -115,12 +115,28 @@ Hard = blocks before the engine. Warning = non-blocking, needs no solve.
 | | Longueur non tendue | `L₀` | m | `> 0` | — | → premier lancement |
 | Passager | Masse | `m_p` | kg | `> 0` | ⚠ non confirmé | **120** |
 | | Enveloppe passager | `h_rider` | m | `> 0` | ⚠ non confirmé | **2.1** |
+| | Coefficient dynamique | `DAF` | — | `> 0` | flèche < 3 % (§8.2) | **1.2** |
+
+**Amended 2026-08-11** by [Results panel](./08-results-panel-and-provenance-warnings.md) §4: the
+`Coefficient dynamique` row above is new — this table had no DAF field and no other ticket owned
+one, while the verdict has to judge an amplified envelope
+(`T_vide + DAF·(T_chargé − T_vide)`, §8.2). It is **not** an Unconfirmed Default: `[FIELD:SSF]` is
+the highest-trust tag in the reference, so it is editable with a provenance popover and **no
+« non confirmé » chip** — a fourth provenance case (well-attested *and* configurable) that §6
+below had no slot for.
 
 `h < 0` means B below A (§2). The label and its helper text must not muddle that — a
 downhill line has a **negative** dénivelé.
 
 **Valeurs déduites** (read-outs, never editable): the two non-driving tightness quantities,
 poids linéique `w`, corde `√(L²+h²)`, and — in GPX mode only — `L` and `h`.
+
+**Amended 2026-08-11** by [Results panel](./08-results-panel-and-provenance-warnings.md) §1: this
+block and the results block were two competing read-out lists, since the rail is now one column
+with an input half and an output half. The split is **whether the rider is involved** — so
+Valeurs déduites additionally holds `L₀`, `H à vide`, `flèche à vide`, `flèche / portée` and
+`tension permanente en % MBL` (all rider-free; both §8.2's stiffening rule and §9.2's creep cap
+are about the *standing* line), and everything traverse-dependent lives under `Résultats`.
 
 Ranges and thresholds are fixed here; the **scenario numbers** graduate (see §7 below).
 
