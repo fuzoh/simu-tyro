@@ -104,18 +104,22 @@ Hard = blocks before the engine. Warning = non-blocking, needs no solve.
 | Groupe | Champ (FR) | Symbole | Unité | Dur | Avertissement | Initial |
 | --- | --- | --- | --- | --- | --- | --- |
 | Usage | Type d'installation | — | — | §10.4 gate | — | `PERMANENTE` |
-| | Régime de sécurité | — | — | requis | — | *aucun* |
-| Géométrie | Portée | `L` | m | `> 0`, fini | ∉ [50, 2000] (§3) | → premier lancement |
-| | Dénivelé | `h` | m | fini | `\|h\| > L` (>45°) | → premier lancement |
-| | Hauteur d'ancrage A | — | m | `≥ 0` | `> 30` | → premier lancement |
-| | Hauteur d'ancrage B | — | m | `≥ 0` | `> 30` | → premier lancement |
+| | Régime de sécurité | — | — | requis (Verdict Gate) | — | *aucun* |
+| Géométrie | Portée | `L` | m | `> 0`, fini | ∉ [50, 2000] (§3) | **150,0** |
+| | Dénivelé | `h` | m | fini | `\|h\| > L` (>45°) | **−18,0** |
+| | Hauteur d'ancrage A | — | m | `≥ 0` | `> 30` | **12,0** |
+| | Hauteur d'ancrage B | — | m | `≥ 0` | `> 30` | **12,0** |
+| | Importer un profil… | — | — | bouton | — | *aucun tracé* |
+| | Retirer le tracé | — | — | bouton, actif si tracé chargé | — | — |
+| | *identité du fichier* | — | — | lecture seule | — | *absent* / « nom.csv » / « tracé reçu par lien » |
 | Ligne | famille + spec | — | — | gated | — | → [ticket 05](./05-material-spec-model.md) |
-| Tension de la ligne | Flèche à vide cible | `D_target` | m | `> 0` | — | → premier lancement |
-| | Prétension cible | `H_target` | daN | `> 0` | — | → premier lancement |
-| | Longueur non tendue | `L₀` | m | `> 0` | — | → premier lancement |
+| Tension de la ligne | Flèche à vide cible | `D_target` | m | `> 0` | — | **6,0** |
+| | Prétension cible | `H_target` | daN | `> 0` | — | *lecture seule* — 253,5 |
+| | Longueur non tendue | `L₀` | m | `> 0` | — | *lecture seule* — 151,64 |
 | Passager | Masse | `m_p` | kg | `> 0` | ⚠ non confirmé | **120** |
 | | Enveloppe passager | `h_rider` | m | `> 0` | ⚠ non confirmé | **2.1** |
 | | Coefficient dynamique | `DAF` | — | `> 0` | flèche < 3 % (§8.2) | **1.2** |
+| | Position du passager | `x_D` | m | `0 ≤ x ≤ L` | — | milieu de portée |
 
 **Amended 2026-08-11** by [Results panel](./08-results-panel-and-provenance-warnings.md) §4: the
 `Coefficient dynamique` row above is new — this table had no DAF field and no other ticket owned
@@ -124,6 +128,23 @@ one, while the verdict has to judge an amplified envelope
 the highest-trust tag in the reference, so it is editable with a provenance popover and **no
 « non confirmé » chip** — a fourth provenance case (well-attested *and* configurable) that §6
 below had no slot for.
+
+**Amended 2026-08-12** by [First-run scenario and default values](./14-first-run-scenario-and-defaults.md)
+§2/§3 and [Validation and error-state UX](./11-validation-and-error-state-ux.md) §1/§6/§12 — three
+changes to the table above.
+
+- **The five « → premier lancement » cells are filled**: Portée 150,0 m, Dénivelé −18,0 m, Hauteur
+  d'ancrage A 12,0 m, Hauteur d'ancrage B 12,0 m, Flèche à vide cible 6,0 m — **`Flèche` is the
+  active segment** of §3's segmented control below, so Prétension (253,5 daN) and Longueur non
+  tendue (151,64 m) are its read-outs, not separately-initialised fields.
+- **New row, Passager group**: `x_D`, « Position du passager », hard `0 ≤ x ≤ L`, no warning,
+  initial = mid-span. It **clamps on every path** — geometry change, link arrival, typed input —
+  with a transient inline note (« position ramenée à la portée : 0 – 150,0 m »), a deliberate
+  exception to §7's typed-blocks rule below because `x` selects a view, not a design input.
+- **New rows, Géométrie group** (ELECTIONS §0.5c): « Importer un profil… » (a button, not a drop
+  zone — the chart already carries three drag targets), « Retirer le tracé », and the
+  file-identity line (« nom.csv » / « tracé reçu par lien » / absent). Parse failures render
+  inline beneath the control. This table listed none of the three.
 
 `h < 0` means B below A (§2). The label and its helper text must not muddle that — a
 downhill line has a **negative** dénivelé.
@@ -237,18 +258,39 @@ a user-supplied 100 kg is no more standards-backed than the shipped 120 kg.
 ### 7. Validation — two tiers, one source of truth each
 
 ```
-FORM  (no physics — §simulation.md forbids re-deriving)
-  masse > 0 · portée > 0 et finie · dénivelé fini
-  hauteurs ≥ 0 · régime choisi · famille × usage (§10.4)
-      ↓ passes
+SOLVE GATE  (no physics — §simulation.md forbids re-deriving)
+  masse (`m_p`) > 0 · portée > 0 et finie · dénivelé fini · hauteurs ≥ 0
+  la tightness field active · famille + Material Spec · famille × usage (§10.4)
+      ↓ passes — else no `SpanState`, no cable, no read-outs
 ENGINE  (owns every physical rule)
   invalid-input{field:"L0"}   ← §5.4 chord bound
   no-convergence              ← bracket failed (modes 2 & 3)
   slack-limit                 ← line lying down
       ↓
+CLEARANCE GATE  (independent of the Solve Gate — suppresses garde au sol and the
+                 clearance curve only; the cable still draws)
+  hauteur d'ancrage A/B · terrain · enveloppe passager (`h_rider`) > 0
+      ↓ passes
+VERDICT GATE  (independent — suppresses only the banner and the criteria×ends grid)
+  régime de sécurité choisi · terminaisons A et B · `DAF` > 0
+      ↓
 RESULT-LEVEL WARNINGS  (need a solve → ticket 08)
   > 30 % MBL (§9.2) · flèche < 3 % de la portée (§8.2) · verdict (§10)
 ```
+
+**Amended 2026-08-12** by [Validation and error-state UX](./11-validation-and-error-state-ux.md)
+§1/§6/§12 (ELECTIONS §0.1) — the single FORM tier this block used to show is now **three named
+gates**, drawn above. **« régime choisi » is struck from the Solve Gate**: it never blocks a
+solve, which is what makes ticket 14's verdict-less first run coherent — as originally written,
+first run blocked the engine and showed an empty chart, defeating this ticket's own reason for
+inventing manual-mode ground (« garde au sol is live from first launch »). `m_p`, `h_rider` and
+`DAF` are named as gate inputs above, since none of the three had an owning gate before this
+amendment.
+
+Also amended by [First-run scenario and default values](./14-first-run-scenario-and-defaults.md)
+§2/§3: the Solve Gate's message for an **empty** required field is **« Valeur requise. »** —
+deliberately gender-free, and it states no global consequence, because the consequence of an
+empty field is rendered on the rail's output half (ticket 14 §8), not on the control.
 
 The hard bound `L₀ > chord/(1 + T_break/EA)` needs `EA` and `MBF`, so evaluating it in the
 form would re-derive physics in the UI — forbidden by `docs/conventions/simulation.md`. It
@@ -261,8 +303,21 @@ Two consequences worth stating:
 - The chord bound is only **user-violable in direct-`L₀` mode**. In sag and tension modes
   `L₀` is an output of `resolveL0`, so an infeasible target surfaces as a failed bracket
   (`no-convergence`) rather than a bad length.
+
+  **Amended 2026-08-12** by [Validation and error-state UX](./11-validation-and-error-state-ux.md)
+  (ELECTIONS §0.2), measured **false**. The §5.4 floor **is** the breaking load — floor
+  `L₀ = 197,404 m` on a 200 m level span gives `T_max = 100,0 % MBF` — so any over-`MBF` target
+  maps through `resolveL0` to a sub-floor `L₀` that the same pre-check refuses. The bound is
+  violable in **all three modes**, not only direct-`L₀`.
 - `H_target ≥ MBF` is **not** an input error. It solves perfectly and the verdict says
   rupture — consistent with ticket 03's split between physics succeeding and safety failing.
+
+  **Amended 2026-08-12** by [Validation and error-state UX](./11-validation-and-error-state-ux.md)
+  (ELECTIONS §0.2), measured **false**, for the reason above: an over-`MBF` target produces a
+  sub-floor `L₀`, which the pre-check refuses before any solve runs. No rupture verdict is
+  reachable this way. The state this now surfaces as is **« Tension impossible »** (one of
+  §0.2's three "no result" surfaces), with no fix button since no unambiguous repair exists;
+  copy carries the attainable bound (ticket 03's amended `invalid-input` payload).
 
 Presentation of each error state belongs to
 [Validation and error-state UX](./11-validation-and-error-state-ux.md).

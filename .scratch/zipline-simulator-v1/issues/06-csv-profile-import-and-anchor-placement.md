@@ -265,6 +265,16 @@ Rejected: **adopting the existing `L`** (place A at 0, B at station `L`). It pre
 needs a further fallback rule whenever the trace is shorter than `L`. Also rejected:
 **overwrite and reset**, which makes an accidental import destroy typed geometry with no undo.
 
+**Amended 2026-08-12** by
+[First-run scenario and default values](./14-first-run-scenario-and-defaults.md) §10: this
+remove path keeps the **profile cached in the Session** — it discards the stations, not the
+trace — and the file-identity line in `Paramètres › Géométrie` gains a **fourth state**, « Tracé
+en mémoire : *nom.csv* (non utilisé) » with **`[ Réutiliser ce tracé ]`**, which re-places A at
+the first station and B at the last exactly as an import does. For a link-received trace the
+line reads « tracé reçu par lien (non utilisé) », since ticket 09 §6 drops the filename. Without
+this path « Réinitialiser le scénario »'s promise to keep the Trace cached is empty and the
+reset is destructive in effect.
+
 ### 6. Crop rule — one shared domain, span + 5 % margin, clamped to the trace
 
 ```
@@ -293,6 +303,17 @@ and because the domain is shared the clearance curve is simply **undefined outsi
 which marks the span's boundaries visually for free rather than needing a separate cue.
 Horizontal rescale while dragging an anchor is consistent with the vertical auto-fit ticket 07
 already established per render.
+
+**Amended by [ticket 15](./15-responsive-and-narrow-screen-layout.md) §4, §9.** This
+pixel-alignment requirement was violated in the prototype that demonstrated it — profile pad
+`{left 16, right 16}` (`chart-kit.ts:37`) against strip pad `{left 24, right 24}`
+(`variant-d.tsx:104`), so the two x axes coincide only at mid-span and diverge to 8 px at each
+end, **34 m at a 1500 m span**, exactly at the anchors. It is now enforced structurally: **one
+shared x scale object, one `GUTTER = 24`, one inverse**. Consequently the draggable station
+handles of §4 do **not** sit on the profile: they live in a dedicated 24 px **Handle Lane**
+between the plot area and the x-axis labels, reserved at every width and in both modes — in
+manual mode it draws the non-interactive span bracket, which is also the « span markers »
+ELECTIONS §0.3 requires to keep drawing when the Clearance Gate fails.
 
 ### 7. Degenerate placements — block with a one-click fix
 

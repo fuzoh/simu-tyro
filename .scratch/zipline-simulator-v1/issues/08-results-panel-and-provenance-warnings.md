@@ -153,6 +153,12 @@ Flèche chargée max       13,78 m
 Couverture              240 / 240 pas
 ```
 
+**Amended 2026-08-12** by
+[Validation and error-state UX](./11-validation-and-error-state-ux.md). **The coverage
+denominator above is wrong: it is 260, not 240.** Verified `sweepGrid(L0, 240).length === 260`
+(`solver.ts:235`); the read-out should print « Couverture 260 / 260 pas » — as printed, a fully
+solved sweep read 260/240.
+
 Rejected: hiding the detail rows behind a disclosure. `flèche/portée` in particular is a
 **validity** read-out, not a nicety — below 3 % the model the tool is running starts
 misreporting the dynamic response — and anything behind a click is read by nobody. `H` is kept
@@ -255,6 +261,11 @@ per ticket 04's family-flip precedent, moving `Type d'installation` into a state
 chosen regime is disabled is a **blocking error with a one-click fix**, never a silent
 re-selection.
 
+**Amended 2026-08-12** by
+[Validation and error-state UX](./11-validation-and-error-state-ux.md). **This blocking error
+gains its fix action: `[ Choisir un autre régime ]`** — a focus action, not a value-setting one,
+since no single correct regime exists.
+
 ### 6. Five verdict states, because each maps to a different user action
 
 The banner is **one sentence naming the governing criterion**; the full criteria × ends grid
@@ -294,6 +305,20 @@ traverse-scope caveat). `Indéterminé` must be styled as neither pass nor fail.
 The claim is then about the rule the user selected, not about the law — the anti-certificate
 requirement met in the grammar rather than bolted on as a disclaimer nobody reads.
 
+**Amended 2026-08-12** by
+[Validation and error-state UX](./11-validation-and-error-state-ux.md).
+
+- **The `Indéterminé` row's denominator above is wrong: it is 260, not 240.** Verified
+  `sweepGrid(L0, 240).length === 260` (`solver.ts:235`); the banner should read « Indéterminé —
+  209 des 260 pas résolus » — as printed, a fully solved sweep read 260/240.
+- **`Indéterminé` additionally punches gaps in the scrub track.** Ticket 07 §2 made the
+  clearance curve the only pointer path and ticket 03 §6 makes failures sparse, so under
+  coverage < 1 the track is discontinuous: gaps are drawn as an explicit break with the
+  interval hatched in the axis gutter (not tinted — tint is danger), pointer drag snaps to the
+  nearest solved step, and a typed `x` inside a gap gets ticket 07 §4's exact §6.1-case-2 solve.
+- **« — » is reserved to `Indéterminé`** and may not be reused for absent (ticket 14 §5) or
+  blocked (ticket 11 §5) values.
+
 ### 7. The margin is an effective safety factor, never a percentage
 
 Headline: **`FS effectif = η_t · MBF / T_max`, shown against the regime's required `k`** — « FS
@@ -315,6 +340,19 @@ margin left for the coefficients this tool openly admits it does not know.
 `T adm` is **per end** — ticket 05 gives one termination per end, so `η_t(A)` and `η_t(B)` differ
 — while WorkSafe's suspended-load criterion is not per-end at all. The grid is therefore
 criteria × ends with some cells empty, which is why §6's banner names the governing cell.
+
+**Amended 2026-08-12**, resolving a contradiction found while assembling
+[ticket 10](./10-assemble-the-v1-build-spec.md): this section never wrote the suspended-load
+criterion's **denominator**, and ticket 14 §5 then supplied
+`η_t·MBF / [DAF·(T_chargé − T_vide)]` — whose `η_t` is per end, which would contradict « not
+per-end at all » two lines above. Settled: the criterion stays **one cell, not per end**, and its
+numerator is **`min(η_A, η_B) · MBF`**. §10.1's row is `[REGULATOR]` verbatim and says nothing
+per-end, so the grid's empty cells stand; bare `MBF` was rejected because §7 credits `η_t·MBF/k`
+everywhere else, so it would be the only place the app credits an unterminated rope; and `min` is
+right because a line fails at its **weakest** termination, so one criterion cannot honestly report
+two margins. Writing the denominator down is load-bearing rather than pedantic: read as `MBF/P` the
+criterion scores **77** on the shipped line and can never bind, so it would silently drop out of
+the two-criteria regime that is this section's whole reason for existing.
 
 ### 8. Provenance: two idioms, two chip levels, three warning tiers
 
@@ -360,6 +398,12 @@ multiplies into every margin in the grid, so with ACCT selected the headline ver
 convention that [R1] and [R2] contradict each other about. Ticket 04's rule holds: editing a
 value flips its chip to *valeur utilisateur* but does **not** remove it from the list.
 
+**Amended 2026-08-12** by
+[Validation and error-state UX](./11-validation-and-error-state-ux.md). **The coarse-terrain
+⚠ warning (ticket 06 §2/§9's `pas > 5 m` disclosure) is confirmed at the Avertissement tier**,
+with one addition: the ≈995 m span threshold at which it fires is **arithmetic, not observed** —
+all three repo traces are 183,4 / 224 / 188,4 m, so nobody has seen a coarse file.
+
 ### 9. Terrain quality is always disclosed — in manual mode too
 
 Ticket 06's drafted block is kept verbatim for the import case (point count and max spacing
@@ -378,6 +422,15 @@ Settled: the block is **always present**, and in manual mode reads
 **ℹ « Terrain — ligne droite entre les pieds d'ancrage (aucun profil importé) »**. Placement: its
 own sub-block in the rail's Provenance section, **above** the aggregate list — terrain quality is
 about *this run's inputs*, the aggregate list about values unconfirmable in principle.
+
+**Amended 2026-08-12** by
+[First-run scenario and default values](./14-first-run-scenario-and-defaults.md). This
+manual-terrain disclosure must carry the measured consequence, not just the model — **on a
+straight ground line no metre of dénivelé buys clearance** (garde min 2,46 / 2,44 / 2,37 /
+2,25 m for `h` 0 / −18 / −40 / −60 at fixed `L`, flèche and hauteurs), because garde ≈
+lerp(hauteurs d'ancrage) − flèche chargée − enveloppe. A user modelling a gorge crossing
+manually otherwise reads a false failure: measured −62,8 m on a 1109 m line. See also ticket
+14 §7's TODO on §2's headline « T max » label.
 
 ### 10. What the tool does not calculate, and why the formula stays in a popover
 

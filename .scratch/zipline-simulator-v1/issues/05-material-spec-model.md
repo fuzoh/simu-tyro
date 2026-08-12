@@ -111,7 +111,7 @@ to design, not an engine change.
 
 | Champ (FR)       | Symbole | Unité | Affordance                                                                  | Dur    | Avertissement | Initial                                                |
 | ---------------- | ------- | ----- | --------------------------------------------------------------------------- | ------ | ------------- | ------------------------------------------------------ |
-| Diamètre nominal | `d`     | mm    | numérique                                                                   | `> 0`  | ∉ [6, 26] mm  | → [ticket 14](./14-first-run-scenario-and-defaults.md) |
+| Diamètre nominal | `d`     | mm    | numérique                                                                   | `> 0`  | ∉ [6, 26] mm  | **12**                                                 |
 | Grade            | `R₀`    | N/mm² | select : 1770 / 1960                                                        | requis | —             | 1770                                                   |
 | Construction     | —       | —     | select : 6×19 âme textile (`K = 0.330`) / 6×19 âme métallique (`K = 0.356`) | requis | —             | âme métallique                                         |
 
@@ -151,11 +151,22 @@ standards range.
 | Champ (FR)                | Symbole | Unité                    | Affordance                                                                   | Dur           | Avertissement               | Initial                    |
 | ------------------------- | ------- | ------------------------ | ---------------------------------------------------------------------------- | ------------- | --------------------------- | -------------------------- |
 | Classe de corde           | —       | —                        | select : HMPE 12 torons / Polyamide EN 1891 type A / Polyester semi-statique | requis        | —                           | HMPE                       |
-| Charge de rupture         | `MBL`   | daN _(sélecteur global)_ | numérique                                                                    | `> 0`         | —                           | → ticket 14                |
-| Masse linéique            | `μ`     | kg/m                     | numérique                                                                    | `> 0`         | —                           | → ticket 14                |
+| Charge de rupture         | `MBL`   | daN _(sélecteur global)_ | numérique                                                                    | `> 0`         | —                           | *vide, requis*              |
+| Masse linéique            | `μ`     | kg/m                     | numérique                                                                    | `> 0`         | —                           | *vide, requis*              |
 | Raideur relative `EA/MBL` | `k`     | —                        | numérique                                                                    | `> 0`, requis | ⚠ non confirmé + hors bande | **22** / **1,5** / _aucun_ |
 
 **Valeur déduite**: `EA = k·MBL`, plus `w = μ·g`.
+
+**Amended 2026-08-12** by [First-run scenario and default values](./14-first-run-scenario-and-defaults.md)
+§4: the shipped Material Spec fills the cells above. Acier ships `d` **12 mm** (§2's table), `R₀`
+1770 and 6×19 âme métallique (already fixed there) ⇒ MBF 9074 daN, EA 6,90 MN, μ 0,5465 kg/m, with
+**no override on any derived value** — §5's « absence = non surchargée » below: an override on
+first run would ship the one `[STD-ATTESTED]` derived value pre-downgraded. The retained
+**inactive** textile spec ships classe HMPE with `k` **22** (already fixed above) and `Charge de
+rupture` / `Masse linéique` **blank and required**, shown above — no rope is shipped, because
+§13.2 compromises every product row and, measured, the invented MBL decides the verdict (100 kN ⇒
+FS 11,94 « dans les limites »; 60 kN ⇒ 7,63 « hors limites » on the same line). Terminaisons A
+**and** B ship « Cosse à sertir / œil Flamand », `η_t` 0,90 (§6 below).
 
 **Diamètre is dropped.** Nothing in the v1 scope consumes it: §13.2 has no `MBL(d)`, sheave
 `D/d` is §13.1 and unused by the Verdict, and §12 dynamics are out of scope. A decorative
@@ -235,14 +246,29 @@ Raideur axiale     [ 6.90 ] MN   ⚠ non confirmé    ⟳
 Masse linéique     [ 0.5465 ] kg/m ⚠ non confirmé  ⟳
 
 — après passage de d = 12 à 16 mm —
-Charge de rupture  [ 9074 ] daN   valeur saisie
-  ⚠ la formule donne maintenant 16 129 daN · recalculer
+Charge de rupture  [ 9074 ] daN
+  valeur saisie — la formule donne 16 129 daN                        [ Recalculer ]
 ```
 
 - Typing into a derived field flips it to a «valeur saisie» pastille with a reset control
   restoring the formula.
 - On a change to `d`, `R₀` or construction, overrides **survive** and each gains a **stale
   badge** carrying the new formula value and a one-click «recalculer». **Non-blocking.**
+
+**Amended 2026-08-12** by [Validation and error-state UX](./11-validation-and-error-state-ux.md)
+§8 (ELECTIONS §0.9) — two corrections to the mockup and bullets above.
+
+- The badge copy dropped **« maintenant »**: messages state, buttons act, and the reset is a
+  button, not a clause in the sentence — « valeur saisie — la formule donne 16 129 daN »
+  `[ Recalculer ]`, as redrawn above.
+- **The stale badge is derived, never carried as state.** Ticket 09 §1 has no staleness key, so
+  a link from a sender whose override was stale would arrive as a plain override and the
+  recipient would see a 12 mm breaking force on a 16 mm rope with no badge. **On every load and
+  every link arrival, each override is compared against the formula for the current `(d, R₀,
+  construction)` and badged if it differs.** The comparison runs at the field's **display
+  precision, not on floats**: the mockup above writes the *displayed* value into state, so a
+  freshly created override holds `9074` daN against a formula value of `9073,98`, and float
+  equality would badge every override on every load.
 
 Rejected both alternatives, because both lose information silently — the failure ticket 04
 legislated against when it refused the silent family auto-switch. Clearing the override
@@ -258,6 +284,19 @@ breaking force, and `MBF` drives the Verdict, so that is the worst thing to hide
 | `μ` acier      | plage `W` `[STD-ATTESTED]`, milieu choisi par nous | toujours — « milieu de plage » |
 | `EA` textile   | `k` `[DATASHEET]`, hors bande                      | toujours                       |
 | `η_t`          | `[CONVENTION]` sauf manchon 1,00 `[STD-ATTESTED]`  | toutes sauf manchon            |
+
+**Amended 2026-08-12** by [Validation and error-state UX](./11-validation-and-error-state-ux.md)
+§7 / [First-run scenario and default values](./14-first-run-scenario-and-defaults.md) §4
+(ticket 10 §5) — this table's `η_t` row above (« toutes sauf manchon ») **contradicts §6 below**,
+which tags Cosse à sertir / œil Flamand and Épissure `[STD-ATTESTED]`, not `[CONVENTION]`. **§6's
+tags govern** — see the matching note there. Recorded at both places so neither reads as
+authoritative alone; the corrected first-run aggregate is **4 valeurs**, not 6.
+
+Also new: ticket 11 §7's derived-value **culprit table** follows §13.1's formulas rather than the
+field group — `MBF = K·d²·R₀/1000` attributes to **Diamètre, Grade, Construction**, but
+`EA = E_app·C·d²` and `μ = W·d²/100` attribute to **Diamètre alone**, since `E_app`, `C` and `W`
+are pinned midpoints and not construction-indexed. An **overridden** derived value is its own
+culprit, because override makes the read-out editable.
 
 `MBF` is the only derived value shipping **attested**, so overriding it **downgrades**
 provenance: a typed `MBF` gains a «valeur saisie» pastille and **enters** ticket 08's
@@ -288,6 +327,14 @@ requires it configurable). The Verdict checks worst `T_A` against `η_A·MBF/k` 
 |         | Nœud de huit (PA)                 | **0,60**     | `[CONVENTION]`, plage 0,60–0,80      |
 |         | Nœud de chaise (PA)               | **0,55**     | `[CONVENTION]`, plage 0,55–0,70      |
 |         | Nœuds sur HMPE                    | —            | **désactivé**                        |
+
+**Amended 2026-08-12** — see the correction in §5 above: this table's `[STD-ATTESTED]` tags on
+Cosse à sertir / œil Flamand and Épissure **govern** over §5's provenance-mapping pastille
+(« toutes sauf manchon »), which was wrong to lump them with the conventioned rows. Only Manchon
+à coin, Serre-câbles étrier and every textile termination carry the « non confirmé » pastille.
+
+**Amended 2026-08-12** by [First-run scenario and default values](./14-first-run-scenario-and-defaults.md)
+§4: first run ships **Cosse à sertir / œil Flamand** at both Terminaison A and B, `η_t` 0,90.
 
 Every range takes its conservative end (§10.3, §14 row 13): 0,90 not 0,95; 0,60 not 0,80.
 
@@ -360,6 +407,16 @@ eyeballing whether 437 sits safely under 90,7 is wrong by a factor of 100. Worse
 than the typo, and _unavoidable_, whereas the typo has a clean escape: switch the selector to
 kN and every field converts losslessly, including the one about to be typed. The remedy for
 wanting kN is the global control doing its job.
+
+**Amended 2026-08-12** by
+[URL state schema and persistence](./09-url-state-schema-and-persistence.md) §2: this section
+rejected all carve-outs from the global selector, but §2's own table renders **`EA` in MN** while
+`MBF` is in daN — an undeclared carve-out. It **survives**, because the argument above is about
+*eyeball comparability* (437 daN read against 90,7 kN) and `EA` is never compared to a tension by
+eye: it is three orders of magnitude larger and consumed only inside ratios. But it must be
+**declared as a carve-out with that reason** rather than left as an inconsistency — an obligation
+now on ticket 10. In the URL, `EA` serialises in daN like every other force, since ticket 09 §2
+fixed that the display selector is physics-neutral at the serialisation boundary too.
 
 **Consequence for ticket 08**: `MBF` is usually the largest force in the app and tensions the
 smallest, so under the daN default they differ by ~2 orders of magnitude in one panel. Render

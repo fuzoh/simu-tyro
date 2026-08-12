@@ -156,6 +156,17 @@ glyph would misrepresent the one measurement the tool exists to produce; legibil
 by the printed strip number, per ticket 02's "printed read-out anywhere a number must be
 trusted".
 
+**Amended by [ticket 15](./15-responsive-and-narrow-screen-layout.md) §5, §7.** The **« ×1 vraie
+échelle » button moves into the View Strip** (see §9's amendment — it moves there together with
+the numeric `x` field) **and gains a pointer-dependent interaction**: a *toggle* under
+`@media (pointer: coarse)`, hold-to-peek on fine pointers, and **disabled** whenever the ×1
+clamp is already in force. Press-and-hold on touch collides with text selection, the context
+menu and scroll initiation; this section's original gesture had no touch story.
+
+**Also superseded: the auto-fit range above.** « ×1,2…×4,7 » was measured against one box shape
+and is ~10 % low against ticket 06 §6's x domain (ticket 15 §1). The measured figure at the
+prototype's own aspect is **×1,57…×4,70**.
+
 ### 7. Clearance failure — four coordinated signals, two of them positional
 
 1. A worded verdict naming `h_min` and its `x`, visible whenever the line fails **anywhere**.
@@ -193,6 +204,14 @@ Five cells. **Both anchor tensions, not one `T max`** — on an inclined span th
 not obvious, ticket 05 judges terminations against `T_A` and `T_B` separately, and watching them
 swap as the rider crosses is genuinely informative. `H` stays out: identical at both ends and
 engine plumbing. Position lives beside the numeric field in the rail, not in the strip.
+
+**Amended by [ticket 15](./15-responsive-and-narrow-screen-layout.md) §5, §7.** This placement
+of the numeric `x` field is superseded. « Position lives beside the numeric field in the rail »
+does not survive ticket 15 §6: at 390 px the rail is not co-visible with the chart — the Chart
+Block collapses precisely when the rail comes into view — so a rail-only `x` puts the app's only
+precision input path out of sight of the thing it moves. The field and its position read-out
+(`x` in metres, `%` secondary, `s_D` never) move into the **View Strip** inside the Chart Block,
+unchanged in kind.
 
 **The clearance cell reports the worst clearance anywhere on the line for the current rider
 position** — §11's inner minimum over x — and the chart draws its dimension line wherever that

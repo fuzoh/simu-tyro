@@ -256,6 +256,225 @@ These came out of the charting grill and are not up for re-litigation inside a t
   formula, because printed on the surface someone applies those γ-factors by hand and believes the
   result. **Amended ticket 04** twice (the DAF field; the Valeurs déduites split).
 
+- [Sweep performance measurement and the Web Worker decision](./issues/12-sweep-performance-and-worker-decision.md)
+  — **no Web Worker**, on a ≈6× margin: worst-conditioned p95 of `sweep()` + `evaluateClearance`
+  is 1,30 ms at 240 steps against ticket 03's pre-agreed 8 ms, and 2,30 ms at 500. `SWEEP_STEPS
+  = 240` is now confirmed by data rather than inherited — it costs the same as 100 within
+  Chromium's 0,1 ms clock clamp and buys 2,4× the resolution. The ticket stayed arithmetic
+  because the criterion was fixed before the numbers existed. Three things it explicitly does
+  **not** license: the **`useSweep` seam stays** (ticket 03 justified it on
+  stale-while-recomputing, independently of the worker — "no worker, therefore drop the async
+  seam" is the obvious wrong inference); the **coarse-live/fine-on-release fallback stays
+  unbuilt**, with its hazard recorded as a safety failure rather than a fidelity one (a coarse
+  sweep can miss the worst clearance point and flash a green verdict); and neither `steps` nor
+  `samplesPerStep` should be raised, since the **clearance reducer is the larger half of the
+  budget** and scales with their product, while ticket 06 already measured the fidelity on offer
+  at ≈ 5 mm. Also settles the worker question from a second direction: dragging is **vsync-bound**
+  (frame p50 16,70 ms against a 16,7 ms interval), so off-threading would not have made it
+  smoother anyway. Re-validated against ticket 08's later DAF decision — `T_vide` is one solve,
+  not a per-step one — so the 2026-08-05 measurement stands.
+
+- [Profile CSV export — can it exceed 200 points?](./issues/16-profile-export-point-count.md)
+  — **no: 200 is the ceiling**, operator-attested (not documentation-verified, and recorded as
+  such) and corroborated by ticket 06's two traces of different lengths both landing on exactly
+  200 rows. So the warning this ticket existed to word **cannot be actionable**: it states a
+  structural limit and must say the cap is *per export, not per line*, or an operator re-exports
+  hoping for a denser file. Since spacing is `length/199`, the ~5 m threshold is crossed at
+  ≈ 1000 m and everything above is stuck — coarse terrain is the **normal** state on the upper
+  half of the 50–2000 m range, a new fact for ticket 08's warning tiers that is flagged to
+  ticket 11 rather than resolved here (it fires often but conditionally, and names a real
+  blind spot, so ⚠ over ambient is arguable either way).
+  The one remedy left interlocks two earlier decisions: ticket 06's columns-by-name contract
+  makes a hand-authored two-column CSV a first-class input, and such a file has no
+  `Easting`/`Northing` — so **the denser-terrain remedy *is* ticket 08's « rectitude non
+  vérifiable » state**, and the operator trades clearance fidelity against the straightness
+  check. Left deliberately unchased: the DEM's own resolution, which would sharpen the copy's
+  *explanation* but changes no behaviour, because ticket 06 designed the app never to need to
+  know what the source could have provided.
+
+- [URL state schema and persistence](./issues/09-url-state-schema-and-persistence.md)
+  — one principle answers the ticket: **the URL is a typing boundary, not a validation boundary**,
+  so a link restores state *faithfully, including invalid state* — `L = −5` lights up ticket 04's
+  existing form validation, and `reg=secours10&fam=ac` arrives already invalid and raises ticket
+  08 §5's blocking error exactly as clicking into it would. Re-checking ranges at the URL would
+  make three tiers with one rule living in two, and silently repairing a link yields a scenario
+  **neither party ever saw** — in the one field ticket 08 pins first. The same rule runs the write
+  side (`replace` always) and the refusal path: **applied whole or refused whole**, keys dropped
+  only when the remainder still describes a complete line. Schema is **readable flat keys**, ~200
+  chars, because a URL you cannot read is a URL you cannot check — with two structural tricks: the
+  tightness driver is encoded by *which key is present* (`fl`/`te`/`lo`), since three value keys
+  could carry contradictory tightness, and the terrain source is *inferred* from `tr`, extending
+  ticket 05's "active family only" into a general rule — **the URL carries the active
+  configuration, never a retained alternate**. Forces serialise in **daN always**, so ticket 04's
+  «a display control must be provably physics-neutral» keeps holding where a URL is hand-edited
+  (`u=daN`→`u=kN` must not make a line 100× tighter). Precision refuses its own trade: the URL
+  carries only inputs, inputs are typed at field precision, so **a prefill writes the *displayed*
+  value into state, never the float** — 201,84 enters, 201,8412773 never does, serialisation is
+  verbatim, and per-quantity display precision becomes load-bearing state nobody owned (→ ticket
+  10). `stripSearchParams` rejected: absence already means « — choisir — » and *not overridden*,
+  and a fourth meaning would make it unreadable in the field that matters most — plus `mp=120` is
+  an Unconfirmed Default, so a link must record what the sender actually computed with. The trace
+  is **embedded**, because ticket 06 makes `L`/`h` derived so a link without terrain describes
+  **no span at all**: format `p1.<base64url>`, delta + zigzag varint, cm, **altitude quantised by
+  ceiling** so the one lossy step is provably safe-side, straightness carried as a scalar instead
+  of `Easting`/`Northing`, and no resampling (ticket 06 killed it, and shrinking by resampling
+  would smuggle it back in). Hand-rolled and **synchronous — because `validateSearch` is**, which
+  rules out `DecompressionStream` outright and keeps terrain off an async boundary ticket 03
+  fought to avoid. Oversize **refuses at « Copier le lien »** rather than degrading; the filename
+  does not travel («tracé reçu par lien»). Two findings outliving the ticket: the default
+  `parseSearch` JSON-parses every value, so an all-digit base64 payload **silently loses
+  precision** — hence the `p1.` sentinel; and **no verdict state covers "no regime chosen"** —
+  ticket 04 gave the field no default, ticket 08's five states all presuppose one, and it is not
+  `Indéterminé` (nothing was attempted), so the banner is *absent* and replaced by a prompt
+  (→ tickets 11 and 14). Back is **not** undo — history would restore search params but not the
+  retained specs, landing the user somewhere subtly different. Amended ticket 05 (`EA`-in-MN is a
+  *declared* carve-out) and CONTEXT.md (**Scenario** vs **Session**).
+
+- [Validation and error-state UX](./issues/11-validation-and-error-state-ux.md)
+  — the app's whole error vocabulary, and **two of the ticket's own eight items were misfiled**:
+  `slack-limit` and "far too slack" are not refusals — deep slack *converges* (L₀ 400 m on a 200 m
+  span ⇒ garde −169,67 m, `contact: "cable"`), so a line lying down is ticket 07's « Câble au sol »
+  verdict — while item 8's sub-floor `L₀` is not a safety verdict but the hardest refusal in the app,
+  because **the §5.4 chord bound *is* the breaking load** (floor L₀ 197,404 m on 200 m ⇒ T_max
+  100,0 % MBF; 987,02 m on 1000 m ⇒ 101,1 %). That one measurement kills ticket 04 §7's line 264
+  (`H_target ≥ MBF` "solves perfectly and the verdict says rupture" — no such verdict is reachable)
+  and line 261 (violable in all three modes, not just direct-`L₀`), and turns
+  `invalid-input{field:"L0"}` into **« Tension impossible »**, which carries its attainable bound and
+  no fix button, since the bound *is* a rupture design and no unambiguous repair exists. Structural
+  finding: the inherited three-gate table named **no rider field at all**, so `m_p` joins the Solve
+  Gate (it is the single `PointLoad`'s magnitude), `h_rider` the Clearance Gate, `DAF` the Verdict
+  Gate — three different gates for three fields of one group, which is itself the evidence the split
+  was right. Consequently the blocking banner names **the worst gate breached** (« aucun résultat » /
+  « garde au sol indisponible » / « aucun verdict »), because a bad DAF beside a printed `Garde min`
+  makes the elected single copy contradict the screen. Every state is enumerated in French: two
+  per-field messages (neutral « valeur requise » vs ⛔ on a fixed template) plus « nombre illisible »,
+  a state `inputMode=decimal` *creates* where `type=number` silently emptied the field; the seven
+  import failures inline under the file control, file-name prefixed, **leaving the current terrain
+  untouched**; the culprit table keyed by (quantity × mode) with ticket 05's rows derived from §13.1's
+  formulas — `MBF` from (d, R₀, construction) but `EA` and `μ` from **`d` alone** — and the rule that
+  an overridden derived value is its own culprit. Verified `sweepGrid(L0, 240).length === 260`, so
+  ticket 08's « 209 des 240 pas » becomes **260**, and `Indéterminé` punches **gaps in the scrub
+  track** where « — » is the only legal glyph. Rejections that matter: no residual on screen and **no
+  `SolveNote` ever surfaces** (349 440 instrumented solves — `reseeded` 0, near-taut 0), no dev panel,
+  no dashes for absent values, no « ouvrir malgré tout », no persisted strip dismissal, and no second
+  equivalent beside a quoted bound. Four invariants carry into the spec as its error contract: no hard
+  check renders only on a read-out · no message asserts an act · no verdict stands on numbers it was
+  not computed from · one banner occupant. Amended tickets 03 (payload bound, plus `resolveL0`
+  re-reporting the bound in the driving quantity), 04 (gates, two struck claims, `x_D` row), 05
+  (badge derived on load, compared at *display precision* or it fires every time) and 08 (260, gaps,
+  ⚠ confirmed with its frequency labelled arithmetic, not observed).
+
+- [App shell and routing shape](./issues/13-app-shell-and-routing-shape.md)
+  — the most measurement-dense ticket on the map, and the measurements *are* the answer: a
+  scratch dev server on :3111 plus the installed router source contradict the documentation five
+  times, and one contradiction silently destroys ticket 11's ignored-keys banner. **Exactly one
+  route** (`/`), because the router validates search params *per route* and a second one would
+  re-declare the same ~30-key `validateSearch` — the one place this app cannot afford drift;
+  **no print route and no print stylesheet** (→ Out of scope), refused on ticket 08's grammar
+  rather than on effort, since a printed « Indéterminé » is a document that outlives its
+  context. **`ssr: false` on the index route only**, `__root`'s `shellComponent` still
+  server-rendered: measured, `defaultSsr` in `src/router.tsx` is a **silent no-op**
+  (`createStartHandler` spreads an `undefined` from a `src/start.ts` that does not exist), and a
+  thrown `validateSearch` renders the refusal at **500** under SSR against **200** without it.
+  Full SSR was rejected on provenance, not cost — for a bare `/` the server would paint ticket
+  14's defaults and the Session read would replace them a tick later, a flash of somebody else's
+  numbers. So the server renders exactly one thing below the document, now named the
+  **Skeleton**: five section headings, two chart frames at ticket 15's aspect, labels without
+  values, the banner band's *height* reserved but nothing drawn in it — measured, with no
+  `pendingComponent` the body ships **empty**, so the choice was Skeleton or blank page.
+  Rewrite-on-load is a **client mount effect building a plain object**, and it corrects ticket
+  09 §4 outright: unknown keys **never** vanish on their own under the default `search.strict`,
+  so the rewrite is the *only* thing that cleans the address bar — and it works because a
+  plain-object `search` replaces the whole bag. Hard rules on the validator: **omit, never
+  `undefined`** (`{key: undefined}` makes the *server* 307 the key away before any client code
+  runs, even under `ssr: false`), never coerce, and stay pure and cheap because it runs **3× per
+  request** inside a swallowing `catch {}`; `p1.` payloads are validated **structurally only**
+  and returned verbatim, the real decode being a memoised client derivation (2,3–2,5 µs). The
+  dropped-keys report has exactly **one** transport — client-side, from the raw query string,
+  before the rewrite — since every server-side alternative either stringifies into the URL,
+  leaks across requests, or destroys the evidence. The Session is read **synchronously in a lazy
+  initialiser** (measured: never runs on the server inside `ClientOnly`), so ticket 09 §7's
+  "frame before it lands" does not exist. `__root` carries the **document only** — `lang="fr"`,
+  French title and `notFoundComponent`, ticket 15's viewport meta — and it *can*, because §0.5
+  gave the ten homeless controls three homes. The refusal page is the **index** route's
+  `errorComponent` (on the root it would replace the shell, leaving no way back), at 200 after a
+  Skeleton frame; an unknown path **404s** rather than redirecting to `/`, which would turn a
+  truncated link into somebody else's scenario. URL is write-only after the load-time seed;
+  offline is declared as **no runtime network dependency after load, no service worker, no PWA
+  manifest**; and `docs/conventions/routing.md` — which asserted plain SSR — is amended.
+
+- [First-run scenario and default values](./issues/14-first-run-scenario-and-defaults.md)
+  — the scenario turned out not to be a taste question: on manual terrain (ticket 04 §1's plane)
+  clearance reduces to `lerp(hauteurs) − flèche chargée − enveloppe`, so **dénivelé buys no
+  clearance at all** — measured garde 2,46 / 2,44 / 2,37 / 2,25 m across `h` 0 / −18 / −40 / −60 —
+  while flèche moves it metre for metre (3,39 / 2,44 / 1,44 / 0,40 m for 5 / 6 / 7 / 8 m). Ships
+  **150,0 m · −18,0 m · hauteurs 12,0 / 12,0 m · flèche à vide cible 6,0 m** ⇒ L₀ 151,644 m ·
+  H 253,5 daN · T max statique 817,1 daN · enveloppe DAF 927,9 daN · **garde min 2,44 m à x 74,1** ·
+  couverture 260/260 · FS effectif 8,80 (A) / 9,06 (B), every figure measured on ticket 07's
+  §15-verified solver. The 12 m platforms at *both* ends are **forced by arithmetic, not taste**, and
+  the objection is recorded in the ticket: every intuitively realistic pair (A 12 m, B 6 m) opens in
+  **« Câble au sol »** — −1,04 m at 150/−18, −1,53 m at 200/−25 — which the ticket forbade outright.
+  **Flèche ships as the active tightness segment** because it is the only mode whose value is exact
+  at display precision: ticket 09 §3 writes the *displayed* value into state, and a direct-`L₀`
+  default at one decimal costs 0,21 m of flèche and 0,20 m of garde, **8 % of the shipped margin** —
+  which also promotes ticket 09's "mechanical" precision table into a measured sensitivity decision
+  (`L₀` needs 2 decimals). The shipped line is **allowed to read « Hors limites » under ACCT 10:1**
+  (8,80 against k = 10): the app opens verdict-less so nothing fails on first contact, up-sizing to
+  14 mm does not even fix it (10,79, still « Marge faible »), and choosing hardware so a
+  `[CONVENTION]` passes would turn the shipped Material Spec into an implicit safety
+  recommendation — the spread from « dans les limites » at k = 3 is the teaching. **No worked example
+  and no bundled trace**: an SSF-Vercors-shaped line opens at garde −62,8 m on straight ground and
+  its verdict flips on invented numbers (MBL 100 kN ⇒ 11,94 « dans les limites », 60 kN ⇒ 7,63
+  « hors limites »), while all three repo traces show the *uninteresting* clearance case (6,83 /
+  9,90 / 8,80 m). Coined **« Résultats sans régime »** — four k-dependent rows *plus* the criteria ×
+  ends grid **absent, not dashed**, because ticket 08 spent « — » on `Indéterminé` and a lone
+  `FS effectif 8,80` invites the reader to supply their own k — and gave
+  **« Saisie en cours »** its firing rule: **focus-scoped**, so a blurred or never-filled required
+  field is « Aucun résultat » with no stale picture, the chart freezes rather than dims, and
+  scrubbing goes inert because a stale Sweep must not be used to *generate* new stale numbers.
+  « Réinitialiser le scénario » **removes the Trace as terrain source and keeps it cached** (else
+  Portée would read the trace's 183,4 m after a reset) — which forced a re-add path, or the cache is
+  dead weight. Partial recognised links are **completed literally**, and the measurement settles it:
+  `?L=250&h=-40` with `fl=6.0` lands clear at garde 1,25 m with an honest 2,40 % ⚠, while the
+  "smart" 4 %-of-span completion lands at −2,39 m, on the ground. Frozen as a Vitest fixture that
+  asserts the **formatted strings**, since 1e-3 relative on `L₀` would let the opening screen drift
+  6 % of its margin and stay green.
+
+- [Responsive and narrow-screen layout for the profile view](./issues/15-responsive-and-narrow-screen-layout.md)
+  — settled by measuring the prototype's own layout code rather than reasoning about phones, and the
+  load-bearing finding is one line of arithmetic nobody in tickets 02, 06 or 07 had written down:
+  **VE = plot aspect × (x-domain span / z-domain span)**, so vertical exaggeration never depended on
+  pixel size at all — only on the plot's H/W and the scenario's flatness. That single identity
+  retires the ticket and convicts the artifact twice. `flex-[3]`/`flex-1` makes VE a function of
+  *window height*, so the **desktop was already out of budget** — 1440×900 gives the profile H/W
+  0,4978 and VE **×5,02** against ticket 07's verified ×4,7 — while a wide-short box (844×330
+  landscape, H/W 0,16) yields **×0,54…×1,61 with four of seven scenarios vertically compressed**:
+  auto-fit was **unbounded in both directions** and tickets 02/07 had only ever measured one box,
+  900×420. A third finding falls out for free: ticket 07's published ×1,2…×4,7 is itself ~10 % low,
+  because ticket 06 §6 widened the shared x domain to span + 5 % *after* it was measured. So the
+  profile's height is set by **its own width** (target aspect **0,42** — the exact value that keeps
+  the flattest scenario inside ×4,7 on ticket 06's domain — with a **Plot Aspect Band [0.35, 0.50]**
+  as a guard whose ceiling is what ticket 10 must publish, ×5,5), the strip gets its own
+  width-derived band [72, 200], and **VE is floored at ×1 and never compresses**, disclosed as its
+  own badge state with the peek control disabled because it is already in force. Compressing the sag
+  in a clearance tool is the same error class as exaggerating it and worse, because *it reads safe*.
+  The other measured defect is ticket 06 §6's own pixel-alignment constraint, violated in the only
+  artifact that ever demonstrated it: profile pad {left 16, right 16} against strip {left 24,
+  right 24}, so the two x axes **coincide only at mid-span and diverge to 8 px at each end — 34 m at
+  a 1500 m span**, precisely at the anchors, which is where this ticket puts two drag handles. Fixed
+  by **one shared x scale object with one `GUTTER = 24`** owning the pointer inverse too (the
+  prototype's hand-typed inverse assumes `domain[0] === 0` and is off by 0,05 L = 75 m under the real
+  domain). Layout: **two breakpoints stated as what fails** — B1 « the read-out row can no longer fit
+  five values » at 600 px of *container* (the value, not the label, binds: ≈605 px for five cells) and
+  B2 « the rail and an aspect-legal profile cannot coexist » at 768 px of viewport — because the rail
+  is `w-72` = **288 px, not 280**, which leaves the chart column 101 px and the plot **69 px** of x
+  range at 390 px, and everything else is downstream of that one number. At narrow the rail becomes an
+  in-flow region (CSS only, no `useMediaQuery`, no bottom sheet — Base UI 1.6.0 *does* ship a Drawer,
+  so it was declined on **occlusion**, not availability) and the **Chart Block collapses to a pinned
+  safety header** driven by scroll, focus, or by not fitting — which is also what makes landscape
+  always open collapsed, so portrait needs no rotate prompt and gets none. Budgets sum to the
+  viewport at 390×664, 768×1024 and 1440×900, with the letterbox margin left deliberately empty.
+
 ## Not yet specified
 
 Fog: in scope, heading toward the destination, not yet sharp enough to ticket.
@@ -277,6 +496,24 @@ exists (four of them) or as an amendment to
 *closed* two of [Validation and error-state UX](./issues/11-validation-and-error-state-ux.md)'s
 own sub-questions outright — the `coverage` threshold (there is none) and whether a fix-action is
 a general affordance (three instances now, so yes).
+
+[URL state schema and persistence](./issues/09-url-state-schema-and-persistence.md) added no fog
+and opened no ticket either: everything it surfaced landed as an obligation on tickets 10, 11, 13
+and 14, or as an amendment to
+[Material spec model](./issues/05-material-spec-model.md). The one thing it found that nobody
+owned — a per-quantity display precision table — is tabulation rather than a decision, so it went
+to [Assemble the v1 build spec](./issues/10-assemble-the-v1-build-spec.md) rather than becoming a
+seventeenth ticket.
+
+**The final four — 11, 13, 14 and 15 — added no fog and opened no ticket**, which is what it looks
+like when a map runs out. Everything they surfaced landed as an obligation on
+[Assemble the v1 build spec](./issues/10-assemble-the-v1-build-spec.md), as an amendment to a
+resolved ticket (03's error payload · 04's gates, its two struck §7 claims and three new rows · 05's
+override badge and its termination-provenance contradiction · 06's shared x scale and handle lane ·
+07's `x` field placement, its peek control and its VE range · 08's coverage denominator, scope label
+and warning tier · 09's rewrite mechanism, its multi-driver row and its "mechanical" precision
+table · 12's guard rail), or as one scope ruling below. The frontier is empty: **the only open
+ticket is the destination artifact itself.**
 
 ## Out of scope
 
@@ -302,14 +539,45 @@ redrawn as a fresh effort.
   projection of a winding track onto a chord, no plan-view map.
 - **Rider dynamics, speed and braking** (§12). Follows from the position-only slider
   decision. Rules out drag, trolley friction, eddy brakes and terminal velocity.
-- **Thermal change of state, creep, DAF and load combinations** (§8, §9). The engine
+- **Thermal change of state, creep, and normative load combinations** (§9, §8.3). The engine
   parameterises on `L₀`, so these can be added later as `ΔL₀` without redesign — but not
   in this effort.
+
+  **Corrected 2026-08-12** while assembling
+  [the v1 build spec](./issues/10-assemble-the-v1-build-spec.md), which found this entry
+  contradicting the map's own decisions: it originally read « Thermal change of state, creep,
+  **DAF** and load combinations (§8, §9) », yet
+  [Results panel](./issues/08-results-panel-and-provenance-warnings.md) §4 put a
+  `Coefficient dynamique` field in scope at **1,2 `[FIELD:SSF]`** and made the Verdict judge the
+  amplified envelope `T_vide + DAF·(T_chargé − T_vide)`. The line is drawn **inside §8**, not
+  around it: **§8.2's single measured multiplier is in scope**; **§8.3's γ-factor load
+  combination is out** and stays unapplied-but-disclosed, with its formula in a popover
+  (ticket 08 §10). §9 is out entirely. Nothing about the entry's *intent* changed — DAF was
+  listed here before any ticket owned it — but left as written it reads as excluding the one
+  coefficient the Verdict divides by.
 - **Product identity fields — rope/cable désignation, model name, manufacturer.** Ruled out
   while resolving [Material spec model](./issues/05-material-spec-model.md): purely
   decorative, no consumer in the v1 physics, and every such field still costs surface in
   ticket 09's URL schema and ticket 14's defaults. Consistent with the map's zero-product-
   presets decision — the app describes a rope by its numbers, not its name.
+- **A print or report view, and any print stylesheet.** Ruled out while resolving
+  [App shell and routing shape](./issues/13-app-shell-and-routing-shape.md) §1, which had raised a
+  printable-report route as its own sub-question. Refused on
+  [ticket 08](./08-results-panel-and-provenance-warnings.md)'s verdict grammar rather than on
+  effort: that ticket spent five verdict states, a « Ce que cet outil ne calcule pas » block and a
+  rule against ever saying « conforme » to stop the app implying a compliance certificate, and a
+  print target hands all of it back — a printed page is precisely what gets read as an attestation,
+  and a printed « Indéterminé », or a printed « Choisissez un régime » where a verdict should be, is
+  a document that **outlives its context**. Note what is *not* ruled out: ticket 02 §5's client-side
+  SVG export of the chart already in the page, which needs no route and carries no verdict. A real
+  hand-over sheet would need the destination redrawn, and its first question is what a refused or
+  verdict-less state is allowed to print.
+- **A service worker, a PWA manifest, or any installable packaging.** Ruled out while resolving
+  [App shell and routing shape](./issues/13-app-shell-and-routing-shape.md), which had to pin down
+  what this map's "genuinely offline" actually obliges. It is a **data** claim — no network call for
+  terrain or coefficients, no runtime network dependency after load — and not a packaging one. Left
+  undeclared it reads as installable-PWA, which adds a caching layer that can serve a **stale build
+  of a safety tool**: the one failure mode a provenance-obsessed app must not acquire by accident.
 - **Resolving the §16 gap register.** Buying paywalled standards, contacting SSF for the
   Vercors dataset, re-pulling product datasheets. The provenance rule above is how v1
   copes with the gaps instead.

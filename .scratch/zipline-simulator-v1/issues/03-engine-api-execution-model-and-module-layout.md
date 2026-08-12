@@ -196,12 +196,32 @@ type SolveResult =
   | { ok: false; error: SolveError }
 
 type SolveError =
-  | { kind: "invalid-input"; field: string; value: number }        // non-finite/non-positive L₀,w,EA,L — pre-check
+  | { kind: "invalid-input"; field: string; value: number; bound: number; boundKind: "min" | "max" }
+                                                                    // non-finite/non-positive L₀,w,EA,L — pre-check
   | { kind: "no-convergence"; attempts: number; residual: number } // after §5.2's ≤5 re-seeds
   | { kind: "slack-limit"; hFloored: number }                      // §4.3 H→0: the line is lying down
 
 type SolveNote = "near-taut-fallback" | "damped" | "reseeded"
 ```
+
+**Amended 2026-08-12** by [Validation and error-state UX](./11-validation-and-error-state-ux.md)
+§1/§7 (ELECTIONS §0.11) — twice, both in the failure union above.
+
+1. `invalid-input` gains `bound: number; boundKind: "min" | "max"`, shown above. Without the
+   bound, « Tension impossible »'s only actionable copy — « longueur non tendue minimale pour ce
+   câble : 197,40 m » — was unwritable. Same shape of hole as ticket 08's missing DAF field: the
+   state was named, its payload could not say what the user needs.
+2. **`resolveL0` must re-report the bound in the driving quantity.** `solveSpan` reports
+   `field: "L0"` with the §5.4 floor; `resolveL0` (decision 2 above) catches that and re-emits
+   `field: "D_target" | "H_target"` with the bound mapped forward through the same inversion that
+   failed, so flèche mode reads « Flèche minimale atteignable : 0,29 m » and tension mode
+   « Prétension maximale atteignable : 9 074 daN ». Free — `resolveL0` already owns the mode↔`L₀`
+   map — and required, because quoting an `L₀` bound beside a tension field invites typing a
+   length into it.
+
+Also recorded, for the test plan rather than the API: all three error kinds and all three
+`SolveNote`s are **unreachable within the admissible envelope** and must be injected (forced
+iteration cap or stub).
 
 Ground contact is **not** a `SolveError` — it surfaces in `evaluateClearance` as
 `contact: "rider"` (the 2.1 m envelope is violated) or `contact: "cable"` (the cable is in
