@@ -475,6 +475,31 @@ These came out of the charting grill and are not up for re-litigation inside a t
   always open collapsed, so portrait needs no rotate prompt and gets none. Budgets sum to the
   viewport at 390×664, 768×1024 and 1440×900, with the letterbox margin left deliberately empty.
 
+- [Assemble the v1 build spec](./issues/10-assemble-the-v1-build-spec.md)
+  — **the destination artifact exists**: [`spec.md`](./spec.md), 6 317 lines, thirteen sections,
+  every « voir § » cross-reference wired to a real number. All nine brief items and all **six**
+  `Inherited from …` blocks discharged (the brief counted five; ticket 15's is the sixth), and the
+  three parked obligations closed rather than carried: the display-precision table is **tabulated
+  and turned out to be a measured sensitivity decision, not the mechanical derivation ticket 09
+  expected** (`L₀` at 2 decimals, with three consumers, two of which are not readers); the `p1`
+  payload is **measured, not estimated** — 910 / 859 / 897 chars on the three real traces,
+  1065–1071 synthetic at 1000–2000 m, against 2000, so the embed decision stands and both size
+  estimates become in-build re-checks; and ticket 05's `EA`-in-MN is **declared as a carve-out with
+  its reason** rather than reproduced as an inconsistency. Assembly was not transcription — it
+  settled three things no ticket owned: the WorkSafe suspended-load criterion is **one cell, not
+  per end**, numerator `min(η_A, η_B)·MBF` (bare `MBF` would make it the only place in the app
+  crediting an unterminated rope, and yields 77 — a criterion that can never bind), **`pente
+  locale` is percent / 1 decimal / downhill negative**, and **`latest` on five TanStack packages is
+  a real hazard, not a default** — six of §8's decisions are workarounds for measured behaviour
+  contradicting the docs, so an upgrade silently converts a correct workaround into dead code or
+  breaks the ignored-keys banner where **no test can see it**; pinning to the measured tree becomes
+  stage **A0**, ahead of everything in the app phase. Five ADRs written, six candidates tested
+  against the `/domain-modeling` bar and rejected with reasons. §10 is a **28-stage gated order**
+  (P0 · E1–E11 · A0–A12 · P3) where the fixture is written first and the prototype's deletion is
+  sequenced behind three re-checks, never a code lift — §13 carries the four resolving agents'
+  thin spots so they read as *seen*. Two corrections to this map's own text came out of it: the
+  Out-of-scope DAF entry (fixed above) and the frontier note below.
+
 ## Not yet specified
 
 Fog: in scope, heading toward the destination, not yet sharp enough to ticket.
@@ -512,8 +537,13 @@ resolved ticket (03's error payload · 04's gates, its two struck §7 claims and
 override badge and its termination-provenance contradiction · 06's shared x scale and handle lane ·
 07's `x` field placement, its peek control and its VE range · 08's coverage denominator, scope label
 and warning tier · 09's rewrite mechanism, its multi-driver row and its "mechanical" precision
-table · 12's guard rail), or as one scope ruling below. The frontier is empty: **the only open
-ticket is the destination artifact itself.**
+table · 12's guard rail), or as one scope ruling below.
+
+**The map is complete as of 2026-08-12.** The frontier is empty and so is the ticket list: the
+destination artifact — [`spec.md`](./spec.md) — exists, and its own fog sweep confirmed nothing was
+left vague by accident (`pente locale`'s convention graduated into a decision in §5; two
+implementation-level choices with no owner are recorded in §11 as *deferred with their binding
+constraint*, not left open). What remains is execution, which this map deliberately does not carry.
 
 ## Out of scope
 

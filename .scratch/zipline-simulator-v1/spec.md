@@ -38,8 +38,17 @@ against MoorPy 1.3.0. This spec decides *everything else* and re-decides none of
 6. **Never commit.** The agent does not make git commits in this repo.
 
 Stack, fixed: bun · TanStack Start (SSR for the document, `ssr: false` for the app route — § 8)
-· React 19 · Tailwind v4 (CSS-vars theme, no JS config) · shadcn/ui on Base UI · Vitest 4 +
-jsdom per file.
+· React 19 · Tailwind v4 (CSS-vars theme, no JS config) · shadcn/ui on Base UI ·
+**`@tanstack/react-form` · valibot** · Vitest 4, **`node` environment only**.
+
+> ⚠ **Four decisions here are superseded** by
+> [the build backlog's amendments](../zipline-simulator-v1-build/AMENDMENTS.md), taken after this
+> document was assembled: **A** Vitest is unit-only, no component tests, no jsdom · **B**
+> `agent-browser` owns point-to-point testing and § 10 A12's manual re-checks · **C** the TanStack
+> versions are the actual latest (still pinned), with a re-probe obligation on § 8's five measured
+> behaviours · **D** `@tanstack/react-form` owns form state and **valibot replaces the hand-rolled
+> `validateSearch`** — under § 8's four hard rules, unchanged. The paragraphs affected carry a pointer.
+> Everything else below stands.
 
 ### Table of contents
 
@@ -3685,8 +3694,15 @@ converting shipped defaults into a shared scenario.*
 
 #### The validator's hard rules
 
-`validateSearch` is **hand-rolled — no zod**, lives on the index route, and obeys four rules
-that are not stylistic. The required behaviour is per-key salvage with a report, not
+`validateSearch` lives on the index route and obeys four rules that are not stylistic.
+
+> ⚠ **Superseded on one point** by
+> [amendment D](../zipline-simulator-v1-build/AMENDMENTS.md#d--tanstack-form-for-forms-valibot-for-data-validation):
+> it is **no longer hand-rolled — valibot builds it**, with `v.safeParse` (sync, which is what makes
+> it admissible) and **one schema per key**. The four rules below are unchanged and now constrain
+> how valibot may be used: **no `transform`** (that *is* the coercion the 307 measurement forbids),
+> **no `minValue`/`maxValue`** (the URL is a typing boundary), per-key salvage rather than
+> valid-or-throw, and omit-never-`undefined`. The required behaviour is per-key salvage with a report, not
 valid-or-throw.
 
 - **It omits unknown or unrepresentable keys. It never returns `{ key: undefined }`.**
@@ -5328,21 +5344,15 @@ Three things are missing today and each blocks the first test rather than the la
 
 1. **`vitest` has no configuration at all.** `bun run test` is `vitest run` and `vite.config.ts`
    declares no `test` block, so `docs/conventions/testing.md`'s claim that « environment is
-   jsdom » is currently false — the default is `node`. **Keep `node` as the default and opt into
-   jsdom per file** with a docblock:
+   jsdom » is currently false — the default is `node`. **The environment is `node`, always** —
+   [amendment A](../zipline-simulator-v1-build/AMENDMENTS.md#a--vitest-is-for-unit-tests-only-no-component-tests):
+   no `@vitest-environment` docblocks, no per-file DOM, and `jsdom` /
+   `@testing-library/*` come out of `devDependencies`.
 
-   ```ts
-   /**
-    * @vitest-environment jsdom
-    * @vitest-environment-options { "url": "https://example.com/?L=250&h=-40" }
-    */
-   ```
-
-   *Node by default rather than jsdom everywhere, because the engine is the bulk of the suite
-   and is pure — jsdom costs a DOM per file and buys nothing for `solveSpan`. The
-   `@vitest-environment-options` URL is not decoration either: A5's link-arrival cases read the
-   raw query string on the client (« voir § 8 — état, URL et coquille applicative »), so the
-   test's `window.location` is an input to the case, not ambient state.*
+   *`node` only, because the engine is the bulk of the suite and is pure, and because component
+   tests are out: what a DOM would have decided is now `agent-browser`'s. The link-arrival cases
+   that wanted a `window.location` take the **raw query string as a parameter** instead — a pure
+   function, and a better seam than the one the docblock was propping up.*
 2. **A `bench` script.** `vitest bench` globs `*.bench.ts` / `*.benchmark.ts` and replaces
    `test.include` while it runs, so a bench never executes inside `bun run test` unless
    `benchmark.enabled` is set — leave it unset. Add `"bench": "vitest bench"` beside `"test"`.
@@ -5743,11 +5753,19 @@ heights (44 / 60 / 76 px), the View Strip's label widths and the first-run VE (�
 jsdom tests would produce a suite that passes on a broken layout — worse than no test, because
 it reads as coverage.*
 
-Component tests that do need a DOM (`@vitest-environment jsdom` per file,
-`@testing-library/react`): the Skeleton renders the Rail's five headings and both chart frames
-but **no control, no value and no « — »**; the refusal page is the *index* route's
-`errorComponent`; « Saisie en cours » keeps the last valid Sweep marked as such while
-suppressing the verdict and the URL write; « Aucun résultat » blanks the output half and leaves
+> ⚠ **Superseded** by
+> [amendments A and B](../zipline-simulator-v1-build/AMENDMENTS.md#a--vitest-is-for-unit-tests-only-no-component-tests):
+> **there are no component tests and no jsdom.** The Vitest environment is `node`, always. The four
+> states below keep their specified behaviour and change owner — `agent-browser` drives them in a
+> real browser ([ticket 29](../zipline-simulator-v1-build/issues/29-agent-browser-point-to-point-pass.md)),
+> which also takes over the five manual re-checks named just above. Two seams become pure so they stay
+> unit-testable in `node`: the dropped-keys reporter takes the **raw query string** as a parameter, and
+> `readSession` takes the **storage object**.
+
+The four states that were to be component-tested, now `agent-browser`'s: the Skeleton renders the
+Rail's five headings and both chart frames but **no control, no value and no « — »**; the refusal page
+is the *index* route's `errorComponent`; « Saisie en cours » keeps the last valid Sweep marked as such
+while suppressing the verdict and the URL write; « Aucun résultat » blanks the output half and leaves
 the strip a scrub track with its axes.
 
 ### The diff to `docs/conventions/testing.md`
@@ -5755,10 +5773,12 @@ the strip a scrub track with its axes.
 The doc already carries ticket 03's layout and needs six changes. Apply them **before the first
 test file exists** (P0.1):
 
-1. **Environment.** « Environment is `jsdom` » becomes: default `node`; jsdom per file via the
-   `@vitest-environment` docblock, with `@vitest-environment-options` supplying
-   `window.location` where a link-arrival case needs one. Note that `vite.config.ts` has no
-   `test` block today.
+1. **Environment.** « Environment is `jsdom` » becomes **`node`, always**, and the
+   « React component tests use `@testing-library/react` » line is **deleted** — Vitest is
+   unit-only, and `agent-browser` owns point-to-point app testing
+   ([amendments A and B](../zipline-simulator-v1-build/AMENDMENTS.md)). `jsdom`,
+   `@testing-library/react` and `@testing-library/dom` leave `devDependencies`. Note that
+   `vite.config.ts` has no `test` block today.
 2. **Tolerance.** Replace « assert at `1e-3` relative for now » and its single TODO with the
    four-tier table above. **The TODO is discharged** — record why (§5.3's tolerance is fixed and
    ≤ 4×10⁻⁶ was measured), so nobody re-opens it as an oversight.
@@ -6175,6 +6195,13 @@ accepted with its eyes open.
   and record the reason in `package.json`'s vicinity or in
   `docs/conventions/routing.md`, which is already the binding doc for all of it.
 
+  > ⚠ **The versions are superseded, the mechanism is not**, by
+  > [amendment C](../zipline-simulator-v1-build/AMENDMENTS.md#c--tanstack-versions-the-actual-latest-pinned):
+  > pin the **actual latest** instead — `react-router` **1.170.27**, `react-start` **1.168.44**,
+  > `router-plugin` **1.168.30**, transitives as resolved. A patch bump, so it is cheap; but the five
+  > behaviours listed below carry a **re-probe obligation**, and if one has changed it is a § 8
+  > decision to re-open, not a version to nudge.
+
   The argument is that `latest` is not a neutral default here. Six of § 8's decisions are
   *workarounds for measured behaviour that contradicts the documentation*, so an upgrade that
   fixes any of them silently converts a correct workaround into dead code, and an upgrade that
@@ -6250,8 +6277,11 @@ accepted with its eyes open.
   it.
 - **« Saisie en cours » is focus-scoped**, which makes it depend on a UI concern rather than on
   state. Trivially implementable and it is what « mid-edit » means, but it has no representation
-  in the URL or the Session, so it cannot be restored, shared, or unit-tested through the store
-  alone — only through a component test.
+  in the URL or the Session, so it cannot be restored or shared. **This thin spot closes**:
+  [amendment D](../zipline-simulator-v1-build/AMENDMENTS.md#d--tanstack-form-for-forms-valibot-for-data-validation)
+  puts the rule on `@tanstack/react-form`'s `field.state.meta.isTouched` / `isBlurred`, so it is
+  library state and **is** unit-testable — which is also what stops amendment A's removal of
+  component tests from costing it its only check.
 - **« Réinitialiser le scénario » discards a 20-field scenario with no undo and no
   confirmation.** The argument (a confirmation on a non-destructive action devalues the one
   dialog guarding real data loss) is sound; the accepted cost is that a mis-click in the
