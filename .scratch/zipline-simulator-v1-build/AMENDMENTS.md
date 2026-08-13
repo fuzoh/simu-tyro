@@ -139,3 +139,42 @@ Three things this actively improves:
 One trap: **TanStack Form marks every field touched on submit**. This app has **no submit** — it is
 live and continuous — so nothing may depend on that transition. Anything keyed on `isTouched` must
 work without it ever firing.
+
+---
+
+## E · The refusal is a rendered state, not a thrown error — 200 survives
+
+**2026-08-13, by the repo owner**, on the evidence of [ticket 15](./issues/15-pin-tanstack-versions.md)'s
+re-probe. **Amends** § 8's refusal mechanism and the parts of § 7 and § 13 that name an
+`errorComponent`. It changes **no user-visible behaviour** — that is the whole point of it.
+
+**What the re-probe found.** Amendment C's probe 4 came back **changed**: on the pinned tree, a thrown
+`validateSearch` under `ssr: false` answers **HTTP 500**, where the tree § 8 measured answered 200.
+Reproduced in dev and on a production build. TanStack rewrote the load path (`load-matches.js` →
+`load-server.js`) and `applyFailure` now returns `status: 500`. This is not a version to nudge.
+
+**The decision.** § 8 elected `ssr: false` partly *because* the refusal arrived at 200; § 7's refusal
+copy (« nothing failed to load and the status line agrees ») rests on it, and § 13's crawler and
+link-preview thin spot is written around it. Those commitments are kept. The **throw** is what goes.
+
+- **`validateSearch` no longer throws** for § 8's three refusal classes — unknown `v`, `tr`
+  undecodable or oversize, two tightness drivers present. It **salvages the refusal into the
+  validated search** as a `refused` marker carrying the existing `RefusalKind`, and returns normally.
+- **The index route renders the refusal surface as an ordinary component** when `search.refused` is
+  set — still after a Skeleton frame, still leaving the shell and the back button intact, still the
+  *index* route and never the root's. The status is **200** because nothing failed.
+- **`LinkRefusal` survives as the carrier**, not as a thrown control-flow device: the kind, the
+  message and `received` are what the marker holds, so the `node` unit tests keep asserting the
+  refusal with no router in the room.
+- **The other three probes are unchanged** and § 8's four validator rules (no `transform`, no range
+  checks, per-key salvage, omit-never-`undefined`, synchronous) bind exactly as before. A refusal is
+  still whole-link — it is checked on the **raw** bag before per-key salvage, and it suppresses the
+  rest of the screen rather than merging with it.
+
+**What this costs.** § 8's sentence naming the index route's `errorComponent` as the refusal's owner
+is **struck**; the route may still declare one for genuine load failures, but no refusal reaches it.
+Anything that asserted « a thrown `validateSearch` » as the mechanism now asserts the marker.
+
+**Lands on** tickets **20** (rework: salvage instead of throw), **22** (render the refusal surface
+from `search.refused`), **26** (banner precedence and the refusals), **29** (the walkthrough asserts
+**200**, and it now genuinely is one).

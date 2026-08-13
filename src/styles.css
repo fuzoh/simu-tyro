@@ -133,3 +133,25 @@
     @apply font-sans;
   }
 }
+
+/**
+ * § 5's hit radii — « CSS only, no JS branch ». The rider's grab target is a transparent circle
+ * with a transparent **stroke**: `r + sw/2` gives 36 px on a fine pointer and 44 px under
+ * `@media (pointer: coarse)`. Stroke width is used deliberately in place of the SVG2 geometry
+ * property `r`, whose CSS support is uneven — a stroke is a plain presentation property
+ * everywhere, so the whole rule is one media query.
+ */
+@layer components {
+  .chart-grab {
+    fill: transparent;
+    pointer-events: all;
+    stroke: transparent;
+    stroke-width: 14px;
+  }
+
+  @media (pointer: coarse) {
+    .chart-grab {
+      stroke-width: 22px;
+    }
+  }
+}

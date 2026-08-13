@@ -1,0 +1,322 @@
+/**
+ * **The three refusal surfaces, and the diagnostic** — « v1 build spec » § 7 (*Les trois refus*,
+ * *« Tension impossible » — la borne §5.4 est la charge de rupture*, *« Calcul impossible » —
+ * aucun résidu à l'écran, aucun `SolveNote`, aucun panneau dev*).
+ *
+ * The engine refuses in **three kinds** and the app shows **three surfaces**, and the two sets do
+ * not line up one for one — `no-convergence` has two origins needing two surfaces because
+ * `resolveL0` shares the engine's error union. That mapping *is* what users see, so it lives here,
+ * as a pure function of the failure, and never as a `switch` inside a component:
+ *
+ * | Engine | Surface |
+ * | --- | --- |
+ * | `invalid-input{field: "L0" \| "D_target" \| "H_target"}` | **Tension impossible**, with the attainable bound and **no Fix Action** |
+ * | `resolveL0`'s bracket failure — `no-convergence` at stage `L0` | **Cible inatteignable**, naming the *target* |
+ * | `solveSpan`'s `no-convergence` **or** `slack-limit` | **Calcul impossible**, with `[ Copier le diagnostic ]` |
+ *
+ * Rules this module exists to keep:
+ *
+ * - **« Tension impossible » carries no Fix Action, and the reason is not restraint**: §5.4's chord
+ *   bound *is* the breaking load, so no unambiguous repair exists. You cannot tension a rope past
+ *   its breaking load, and a rupture verdict would report a line that cannot exist.
+ * - **The bound is quoted in the driving field's own quantity and unit, and never twice.** In
+ *   tension mode the copy states the prétension and *not* « soit L₀ ≥ 197,40 m »: a second
+ *   equivalent invites the user to type a length into a tension field. That is why the two
+ *   mode-specific messages depend on `resolveL0` re-emitting the floor in the driving quantity —
+ *   without it the state degrades to quoting an `L₀` floor at a user editing a tension.
+ * - **Two kinds share one surface because they map to the same non-action.** `no-convergence` and
+ *   `slack-limit` are both « Calcul impossible »; a state earns its own presentation when it maps
+ *   to a *different* user action, and these two do not.
+ * - **No residual on screen, no `SolveNote`, no dev panel.** Measured across 349 440 instrumented
+ *   solves: `reseeded` 0, §4.3's near-taut condition 0. The evidence goes to the **clipboard**
+ *   instead — plain text, English keys, full float precision, decimal point — because rounding it
+ *   to the display grain would destroy the thing it exists to carry.
+ * - **Two things that look like refusals and are not.** Deep slack *converges* and is the « Câble
+ *   au sol » verdict; and `Indéterminé` is a complete solve of an incomplete traverse, hence a
+ *   verdict state. Neither reaches this module.
+ */
+
+import type { ForceUnit, ScenarioDraft } from "@/lib/scenario/types.ts";
+import type { SolveError, SolveNote, TightnessSpec } from "@/lib/sim";
+
+import { formatQuantity } from "@/lib/format/quantity.ts";
+import { SOLVER } from "@/lib/sim";
+
+/** The three surfaces § 7 names. Three, not two: `no-convergence` has two origins. */
+export type RefusalId = "tension-impossible" | "cible-inatteignable" | "calcul-impossible";
+
+/**
+ * One rendered refusal. **There is no `fixes` field**, and its absence is the decision: the only
+ * action any of the three offers is `[ Copier le diagnostic ]`, and only « Calcul impossible »
+ * offers it.
+ */
+export type EngineRefusal = {
+  readonly id: RefusalId;
+  /** § 7's copy, verbatim, with the bound or the target filled in. */
+  readonly message: string;
+  /** Does this surface carry `[ Copier le diagnostic ]`? True for « Calcul impossible » alone. */
+  readonly diagnostic: boolean;
+};
+
+/**
+ * Which half of the rider-free chain refused. The engine's error union is shared by both, so the
+ * stage is what tells `resolveL0`'s bracket failure (« Cible inatteignable ») apart from
+ * `solveSpan`'s own `no-convergence` (« Calcul impossible ») — ELECTIONS §0.2's « three states,
+ * not the two a naive collapse gives ».
+ */
+export type SolveStage = "L0" | "span";
+
+/** One engine refusal, with the stage that produced it. `@/lib/rail/deduced.ts` publishes it. */
+export type EngineFailure = { readonly stage: SolveStage; readonly error: SolveError };
+
+/** The one action a refusal offers, on the one surface that offers it. */
+export const DIAGNOSTIC_ACTION = "Copier le diagnostic";
+
+/** Both mode-specific messages open on this sentence — the physics, stated once. */
+const TENSION_LEAD = "⛔ Tension impossible — la ligne casserait avant d'atteindre cette tension.";
+
+/** One surface, two kinds, same user action. It is thin on purpose: no residual, no note. */
+const CALCUL_IMPOSSIBLE: EngineRefusal = {
+  id: "calcul-impossible",
+  message:
+    "⛔ Calcul impossible pour cette configuration. Le solveur n'a pas convergé — ce cas n'est pas censé se produire. Modifiez légèrement la tension ou la géométrie.",
+  diagnostic: true,
+};
+
+/** The short clause « Aucun résultat » echoes — voir `./banner.ts`, which writes that sentence. */
+export const REFUSAL_CAUSE: Record<RefusalId, string> = {
+  "tension-impossible": "tension impossible",
+  "cible-inatteignable": "cible inatteignable",
+  "calcul-impossible": "calcul impossible",
+};
+
+/**
+ * The surface one engine refusal renders as.
+ *
+ * @param unit the global force selector — a bound in tension mode is quoted in the unit the field
+ *   the user is editing reads in, which is the whole of « in the driving field's own quantity ».
+ * @returns `null` when the failure is **not** one of the three refusals: `invalid-input` on `L`,
+ *   `h`, `w`, `EA` or `strength` is a statement about the span, and the three gates own it as a
+ *   blocking error on an editable field. A refusal never doubles a field message.
+ */
+export function engineRefusal(
+  { stage, error }: EngineFailure,
+  { tightness, unit = "daN" }: { tightness: TightnessSpec; unit?: ForceUnit },
+): EngineRefusal | null {
+  if (error.kind === "invalid-input") {
+    // §5.4's floor, in whichever quantity `resolveL0` re-emitted it. Every other field is tier
+    // one's or a gate's, and this module says nothing about it.
+    switch (error.field) {
+      case "L0":
+        return {
+          id: "tension-impossible",
+          // The one row that echoes the offending value: `L₀` is a field the user typed, and what
+          // was typed is the evidence. The two inverted modes quote the bound **alone** — a second
+          // number beside an attainable maximum reads as a second target.
+          message: `${TENSION_LEAD} Longueur non tendue minimale pour ce câble : ${formatQuantity(
+            "L0",
+            error.bound,
+          )} · valeur : ${formatQuantity("L0", error.value)}.`,
+          diagnostic: false,
+        };
+      case "H_target":
+        return {
+          id: "tension-impossible",
+          message: `${TENSION_LEAD} Prétension maximale atteignable : ${formatQuantity(
+            "H_target",
+            error.bound,
+            unit,
+          )}.`,
+          diagnostic: false,
+        };
+      case "D_target":
+        return {
+          id: "tension-impossible",
+          message: `${TENSION_LEAD} Flèche minimale atteignable : ${formatQuantity(
+            "D_target",
+            error.bound,
+          )}.`,
+          diagnostic: false,
+        };
+      default:
+        return null;
+    }
+  }
+
+  // A bracket failure for any reason **other** than rupture, and only `resolveL0` can produce one:
+  // the same kind out of `solveSpan` is the solver failing on a target it was handed, which is a
+  // different sentence and a different (non-)action.
+  if (error.kind === "no-convergence" && stage === "L0" && tightness.mode !== "length") {
+    return {
+      id: "cible-inatteignable",
+      message: `⛔ Cible inatteignable — aucune longueur non tendue ne donne ${target(
+        tightness,
+        unit,
+      )}.`,
+      diagnostic: false,
+    };
+  }
+
+  return CALCUL_IMPOSSIBLE;
+}
+
+/** « cette flèche à vide (6,00 m) » / « cette prétension (9074,0 daN) » — the target, named. */
+function target(tightness: TightnessSpec, unit: ForceUnit): string {
+  if (tightness.mode === "sag") {
+    return `cette flèche à vide (${formatQuantity("D_target", tightness.D_target)})`;
+  }
+  if (tightness.mode === "tension") {
+    return `cette prétension (${formatQuantity("H_target", tightness.H_target, unit)})`;
+  }
+  return `cette longueur non tendue (${formatQuantity("L0", tightness.L0)})`;
+}
+
+/**
+ * What `[ Copier le diagnostic ]` puts on the clipboard. **Evidence, not UI copy**: English keys,
+ * full float precision, a decimal point, and no terrain — `solveSpan` is terrain-free and
+ * clearance is a reducer above it, so a solve failure is fully reproducible without the 200-row
+ * trace.
+ */
+export type DiagnosticInput = {
+  readonly failure: EngineFailure;
+  /** The instant, ISO-8601. **A parameter**, so the payload is a pure function with no clock. */
+  readonly at: string;
+  /** The build identifier the header carries. */
+  readonly build: string;
+  readonly scenario: ScenarioDraft;
+  /** The span posed to the solver. `L0` is `null` when the inversion itself is what refused. */
+  readonly span: { readonly L: number; readonly h: number; readonly L0: number | null } | null;
+  /** What the solver consumed, or `null` while the Material Spec is still incomplete. */
+  readonly derived: { readonly w: number; readonly EA: number; readonly strength: number } | null;
+  /** The point loads, in engine units — empty on the unloaded solve. */
+  readonly loads?: readonly { readonly x: number; readonly P: number }[];
+  /**
+   * The canonical link, or `null` where it would be refused. `null` prints « (non partageable —
+   * tracé hors budget) », so the payload **never silently omits a field**.
+   */
+  readonly address: string | null;
+  /**
+   * §5's internal remedies, counted. A failed solve publishes none — the union carries them on
+   * success only — so this is normally empty and the line reads three zeroes. It is printed
+   * anyway: a reader has to be able to tell « none » from « not recorded ».
+   */
+  readonly notes?: readonly SolveNote[];
+};
+
+/** Every `SolveNote`, in the order the payload counts them. */
+const NOTE_ORDER: readonly SolveNote[] = ["damped", "reseeded", "near-taut-fallback"];
+
+export function diagnosticPayload(input: DiagnosticInput): string {
+  const { failure, at, build, scenario, span, derived, address, loads = [], notes = [] } = input;
+  const lines = [`scoutech diagnostic — ${at} — build ${build}`, ...errorLines(failure, span)];
+
+  const counted = NOTE_ORDER.map((note) => `${note}×${notes.filter((n) => n === note).length}`);
+  lines.push(key("notes", counted.join("  ")));
+
+  const { tightness } = scenario;
+  const targetValue =
+    tightness.mode === "sag"
+      ? tightness.D_target
+      : tightness.mode === "tension"
+        ? tightness.H_target
+        : tightness.L0;
+  lines.push(tag("resolveL0", `mode=${tightness.mode}  target=${num(targetValue)}`));
+
+  if (span !== null && derived !== null) {
+    lines.push(
+      tag(
+        "solveSpan",
+        `L=${num(span.L)}  h=${num(span.h)}  L0=${span.L0 === null ? "—" : num(span.L0)}  w=${num(
+          derived.w,
+        )}  EA=${num(derived.EA)}`,
+      ),
+      // Continuation line, indented under the tag it belongs to.
+      `${" ".repeat(12)}loads=[${loads
+        .map((load) => `{x:${num(load.x)},P:${num(load.P)}}`)
+        .join(",")}]`,
+    );
+  }
+
+  lines.push(tag("material", materialLine(scenario.material, derived?.strength ?? null)));
+  lines.push(tag("address", address ?? "(non partageable — tracé hors budget)"));
+  return lines.join("\n");
+}
+
+/** The kind and the numbers that kind carries. Three shapes, because the union has three arms. */
+function errorLines({ error }: EngineFailure, span: DiagnosticInput["span"]): readonly string[] {
+  if (error.kind === "no-convergence") {
+    return [
+      key("kind", "no-convergence"),
+      key("attempts", String(error.attempts)),
+      key("residual", error.residual.toExponential(4)),
+      // §5.3's tolerance is **L-scaled beyond 1000 m**, so a residual printed without it could not
+      // be interpreted — which is exactly why § 7 keeps both off the screen and both in here.
+      key("tolerance", toleranceOf(span).toExponential()),
+    ];
+  }
+  if (error.kind === "slack-limit") {
+    return [key("kind", "slack-limit"), key("hFloored", num(error.hFloored))];
+  }
+  return [
+    key("kind", "invalid-input"),
+    key("field", error.field),
+    key("value", num(error.value)),
+    key("bound", num(error.bound)),
+    key("boundKind", error.boundKind),
+  ];
+}
+
+/** §5.3's tolerance for this span: `1×10⁻⁶ m` up to the crossover, `1×10⁻⁶·L` beyond it. */
+function toleranceOf(span: DiagnosticInput["span"]): number {
+  const L = span?.L ?? 0;
+  return L <= SOLVER.toleranceScaleSpan ? SOLVER.tolerance : SOLVER.tolerance * L;
+}
+
+/**
+ * The active spec, as the fields the user could change — overrides named, never summarised. It
+ * takes the **draft**, blanks included: a diagnostic copied while a textile field is still empty
+ * has to say `MBL=null`, which is the state, rather than a fabricated zero.
+ *
+ * @param strength the breaking load the solver actually consumed, N, or `null` while the spec is
+ *   still incomplete. It is printed because « Tension impossible »'s bound **is** `chord/(1 +
+ *   MBF/EA)`: without it the reader of the payload has to re-derive the number that produced the
+ *   refusal from `d`, `R0` and the construction.
+ */
+function materialLine(material: ScenarioDraft["material"], strength: number | null): string {
+  if (material.family === "textile") {
+    return `family=textile  cls=${material.ropeClass}  MBL=${blank(material.MBL)}  mu=${blank(
+      material.mu,
+    )}  k=${blank(material.k)}`;
+  }
+  const overrides = material.overrides ?? {};
+  const written = (["MBF", "EA", "mu"] as const)
+    .filter((id) => overrides[id] !== undefined)
+    .map((id) => `${id}=${num(overrides[id] as number)}`);
+  return `family=steel  d=${num(material.d)}  R0=${material.R0}  cst=${
+    material.construction === "iwrc" ? "iwrc" : "tc"
+  }  MBF=${blank(strength)}  overrides=${written.length === 0 ? "none" : written.join(",")}`;
+}
+
+/** `kind        no-convergence` — the key column is 12 characters, like the `[tag]` column. */
+function key(name: string, value: string): string {
+  return `${name.padEnd(12)}${value}`;
+}
+
+/** `[solveSpan] L=150  h=-18` — the same 12-character column, so the two blocks line up. */
+function tag(name: string, value: string): string {
+  return `${`[${name}]`.padEnd(12)}${value}`;
+}
+
+/**
+ * **Full float precision, decimal point.** The payload is evidence: rounding a residual or an `L₀`
+ * to the display grain would destroy the one thing it exists to carry, and the comma is a UI
+ * convention that would make the numbers unpastable into a REPL.
+ */
+function num(value: number): string {
+  return String(value);
+}
+
+/** A textile blank prints as `null` — « the user never filled it » is itself evidence. */
+function blank(value: number | null): string {
+  return value === null ? "null" : num(value);
+}

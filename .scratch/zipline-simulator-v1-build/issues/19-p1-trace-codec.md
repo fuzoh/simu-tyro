@@ -1,7 +1,7 @@
 # A4 · `url/p1.ts` — the trace payload codec
 
 Stage: A4
-Status: open
+Status: done
 Blocked by: 17, 18
 Spec: [v1 build spec](../../zipline-simulator-v1/spec.md) § 8, § 11
 
@@ -47,3 +47,10 @@ zigzag varint, centimetres, **altitude quantised by ceiling**, straightness carr
 - **Decode timing (2,3–2,5 µs) belongs in `p1.bench.ts`, not in a test.** A microsecond assertion in
   CI is a flake generator.
 - Stations `sa` / `sb` are full-precision scalars, so `L = sb − sa` is unaffected by cm quantisation.
+
+## Comments
+
+**Done.** `src/lib/url/p1.ts` — `encodeP1` / `validateP1` / `decodeP1`, plus `fitsLinkBudget`,
+`P1_PREFIX`, `URL_BUDGET_CHARS` and the `P1Error` refusal (`illisible` · `hors-budget`) — with
+`p1.test.ts` (48 cases) and `p1.bench.ts` beside it. Status flipped during ticket 20's fix round:
+the deliverable and its gate table were already in the tree and green, only the board was stale.

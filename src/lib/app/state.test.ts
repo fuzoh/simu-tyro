@@ -1,0 +1,380 @@
+/**
+ * § 8's mount order, and the four things that hang off it: the Session precedence, the wholesale
+ * link, the rewrite trigger and the dropped-keys report. All of it `node`, no router and no DOM —
+ * `initialAppState` takes the raw query string and the Session as parameters precisely so that it
+ * can be (amendment A).
+ */
+
+import { describe, expect, it } from "vitest";
+
+import type { Session } from "@/lib/session/session.ts";
+
+import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
+import { DEFAULT_LAYERS } from "@/lib/session/session.ts";
+import { encodeP1 } from "@/lib/url/p1.ts";
+import { FIRST_RUN_LINK } from "@/lib/url/schema.ts";
+
+import { appReducer, initialAppState } from "./state.ts";
+
+/** The query string of § 9's first-run link — a complete, canonical, nothing-to-do bag. */
+const CANONICAL_QUERY = FIRST_RUN_LINK.slice(FIRST_RUN_LINK.indexOf("?"));
+
+/** The samples behind {@link TRACE}, for the tests that need the decoded profile too. */
+const TRACE_DATA = {
+  d: Float64Array.from([0, 100, 200]),
+  z: Float64Array.from([0, -5, -12]),
+};
+
+/** A real `p1.` payload: the validator walks it structurally, so a made-up one is a refusal. */
+const TRACE = encodeP1({ ...TRACE_DATA, dev: 0 });
+
+/** A returning user's Session: their own span, their own toggles, a rope kept on the side. */
+function storedSession(): Session {
+  const scenario = firstRunDefaults();
+  scenario.geometry = { source: "manual", L: 420, h: -33 };
+  scenario.rider.xD = 210;
+  return {
+    scenario,
+    retainedMaterial: FIRST_RUN_RETAINED_TEXTILE,
+    retainedManual: { L: 150, h: -18 },
+    trace: null,
+    layers: { unloadedLine: true, chordAB: false },
+  };
+}
+
+describe("initialAppState — § 8's mount order", () => {
+  describe("bare `/` means « restore the Session »", () => {
+    it("opens on the Session, announces nothing and rewrites nothing", () => {
+      const session = storedSession();
+      const state = initialAppState({ query: "", session });
+
+      expect(state.scenario).toEqual(session.scenario);
+      expect(state.layers).toEqual(session.layers);
+      expect(state.retainedManual).toEqual({ L: 150, h: -18 });
+      // A rewrite here would make `/` destroy itself: the next refresh would stop restoring.
+      expect(state.link.rewrite).toBeNull();
+      expect(state.link.dropped).toEqual([]);
+      expect(state.link.completed).toEqual([]);
+    });
+
+    it("falls back to § 9's shipped defaults when there is no Session", () => {
+      const state = initialAppState({ query: "", session: null });
+
+      expect(state.scenario).toEqual(firstRunDefaults());
+      expect(state.layers).toEqual(DEFAULT_LAYERS);
+      expect(state.retainedMaterial).toEqual(FIRST_RUN_RETAINED_TEXTILE);
+      expect(state.trace).toBeNull();
+      expect(state.link.rewrite).toBeNull();
+    });
+
+    it("treats `?v=1` alone as bare — `v` names the schema, not the line", () => {
+      const session = storedSession();
+      expect(initialAppState({ query: "?v=1", session }).scenario).toEqual(session.scenario);
+    });
+  });
+
+  describe("any recognised key wins wholesale, and never merges", () => {
+    it("takes the Scenario from the link and the extras from the Session", () => {
+      const session = storedSession();
+      const state = initialAppState({ query: "?L=250&h=-40", session });
+
+      expect(state.scenario.geometry).toEqual({ source: "manual", L: 250, h: -40 });
+      // Not the Session's 420 m span with the link's 250 m rider on it — a third scenario nobody
+      // authored is exactly what « never a merge » forbids.
+      expect(state.scenario.rider.xD).toBe(125);
+      // The retained alternate, the cached Trace and the toggles are things a link never carries.
+      expect(state.layers).toEqual(session.layers);
+      expect(state.retainedManual).toEqual({ L: 150, h: -18 });
+    });
+
+    it("completes the recognised keys it omits, literally, from § 9", () => {
+      const state = initialAppState({ query: "?L=250&h=-40", session: null });
+
+      expect(state.link.completed).toContain("fl");
+      expect(state.link.completed).toContain("mp");
+      // `reg` and the three overrides are exempt: their absence **is** the meaning.
+      expect(state.link.completed).not.toContain("reg");
+      expect(state.link.completed).not.toContain("mbf");
+      expect(state.scenario.regime).toBeNull();
+      expect(state.scenario.tightness).toEqual({ mode: "sag", D_target: 6 });
+    });
+  });
+
+  describe("the dropped-keys report", () => {
+    it("names each dropped key with **which** fault it was", () => {
+      const state = initialAppState({ query: "?L=250&h=-40&xy=1&za=oops", session: null });
+
+      expect(state.link.dropped).toEqual([
+        { key: "za", reason: "valeur-non-représentable" },
+        { key: "xy", reason: "clé-inconnue" },
+      ]);
+    });
+
+    it("still names the key when **nothing** recognised survived beside it", () => {
+      // `?junk=zz` restores the Session like a bare `/`, but it is not bare: § 8's salvage table
+      // gives « clé inconnue » a strip line, and the rewrite is the only thing that can take the
+      // key out of the address bar. Losing the report here would lose the whole class.
+      const state = initialAppState({ query: "?junk=zz", session: storedSession() });
+
+      expect(state.link.dropped).toEqual([{ key: "junk", reason: "clé-inconnue" }]);
+      // The empty bag — a bare `/`, which is what « restore the Session » looks like in an address
+      // bar. **Never** the completed defaults: that would convert the restore into a shared link.
+      expect(state.link.rewrite).toEqual({});
+      expect(state.link.completed).toEqual([]);
+      expect(state.scenario).toEqual(storedSession().scenario);
+    });
+
+    it("keeps the `v` a junk-only link arrived with, and drops only the junk", () => {
+      const state = initialAppState({ query: "?v=1&xy=1", session: null });
+
+      expect(state.link.dropped).toEqual([{ key: "xy", reason: "clé-inconnue" }]);
+      expect(state.link.rewrite).toEqual({ v: 1 });
+    });
+
+    it("does **not** rewrite a bare `/` or a `?v=1` that dropped nothing", () => {
+      expect(initialAppState({ query: "", session: null }).link.rewrite).toBeNull();
+      expect(initialAppState({ query: "?v=1", session: null }).link.rewrite).toBeNull();
+    });
+
+    it("reports nothing beside a refusal — the refusal is whole-link", () => {
+      const state = initialAppState({ query: "?v=3&xy=1", session: null });
+
+      expect(state.link.refused).toMatchObject({ kind: "version-inconnue", received: 3 });
+      expect(state.link.dropped).toEqual([]);
+    });
+  });
+
+  describe("the refusal suppresses the screen rather than merging with it", () => {
+    it("carries amendment E's marker and rewrites nothing", () => {
+      const state = initialAppState({ query: "?fl=6&lo=151", session: null });
+
+      expect(state.link.refused).toMatchObject({ kind: "deux-directeurs" });
+      // Completion is the one operation that would turn « refused whole » into a silent repair.
+      expect(state.link.rewrite).toBeNull();
+      expect(state.link.completed).toEqual([]);
+    });
+
+    it("leaves the Session standing behind it — the back button lands on a live app", () => {
+      const session = storedSession();
+      expect(initialAppState({ query: "?v=3", session }).scenario).toEqual(session.scenario);
+    });
+  });
+
+  describe("the rewrite is content, never order", () => {
+    it("fires when a key was dropped", () => {
+      const state = initialAppState({ query: "?L=250&h=-40&xy=1", session: null });
+      expect(state.link.rewrite).not.toBeNull();
+      expect(state.link.rewrite).not.toHaveProperty("xy");
+    });
+
+    it("fires when a key was completed", () => {
+      expect(initialAppState({ query: "?L=250&h=-40", session: null }).link.rewrite).not.toBeNull();
+    });
+
+    it("fires when a key left because it is not the active configuration", () => {
+      // A redundant `L` beside a `tr` gets no strip line — with a trace present `L` is derived —
+      // but leaving it in the address bar would contradict the screen.
+      const state = initialAppState({
+        query: `?v=1&L=250&sa=0&sb=200&tr=${TRACE}${completeTail()}`,
+        session: null,
+      });
+      expect(state.link.rewrite).not.toBeNull();
+      expect(state.link.rewrite).not.toHaveProperty("L");
+    });
+
+    it("does **not** fire on a complete canonical link", () => {
+      expect(initialAppState({ query: CANONICAL_QUERY, session: null }).link.rewrite).toBeNull();
+    });
+
+    it("does **not** fire on the same keys in another order", () => {
+      const shuffled = CANONICAL_QUERY.slice(1).split("&").reverse().join("&");
+      const state = initialAppState({ query: `?${shuffled}`, session: null });
+      // Firing a `replace` for cosmetics would rewrite a URL the user is mid-way through editing.
+      expect(state.link.rewrite).toBeNull();
+      expect(state.scenario).toEqual(firstRunDefaults());
+    });
+
+    it("carries the clamped `x`, so the address bar holds what the app holds", () => {
+      const state = initialAppState({ query: "?L=150&h=-18&x=400", session: null });
+
+      expect(state.link.xClamped).toBe(true);
+      expect(state.scenario.rider.xD).toBe(150);
+      expect(state.link.rewrite).toMatchObject({ x: 150 });
+    });
+
+    it("does not claim a clamp that did not happen", () => {
+      expect(initialAppState({ query: CANONICAL_QUERY, session: null }).link.xClamped).toBe(false);
+    });
+  });
+});
+
+/** The keys an imported link needs so that completion adds nothing and only the `L` row moves. */
+function completeTail(): string {
+  const canonical = CANONICAL_QUERY.slice(1)
+    .split("&")
+    .filter((pair) => !/^(v|L|h|x)=/.test(pair));
+  return `&${canonical.join("&")}&x=100`;
+}
+
+describe("appReducer — one reducer over one object", () => {
+  const state = initialAppState({ query: "", session: null });
+
+  it("replaces the scenario wholesale", () => {
+    const scenario = firstRunDefaults();
+    scenario.rider.xD = 10;
+    const next = appReducer(state, { type: "scénario/remplacé", scenario });
+    expect(next.scenario.rider.xD).toBe(10);
+    expect(next.layers).toBe(state.layers);
+  });
+
+  it("patches one part of it and leaves the rest identical", () => {
+    const next = appReducer(state, {
+      type: "scénario/modifié",
+      patch: { regime: "en15567" },
+    });
+    expect(next.scenario.regime).toBe("en15567");
+    expect(next.scenario.geometry).toBe(state.scenario.geometry);
+    expect(state.scenario.regime).toBeNull();
+  });
+
+  it("sets § 5's two toggles without touching the scenario", () => {
+    const layers = { unloadedLine: true, chordAB: false };
+    const next = appReducer(state, { type: "calques/basculés", layers });
+    expect(next.layers).toEqual(layers);
+    expect(next.scenario).toBe(state.scenario);
+  });
+});
+
+/**
+ * A9's five actions — the ones that touch more than one property of the state object. Everything
+ * else the Rail does is a `scénario/modifié` patch built by `@/lib/rail/values.ts`.
+ */
+describe("appReducer — the Rail's five structural actions", () => {
+  const first = initialAppState({ query: "", session: null });
+
+  describe("« Réinitialiser le scénario » — § 9's reset table, column by column", () => {
+    const edited = appReducer(
+      { ...first, trace: { d: TRACE_DATA.d, z: TRACE_DATA.z, dev: 0, fileName: "pont.csv" } },
+      { type: "scénario/modifié", patch: { unit: "kN", regime: "en15567" } },
+    );
+    const reset = appReducer(edited, { type: "scénario/réinitialisé" });
+
+    it("returns the active configuration to the shipped defaults", () => {
+      expect(reset.scenario.geometry).toEqual({ source: "manual", L: 150, h: -18 });
+      expect(reset.scenario.tightness).toEqual({ mode: "sag", D_target: 6 });
+      // « — choisir — » again: the régime is part of the active configuration.
+      expect(reset.scenario.regime).toBeNull();
+    });
+
+    it("keeps the Trace cached, the retained spec and the display preferences", () => {
+      // Keeping it cached forces a re-add path, or the cache is dead weight — hence the
+      // file-identity line's fourth state.
+      expect(reset.trace).toBe(edited.trace);
+      expect(reset.retainedMaterial).toBe(edited.retainedMaterial);
+      expect(reset.layers).toBe(edited.layers);
+      expect(reset.scenario.unit).toBe("kN");
+    });
+  });
+
+  describe("the family flip retains **both** Material Specs", () => {
+    const textile = appReducer(first, { type: "matériau/famille", family: "textile" });
+
+    it("§ 9's blank rope is what a first flip lands on", () => {
+      // No rope ships: one invented `MBL` decides the verdict.
+      expect(textile.scenario.material).toEqual(FIRST_RUN_RETAINED_TEXTILE.spec);
+      expect(textile.retainedMaterial?.spec).toEqual(first.scenario.material);
+    });
+
+    it("the terminations flip with the family — the whitelist is scoped by it", () => {
+      // A steel `cosse` left on a rope is a value the textile picker's own option list does not
+      // contain, so the control would silently display its first option instead — § 3 retains the
+      // inactive spec « overrides *and* terminations included ».
+      expect(textile.scenario.terminations).toEqual(FIRST_RUN_RETAINED_TEXTILE.terminations);
+      expect(textile.retainedMaterial?.terminations).toEqual(first.scenario.terminations);
+    });
+
+    it("flipping back restores what you built, overrides and terminations included", () => {
+      const built = appReducer(textile, {
+        type: "scénario/modifié",
+        patch: {
+          material: { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 },
+          terminations: {
+            A: { id: "epissure-longue-hmpe", eta: 0.9 },
+            B: { id: "oeil-cousu-epissure", eta: 0.85 },
+          },
+        },
+      });
+      const backToSteel = appReducer(built, { type: "matériau/famille", family: "steel" });
+      expect(backToSteel.scenario.material).toEqual(first.scenario.material);
+      expect(backToSteel.scenario.terminations).toEqual(first.scenario.terminations);
+      expect(backToSteel.retainedMaterial?.spec).toEqual(built.scenario.material);
+      expect(backToSteel.retainedMaterial?.terminations).toEqual(built.scenario.terminations);
+
+      // And the rope comes back exactly as it was left, hardware and all.
+      const backToTextile = appReducer(backToSteel, {
+        type: "matériau/famille",
+        family: "textile",
+      });
+      expect(backToTextile.scenario.material).toEqual(built.scenario.material);
+      expect(backToTextile.scenario.terminations).toEqual(built.scenario.terminations);
+    });
+
+    it("asking for the family already active changes nothing", () => {
+      expect(appReducer(first, { type: "matériau/famille", family: "steel" })).toBe(first);
+    });
+  });
+
+  describe("import, removal and re-use — one Trace, three lifetimes", () => {
+    const trace = { d: TRACE_DATA.d, z: TRACE_DATA.z, dev: 0, fileName: "pont.csv" };
+    const imported = appReducer(first, { type: "tracé/importé", trace, tr: TRACE });
+
+    it("anchor A goes to the first station and B to the last — the trace *is* the span", () => {
+      expect(imported.scenario.geometry).toEqual({
+        source: "trace",
+        trace: TRACE,
+        sa: 0,
+        sb: 200,
+      });
+      expect(imported.trace).toBe(trace);
+    });
+
+    it("the displaced manual `L`/`h` are retained and restored **exactly**", () => {
+      const removed = appReducer(imported, { type: "tracé/retiré" });
+      expect(imported.retainedManual).toEqual({ L: 150, h: -18 });
+      expect(removed.scenario.geometry).toEqual({ source: "manual", L: 150, h: -18 });
+      // Removal discards the stations, **not** the Trace.
+      expect(removed.trace).toBe(trace);
+    });
+
+    it("« Réutiliser ce tracé » re-places A and B exactly as an import does", () => {
+      const removed = appReducer(imported, { type: "tracé/retiré" });
+      const reused = appReducer(removed, { type: "tracé/réutilisé", tr: TRACE });
+      expect(reused.scenario.geometry).toEqual(imported.scenario.geometry);
+    });
+
+    it("a reset leaves the fourth state behind: cached, and no longer the terrain", () => {
+      const reset = appReducer(imported, { type: "scénario/réinitialisé" });
+      expect(reset.scenario.geometry).toEqual({ source: "manual", L: 150, h: -18 });
+      expect(reset.trace).toBe(trace);
+    });
+
+    it("a terrain source change brings `x_D` with it — the clamp is on every path", () => {
+      // The 200 m trace lets the viewpoint travel past the 150 m manual span; the removal that
+      // brings the manual span back has to bring the viewpoint back too, or state and the URL
+      // publish a position the span does not contain while the scene draws the rider at B.
+      const far = appReducer(imported, {
+        type: "scénario/modifié",
+        patch: { rider: { ...imported.scenario.rider, xD: 190 } },
+      });
+      expect(appReducer(far, { type: "tracé/retiré" }).scenario.rider.xD).toBe(150);
+
+      // The same in the other direction: an import never *shortens* this span, so nothing moves.
+      expect(imported.scenario.rider.xD).toBe(75);
+    });
+
+    it("removing nothing is a no-op, and re-using nothing cannot invent a trace", () => {
+      expect(appReducer(first, { type: "tracé/retiré" })).toBe(first);
+      expect(appReducer(first, { type: "tracé/réutilisé", tr: TRACE })).toBe(first);
+    });
+  });
+});

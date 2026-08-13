@@ -1,7 +1,7 @@
 # A2 · Quantity formatting — the display-precision table
 
 Stage: A2
-Status: open
+Status: done
 Blocked by: 15
 Spec: [v1 build spec](../../zipline-simulator-v1/spec.md) § 3 (*Précision d'affichage par grandeur*), § 8, § 11
 
@@ -47,3 +47,69 @@ Table-driven cases per row, including the decimal-mark column. Two that are not 
 - Régime-dependent rows are **absent on the first screen**, not dashed.
 - **`MBF` obeys the global force unit strictly.** A kN carve-out would put 90,7 kN beside 437 daN and
   invite a 100× misread.
+
+## Comments
+
+**Done.** `src/lib/format/quantity.ts` ships § 3's table as **one** `QUANTITIES` object — 33 rows,
+both halves of the spec's table (inputs/deduced *and* results/read-out cells) in its order, each row
+carrying its *Minimum justifié par* reason so a decimals change cannot land without its argument.
+Around it, the five functions the three consumers need: `displayDecimals` (the daN column, `kN` = +2,
+`kgf` unchanged), `toDisplay` / `fromDisplay` (the selector's conversion, `PER_DAN` and the MN
+carve-out), **`roundToDisplay`** (§ 8's prefill rule — the *state* function: rounds in the display
+unit, returns canonical), `formatValue` / `formatQuantity` (padded fixed decimals, French comma, unit
+suffix) and **`equalAtDisplayPrecision`** (the stale-Override badge, comparing *rendered strings* so
+no float can slip between them). `G = 9.81` and `KGF = 9.80665` live here, unexposed as fields.
+
+`quantity.test.ts` — 105 cases. One case per row plus a coverage assertion that `ROWS` **is**
+`Object.keys(QUANTITIES)`, since the table's failure mode is a *missing* row; a decimal-mark case per
+row (comma present exactly when the fraction is, fraction length = the row's decimals, never a `.`);
+the two formatting rules (« 6,00 » never « 6 »; 82,5 kg commits as « 83 kg »); half-away-from-zero on
+the signed rows and no « −0,0 »; the selector (9074 daN / 90,74 kN / 9253 kgf, `w` as daN/m ⁄ kN/m ⁄
+kgf/m, 120 kg → 120,04 kgf); the `EA`-in-MN carve-out under all three settings against `MBF`'s strict
+obedience; **the unit-switch identity** (round-trip to float precision, twenty toggles bit-identical,
+a `kN` prefill landing on the same state as a daN one, and a per-row proof that the display grid
+never coarsens); and **the badge** — 9074 against 9073,98 does not fire, the same taken from
+`steelFormula` rather than a quoted number, and it *does* fire once `d` moves to 16 mm.
+
+**A1's lock is now closed** (§ 10 P2's « A2 precedes A1's *test* »): `first-run.test.ts`'s eleven
+interim numeric assertions are **string equalities** through this module, `OPENING_STATE` and its
+`measuredOffBy` bar deleted — no tolerance appears in that file any more. `MBF` / `EA` / `w` are
+frozen as strings too (« 9074 daN » · « 6,90 MN » · « 0,536 daN/m »), because the first two are the
+badge's inputs. Mutation-checked: dropping `L₀` to 1 decimal reds **both** files, which is the
+coupling the ticket describes.
+
+Judgement calls, where the spec was silent:
+
+- ~~**Canonical units are § 7's URL units, not SI**~~ — **withdrawn, see the correction below.**
+  The percent rows do take a percentage (`4`), not a ratio.
+- **The sign is an ASCII hyphen-minus, not « − »**, and thousands are **not grouped**. A formatted
+  value is written back into an `<input type="text" inputMode="decimal">` and has to be re-typeable
+  on the keypad that widget was chosen for; § 5's cell budget also measures « 12345 daN » ungrouped.
+  The spec's own « 16 129 daN » badge line is the one datum the other way, and it is prose.
+- **Rounding is half away from zero**, with a `toPrecision(15)` de-noising step. `Math.round` rounds
+  half *up*, which is asymmetric on the three signed rows (`h`, `Réserve de tension`, `Pente
+  locale`), and 1.005 × 100 is 100,49999999999999 in binary — a value the user reads as exactly half
+  would round the wrong way. `roundToDisplay` also normalises its result through `toPrecision(15)`,
+  because `90,74 kN → daN` is 9074.000000000002 and that number goes into state and then verbatim
+  into the URL — § 8's « round earlier », applied to the conversion as well as to the value.
+- **`Prétension cible` `H_target` carries the deduced `Prétension H à vide` read-out too.** § 3 gives
+  the grandeur one row, unlike flèche, which it rows twice; one row, documented, rather than a second
+  that could drift.
+- **`ForceUnit` is imported from `src/lib/scenario/types.ts`** rather than re-declared — ticket 16
+  already declares it, and a second copy of a three-member union is a second place the selector can
+  disagree with the URL's `u`.
+- **Non-finite input is out of contract, and there is no guard.** § 6 gives « — » exactly one legal
+  source and it is not this function; a NaN here means an engine `Result` was unwrapped unchecked.
+
+Gates green: `bun run typecheck`, `bun run lint-type-aware`, `bun run test` (16 files, 552 cases).
+
+**Spec-drift correction (§ 3, « SI internally, always. Canonical storage is **newtons** »).** The
+judgement call above was not a silence: § 3 fixes canonical storage, and the Scenario already held
+the engine's newtons (`TightnessSpec.H_target`, `MaterialSpec.MBL`/`overrides`), so the daN claim was
+false wherever it met state. `quantity.ts` now takes and returns **newtons** for every `force`,
+`force/m` and the `MN` carve-out — `PER_DAN` → `N_PER_UNIT` `{ daN: 10, kN: 1000, kgf: KGF }`,
+`DAN_PER_MN` → `N_PER_MN = 1e6` — while `displayDecimals` is untouched, since the table is keyed on
+the *display* unit (daN column, `kN` = +2, `kgf` unchanged). `quantity.test.ts`'s force cases feed
+newtons (9074 daN → 90 740 N) and **every asserted string is unchanged**; `src/lib/url/schema.ts`'s
+`daN()` is now the only N → daN conversion in the codebase. Gates green: `bun run typecheck`,
+`bun run lint-type-aware`, `bun run test` (22 files, 762 cases).

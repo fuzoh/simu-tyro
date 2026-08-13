@@ -1,34 +1,56 @@
+/**
+ * The document, and nothing visible — « v1 build spec » § 7 (*`__root.tsx` carries the document and
+ * nothing visible*) and `docs/conventions/routing.md`.
+ *
+ * **No header, no app bar, no root `component`, no print stylesheet.** It *can* be document-only
+ * because the ten controls that had no address now have three homes — the Rail Header, the View
+ * Strip and `Paramètres › Géométrie`. This is not chrome deferred, it is chrome placed elsewhere,
+ * and the arithmetic is why: at 390×664 the whole stack leaves **124 px**, which *is* the Rail's
+ * resting height against `MIN_RAIL = 120`, so a 44 px title bar would be spent straight out of the
+ * form.
+ *
+ * `shellComponent` stays **server-rendered** — document, head, CSS, scripts — while
+ * `src/routes/index.tsx` sets `ssr: false`. That split is the whole SSR policy, and it goes on the
+ * route: `defaultSsr` in `src/router.tsx` is a measured **silent no-op**.
+ */
+
 import { TanStackDevtools } from "@tanstack/react-devtools";
-import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Link, Scripts } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+
+import { buttonVariants } from "@/components/ui/button.tsx";
 
 import appCss from "../styles.css?url";
 
 export const Route = createRootRoute({
   head: () => ({
     meta: [
+      { charSet: "utf-8" },
       {
-        charSet: "utf-8",
-      },
-      {
+        // `interactive-widget=resizes-content` is § 5's narrow-screen keyboard policy: the shell is
+        // fixed-height with internal scrollers, so the soft keyboard must resize the content rather
+        // than pan a visual viewport over it. The `visualViewport` fallback that pairs with it lives
+        // in `@/components/app/use-keyboard-inset.ts`.
+        content: "width=device-width, initial-scale=1, interactive-widget=resizes-content",
         name: "viewport",
-        content: "width=device-width, initial-scale=1",
       },
-      {
-        title: "TanStack Start Starter",
-      },
+      { title: "Scoutech — simulateur de tyrolienne" },
     ],
-    links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-    ],
+    links: [{ href: appCss, rel: "stylesheet" }],
   }),
+  /**
+   * **An unknown path 404s. It does not redirect to `/`.** The asymmetry with the index route's
+   * error handling is deliberate: for an unmatched path there is no child match to render into, so
+   * replacing the Outlet's content is correct — and a redirect would silently turn a mistyped or
+   * chat-client-truncated link into a working app on somebody else's default scenario,
+   * indistinguishable from a successful share.
+   */
   notFoundComponent: () => (
-    <main className="container mx-auto p-4 pt-16">
-      <h1>404</h1>
-      <p>The requested page could not be found.</p>
+    <main className="mx-auto flex max-w-md flex-col items-start gap-4 p-6 pt-16">
+      <h1 className="font-heading text-xl font-semibold tracking-tight">Page introuvable.</h1>
+      <Link className={buttonVariants()} to="/">
+        Ouvrir le simulateur
+      </Link>
     </main>
   ),
   shellComponent: RootDocument,
@@ -36,12 +58,16 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // `lang="fr"` is **load-bearing, not cosmetic**: the decimal comma is a correctness question in
+    // a tool whose output is a safety margin.
+    <html lang="fr">
       <head>
         <HeadContent />
       </head>
       <body>
         {children}
+        {/* Unguarded on purpose: `devtools-vite` reads `removeDevtoolsOnBuild ?? true`, so the block
+            is stripped at build and a guard here would be dead code pretending to be caution. */}
         <TanStackDevtools
           config={{
             position: "bottom-right",

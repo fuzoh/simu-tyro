@@ -34,6 +34,9 @@
     "dev-dist/**",
     "CHANGELOG.md",
     "apps/web/src/routeTree.gen.ts",
-    ".agents/**"
+    ".agents/**",
+    "**/*.md",
+    "src/routeTree.gen.ts",
+    "src/routes/-prototype-07/**"
   ]
 }

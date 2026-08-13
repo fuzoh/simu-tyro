@@ -1,7 +1,7 @@
 # E10 · `verdict.ts` — §10 regimes and the criteria × ends grid
 
 Stage: E10
-Status: open
+Status: done
 Blocked by: 08, 11
 Spec: [v1 build spec](../../zipline-simulator-v1/spec.md) § 6, § 11
 
@@ -46,3 +46,50 @@ five verdict states.
   `solveSpan` already produces it, one solve, not a per-step one.
 - The ACCT 5:1 / 10:1 conflict ships as **two adjacent picker entries**; one entry with a toggle
   would imply somebody knows which is right. The 2× proof test is an **uncomputable obligation**.
+
+## Comments
+
+**Built.** `src/lib/sim/verdict.ts` — `evaluateVerdict(v)` over the §10 framework, with `REGIMES`
+(the five entries as ordered criterion lists), `TERMINATIONS` (§10.2/§10.3, the grips prohibition
+carried as data), the `VERDICT` thresholds, and `isRegimeAvailable`, `isFamilyAllowed`,
+`allowableTension`, `amplifiedTension` as named exports — plus its colocated `verdict.test.ts`
+(50 cases) and one new `[MEASURED]` row, `UPSIZING_MARGIN`, in `__fixtures__/theory-15.ts`.
+The three gates are green: `typecheck`, `lint-type-aware`, `test` (402 cases over 13 files).
+
+Every gate row reproduces from the engine's own chain (one unloaded `solveSpan` plus
+`sweep(…, 240)`), asserted at the `[MEASURED]` tier floored at each row's recorded last digit:
+`FS effectif` 8,7988 / 9,0560 · `T adm` 2722,2 daN · réserve +1794,0 daN at `k` 3 and
+**−111,5 daN** at `k` 10 (the one row where the 5 N floor actually binds) · `T_DAF` 928,15 /
+901,79 from `T_vide` 263,46 / 253,81 and `T_chargé` 817,37 / 793,79 · suspended load **12,286**
+against 8,80, so total tension governs · textile 11,935 / 7,629 · taut-line flèche/portée 0,146 %
+at 200 m and 0,721 % at 1000 m, **both** warnings raised. Mutating `amplifiedTension` to return
+the static maximum turns 12 cases red, so the DAF envelope is load-bearing in the suite rather
+than merely present.
+
+Judgement calls, where the spec was silent:
+
+- **`VerdictInput` gains two fields beyond § 2's block**, on the `SpanInput.strength` precedent:
+  `family` (required — §10.4 is a *family × usage* rule and `strength` is `MBF` or `MBL` without
+  saying which; inferring the family from a termination id would make a use-class refusal depend
+  on a hardware pick) and `sagRatio` (optional — § 6's two taut-line warnings are scored here,
+  beside the `DAF` figure the second one qualifies; omitted they simply do not fire, so § 2's own
+  call shape still type-checks).
+- **The banner's governing cell is worst-state-first, then lowest `FS`.** § 6 states the tie-break
+  only for the all-clear case (« 12,29 contre 8,80 ⇒ la tension totale gouverne »); ranking on
+  `FS` alone would let WorkSafe name a *clearing* total-tension cell while the suspended-load cell
+  fails, contradicting its own « Hors limites — critère charge suspendue » banner. Both orders are
+  asserted: the shipped line, and a synthetic slack line where the two disagree.
+- **« Régime indisponible » returns a refusal, not a throw.** § 7 routes it to a blocking form
+  error with `[ Choisir un autre régime ]`, so it normally never reaches the engine; reached
+  anyway (a link arriving with `reg=secours10` on a steel line), a refusal can be neither misread
+  as a green nor crash the Rail. Same treatment for §10.4's family gate, likewise a blocking Solve
+  Gate error upstream.
+- **Refusals outrank `Indéterminé`, and both keep the grid.** A prohibition does not become
+  unknown because one step failed; and § 6 keeps the converged margins on screen, so `cells` stays
+  populated in both states while `governing` is `null` — that null **is** the suppression.
+- **§9.2's 30 % standing-tension warning fires on textile only** (it is a creep and service-life
+  bound on family B), and an empty traverse returns `NaN` envelopes with `atStepIndex: -1`,
+  reusing `evaluateClearance`'s own flag for « the traverse never happened ».
+- **Two untracked scratch artefacts were deleted**, `.probe.ts` and `src/lib/sim/__scratch.test.ts`
+  left behind by earlier stages: both failed `lint-type-aware` (an unused variable, and a test
+  with no assertion), and neither is a deliverable of any ticket.

@@ -1,0 +1,97 @@
+import { describe, expect, test } from "vitest";
+
+import { initialAppState } from "@/lib/app/state.ts";
+
+import { linkStrip } from "./link-strip.ts";
+
+/**
+ * § 8's « bandeau des clés ignorées », end to end from a raw query string — `initialAppState` takes
+ * one as a parameter, so the whole strip is a `node` case with no router and no DOM (amendment A).
+ *
+ * Three claims are what the strip exists for, and each has a case below: **each dropped key says
+ * which kind it was**, **the completion sentence names the values and not just the fields**, and
+ * **a link with nothing to report produces no strip at all**.
+ */
+
+function strip(query: string) {
+  return linkStrip(initialAppState({ query, session: null }).link);
+}
+
+describe("§ 8's first sentence — each dropped key with its reason", () => {
+  test("an unknown key and an unreadable value read differently, in one sentence", () => {
+    // § 8's own example: « ignoré » alone cannot distinguish the sender's typo from a value we
+    // could not read, so each key says which it was, and the unreadable one names what it cost.
+    expect(strip("?v=1&xy=3&za=abc&L=150")?.ignored).toBe(
+      "Une partie du lien a été ignorée : clé inconnue « xy » ; " +
+        "« za » n'était pas un nombre (hauteur d'ancrage A ignorée).",
+    );
+  });
+
+  test("French agreement follows the field, not the sentence", () => {
+    expect(strip("?L=150&h=abc")?.ignored).toBe(
+      "Une partie du lien a été ignorée : « h » n'était pas un nombre (dénivelé ignoré).",
+    );
+  });
+
+  test("a token-valued key is not a number, and the clause does not claim it was", () => {
+    // « n'était pas un nombre » is § 8's wording for `za`; saying it of `?fam=zz` would be a lie in
+    // the one sentence whose job is to tell a typo apart from a value we could not read.
+    expect(strip("?L=150&fam=zz")?.ignored).toContain(
+      "« fam » n'était pas une valeur reconnue (famille de ligne ignorée)",
+    );
+  });
+});
+
+describe("§ 8's second sentence — the completion names the values", () => {
+  test("it prints every number the recipient got, at display precision", () => {
+    const sentence = strip("?L=250&h=-40")?.completed ?? "";
+    expect(sentence).toMatch(/^Champs absents du lien, complétés depuis le scénario par défaut : /);
+    expect(sentence).toContain("masse du passager 120 kg");
+    expect(sentence).toContain("enveloppe passager 2,1 m");
+    expect(sentence).toContain("coefficient dynamique 1,2");
+    // § 9's `x` is the one non-literal completion: `L/2` of the **completed** span.
+    expect(sentence).toContain("position du passager 125,0 m");
+    expect(sentence).toMatch(/\.$/);
+  });
+
+  test("a token-valued completion is French, never the wire token", () => {
+    expect(strip("?L=250&h=-40")?.completed).toContain("type d'installation permanente");
+  });
+
+  test("a force is undone from the URL's daN into the unit the screen reads", () => {
+    // § 7 serialises every force in daN; the strip prints what the recipient's own field shows.
+    expect(strip("?te=900&L=150")?.completed).not.toContain("prétension");
+    expect(strip("?L=150&h=-18")?.completed).toContain("flèche à vide cible 6,00 m");
+  });
+
+  test("what absence *means* is never completed, so the strip never names it", () => {
+    // § 7's three meanings of absence: `reg` absent is « — choisir — » and `mbf`/`ea`/`mu` absent
+    // is « non surchargée ». Neither is a hole the defaults may fill.
+    const sentence = strip("?L=250&h=-40")?.completed ?? "";
+    expect(sentence).not.toContain("régime");
+    expect(sentence).not.toContain("charge de rupture");
+  });
+});
+
+describe("§ 8's third sentence, and the states that produce no strip at all", () => {
+  test("the rewrite is stated whenever the address bar was corrected", () => {
+    expect(strip("?L=250&junk=zz")?.rewritten).toBe(
+      "L'adresse a été corrigée pour indiquer les valeurs utilisées.",
+    );
+  });
+
+  test("a bare `/` announces nothing — restoring the Session is the defined normal case", () => {
+    expect(strip("")).toBeNull();
+  });
+
+  test("a complete canonical link says nothing either: nothing was dropped, nothing completed", () => {
+    const complete = initialAppState({ query: "", session: null });
+    expect(linkStrip({ ...complete.link, dropped: [], completed: [] })).toBeNull();
+  });
+
+  test("a refused link has no strip beside it — the refusal is whole-link", () => {
+    const refused = initialAppState({ query: "?v=3&L=150", session: null });
+    expect(refused.link.refused).not.toBeNull();
+    expect(linkStrip(refused.link)).toBeNull();
+  });
+});

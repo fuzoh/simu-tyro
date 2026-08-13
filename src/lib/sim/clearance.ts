@@ -1,0 +1,236 @@
+/**
+ * §11's ground-clearance criterion — `docs/simulation-theory.md` §11 (`h_clear(x; x_P) = z_cable
+ * − z_ground − h_rider`, minimised over `x` then over `x_P`), §6.2 (the sweep this reduces over),
+ * §6.3 (`h_rider` and the trolley footprint) and §4.1 (the geometry each step is sampled from).
+ * Underlying reference reports: `docs/references/simulation tyrolienne.md` (garde au sol, coupe
+ * en travers) and `tyrolienne sur cable.md` (espace libre) — but **no value is transcribed from
+ * either**: §14 records which of their worked examples are fabricated, and EN 15567's free-space
+ * numbers are `[PAYWALLED]`, so this module ships **no clearance threshold at all**. It reports a
+ * distance; §10's verdict is what judges it.
+ *
+ * Rules this module exists to keep:
+ *
+ * - **A reducer over the sweep, never a sweep field.** Clearance is the one place terrain enters
+ *   the engine, which is what keeps every §15 fixture free of a terrain stub and the solver
+ *   terrain-free — voir § 2 — le contrat du moteur.
+ * - **It takes the span, not only the steps.** A `SweepStep` carries `(H, V₀)` but not `L₀`, `w`,
+ *   `EA` or the rider's `P`, and the reducer has to rebuild the cable those four describe 260
+ *   times. The argument list is ticket 03's sketch completed on its own stated ground (« a state
+ *   self-sufficient for sampling »), not a widened signature.
+ * - **The inner minimum runs over the whole line, not under the rider.** The loaded low point
+ *   tracks the trolley, but terrain may rise where the cable is not lowest, so the worst point
+ *   steps sideways onto a bump the rider has already passed. Under-the-rider-only was rejected
+ *   measurably: it reads positive while that same rider position is in violation a few metres
+ *   away, which the aggregate `h_min` then contradicts.
+ * - **Vertex-only evaluation, on *both* sets of vertices, and nobody densifies either.** The scan
+ *   reads the sampled polyline's own vertices **and the terrain's own sample points** — voir § 4,
+ *   « `evaluateClearance` scan[s] at the terrain's own sample points ». Both halves are load-
+ *   bearing and neither is a densification: § 4's ≈5 mm bound is derived *per terrain segment*
+ *   (`h_clear` is convex there only because `z_ground` is linear there), so skipping the terrain's
+ *   vertices does not miss millimetres, it misses whole features — a 200-point profile on a 150 m
+ *   span carries a vertex every 0,75 m against the cable's ≈2,5 m, and a ridge between two cable
+ *   vertices reads as clear ground. `samplesPerStep` 60 against the sweep's 240 is the measured
+ *   pair, and `260 × 60` is the bench tripwire — this reducer is the larger half of the frame
+ *   budget (p95 ≤ 1,7 ms against `sweep()`'s ≤ 0,6 ms). The terrain half adds at most § 4's
+ *   200-point export ceiling per step, and **nothing at all** for manual ground, whose two points
+ *   are the cable's own ends.
+ * - **Ground contact is a clearance verdict, never a solve failure.** Deep slack *converges*, so
+ *   a line lying down surfaces here as `contact: "cable"` rather than as a `SolveError`. The two
+ *   contact kinds stay separate because they are different classes of claim: « Câble au sol » is
+ *   bare geometry, « Enveloppe passager traversée » is true only **given `h_rider`** and carries
+ *   that convention's « non confirmé » chip.
+ * - **The engine is dependency-free, synchronous and SI** — `m`, `N`, `N/m`; `z` positive up,
+ *   `x` measured from anchor A.
+ */
+
+import type { CableShape } from "./catenary.ts";
+import type { ClearanceResult, PointLoad, SpanInput, SweepStep, Terrain } from "./types.ts";
+
+import { xAt, zAt } from "./catenary.ts";
+import { zGroundAt } from "./terrain.ts";
+
+/**
+ * §11's scan resolution. It lives here rather than beside `SWEEP` because it is
+ * `evaluateClearance`'s own default — but the guard rail is the **product** of the two, `260 ×
+ * 60`: the sweep's step count and this scan multiply into the frame budget, so raising either
+ * re-opens the bench.
+ */
+export const CLEARANCE = {
+  /**
+   * Samples per sweep step, giving `samplesPerStep + 1` **cable** vertices per step, on top of
+   * whatever terrain vertices fall between them. 60 is the measured figure every first-run number
+   * was taken at; the fidelity on offer above it was measured at ≈5 mm, which is the cable's own
+   * convexity across one segment. It is not the terrain's resolution — that one is the file's,
+   * and § 4 forbids resampling it in either direction.
+   */
+  samplesPerStep: 60,
+} as const;
+
+/**
+ * §11, whole: `h_min = min over x_P of min over x of (z_cable(x; x_P) − z_ground(x) − h_rider)`,
+ * evaluated on §6.2's sweep.
+ *
+ * Per step it rebuilds the step's cable from the span plus the step's own `(H, V₀, s_D)`, scans
+ * it at `samplesPerStep + 1` vertices uniform in the **material** coordinate — the same grid
+ * `sampleCable` lays down, and the grid every measured figure was taken on — **plus the terrain's
+ * own sample points that fall between two of them** (§ 4), and records that step's worst
+ * clearance and where it sits. The traverse minimum is the least of those.
+ *
+ * At a terrain vertex the ground is exact and the cable is read off the **chord** of the cable
+ * segment bracketing it. `z_cable` is convex in `x`, so that chord sits above the cable by at most
+ * that segment's own sag — the residual is bounded by the *cable* spacing rather than by the
+ * terrain's, which is the property that matters: a feature the terrain resolves is *seen*, and only
+ * its depth carries the error the whole scan already carries. Measured at **69 mm** on a 5 m ridge
+ * placed where the trolley kink passes (against 18,5 mm on smooth ground), because the kink is the
+ * one vertex no uniform grid lands on; § 4's ≈5 mm is the unloaded convexity alone. Inverting
+ * `x(s)` per terrain vertex would be exact and would cost a root-find in the inner loop, and adding
+ * the kink's own `s_D` to the scan would move every measured garde — 60 uniform samples *is* the
+ * grid ticket 14 measured on. Centimetres either way, for the half of the frame budget that scales.
+ *
+ * The scan is written against `xAt` / `zAt` on one reused {@link CableShape} rather than through
+ * `sampleCable`: the two are the same arithmetic on the same vertices, and 260 discarded
+ * `Float64Array`s per parameter change are 260 allocations this reducer does not have to make.
+ *
+ * @param input the span **without** a rider — `riderP` is the load each step places, exactly as
+ *   `sweep` requires, so the two cannot disagree about how many riders are on the line.
+ * @param riderP the rider's design load, N, downward.
+ * @param steps the solved steps from `sweep`, in grid order. The **failed** steps are absent by
+ *   construction, so every array returned here is indexed by `steps`, not by the sweep grid —
+ *   a partial sweep suppresses the verdict anyway (`coverage < 1`).
+ * @param terrain the ground, as data. Manual ground is its two-point case — and those two points
+ *   are the cable's own ends, so it contributes no extra evaluation at all.
+ * @param hRider §6.3's passenger envelope, m — `[CONVENTION]` 2,1 m, and the reason the rider
+ *   contact kind is a separate verdict that names its own value.
+ * @param samplesPerStep vertices minus one per step; the default is the measured 60.
+ * @returns `hMin` positive is clearance, negative is contact. An **empty** `steps` — a sweep that
+ *   lost every step — has no minimum: `hMin` is the reducer's identity `+∞`, `atX` is `NaN` and
+ *   `atStepIndex` is **−1**, which is the flag a caller checks rather than reading a garde off a
+ *   traverse that never happened.
+ * @throws RangeError when `input.loads` is not empty, or when `samplesPerStep` is not a positive
+ *   integer — both are caller bugs of `sampleCable`'s class, not physics failures.
+ */
+export function evaluateClearance(
+  input: SpanInput,
+  riderP: number,
+  steps: SweepStep[],
+  terrain: Terrain,
+  hRider: number,
+  samplesPerStep: number = CLEARANCE.samplesPerStep,
+): ClearanceResult {
+  if (input.loads.length !== 0) {
+    throw new RangeError(
+      `evaluateClearance: input.loads must be [], got ${input.loads.length} load(s)`,
+    );
+  }
+  if (!Number.isInteger(samplesPerStep) || samplesPerStep < 1) {
+    throw new RangeError(
+      `evaluateClearance: samplesPerStep must be a positive integer, got ${samplesPerStep}`,
+    );
+  }
+
+  const { L0 } = input;
+  const count = steps.length;
+  const perStep = new Float64Array(count);
+  const perStepX = new Float64Array(count);
+  const perStepCable = new Uint8Array(count);
+
+  // One cable, re-posed per step: only `H`, `V₀` and the trolley's material coordinate move.
+  const rider: PointLoad = { P: riderP, s: 0 };
+  const shape: CableShape = { H: 0, V0: 0, w: input.w, EA: input.EA, loads: [rider] };
+
+  // The terrain's own sample points, hoisted out of the inner loop. `flat` has none — it is one
+  // segment over the whole line, so the cable's vertices already are the scan § 4 asks for.
+  const ground = terrain.kind === "profile" ? terrain : null;
+  const groundCount = ground === null ? 0 : ground.xs.length;
+
+  let hMin = Number.POSITIVE_INFINITY;
+  let atX = Number.NaN;
+  let atStepIndex = -1;
+
+  // « Câble au sol » is the outer verdict: the cable under the terrain always puts the envelope
+  // under it too, so the two kinds nest and the bare-geometry one wins.
+  let cableInGround = false;
+
+  for (let i = 0; i < count; i++) {
+    const step = steps[i];
+    shape.H = step.H;
+    shape.V0 = step.V0;
+    rider.s = step.sD;
+
+    let stepMin = Number.POSITIVE_INFINITY;
+    let stepMinX = Number.NaN;
+
+    // `x(s)` is strictly increasing (`dx/ds = H/T > 0`, and `H > 0` on every solved step), so the
+    // terrain's vertices are consumed once per step by a forward cursor rather than searched for.
+    let g = 0;
+    let xPrev = 0;
+    let zPrev = 0;
+
+    for (let k = 0; k <= samplesPerStep; k++) {
+      // The last vertex is `L₀` exactly, so the scan closes on the far anchor rather than on a
+      // rounding of it — `sampleCable`'s own end condition.
+      const s = k === samplesPerStep ? L0 : (L0 * k) / samplesPerStep;
+      const x = xAt(shape, s);
+      const z = zAt(shape, s);
+      const above = z - zGroundAt(terrain, x);
+      if (above < 0) {
+        cableInGround = true;
+        perStepCable[i] = 1;
+      }
+      const clear = above - hRider;
+      if (clear < stepMin) {
+        stepMin = clear;
+        stepMinX = x;
+      }
+
+      // The other half of § 4's scan: the terrain's own sample points **strictly inside** this
+      // cable segment. A vertex that coincides with a cable vertex is already evaluated above —
+      // which is why two-point manual ground, whose two points are the cable's own ends, costs
+      // nothing and reproduces every measured figure bit for bit. The cable is read off the
+      // segment's chord, which sits above the convex cable by that segment's own sag — the
+      // residual is bounded by the *cable* spacing, never by the terrain's, so a feature the file
+      // resolves is always seen. Voir the function's own docblock for the measured magnitude.
+      if (ground !== null && k > 0) {
+        const { xs, zs } = ground;
+        while (g < groundCount && xs[g] <= xPrev) g++;
+        const dx = x - xPrev;
+        for (; g < groundCount && xs[g] < x; g++) {
+          const xg = xs[g];
+          const zChord = dx > 0 ? zPrev + ((xg - xPrev) / dx) * (z - zPrev) : z;
+          const aboveG = zChord - zs[g];
+          if (aboveG < 0) {
+            cableInGround = true;
+            perStepCable[i] = 1;
+          }
+          const clearG = aboveG - hRider;
+          if (clearG < stepMin) {
+            stepMin = clearG;
+            stepMinX = xg;
+          }
+        }
+      }
+
+      xPrev = x;
+      zPrev = z;
+    }
+
+    perStep[i] = stepMin;
+    perStepX[i] = stepMinX;
+    // Strictly less, so the traverse minimum is reported at the **first** step that reaches it.
+    if (stepMin < hMin) {
+      hMin = stepMin;
+      atX = stepMinX;
+      atStepIndex = i;
+    }
+  }
+
+  return {
+    hMin,
+    atX,
+    atStepIndex,
+    contact: cableInGround ? "cable" : hMin < 0 ? "rider" : "none",
+    perStep,
+    perStepX,
+    perStepCable,
+  };
+}

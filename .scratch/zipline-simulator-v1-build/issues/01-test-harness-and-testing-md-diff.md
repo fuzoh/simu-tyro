@@ -1,7 +1,7 @@
 # P0.1 · Test harness and the `testing.md` diff
 
 Stage: P0.1
-Status: open
+Status: done
 Blocked by: —
 Spec: [v1 build spec](../../zipline-simulator-v1/spec.md) § 10 (P0), § 11 ·
 [Amendments](../AMENDMENTS.md) **A**, **B**
@@ -44,3 +44,37 @@ dependencies. `bun run typecheck` and `bun run lint-type-aware` clean.
   spanning modules.
 - The `agent-browser` section must say what CI does **not** cover, so a green suite is not misread as
   coverage of the four states ticket 29 inherits.
+
+## Comments
+
+**Built.** `vite.config.ts` carries a `test` block: `environment: "node"`,
+`include: ["src/**/*.test.ts"]`, `benchmark.include: ["src/**/*.bench.ts"]`, `benchmark.enabled`
+left unset. `jsdom`, `@testing-library/react` and `@testing-library/dom` are gone from
+`devDependencies` **and** from `bun.lock` — bun kept `jsdom` alive as vitest's optional peer after
+`bun remove`, so the resolution entry was dropped and `node_modules` reinstalled from the lockfile;
+`bun pm why jsdom` now finds nothing. `"bench": "vitest bench"` sits beside `"test"`.
+`docs/conventions/testing.md` was rewritten with the seven changes: `node`-always environment with
+the `@testing-library` line deleted (not softened), the four-tier tolerance table with the `1e-3`
+TODO discharged and its reason recorded, the two `source` provenance classes plus `check.ts` as a
+coverage checklist with the four assertions it never made, a benches subsection (tinybench has no
+`p95`, so the threshold is a plain `test` timing 40 runs against 8 ms; Node does not reproduce
+1,30 ms), an injected-states subsection (`vi.mock` the collaborator, never widen a signature, never
+assert unreachability, the envelope sweep is not CI), the colocated one-test-per-source-file rule
+with no `tests/` directory, and a seventh section naming what CI does **not** cover — ticket 29's
+four states, five measurements and walkthroughs.
+
+Gates: `bun run typecheck`, `bun run lint-type-aware`, `bun run test` (0 tests, exit 0) and
+`bun run bench` (0 benches, exit 0) all green.
+
+**Judgement calls.**
+
+- `passWithNoTests: true` in the `test` block — the gate asks for `bun run test` to report 0 tests
+  and Vitest otherwise exits 1 on an empty run. In config rather than as a CLI flag so `vitest bench`
+  inherits it too.
+- `test.include` narrowed to `src/**/*.test.ts`; the default glob also matches `.tsx` and paths
+  outside `src/`. `.ts`-only mechanically forecloses the component tests amendment A removes.
+- `benchmark.include` set for symmetry with the colocated `*.bench.ts` rule — only `enabled` had to
+  stay unset.
+- `vite.config.ts` keeps `defineConfig` from `vite` and adds `/// <reference types="vitest/config" />`
+  rather than importing `defineConfig` from `vitest/config`, so only one Vite type instance is in
+  play.

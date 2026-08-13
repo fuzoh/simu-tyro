@@ -1,7 +1,7 @@
 # A11 · The error surfaces — banner precedence and the refusals
 
 Stage: A11
-Status: open
+Status: done
 Blocked by: 25
 Spec: [v1 build spec](../../zipline-simulator-v1/spec.md) § 7, § 11 ·
 [Amendments](../AMENDMENTS.md) **A**, **B**, **D**

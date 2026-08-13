@@ -1,7 +1,7 @@
 # E8 · `materials/steel.ts` and `materials/textile.ts`
 
 Stage: E8
-Status: open
+Status: done
 Blocked by: 03
 Spec: [v1 build spec](../../zipline-simulator-v1/spec.md) § 2, § 3, § 11
 
@@ -42,3 +42,35 @@ Spec: [v1 build spec](../../zipline-simulator-v1/spec.md) § 2, § 3, § 11
   §5.4 bound in the driving quantity — « Prétension maximale atteignable : 9 074 daN » — and 9 074
   daN is this module's output. Built after, it would be tested against a hand-typed strength.
 - **Zero shipped product presets.** Every product row in `docs/references/` is compromised.
+
+## Comments
+
+**Built.** `src/lib/sim/materials/steel.ts` (`STEEL` constants, `steelFormula(d, R₀, construction)`,
+`resolveSteelValues(spec)`, `deriveSteel(spec)`), `src/lib/sim/materials/textile.ts` (`TEXTILE`
+constants, `deriveTextile(spec)`), their two colocated tests, and two new `[MEASURED]` fixture rows
+in `__fixtures__/theory-15.ts` — `STEEL_12MM_IWRC_1770` and `TEXTILE_STIFFNESS`, with `SteelCase` /
+`TextileCase` types that hoist `construction` and `ropeClass` out of the numeric `in` block exactly
+the way `ClearanceCase` hoists `contact`. No barrel, no shared helper, no import between the two
+files; `g = 9,81` is declared twice on purpose and the tests read the directory listing and both
+files' import specifiers so the day someone adds `materials/index.ts` a case goes red. Gates green:
+`typecheck`, `lint-type-aware`, `test` (314 passing).
+
+Judgement calls, all where the spec was silent about *where* a stated value lives:
+
+- **Three steel functions, not one.** `steelFormula` is override-blind (the stale badge's input,
+  and the ticket's stated `(d, R₀, construction)` signature), `resolveSteelValues` applies the
+  per-value overrides for the « Valeurs déduites » read-outs, `deriveSteel` reduces to § 2's
+  `{ w, EA, strength }`. Collapsing the middle one would make the UI re-implement override
+  precedence — one rule in two places.
+- **§13.2's per-class `k` defaults (22 / 1,5 / `null`) and the 10–30 % MBL attested band live in
+  `textile.ts`.** They are §13.2 data with a stated consumer, and a second copy in the form layer
+  could drift; `polyester: null` keeps « nobody published it » expressible.
+- **9073,98 daN is recorded as a `[MEASURED]` row, not re-derived.** Exact arithmetic on the spec's
+  own factors gives `0,356·144·1770 = 90 737,28 N = 9073,728 daN`, 0,25 daN below ticket 14's
+  recorded 9073,98 — 0,03 of the `1e-3` bar, so the case passes as written and the ticket's number
+  stays the assertion. Both roundings display as 9074 daN, so the badge property is unaffected.
+- **§13.1's attested 6 mm 6×19 examples are deliberately not asserted** (12,9 / 14,4 / 21,0 kN):
+  §13.1 records that they and the `K`-factors disagree (`K·36·1770` is 21,0 kN, not 12,9), and `K`
+  is what the spec ships. A test file says so, so nobody ports them later as missing coverage.
+- **`d`'s [6, 26] mm warning band is *not* here** — it is `[CONVENTION]`, tier one, and belongs to
+  the form validators (ticket 24).
