@@ -181,7 +181,7 @@ Two findings declined, both settled by the spec rather than by code:
 
 - **The block falling below the fold on a viewport shorter than it** (measured 1366×657) is § 5's
   collapse trigger **(c)** — « il ne tient pas : `blockHeight > availableHeight − MIN_RAIL` » — and
-  the Pinned Safety Header is **ticket 27's** (A12), which has not landed. `shell.tsx` already says
+  the Pinned Safety Header is **tickets 27–28's** (A12), which have not landed. `shell.tsx` already says
   so in prose. A8 is not allowed to answer it with a squeeze: a height-fed band is the mechanism both
   measured defects came from.
 - **« Pente −19,4 % » is right and § 9's « −11,1 % » is a stale *degree* figure.** § 13 records that

@@ -15,7 +15,7 @@ Spec: [v1 build spec](../../zipline-simulator-v1/spec.md) § 8; `docs/convention
 ## Gate
 
 Mount order correct, **no hydration warning**, a refused link returns **200** after a Skeleton frame,
-an unknown path **404s**. All four are browser-observable, so they are checked from ticket 29 — there
+an unknown path **404s**. All four are browser-observable, so they are checked from ticket 31 — there
 are no component tests (amendment A). Ticket 15's five router re-probes must be green before this
 stage starts; every behaviour below depends on them.
 
@@ -86,7 +86,7 @@ stage starts; every behaviour below depends on them.
 | `src/lib/app/state.ts` · `refusal-copy.ts` | the mount order and the four reason lines, both **pure** |
 | `src/lib/scenario/from-search.ts` · `src/lib/layout/contract.ts` | the read side of § 7's key table, and § 5's numbers |
 
-**The gate is browser-observable, so it was observed** — not deferred to ticket 29, which owns the
+**The gate is browser-observable, so it was observed** — not deferred to ticket 31, which owns the
 repeatable version. On the pinned tree, dev server: `/` **200**, `/?v=3` **200**, `/?fl=6&lo=151`
 **200**, `/nexistepas` **404**; the server HTML for `/?v=3` carries the Skeleton (`aria-busy`, the
 five headings, « Garde min », the `<noscript>` line, `lang="fr"`), so the refusal genuinely arrives

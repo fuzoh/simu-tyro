@@ -2,15 +2,16 @@
 
 Execution of [the v1 build spec](../zipline-simulator-v1/spec.md), **as amended** by
 [AMENDMENTS.md](./AMENDMENTS.md) — read that first, it supersedes the spec in four places. One ticket
-per stage of the spec's **§ 10 — Implementation order**, plus one the amendments added: **29 tickets**
-in `issues/`, numbered in stage order.
+per stage of the spec's **§ 10 — Implementation order**. Original final three tickets were split for
+fresh-context delegation on 2026-08-13: **36 tickets** now live in `issues/`, numbered in dependency
+order.
 
 ## The four amendments, in one line each
 
 | | Amendment | Lands on |
 | --- | --- | --- |
 | **A** | Vitest is **unit-only** — `node` environment always, no component tests, `jsdom` and `@testing-library/*` removed | 01, 20, 21, 22, 26, 27 |
-| **B** | **`agent-browser`** owns point-to-point app testing, and takes over § 10 A12's five manual re-checks | **29** (new), 22, 26, 27, 28 |
+| **B** | **`agent-browser`** owns point-to-point app testing, and takes over § 10 A12's five manual re-checks | **29–35**, 22, 26, 27, 28, 36 |
 | **C** | TanStack versions are the **actual latest, still pinned** — with a re-probe of § 8's five measured behaviours | 15, 22 |
 | **D** | **`@tanstack/react-form`** for forms, **valibot** for data validation — valibot replaces the hand-rolled `validateSearch` under § 8's four unchanged rules | 15, 18, 20, 21, 24, 26 |
 
@@ -36,7 +37,7 @@ turns out to need one, that is a new question and belongs on a map, not in a bui
 - Gate every stage on `bun run typecheck` and `bun run lint-type-aware` (`AGENTS.md`).
 - Never edit `src/routeTree.gen.ts`; never hand-write `src/components/ui/**`.
 - **Vitest is unit-only, `node` environment.** If a check needs a DOM or a layout, it is not a Vitest
-  case — it belongs to [ticket 29](./issues/29-agent-browser-point-to-point-pass.md).
+  case — it belongs to browser tickets [29–35](./issues/29-responsive-layout-browser-evidence.md).
 - **Valibot lives at the boundaries only** — URL, CSV, forms, Session. **Never inside `src/lib/sim/`**:
   the engine stays dependency-free and its §15 fixtures stay free of schema stubs.
 - **The engine owns physics validation, the form owns tier one.** §5.4's chord bound is never
@@ -73,9 +74,16 @@ turns out to need one, that is a new question and belongs on a map, not in a bui
 | 24 | A9 | The Rail's input half and the three gates (TanStack Form + valibot) | 17, 23 |
 | 25 | A10 | The Rail's output half — `Résultats`, verdict, provenance | 13, 24 |
 | 26 | A11 | The error surfaces — banner precedence and the refusals | 25 |
-| 27 | A12 | Narrow-screen reflow | 26 |
-| 28 | P3 | Delete the prototype | 02, 10, 29 |
-| 29 | A13 | The `agent-browser` point-to-point pass | 27 |
+| 27 | A12.1 | Pinned Safety Header for Rail navigation | 26 |
+| 28 | A12.2 | Constrained-height and keyboard safety modes | 27 |
+| 29 | A13.1 | Responsive-layout browser evidence | 28 |
+| 30 | A13.2 | Chart-fidelity and drag-performance evidence | 28 |
+| 31 | A13.3 | Shell and suppressed-output browser pass | 26 |
+| 32 | A13.4 | Shared-link browser pass | 26 |
+| 33 | A13.5 | Trace lifecycle browser pass | 28 |
+| 34 | A13.6 | Material and regime browser pass | 26 |
+| 35 | A13.7 | Narrow-keyboard browser pass | 28 |
+| 36 | P3 | Retire the profile prototype | 02, 10, 29, 30 |
 
 Three cross-stage couplings that the table cannot show, all argued in § 10 P2:
 
@@ -86,7 +94,10 @@ Three cross-stage couplings that the table cannot show, all argued in § 10 P2:
 - **A9 wires its gates field by field**, not as a later pass, and « régime choisi » is **struck**
   from the solve tier — so the app must open verdict-less and still compute. That is a property of
   how A9 is built, not something A11 bolts on.
-- **A13's measurements *are* P3's deletion gate.** They can only be taken while the prototype still
-  stands — which is why the last build ticket blocks the deletion ticket, not the other way round.
+- **A13.1 and A13.2 measurements *are* P3's deletion gate.** They can only be taken while the
+  prototype still stands. Functional browser passes 31–35 do not gate deletion; only evidence that
+  dies with artifact does.
+- **Tickets 31, 32 and 34 can start immediately.** Their desktop journeys do not depend on A12;
+  responsive and keyboard passes 29, 30, 33 and 35 wait for ticket 28.
 - **Ticket 15's five router re-probes gate A7 onward.** If one comes back changed, that is a § 8
   decision to re-open on a map, not a version to nudge.

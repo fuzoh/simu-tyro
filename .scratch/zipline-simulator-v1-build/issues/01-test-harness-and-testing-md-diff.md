@@ -16,7 +16,7 @@ Spec: [v1 build spec](../../zipline-simulator-v1/spec.md) § 10 (P0), § 11 ·
 4. The diff to `docs/conventions/testing.md` — the spec's six changes, **as amended**: item 1 becomes
    « `node`, always », the « React component tests use `@testing-library/react` » line is **deleted**
    rather than softened, and a **seventh** change adds the `agent-browser` section naming what lives
-   outside the unit suite (voir ticket 29).
+   outside the unit suite (voir browser tickets 29–35).
 
 ## Gate
 
@@ -43,7 +43,7 @@ dependencies. `bun run typecheck` and `bun run lint-type-aware` clean.
 - Also in the diff: colocated one-test-per-source-file, **no `tests/` directory**, and no suite file
   spanning modules.
 - The `agent-browser` section must say what CI does **not** cover, so a green suite is not misread as
-  coverage of the four states ticket 29 inherits.
+  coverage of the four states ticket 31 inherits.
 
 ## Comments
 
@@ -60,7 +60,7 @@ coverage checklist with the four assertions it never made, a benches subsection 
 `p95`, so the threshold is a plain `test` timing 40 runs against 8 ms; Node does not reproduce
 1,30 ms), an injected-states subsection (`vi.mock` the collaborator, never widen a signature, never
 assert unreachability, the envelope sweep is not CI), the colocated one-test-per-source-file rule
-with no `tests/` directory, and a seventh section naming what CI does **not** cover — ticket 29's
+with no `tests/` directory, and a seventh section naming what CI does **not** cover — browser tickets 29–35's
 four states, five measurements and walkthroughs.
 
 Gates: `bun run typecheck`, `bun run lint-type-aware`, `bun run test` (0 tests, exit 0) and

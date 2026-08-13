@@ -56,11 +56,11 @@ Injected refusals — `vi.mock` on the collaborator, never a widened signature �
   résultat » with no stale picture: the chart **freezes rather than dims**, and scrubbing goes **inert**,
   because a stale Sweep must not be used to *generate* new stale numbers. Amendment D gives it a home:
   TanStack Form's `field.state.meta.isTouched` / `isBlurred`, so the **rule** is a unit test here while
-  the **screen behaviour** — freeze, inert scrubbing, suppressed URL write — is ticket 29's. It still
+  the **screen behaviour** — freeze, inert scrubbing, suppressed URL write — is ticket 31's. It still
   has no representation in the URL or the Session, so it cannot be restored or shared.
 - **The 17-row message table and the culprit table are the spec's French strings**, keyed off valibot's
   issues — never rendered from valibot's default messages.
-- **Four surfaces here have no CI check** and belong to ticket 29: the Skeleton's content, the refusal
+- **Four surfaces here have no CI check** and belong to ticket 31: the Skeleton's content, the refusal
   page at 200, « Saisie en cours » on screen, and « Aucun résultat ». Everything expressible as a pure
   function — the banner reducer, both tables, the three refusals' bounds — stays in Vitest.
 - **The geometry-invalid exception is scoped to `L` / `h` / station failures.** If a later change gives

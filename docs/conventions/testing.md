@@ -137,7 +137,7 @@ input the app's own ranges refuse.
 
 A green suite is **not** coverage of the following. Vitest cannot see them, so `agent-browser` drives
 the real app in a real browser instead
-([ticket 29](../../.scratch/zipline-simulator-v1-build/issues/29-agent-browser-point-to-point-pass.md)).
+([browser tickets 29–35](../../.scratch/zipline-simulator-v1-build/issues/29-responsive-layout-browser-evidence.md)).
 **A state nobody scripts there is a state nobody checks** — that is the deliberate trade.
 
 - **Four DOM-shape states**: the Skeleton's content (five Rail headings, both chart frames, no

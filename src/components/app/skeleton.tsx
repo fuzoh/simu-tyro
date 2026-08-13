@@ -23,7 +23,7 @@
  *   and **no `aria-live` region**.
  *
  * Its content has no CI check — it needs a DOM, which amendment A removed — so it is
- * [ticket 29](../../../.scratch/zipline-simulator-v1-build/issues/29-agent-browser-point-to-point-pass.md)'s
+ * [ticket 31](../../../.scratch/zipline-simulator-v1-build/issues/31-shell-and-suppressed-output-browser-pass.md)'s
  * to script. **A state nobody scripts there is a state nobody checks.**
  */
 

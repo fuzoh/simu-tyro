@@ -5757,8 +5757,8 @@ it reads as coverage.*
 > [amendments A and B](../zipline-simulator-v1-build/AMENDMENTS.md#a--vitest-is-for-unit-tests-only-no-component-tests):
 > **there are no component tests and no jsdom.** The Vitest environment is `node`, always. The four
 > states below keep their specified behaviour and change owner — `agent-browser` drives them in a
-> real browser ([ticket 29](../zipline-simulator-v1-build/issues/29-agent-browser-point-to-point-pass.md)),
-> which also takes over the five manual re-checks named just above. Two seams become pure so they stay
+> real browser ([tickets 29–35](../zipline-simulator-v1-build/issues/29-responsive-layout-browser-evidence.md)),
+> which also take over the five manual re-checks named just above. Two seams become pure so they stay
 > unit-testable in `node`: the dropped-keys reporter takes the **raw query string** as a parameter, and
 > `readSession` takes the **storage object**.
 

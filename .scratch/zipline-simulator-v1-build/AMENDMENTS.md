@@ -47,15 +47,16 @@ Neither changes a decision — both are how the same rules survive a `node`-only
 An agent drives the real app in a real browser. This is not a replacement for the unit suite; it
 owns what the unit suite structurally cannot see.
 
-- **New ticket: [A13 · The agent-browser point-to-point pass](./issues/29-agent-browser-point-to-point-pass.md).**
-- It **inherits the four states** amendment A left without a check, plus the end-to-end walkthroughs
-  no unit test spans (a link arriving, an import, a family flip, a régime chosen).
-- **It also takes over § 10 A12's five « manual re-checks ».** `agent-browser` has a real layout
+- **A13 is delegated across [tickets 29–35](./issues/29-responsive-layout-browser-evidence.md).**
+  Tickets 29–30 capture prototype-dependent evidence; tickets 31–35 own bounded browser journeys.
+- Tickets 31–35 **inherit the four states** amendment A left without a check, plus the end-to-end
+  walkthroughs no unit test spans (a link arriving, an import, a family flip, a régime chosen).
+- Tickets 29–30 **take over § 10 A12's five « manual re-checks ».** `agent-browser` has a real layout
   engine, so the three pixel budgets, the banner heights, the View Strip's label widths, the
   first-run VE and the drag frame time become **scripted and repeatable** instead of hand-taken.
   This strictly improves them: the spec called them manual because it had no way to automate them.
-- Ticket 28's deletion gate is unchanged in substance — it still requires those measurements — but
-  they now arrive from a script, and the script survives the prototype.
+- Ticket 36's deletion gate is unchanged in substance — it still requires those measurements — but
+  they now arrive from scripts, and the scripts survive the prototype.
 
 ---
 

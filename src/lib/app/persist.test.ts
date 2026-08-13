@@ -1,7 +1,7 @@
 /**
  * The write side — « v1 build spec » § 7 (*The write side*, *The Session*, *Oversize refuses at
  * « Copier le lien »*). `node`, no router and no clipboard: the timers and the two side effects are
- * `@/components/app/use-persist.ts`'s, and their *timing* belongs to ticket 29 (amendment B).
+ * `@/components/app/use-persist.ts`'s, and their *timing* belongs to ticket 31 (amendment B).
  *
  * What is asserted here is the pure half — the bag the app publishes, the Session it stores, and
  * the one refusal the copy button can produce out of its own arithmetic.
