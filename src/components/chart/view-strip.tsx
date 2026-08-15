@@ -26,6 +26,9 @@
  *   equivalent.
  * - **Below B1 the labels abbreviate rather than wrap** — 44 px out of `MIN_RAIL` is the tightest
  *   budget in the app — and each keeps its full string as `aria-label` and `title`.
+ * - **The row's controls are 32 px of visual inside a 44 px hit target**, and a press here never
+ *   moves the caret. Both are § 5 read literally rather than widened; voir `CONTROL` and
+ *   `keepCaret` below, and amendment H.
  */
 
 import { useEffect, useState } from "react";
@@ -34,6 +37,7 @@ import type { PeekMode } from "@/lib/layout/contract.ts";
 import type { LayerToggles } from "@/lib/session/session.ts";
 
 import { formatValue } from "@/lib/format/quantity.ts";
+import { keepCaret } from "@/lib/layout/collapse.ts";
 import { cn } from "@/lib/utils.ts";
 
 /** One control's two labels: the full string, and what it reads below 600 px of chart column. */
@@ -46,8 +50,18 @@ function Label({ full, short }: { full: string; short: string }) {
   );
 }
 
+/**
+ * § 5 states « the row is 44 px tall, **so** every control in it is a legal touch target ». That is
+ * an inference, and the shipped controls did not support it: `h-8` is 32 px on **every** pointer
+ * type (the app's one `@media (pointer: coarse)` rule is the rider's stroke width, nothing here).
+ * The visual stays 32 px — growing it to 44 leaves the row no padding — and the **hit box** is what
+ * reaches 44, through the same trick § 5 already uses for the rider's transparent stroke: an empty
+ * `::after` bled 6 px past each edge, which the 44 px row absorbs exactly. It overlays the button's
+ * own content, which costs a button nothing; the `x` field is *not* done this way, because an
+ * overlay there would swallow the click that places the caret.
+ */
 const CONTROL =
-  "border-border text-foreground flex h-8 items-center rounded-md border px-2 whitespace-nowrap";
+  "border-border text-foreground relative flex h-8 items-center rounded-md border px-2 whitespace-nowrap after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-['']";
 
 /**
  * § 5's peek query, read at the event and never at render. A pointer handler only ever runs on the
@@ -111,6 +125,7 @@ export function ViewStrip({
         aria-pressed={layers.unloadedLine}
         className={cn(CONTROL, layers.unloadedLine && "bg-accent")}
         onClick={() => onLayers({ ...layers, unloadedLine: !layers.unloadedLine })}
+        onMouseDown={keepCaret}
         title="ligne à vide"
         type="button"
       >
@@ -121,6 +136,7 @@ export function ViewStrip({
         aria-pressed={layers.chordAB}
         className={cn(CONTROL, layers.chordAB && "bg-accent")}
         onClick={() => onLayers({ ...layers, chordAB: !layers.chordAB })}
+        onMouseDown={keepCaret}
         title="corde A–B"
         type="button"
       >
@@ -130,7 +146,16 @@ export function ViewStrip({
       <button
         aria-label={PEEK_LABEL[peek].full}
         aria-pressed={peeking}
-        className={cn(CONTROL, "ml-auto", peeking && "bg-accent", peek === "off" && "opacity-50")}
+        // `min-w-11` is § 5's own abbreviation arithmetic, restored: the row budgets
+        // `59 + 48 + 44 + 128 + 24 = 303`, and the **44** in it is this control abbreviated to
+        // « ×1 ». It shipped at 29,8 px, so the width was a spec figure missed while the height was
+        // a spec inference unmet. The 14,2 px come out of the row's 53,6 px of `ml-auto` slack.
+        className={cn(
+          CONTROL,
+          "ml-auto min-w-11 justify-center",
+          peeking && "bg-accent",
+          peek === "off" && "opacity-50",
+        )}
         disabled={peek === "off"}
         // Hold on a fine pointer; a plain toggle under `(pointer: coarse)`, where a held gesture
         // has no room — and the same toggle from the keyboard, in both modes.
@@ -140,7 +165,15 @@ export function ViewStrip({
             onPeek(!peeking);
           }
         }}
-        onLostPointerCapture={() => onPeek(false)}
+        // Guarded like `onPointerUp` beside it, and for the same reason. This exists to end a
+        // **hold** whose pointer was taken away mid-gesture, which is a fine-pointer story: the
+        // coarse branch takes no capture. But a touch pointer gets *implicit* capture, so this fired
+        // on every tap — `pointerdown` toggled the peek on and `lostpointercapture` forced it back
+        // off before the frame, and § 5's « toggle under `(pointer: coarse)` » could never stick.
+        onLostPointerCapture={() => {
+          if (!coarsePointer()) onPeek(false);
+        }}
+        onMouseDown={keepCaret}
         onPointerDown={(event) => {
           if (coarsePointer()) onPeek(!peeking);
           else {
@@ -217,7 +250,11 @@ function PositionField({
 
   return (
     <label
-      className="relative ml-3 flex items-center gap-1 whitespace-nowrap"
+      // `self-stretch` is this control's half of the 44 px hit target: the label is transparent, so
+      // filling the row's height costs nothing visually — the field keeps its 32 px box — and
+      // activating a label focuses the control it labels. **Not** the `::after` the buttons use: an
+      // overlay here would swallow the click that places the caret inside the field.
+      className="relative ml-3 flex items-center gap-1 self-stretch whitespace-nowrap"
       // **Before the blur, not after the focus.** Coming from the Rail's own « Position du
       // passager » the block is in `pinned + x`; a tap here fires this, then the Rail field's
       // `blur`, then this field's `focus` — and without the first the state would fall back to

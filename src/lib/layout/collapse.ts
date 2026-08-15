@@ -320,6 +320,39 @@ export function revealSurvivesScroll(atTop: boolean): boolean {
 }
 
 /**
+ * **`mousedown`'s default action is the focus shift — cancel it, and `pinned + x` survives its own
+ * press.** Voir [amendment H](../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md).
+ *
+ * The defect this answers: from `pinned + x` the Rail's « Position du passager » holds the caret and
+ * the Chart Block keeps the View Strip *because of that focus*. Pressing anything the strip
+ * renders — its two layer toggles, « ×1 », or the pinned header's own chevron 44 px below it — blurs
+ * that field on `mousedown`, so the state falls to `pinned`, the row unmounts mid-gesture, the cells
+ * row shifts up 44 px, and `mouseup` lands on a Rail control. The browser then dispatches `click` to
+ * the common ancestor and **the handler never runs**. Measured on fine *and* coarse pointers, on all
+ * four controls; a second press always worked, which is what made it read as « press twice ».
+ *
+ * Why this and not a latch: § 5's fourth state is scoped « **tant que le champ `x` a le focus** ».
+ * Latching on `pointerdown` for the other controls would re-read that as « tant qu'un contrôle de la
+ * rangée est pressé » — a spec widening — **and** would need a release rule (`pointerup` +
+ * `pointercancel` + `lostpointercapture`), which is stuck-open on a platform where buttons take no
+ * focus. Cancelling the focus shift needs no release: focus never leaves the `x` field, so § 5's
+ * sentence stays true exactly as written and nothing collapses to recover from.
+ *
+ * **This is load-bearing and invisible.** Remove a call and every victim comes back, with no type
+ * error and no failing test to catch it — amendment B puts the pixels in `agent-browser`, and a node
+ * suite that asserted the handler's presence could only do it by matching source text, which the
+ * `contract.test.ts` ruling declines. The guard is this docblock and the browser procedure.
+ *
+ * The cost, stated: these controls no longer take focus from a pointer press — Safari's own button
+ * behaviour — so a pointer user keeps tabbing from wherever the caret already was. The keyboard path
+ * is untouched, and the strip's `x` keeps its own `pointerdown` latch, which is the one control § 5
+ * *does* scope and the one that must genuinely take the focus.
+ */
+export function keepCaret(event: { preventDefault: () => void }): void {
+  event.preventDefault();
+}
+
+/**
  * § 5's state table as arithmetic: `76 + 44 = 120` pinned, `+ 44 = 164` with the View Strip. It is
  * also what `--pinned-clearance` reserves for § 7's jump primitive, so the jumped-to control never
  * lands underneath the header.

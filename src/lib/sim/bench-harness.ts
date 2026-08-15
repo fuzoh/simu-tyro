@@ -3,11 +3,12 @@
  * *Benches*. It is the shared half of two consumers: `sweep.bench.ts`, which a human reads through
  * `bun run bench`, and `bench-harness.test.ts`, which holds the **p95 tripwire** CI enforces.
  *
- * What the port reproduces, from `src/routes/-prototype-07/perf.tsx` (the « bench ×40 » button):
- * **40 runs per cell**, `SWEEP_STEPS` at **100 / 240 / 500**, over the **three worst-conditioned
- * spans** — 1000 m quasi tendu, 1000 m très mou, 1500 m long — and the p95 of `sweep()` **plus**
- * `evaluateClearance`, the *pair*, because both re-run on every parameter change. The prototype's
- * own index rule for a percentile is kept as-is, so a cell here reads against a cell there.
+ * What the port reproduces, from what was `src/routes/-prototype-07/perf.tsx` (the « bench ×40 »
+ * button, deleted by ticket 36): **40 runs per cell**, `SWEEP_STEPS` at **100 / 240 / 500**, over
+ * the **three worst-conditioned spans** — 1000 m quasi tendu, 1000 m très mou, 1500 m long — and the
+ * p95 of `sweep()` **plus** `evaluateClearance`, the *pair*, because both re-run on every parameter
+ * change. The prototype's own index rule for a percentile is kept as-is, so a cell here still reads
+ * against the recorded cells there — which is the whole reason this module exists.
  *
  * **What does not survive the port, stated rather than quietly lost** (voir § 10 E7b):
  *

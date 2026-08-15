@@ -21,9 +21,9 @@ bun run lint-type-aware  # oxlint --type-aware --type-check
 ## Formatting
 
 Format the files you touched — `bunx oxfmt --write <path>` — never the repo-wide `bun run format`.
-Markdown, `src/routeTree.gen.ts` and `src/routes/-prototype-07/**` are in `.oxfmtrc.json`'s
-`ignorePatterns`: specs, tickets and reference reports are the contract, and the prototype is a
-source of measurements — none of them is a formatter's to rewrite.
+Markdown and `src/routeTree.gen.ts` are in `.oxfmtrc.json`'s `ignorePatterns`: specs, tickets and
+reference reports are the contract, and the route tree is generated — neither is a formatter's to
+rewrite.
 
 ## Read before you touch that area
 

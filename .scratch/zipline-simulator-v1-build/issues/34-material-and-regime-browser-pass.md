@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** claimed
+**Status:** done
 
 - [x] Switching steel to textile and back restores each family’s retained Material Spec values.
 - [x] `PERMANENTE` with textile is disabled and explains why; app never auto-switches family or use class.
@@ -547,3 +547,85 @@ touched no `src/**` file and markdown is in `.oxfmtrc.json`'s `ignorePatterns`.
   `TEMPORAIRE` + `secours10` shows the reduced row set with **no** neutral prompt and `⛔ 1 erreur
   bloquante — aucun verdict`, i.e. the four `k`-dependent rows are suppressed along with the banner
   and the grid. Still a spec question, still ticket 26's surface, still untouched.
+
+---
+
+## D2 closed — § 10.1's reason ships — 2026-08-15
+
+**Owner decision on both calls this ticket refused to make.** D2 stayed open because closing it took
+a **placement** decision and a **copy** decision, and neither belongs to a build ticket. Both are
+taken; the reason now renders.
+
+### Placement — the `note` slot, shared with the Fix Action
+
+`Row`'s full-width `note` slot, via the existing `DisabledReason` — **one reason per row, not one per
+disabled option**, which is what `Picker`'s docblock argues with its own 288 px measurement. The
+reason renders **above** the `[ Choisir un autre régime ]` Fix Action, because it explains the state
+the Fix Action offers to leave: the other order asks the user to act before telling them why.
+
+**Routing the row through `Picker` itself was considered and rejected on inspection** — the decision
+named `Picker + DisabledReason`, and the `DisabledReason` half is what carries § 10.1. `Picker` would
+have taken two regressions with it:
+
+- it renders « — choisir — » **only while `value === ""`**, which would break this ticket's own
+  acceptance item « Removing regime returns exactly to « Résultats sans régime » state »;
+- its box is `max-w-40` against the régime select's `max-w-44`, so it would move Rail widths — the
+  cost this ticket already flagged for the 16 px question.
+
+So the hand-rolled `<select>` stays, and it gains `Picker`'s **convention**: a disabled option now
+reads « `label` — indisponible », which says *that*, while the note says *why*.
+
+### The sentence — derived from `requires`, not from the régime
+
+`regimeUnavailableReason(regime, family, usage)` sits beside `isRegimeAvailable` in
+`src/lib/sim/verdict.ts` and is built from the **unmet requirement**, never from the régime's
+identity: `isRegimeAvailable` is one predicate over `requires`, and per-régime copy would put a
+second table beside the one that decides, to drift the first time a régime gained a requirement.
+
+**Three forms, not the two the decision anticipated** — because both clauses can fail at once, and
+§ 10.1 asks for one reason per row rather than two notes:
+
+| condition | string |
+| --- | --- |
+| family only | « Indisponible — ce régime suppose une corde textile ; la famille active est l'acier. » |
+| usage only | « Indisponible — ce régime ne couvre pas un usage permanent. » |
+| **both** | « Indisponible — ce régime suppose une corde textile et un usage temporaire. » |
+
+**The third is the one that actually ships on first run**, which the decision did not anticipate:
+the first-run scenario is **steel + `PERMANENTE`**, so « Secours textile — 10:1 » fails the family
+*and* the usage requirement. Measured in the browser, not inferred.
+
+### The accepted cost, re-measured rather than assumed
+
+This ticket warned that a prose line in `PARAMÈTRES` moves rail heights tickets 27, 28 and 29
+measured. It does, by **exactly +32 px** — the note's 30 px box plus its 2 px margin — **and nothing
+else moves**:
+
+| relevé | ticket 27's re-measurement | after D2 | delta |
+| --- | --- | --- | --- |
+| 390 × 664 · `PARAMÈTRES` | 1034,5 | **1066,5** | **+32** |
+| 390 × 664 · `aside.scrollHeight` | 2120 | **2152** | +32 |
+| 390 × 664 · sections 2–5 | 322 / 333 / 222 / 164 | **identiques** | 0 |
+| 1440 × 900 · `PARAMÈTRES` | 1053,5 | **1085,5** | **+32** |
+| 1440 × 900 · `aside.scrollHeight` | 2340 | **2372** | +32 |
+| 1440 × 900 · sections 2–5 | 322 / 402,328 / 288 / 230 | **identiques** | 0 |
+
+The Rail is a scroller, so this is content growth inside it: **no chart budget, no block height and
+no `MIN_RAIL` arithmetic moves**. Environment: `HeadlessChrome/151.0.0.0`, `agent-browser 0.34.0`,
+session cleared before each reading, `aside.scrollTop = 0` before every row, viewport read back from
+`innerWidth`/`innerHeight`.
+
+### Coverage
+
+The pure half landed as this ticket predicted it would — **four `node` cases** in
+`src/lib/sim/verdict.test.ts` (« § 10.1 — an unavailable entry shows its reason »): the two functions
+agree over **every** `regime × family × usage` combination (a reason exists exactly where the entry
+is disabled, so the note can never contradict the `<option>` beside it), plus one case per sentence
+form. The rendered placement is a layout fact and carries the measurement above instead
+([amendment B](../AMENDMENTS.md)).
+
+**Files:** `src/lib/sim/verdict.ts` (`regimeUnavailableReason` and its two noun tables),
+`src/lib/sim/index.ts` (barrel), `src/components/rail/inputs.tsx` (the suffix, the reason, the
+shared slot), `src/lib/sim/verdict.test.ts`.
+
+**Status → `done`.** § 10.1's « une entrée indisponible montre sa raison » holds for the régime row.

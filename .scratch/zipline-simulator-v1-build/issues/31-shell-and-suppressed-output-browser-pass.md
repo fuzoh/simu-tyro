@@ -4,16 +4,16 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** claimed
+**Status:** done
 
 - [x] Server frame shows five Rail headings, both chart frames, five labelled read-out cells, and reserved banner space, with no control, value, or « — ».
 - [x] Skeleton transitions to live app without hydration warning or desktop-to-narrow tree jump.
 - [x] Refused link resolves after Skeleton on index route at HTTP 200 and keeps route-level recovery action.
 - [x] Unknown path returns 404 instead of silently redirecting to First-Run Scenario.
 - [x] « Saisie en cours » keeps last valid Sweep visibly marked, freezes chart, disables scrubbing and link copy, and suspends URL/Session writes.
-- [ ] Blurring an empty required field changes to « Aucun résultat », removes stale output values, and leaves scrub track with axes but inert. — **partiel** : the state, its three echoes and the removal of stale values hold, and the axes stay; the track is **not inert** — a pointer drag still moves the rider and rewrites `x` in the URL. Voir **D1** under ## Comments.
+- [x] Blurring an empty required field changes to « Aucun résultat », removes stale output values, and leaves scrub track with axes **and live**. — **item reworded and closed 2026-08-15** by [amendment J](../AMENDMENTS.md): the owner read § 7 as keeping the track live in this state, because the geometry is still valid and `x` selects a *view*. Inertness is scoped to **L'exception géométrique** (structural) and « Saisie en cours » (transient), both of which the app already implements. **No code changed — the spec's two headings did.** Voir **D1** and **F1** under ## Comments.
 - [x] Browser procedure records assertions and can be repeated without component-test infrastructure.
-- [x] Any defect fixed during walkthrough receives regression coverage at pure seam where expressible. — the fix phase below: **D3** is fixed at `fitsWholeBlock`'s own seam with two `node` cases in `src/lib/layout/collapse.test.ts`; **D2** is a layout fact and carries a browser procedure instead (amendment B); **D1** is **not fixed** — it is a § 7 reading, escalated rather than legislated. Voir **## Comments → Phase correctifs**.
+- [x] Any defect fixed during walkthrough receives regression coverage at pure seam where expressible. — the fix phase below: **D3** is fixed at `fitsWholeBlock`'s own seam with two `node` cases in `src/lib/layout/collapse.test.ts`; **D2** is a layout fact and carries a browser procedure instead (amendment B); **D1** was escalated rather than legislated and the owner **ruled it not a defect** ([amendment J](../AMENDMENTS.md)) — the live track is the specified behaviour, so there is nothing to regress against. The **second** § 7 reading this ticket left open — a scrub writing an unrounded float into the URL — *was* a defect, and it is fixed at the display-precision seam (`roundToDisplay("x_D", …)` in `scrub()`). Voir **## Comments → Phase correctifs** and **F1**.
 
 ## Comments
 

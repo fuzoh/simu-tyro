@@ -36,7 +36,6 @@
     "apps/web/src/routeTree.gen.ts",
     ".agents/**",
     "**/*.md",
-    "src/routeTree.gen.ts",
-    "src/routes/-prototype-07/**"
+    "src/routeTree.gen.ts"
   ]
 }

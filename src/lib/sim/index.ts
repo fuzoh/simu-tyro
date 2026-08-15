@@ -124,6 +124,7 @@ export {
   isFamilyAllowed,
   isRegimeAvailable,
   REGIMES,
+  regimeUnavailableReason,
   TERMINATIONS,
   VERDICT,
 } from "./verdict.ts";

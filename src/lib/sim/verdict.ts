@@ -445,6 +445,52 @@ export function isRegimeAvailable(
   return requires === null || (requires.family === family && requires.usage === usage);
 }
 
+/** What a régime's `requires` asks for, as the noun the reason sentence needs. */
+const FAMILY_REQUIRED = { steel: "un câble acier", textile: "une corde textile" } as const;
+const USAGE_REQUIRED = {
+  PERMANENTE: "un usage permanent",
+  TEMPORAIRE: "un usage temporaire",
+} as const;
+/** And what is currently selected, for the clause that names it. */
+const FAMILY_ACTIVE = { steel: "l'acier", textile: "le textile" } as const;
+
+/**
+ * § 10.1 — « une entrée indisponible **montre sa raison** ». `null` where the entry is choosable,
+ * so a caller renders the note only when there is something to say.
+ *
+ * **Derived from `requires`, never from the régime's identity.** {@link isRegimeAvailable} is one
+ * predicate over that field; writing per-régime copy would put a second table beside the one that
+ * decides, and the two would drift the first time a régime gained a requirement. Today only
+ * « Secours textile — 10:1 » carries one.
+ *
+ * **Three forms, not two, because both clauses can fail at once** — steel *and* `PERMANENTE`. § 10.1
+ * asks for one reason per row, so the pair is one sentence rather than two notes.
+ *
+ * The string is the whole answer: the option itself already reads « — indisponible » inside the
+ * select, which says *that*; this says *why*, which is what § 10.1 actually requires and what the
+ * shipped tree did not have.
+ */
+export function regimeUnavailableReason(
+  regime: RegimeId,
+  family: "steel" | "textile",
+  usage: "PERMANENTE" | "TEMPORAIRE",
+): string | null {
+  const { requires } = REGIMES[regime];
+  if (requires === null) return null;
+  const wrongFamily = requires.family !== family;
+  const wrongUsage = requires.usage !== usage;
+  if (wrongFamily && wrongUsage) {
+    return `Indisponible — ce régime suppose ${FAMILY_REQUIRED[requires.family]} et ${USAGE_REQUIRED[requires.usage]}.`;
+  }
+  if (wrongFamily) {
+    return `Indisponible — ce régime suppose ${FAMILY_REQUIRED[requires.family]} ; la famille active est ${FAMILY_ACTIVE[family]}.`;
+  }
+  if (wrongUsage) {
+    return `Indisponible — ce régime ne couvre pas ${USAGE_REQUIRED[usage]}.`;
+  }
+  return null;
+}
+
 /** §10.4, as the theory doc states it: permanent public attractions are steel only. */
 export function isFamilyAllowed(
   family: "steel" | "textile",

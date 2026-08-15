@@ -74,7 +74,13 @@ import {
   switchTightness,
 } from "@/lib/rail/values.ts";
 import { clearSession } from "@/lib/session/session.ts";
-import { isFamilyAllowed, isRegimeAvailable, REGIMES, TERMINATIONS } from "@/lib/sim";
+import {
+  isFamilyAllowed,
+  isRegimeAvailable,
+  REGIMES,
+  regimeUnavailableReason,
+  TERMINATIONS,
+} from "@/lib/sim";
 import { parseFailureMessage, parseProfileCsv, readFailure } from "@/lib/terrain/csv.ts";
 import { encodeP1 } from "@/lib/url/p1.ts";
 
@@ -286,6 +292,17 @@ export function RailInputs({
   const driver = drivingField(scenario);
   const familyBreach = breaches.get("family");
   const regimeBreach = breaches.get("regime");
+  /**
+   * § 10.1's « une entrée indisponible montre sa raison », for the régime row. **One reason per
+   * row, not one per disabled option** — `Picker`'s docblock argues that at 288 px, and the rule
+   * applies here even though this select is hand-rolled. Today at most one régime is ever
+   * unavailable, so the first is the reason; if a second ever were, they would share a cause and
+   * the sentence would be the same twice.
+   */
+  const regimeReason =
+    Object.values(REGIMES)
+      .map((regime) => regimeUnavailableReason(regime.id, scenario.material.family, scenario.usage))
+      .find((reason) => reason !== null) ?? null;
 
   // Unmemoised on purpose: every field of it is rebuilt each render anyway, and every consumer is
   // a child of this component. What matters is that the consumers are **stable component types**,
@@ -338,17 +355,20 @@ export function RailInputs({
                 >
                   {/* No default, and its absence is legitimate state — never a hole to fill. */}
                   <option value="">— choisir —</option>
-                  {Object.values(REGIMES).map((regime) => (
-                    <option
-                      disabled={
-                        !isRegimeAvailable(regime.id, scenario.material.family, scenario.usage)
-                      }
-                      key={regime.id}
-                      value={regime.id}
-                    >
-                      {regime.label}
-                    </option>
-                  ))}
+                  {Object.values(REGIMES).map((regime) => {
+                    const unavailable = !isRegimeAvailable(
+                      regime.id,
+                      scenario.material.family,
+                      scenario.usage,
+                    );
+                    return (
+                      <option disabled={unavailable} key={regime.id} value={regime.id}>
+                        {/* `— indisponible` is `Picker`'s and `Choice`'s own convention, and it
+                            says *that*; § 10.1's *why* is the row's note below. */}
+                        {unavailable ? `${regime.label} — indisponible` : regime.label}
+                      </option>
+                    );
+                  })}
                 </select>
               }
               htmlFor="rail-regime"
@@ -358,14 +378,27 @@ export function RailInputs({
                   ? undefined
                   : { text: regimeBreach.message, blocking: regimeBreach.kind !== "empty" }
               }
+              // § 10.1's reason and § 7's Fix Action share the one full-width slot, reason first:
+              // it explains the state the Fix Action offers to leave, so reading it in the other
+              // order asks the user to act before they are told why.
               note={
-                regimeBreach !== undefined && regimeBreach.fixes.length > 0 ? (
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {regimeBreach.fixes.map((fix) => (
-                      <FixButton key={fix.id} label={fix.label} onClick={() => runFix(fix.id)} />
-                    ))}
-                  </div>
-                ) : null
+                regimeReason === null &&
+                (regimeBreach === undefined || regimeBreach.fixes.length === 0) ? null : (
+                  <>
+                    {regimeReason !== null && <DisabledReason reason={regimeReason} />}
+                    {regimeBreach !== undefined && regimeBreach.fixes.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {regimeBreach.fixes.map((fix) => (
+                          <FixButton
+                            key={fix.id}
+                            label={fix.label}
+                            onClick={() => runFix(fix.id)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )
               }
             />
           </Group>

@@ -146,7 +146,8 @@ the real app in a real browser instead
   « Saisie en cours », and « Aucun résultat ».
 - **Five measurements a layout engine has to make**: the three pixel budgets (390×664 · 768×1024 ·
   1440×900), the banner heights 44 / 60 / 76 px, the View Strip's label widths, the first-run
-  auto-fit VE ≈ ×1,5, and the drag frame time against a 16,7 ms vsync.
+  auto-fit VE **×1,86** at aspect 0,42 on the 1,1 L domain (badge « ×1,9 », at and below § 5's
+  reference chart column), and the drag frame time against a 16,7 ms vsync.
 - **The end-to-end walkthroughs** no unit test spans: a link arriving, a CSV import, a steel ⇄ textile
   family flip, a régime chosen, the narrow-screen keyboard.
 

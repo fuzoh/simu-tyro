@@ -45,7 +45,7 @@ import {
 } from "@/components/app/shell.tsx";
 import { useAppDispatch, useAppState } from "@/components/app/store.tsx";
 import { clampToSpan, placeRider, snapToStep } from "@/lib/chart/scene.ts";
-import { formatQuantity, formatValue } from "@/lib/format/quantity.ts";
+import { formatQuantity, formatValue, roundToDisplay } from "@/lib/format/quantity.ts";
 import {
   CELL_WRAP_PX,
   createSharedX,
@@ -254,14 +254,25 @@ export function ChartBlock({
    * Pointer input **snaps to the sweep steps**: at 1500 m one pixel is 1,2 m. With no traverse to
    * snap to the track is still a track — § 8 only ever takes the pointer path away for the
    * geometric exception — so the position lands exactly where it was pointed at.
+   *
+   * **A scrub is a prefill, so it writes the *displayed* value** — § 8's *round earlier*. The rule
+   * names the tightness switch and « Recalculer » as the inputs that are not typed; a drag is the
+   * third, and it was writing the underlying float: the field read « 44,3 » while the URL carried
+   * `x=44.28985507246377`, so two links to the same visible position differed. `roundToDisplay` is
+   * the same primitive every other prefill uses, and it goes **after** the snap so that what state
+   * holds is what the strip prints. At 1500 m the correction is under 0,05 m — a twenty-fourth of a
+   * pixel — so the snap keeps its whole purpose.
+   *
+   * The **typed** path is untouched and must stay that way: a typed position is exact, and
+   * `PositionField` says so.
    */
   function scrub(metres: number) {
     if (scene === null) {
-      moveRider(metres);
+      moveRider(roundToDisplay("x_D", metres));
       return;
     }
     const snapped = snapToStep(scene.traverse, clampToSpan(metres, scene.L));
-    if (snapped !== null) moveRider(snapped);
+    if (snapped !== null) moveRider(roundToDisplay("x_D", snapped));
   }
 
   /**

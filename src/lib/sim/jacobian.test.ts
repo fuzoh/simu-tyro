@@ -11,8 +11,8 @@ import { jacobianAt } from "./jacobian.ts";
  * plan de test »: `F1`'s three partials land here, and so do §15's two stated invariants for
  * this module, `∂z/∂H = ∂x/∂V₀` and the finite-difference agreement.
  *
- * **All four of these assertions are new work, not a port.** The prototype exposes no Jacobian,
- * so a green `check.ts` is not coverage for any of them — testing.md's « fixture rules » says so
+ * **All four of these assertions are new work, not a port.** The prototype exposed no Jacobian,
+ * so its green `check.ts` was never coverage for any of them — testing.md's « fixture rules » says so
  * explicitly, and it is why the module exists before the solver that consumes it.
  *
  * **No solver runs in this file.** `F1` publishes `(H, V₀)` directly; the two loaded / inclined

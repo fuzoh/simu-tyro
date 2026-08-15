@@ -15,8 +15,8 @@ import { chordBoundFloor, solveSpan } from "./solve.ts";
 
 /**
  * §7's inverse modes against `docs/simulation-theory.md` §15 — « voir § 11 — le plan de test » for
- * which row lands here: **`Z6`, and `Z6` is entirely new work**. The prototype implements no
- * inverse mode, so `check.ts` is not coverage for a single line of this file.
+ * which row lands here: **`Z6`, and `Z6` is entirely new work**. The prototype implemented no
+ * inverse mode, so its `check.ts` was never coverage for a single line of this file.
  *
  * Four things this file exists to pin down:
  *

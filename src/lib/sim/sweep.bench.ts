@@ -1,11 +1,10 @@
 /**
  * The bench a human reads — `bun run bench` (`vitest bench`), « v1 build spec » § 10 (E7b) and
- * § 11, *Benches*. Ported out of the prototype's « bench ×40 » chip
- * (`src/routes/-prototype-07/perf.tsx`), which the deletion at P3 takes with it: **not ported, the
- * only measured performance evidence on this map becomes unreproducible**, and ticket 12's tripwire
- * — « re-run the bench if anything raises `260 × 60` » — keeps naming
- * `/prototype/profile-view?variant=D&scenario=taut`, a route scheduled for deletion. Ported, it
- * names `bun run bench`.
+ * § 11, *Benches*. Ported out of the prototype's « bench ×40 » chip, which lived at
+ * `src/routes/-prototype-07/perf.tsx` **until ticket 36 deleted it**: unported, the only measured
+ * performance evidence on this map would have become unreproducible, and ticket 12's tripwire
+ * — « re-run the bench if anything raises `260 × 60` » — would still be naming a route that no
+ * longer exists. It names `bun run bench`, which is why the deletion cost nothing.
  *
  * The harness — the three worst-conditioned spans, 40 runs per cell, the 100 / 240 / 500 step
  * counts, and what the port does *not* carry over — lives in

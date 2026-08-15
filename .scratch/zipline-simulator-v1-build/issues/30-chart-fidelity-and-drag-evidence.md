@@ -4,9 +4,9 @@
 
 **Blocked by:** 28 — Keep safety controls usable under constrained height.
 
-**Status:** claimed
+**Status:** done
 
-- [ ] First-run screen on 1080×420 plot reports auto-fit vertical exaggeration near ×1.5. — **measured ×1,863, not ×1,5**, and a 1080×420 box is unreachable under the elected width-derived rule. The number the app draws is exactly what § 5's own identity predicts; the ≈×1,5 in the re-check line is stale. Voir « Item 1 » under ## Comments — **this needs a spec decision and is left open.**
+- [x] First-run screen reports auto-fit vertical exaggeration **×1,86** at aspect 0,42 on the 1,1 L domain (badge « ×1,9 »), at and below § 5's reference chart column. — **item reworded and closed 2026-08-15** by [amendment I](../AMENDMENTS.md), which took option 1 below: the app draws ×1,86290 and the published ≈×1,5 was arithmetic from a superseded 1,05 L domain and a 1080×420 box the elected rule cannot produce, so **the spec moved, not the app**. Re-measured once more against the shipped tree on 2026-08-15. Voir « Item 1 » under ## Comments.
 - [x] Measured plot aspect remains inside [0.35, 0.50] and first-run view stays clear of ×1 floor. — **qualified, and the tick is only true at and below § 5's reference chart column.** Measured here at five viewports it is 0,42000 to five places, dead centre of the band. But [amendment F](../AMENDMENTS.md#f--the-plots-height-is-capped-at--5s-reference-chart-column) has since capped the plot at 463,68 px, so above a **1372,8 px chart column** the *drawn* aspect falls out of the band's floor — 0,2927 at 1920 × 1080, 0,2085 at 2560 × 1440 — and the first-run view reaches the **×1 floor** at 2560 (and badge row 3 at 3440). Amendment F's cost 1 argues why that is acceptable rather than a regression (a cap can only ever *lower* the aspect, and the band's dangerous half is its ceiling); its cost 2 is what the clip costs and what closes it. **This box is ticked for the widths it was measured at, not for every width.**
 - [x] Rider drag frame intervals are sampled in browser and p50 is recorded against 16.7 ms vsync interval.
 - [x] Measurement records browser version, viewport, hardware context, sample method, and production/prototype values.
@@ -78,6 +78,35 @@ on the 1,1 L domain » edits a published spec figure, and it lands in three more
 3. **Leave both and annotate.** Cost: a live safety document carries a number no build reproduces.
 
 Left for the map, not decided here.
+
+#### Décision du propriétaire — 2026-08-15 : c'est l'option 1, et elle est livrée
+
+**Recorded as [amendment I](../AMENDMENTS.md).** The re-check line now reads « auto-fit VE **×1,86**
+at aspect 0,42 on the 1,1 L domain (badge « ×1,9 »), at and below § 5's reference chart column », and
+**the 1080×420 box is dropped** as unreachable under the elected rule. Options 2 and 3 were rejected
+for the reasons costed above — option 2 needs aspect 0,3389, below the band floor, and option 3 would
+leave a live safety document carrying a number no build reproduces.
+
+**Re-measured once more before the edit**, against the shipped tree rather than trusting this table:
+`HeadlessChrome/151.0.0.0`, session cleared (`localStorage.clear()` then reload), viewport
+**1440 × 900** read back from `innerWidth`/`innerHeight` — badge « **Éch. verticale ×1,9** », plot
+clip **1152 × 463,68** (amendment F's cap to the pixel). The domain correction was verified rather
+than assumed: plot inner **1104 px ÷ `pxPerM_x` 6,69091 = 165,0 m**, i.e. 1,1 L, so the spec's old
+« `x` domain **[−3,75 ; 153,75] m** (span + 5 %) » was the superseded 1,05 L and now reads
+**[−7,5 ; 157,5] m**.
+
+**Edited, five sites:** `spec.md` × 4 (the § 5 re-check list, the first-paint paragraph — domain and
+VE both — the A12 gate list, and the jsdom-limits paragraph) and `docs/conventions/testing.md` × 1.
+`src/lib/layout/contract.test.ts`'s first-run case needed no change — it already asserted
+`toBeCloseTo(1.8629, 4)` — but its docblock, which carried « reconciling it is an open spec
+decision », now cites the settled figure.
+
+**One record corrected while settling this.** A handoff claimed amendment F's ×1,9 was contradicted by
+« a later reading of ×1,4 on the same host », unreconciled. **No such reading exists anywhere in the
+repo**: every recorded first-run badge is ×1,9 (11 occurrences across tickets 29, 30, 34 and
+`AMENDMENTS.md`), and the only other figure — ×1,2 — is this ticket's own `D_target` 6 leg *after* a
+scenario change, which is not the first-run screen. There was nothing to reconcile, and the trap was
+itself the stale record.
 
 ### Item 2 — rider drag frame cadence
 

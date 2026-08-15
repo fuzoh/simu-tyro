@@ -4,12 +4,12 @@
 
 **Blocked by:** None — ticket 26 is complete.
 
-**Status:** claimed
+**Status:** done
 
 - [x] Chart Block stays whole while Rail is at top and no Rail field has focus.
 - [x] Scrolling Rail or focusing one of its fields reduces Chart Block to banner slot plus live « Garde min ».
 - [x] Focusing rider-position field keeps View Strip present so field never collapses itself away.
-- [ ] Pinned header exposes « Afficher le profil » action with correct accessible name and restores whole block when constraints allow. — **partiel** : the keyboard path holds, the **first pointer press taken from `pinned + x`** never reaches the button's handler. Voir « Item 4 is partial » under ## Comments.
+- [x] Pinned header exposes « Afficher le profil » action with correct accessible name and restores whole block when constraints allow. — **closed 2026-08-15** by [amendment H](../AMENDMENTS.md): the first pointer press from `pinned + x` now reaches the handler, because `keepCaret` cancels `mousedown`'s focus shift instead of widening § 5's latch. Verified on fine **and** coarse pointers. Voir « Item 4 closed » under ## Comments.
 - [x] Banner jump action reveals culpable Rail section, reserves pinned-header clearance, and focuses target control.
 - [x] Blocking errors keep culpable Rail section reachable and pinned at narrow width.
 - [x] Collapse state derives only from scroll and focus; it is absent from Scenario, Session, and URL.
@@ -608,3 +608,76 @@ $ bun run test                 # vitest run
 ```
 
 No `oxfmt`: this leg touched no source file, and Markdown is in `.oxfmtrc.json`'s `ignorePatterns`.
+
+---
+
+## Item 4 closed — the § 5 latch-scope decision was taken — 2026-08-15
+
+**Owner decision, recorded as [amendment H](../AMENDMENTS.md).** The gap this ticket had carried as
+`partiel` since 2026-08-14 — the first pointer press taken directly from `pinned + x` never reaching
+« Afficher le profil »'s handler — is closed, and **§ 5's sentence did not move**.
+
+**The mechanism.** `keepCaret` (`src/lib/layout/collapse.ts`) is one `event.preventDefault()` on
+`mousedown`. `mousedown`'s default action *is* the focus shift, so cancelling it means the Rail's
+`#rail-xD` never blurs, the View Strip never unmounts, the cells row never shifts, and the press lands
+on the button it started on. § 5's « tant que le champ `x` a le focus » stays true **as written**
+rather than being widened to « tant qu'un contrôle de la rangée est pressé » — which is why the
+release-rule problem that made this ticket refuse to invent a latch (`pointerup` + `pointercancel` +
+`lostpointercapture`, stuck-open where buttons take no focus) does not arise: there is nothing to
+release.
+
+**Re-driven on the current tree first, then verified after.** `HeadlessChrome/151.0.0.0`,
+`agent-browser 0.34.0`, dev server `http://localhost:3000/` (**200**), viewport **390 × 844** set with
+`set viewport` and read back from `innerWidth`/`innerHeight`, `aside.scrollTop = 0` and
+`focus #rail-xD` before every leg. Event orderings are a capture-phase log on `document`.
+
+**Reproduced before the change**, exactly as this ticket recorded it:
+
+```
+pointerdown: SPAN · mousedown: SPAN · focusout: INPUT#rail-xD
+· focusin: BUTTON «Afficher le profil» · mouseup: SELECT#rail-cst · click: DIV
+→ state stays `pinned`, `#profil` `display: none` — the handler never ran
+```
+
+**After**, same sequence, same coordinates:
+
+| leg, from `pinned + x` | fine pointer | coarse pointer `[CDP]` |
+| --- | --- | --- |
+| chevron « Afficher le profil » (356 ; 142) | `click: SPAN` → handler runs → **`whole`**, `#profil` `display: block`, focus `DIV#profil` | identical: **`whole`**, `#profil` `block`, focus `DIV#profil` |
+| « à vide » (48 ; 98) | `aria-pressed` **flips**, state stays **`pinned-x`**, active stays `INPUT#rail-xD` | identical |
+| « corde » (109 ; 98) | `aria-pressed` **flips**, state **`pinned-x`**, active `INPUT#rail-xD` | identical |
+| « ×1 » (194 ; 98) | held → `aria-pressed true`, released → `false`, state **`pinned-x`** throughout | **toggles and sticks** (`true`) — voir the peek fix below |
+
+The coarse leg is real touch emulation over CDP — `Emulation.setTouchEmulationEnabled
+{ maxTouchPoints: 5 }`, `matchMedia('(pointer: coarse)')` **true**, `navigator.maxTouchPoints` **5**,
+driven with `Input.dispatchTouchEvent`. `(hover: hover)` stays false: emulation, not a device.
+
+**A second defect was found while verifying, and fixed here.** On a coarse pointer « ×1 » could never
+stay toggled — measured from **`whole`, with nothing focused**, so it was never a `pinned + x`
+symptom: `onLostPointerCapture` released the peek unguarded while its sibling `onPointerUp` guards
+with `!coarsePointer()`, and a touch pointer gets *implicit* capture, so every tap toggled on and
+then off before the frame. Logged:
+`pointerdown:false · touchstart:true · gotpointercapture:true · pointerup:true ·
+lostpointercapture:true · … · click:false`. § 5 specifies « Toggle under `(pointer: coarse)` », so
+this was the shipped tree contradicting the spec, not a spec question. The guard now matches its
+sibling.
+
+**Ticket 35's defect 4 closed with it**, since it is the same row: the controls keep their 32 px
+visual and gain a **44 px hit box** through an empty `::after` bled 6 px past each edge, and « ×1 »
+returns to the **44 px width § 5's own arithmetic already budgets** (`59 + 48 + 44 + 128 + 24 = 303`;
+it shipped at 29,8). Measured after: « ×1 » **44,0 × 32**, and `document.elementFromPoint` 4 px above
+*and* below each control's visual box resolves into that control. The `x` field takes `self-stretch`
+instead of an `::after` — **44 px tall label, 32 px input** — because an overlay there would swallow
+the click that places the caret.
+
+**Coverage.** Layout and event ordering, so [amendment B](../AMENDMENTS.md) owns it and the tables
+above are the evidence. **No `node` guard was added**, deliberately: it could only match `.tsx`
+source text, which amendment K's ruling on `contract.test.ts` declines. `keepCaret`'s docblock
+carries the reason and says it is load-bearing and invisible.
+
+**Files changed:** `src/lib/layout/collapse.ts` (`keepCaret`), `src/components/app/shell.tsx` (the
+chevron's `onMouseDown`), `src/components/chart/view-strip.tsx` (the three controls' `onMouseDown`,
+`CONTROL`'s hit box, « ×1 »'s `min-w-11 justify-center`, the `x` label's `self-stretch`, the
+`onLostPointerCapture` guard).
+
+**Status → `done`.** All eight acceptance items now hold.

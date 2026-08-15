@@ -29,6 +29,7 @@ import type { CollapseState } from "@/lib/layout/collapse.ts";
 import {
   CENTRE_IN_RAIL,
   centresOnFocus,
+  keepCaret,
   pinnedHeaderHeight,
   PROFILE_BAND_ID,
   PROFILE_BAND_LABEL,
@@ -611,6 +612,10 @@ export function RevealProfile({
         const band = document.getElementById(PROFILE_BAND_ID);
         if (band !== null && band.checkVisibility()) band.focus({ preventScroll: true });
       }}
+      // From `pinned + x` this button sits 44 px under a View Strip that exists only while the
+      // Rail's `x` holds the caret — so `mousedown`'s own focus shift used to unmount the row above
+      // it, move this button, and send the `click` to an ancestor. Voir `keepCaret`.
+      onMouseDown={keepCaret}
       title={REVEAL_LABEL}
       type="button"
     >

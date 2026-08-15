@@ -537,12 +537,13 @@ describe("§ 5 — vertical exaggeration", () => {
    * measurement had no lock at all: the seven `k` rows above are § 5's table and none of them is
    * the shipped scenario, so nothing here would have caught the *first* screen drifting.
    *
-   * It asserts the app's own identity — `0,42 × 165 / 37,2` — and **not** the spec's re-check line,
-   * which publishes « ≈ ×1,5 on a 1080×420 plot » (`spec.md` 2555 / 4987–4988 / 5487,
-   * `docs/conventions/testing.md` 148). That figure is arithmetic from a 1,05 L domain and the
-   * prototype's box shape, both superseded, and reconciling it is an open spec decision — voir
-   * ticket 30, « Item 1 ». Chasing ×1,5 by nudging {@link PROFILE_ASPECT} or {@link X_MARGIN} is
-   * exactly what this case is here to fail: a true ×1,5 needs aspect 0,3382, *below* the band floor.
+   * It asserts the app's own identity — `0,42 × 165 / 37,2`. The spec used to publish « ≈ ×1,5 on a
+   * 1080×420 plot », which was arithmetic from a 1,05 L domain and the prototype's box shape, both
+   * superseded; **the owner settled it to ×1,86 (badge « ×1,9 ») and the five publication sites now
+   * agree with this case** — voir ticket 30 « Item 1 » and amendment I. Chasing ×1,5 by nudging
+   * {@link PROFILE_ASPECT} or {@link X_MARGIN} is exactly what this case is here to fail: a true
+   * ×1,5 needs aspect 0,3382, *below* the band floor, and a 1080×420 box is unreachable under the
+   * elected width-derived rule, which only ever produces 0,42.
    */
   it("the first-run screen draws ×1,86 at aspect 0,42 — the measured first point on the band", () => {
     const firstRun = exaggeration({
@@ -927,7 +928,14 @@ describe("§ 5 — the anchor targets in the Handle Lane", () => {
 describe("§ 5 — the two mechanisms the layout may not use", () => {
   const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 
-  /** Every source file the app ships, tests and the prototype excluded. */
+  /**
+   * Every source file the app ships, tests excluded.
+   *
+   * The `-prototype` skip **outlives the prototype on purpose** (ticket 36 deleted it): it costs one
+   * line, and without it a directory reintroduced under that name would be silently unscanned by
+   * every prohibition below — the failure mode being that the guards keep passing while the thing
+   * they guard walks back in.
+   */
   function sources(directory: string): string[] {
     const out: string[] = [];
     for (const entry of readdirSync(join(ROOT, directory), { withFileTypes: true })) {
@@ -1027,16 +1035,20 @@ describe("§ 5 — the two mechanisms the layout may not use", () => {
     // browser measurement (amendment B); *that the same inset reaches the scroller's optimal
     // viewing region and not only its content* is source, and that is what regressed.
     const shell = read("src/components/app/shell.tsx");
-    // The same spelling twice, on the same element — one variable, one fallback, no threshold, so
-    // both resolve to `0px` where `interactive-widget=resizes-content` is honoured. Asserted as two
-    // tokens rather than as an adjacent pair, because the formatter sorts the class list.
-    const rail =
-      shell
-        .split("\n")
-        .find((line) => line.includes("className=") && line.includes("pb-[var(--kb,0px)]")) ?? "";
-    expect(rail).toContain("overflow-y-auto");
-    expect(rail).toContain(" pb-[var(--kb,0px)]");
-    expect(rail).toContain(" scroll-pb-[var(--kb,0px)]");
+    // **Read as a set of class tokens, not as a substring of a sorted list.** The earlier form
+    // pinned two tokens with a leading space on the one line that also held `className=` — which
+    // coupled this guard to `oxfmt`'s class ordering *and* to the list staying on one line, and it
+    // had already been rewritten once for exactly that. Splitting the Rail's own class list on
+    // whitespace makes the assertion say what the contract says — « the inset is spent on the
+    // scroller's content **and** on its viewing region » — and leaves the formatter free to order
+    // and wrap however it likes. It also cannot be satisfied by the two tokens being *discussed*
+    // in the doc comment above the element, which a whole-file match is.
+    const railClass = /className="([^"]*overflow-y-auto[^"]*)"/.exec(shell)?.[1] ?? "";
+    const tokens = new Set(railClass.split(/\s+/));
+    expect({
+      padding: tokens.has("pb-[var(--kb,0px)]"),
+      scrollPadding: tokens.has("scroll-pb-[var(--kb,0px)]"),
+    }).toStrictEqual({ padding: true, scrollPadding: true });
     // And no second scroll mechanism was added to pay for it: piece 3 is still one centring call
     // with `behavior` left at `auto`, and the Rail's own scroll is still nobody's to set.
     expect(shell).toContain("target.scrollIntoView(CENTRE_IN_RAIL)");

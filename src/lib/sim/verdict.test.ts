@@ -24,6 +24,7 @@ import {
   evaluateVerdict,
   isFamilyAllowed,
   isRegimeAvailable,
+  regimeUnavailableReason,
 } from "./verdict.ts";
 
 /**
@@ -510,6 +511,47 @@ describe("the refusals — a prohibition survives an ample margin", () => {
     const v = evaluateVerdict(firstRunInput("secours10"));
     expect(v.state).toBe("refuse-usage-interdit");
     expect(v.refusal).toBe("regime-indisponible-pour-cette-ligne");
+  });
+});
+
+describe("§ 10.1 — an unavailable entry shows its reason", () => {
+  test("a choosable régime has no reason to give, in every combination", () => {
+    for (const regime of Object.keys(REGIMES) as RegimeId[]) {
+      for (const family of ["steel", "textile"] as const) {
+        for (const usage of ["PERMANENTE", "TEMPORAIRE"] as const) {
+          // The two are one predicate seen from both sides: a reason exists exactly where the
+          // entry is disabled, so the note can never contradict the `<option>` beside it.
+          expect({ regime, family, usage, reason: null }).toStrictEqual({
+            regime,
+            family,
+            usage,
+            reason: isRegimeAvailable(regime, family, usage)
+              ? regimeUnavailableReason(regime, family, usage)
+              : null,
+          });
+        }
+      }
+    }
+  });
+
+  test("the family clause names the requirement and what is active instead", () => {
+    expect(regimeUnavailableReason("secours10", "steel", "TEMPORAIRE")).toBe(
+      "Indisponible — ce régime suppose une corde textile ; la famille active est l'acier.",
+    );
+  });
+
+  test("the usage clause names the use class that blocks it", () => {
+    expect(regimeUnavailableReason("secours10", "textile", "PERMANENTE")).toBe(
+      "Indisponible — ce régime ne couvre pas un usage permanent.",
+    );
+  });
+
+  test("both clauses failing is **one** sentence, not two notes", () => {
+    // § 10.1 asks for one reason per row. Steel under `PERMANENTE` fails the family *and* the
+    // usage requirement, and the row still gets a single sentence.
+    expect(regimeUnavailableReason("secours10", "steel", "PERMANENTE")).toBe(
+      "Indisponible — ce régime suppose une corde textile et un usage temporaire.",
+    );
   });
 });
 

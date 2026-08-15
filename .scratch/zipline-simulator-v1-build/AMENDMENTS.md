@@ -2,11 +2,13 @@
 
 **Opened 2026-08-12, by the repo owner**, with four decisions taken *after*
 [the spec](../zipline-simulator-v1/spec.md) was assembled; **A–D** are those four. **E** was added
-2026-08-13 on ticket 15's re-probe, and **F** and **G** on 2026-08-14 during A12. They **supersede**
-the spec where they collide, and the spec's affected paragraphs point here. Everything else in the
-spec stands.
+2026-08-13 on ticket 15's re-probe, and **F** and **G** on 2026-08-14 during A12. **H–K** were taken
+2026-08-15, closing the last open decisions of the v1 build: the `pinned + x` row (**H**), the
+published first-run VE (**I**), § 7's two scrub readings (**J**), and the keyboard's focus-into-view
+with its companion ruling on `contract.test.ts` (**K**). They **supersede** the spec where they
+collide, and the spec's affected paragraphs point here. Everything else in the spec stands.
 
-This file is the single source of truth for **all seven**. Do not copy their content into a ticket —
+This file is the single source of truth for **all eleven**. Do not copy their content into a ticket —
 tickets link here. A build decision that amends the spec gets a letter here; one that only records
 how a ticket was executed does not.
 
@@ -622,3 +624,204 @@ answer (α), with the residual above), and **27 · 29** (decision 5's re-measure
 where « not one budget moves » is evidence rather than a claim). In § 13 it sharpens the thin spot
 « the `interactive-widget` / `visualViewport` pair is untested here »: the pair is still unmeasured on
 a device, but the app no longer hands it a zoomed page by default.
+
+---
+
+## H · The `pinned + x` row is read literally: it keeps its caret, and its controls keep 44 px
+
+**2026-08-15, by the repo owner**, on the evidence of
+[ticket 27](./issues/27-pinned-safety-header.md)'s item 4 and
+[ticket 35](./issues/35-narrow-keyboard-browser-pass.md)'s defects 2, 3 and 4. **Interprets** § 5's
+fourth collapse state — « **pinned + x** : idem, plus la View Strip, **tant que le champ `x` a le
+focus** » — and § 5's « the row is 44 px tall, **so** every control in it is a legal touch target ».
+
+**It changes no sentence of § 5.** That is the point of both halves: each defect was the shipped tree
+failing to support a claim § 5 makes, not § 5 making the wrong claim.
+
+**Defect 1 — the first press from `pinned + x` never ran its handler.** The Rail's « Position du
+passager » holds the caret and the Chart Block keeps the View Strip *because of that focus*. Pressing
+anything the strip renders — its two layer toggles, « ×1 », or the pinned header's chevron 44 px
+below — fires `mousedown`, **whose default action is the focus shift**: the Rail field blurs, the
+state falls to `pinned`, the row unmounts mid-gesture, the cells row shifts up 44 px, and by `mouseup`
+the cursor is over a Rail control. Chrome then dispatches `click` to the common ancestor
+(`click: DIV`, never the button). Measured on a **fine** pointer and again under matched
+`(pointer: coarse)` emulation; a second press always worked, which is what made it read to a user as
+« press twice ».
+
+**The decision: cancel the focus shift, do not widen the scope.** `keepCaret` — one
+`event.preventDefault()` on `mousedown`, in `src/lib/layout/collapse.ts` beside `REVEAL_LABEL`, wired
+at the four call sites. Focus never leaves the `x` field, so nothing collapses, and § 5's « tant que
+le champ `x` a le focus » stays true **as written**.
+
+- **Rejected: widening the `pointerdown` latch** to the row and the chevron. It re-reads that sentence
+  as « tant qu'un contrôle de la rangée est pressé » — a spec widening — **and** obliges inventing a
+  release rule (`pointerup` + `pointercancel` + `lostpointercapture`), which is stuck-open on a
+  platform where buttons take no focus. Ticket 27 refused to invent it, correctly.
+- **Rejected: keeping the View Strip in `pinned` unconditionally** — `pinned` becomes 164 px instead
+  of 120 at narrow, spending 44 px out of `MIN_RAIL` and contradicting § 5's own height table, where
+  the two are different states.
+- **Rejected: committing on `pointerdown`** — ordinary button semantics go (no cancelling by dragging
+  off), and hold-to-peek already owns `pointerdown` on fine pointers.
+- **Rejected: changing nothing** — the dead press lands in the exact state § 5 minted `pinned + x`
+  for.
+
+**The accepted cost, stated:** those four controls no longer take focus from a pointer press, which
+is what Safari does with buttons anyway, so a pointer user keeps tabbing from wherever the caret
+already was. The keyboard path is untouched, and the strip's own `x` keeps its `pointerdown` latch —
+it is the one control § 5 *does* scope, and the one that must genuinely take the focus.
+
+**Defect 2 — the row's controls were 32 px, and « ×1 » was 29,8 px wide.** § 5's « the row is 44 px
+tall, so every control in it is a legal touch target » is an **inference**, and `h-8` is 32 px on
+every pointer type (the app's one `@media (pointer: coarse)` rule is the rider's stroke width).
+Separately, § 5's own abbreviation arithmetic budgets **44 px of width** for « ×1 »
+(`59 + 48 + 44 + 128 + 24 = 303`) and the shipped control was **29,8**.
+
+**The decision: make the inference true rather than restate it.** The visual stays 32 px — growing it
+to 44 leaves the 44 px row no padding — and the **hit box** reaches 44 through an empty `::after`
+bled 6 px past each edge, the same trick § 5 already uses for the rider's transparent stroke. The `x`
+field gets `self-stretch` instead, because an overlay there would swallow the click that places the
+caret. « ×1 » returns to the 44 px width § 5 budgeted, out of the row's measured 53,6 px of `ml-auto`
+slack — so the width was a spec figure *missed*, not a spec figure changed.
+
+**Found while verifying, and fixed here: the coarse peek toggle could never stick.** § 5 specifies
+« Toggle under `(pointer: coarse)` », but `onLostPointerCapture` released the peek unguarded while its
+sibling `onPointerUp` guards with `!coarsePointer()`. A touch pointer gets *implicit* capture, so
+`pointerdown` toggled the peek on and `lostpointercapture` forced it off before the frame — measured
+from `whole`, with nothing focused, so it was never a `pinned + x` symptom at all. Ticket 35's coarse
+leg saw the symptom and attributed it to the lost press. The guard now matches its sibling.
+
+**Coverage.** All of it is layout and event ordering, so **amendment B** owns it: verified in
+`agent-browser` on both pointer types (CDP touch emulation, `(pointer: coarse)` true,
+`maxTouchPoints` 5). **No `node` guard**, deliberately — a test asserting the handlers' presence could
+only match `.tsx` source text, which **amendment K**'s companion ruling on `contract.test.ts`
+declines. `keepCaret`'s docblock carries the reason, and says in as many words that it is
+load-bearing and invisible.
+
+---
+
+## I · The published first-run VE is ×1,86, not ≈ ×1,5
+
+**2026-08-15, by the repo owner**, on the evidence of
+[ticket 30](./issues/30-chart-fidelity-and-drag-evidence.md)'s item 1. **Amends** the spec's re-check
+line in **four places** and `docs/conventions/testing.md` in one.
+
+**The app draws ×1,86290 at aspect 0,42000, to five places, at every width** — reproduced three times
+by ticket 30 and once more on 2026-08-15 against the shipped tree (badge « Éch. verticale ×1,9 », plot
+1152 × 463,68 at 1440 × 900). The spec's ≈ ×1,5 was arithmetic from **two superseded inputs**: a
+157,5 m x-domain (1,05 L, which ticket 06 widened to the shared 1,1 L = 165 m) and a 1080 × 420 plot
+box (aspect 0,3889, which the elected width-derived rule can never produce). `0,42 × 165 ÷ 37,2 =
+1,86290`. **The app was right and the published line was stale.**
+
+**The decision: publish what the app draws, with its qualifier.** « auto-fit VE **×1,86** at aspect
+0,42 on the 1,1 L domain (badge « ×1,9 »), at and below § 5's reference chart column ». Both numbers,
+because `testing.md`'s line is a measurement target while the badge is what a human reads off screen;
+the width qualifier because **amendment F**'s cap lowers the drawn aspect above a 1372,8 px chart
+column, where VE falls to ×1 by 2560 px. **The 1080 × 420 box is dropped**, being unreachable under
+the elected rule.
+
+- **Rejected: keeping ×1,5 and re-opening the x-domain or the aspect.** Self-refuting on § 5's own
+  guards — 157,5 m breaks the shared domain the two charts' alignment depends on, and a true ×1,5
+  needs aspect **0,3389**, *below* the Plot Aspect Band's 0,35 floor.
+- **Rejected: leaving both and annotating.** A live safety document would carry a number no build
+  reproduces.
+
+**One record corrected while settling this.** A handoff claimed amendment F's ×1,9 at 1440 × 900 was
+contradicted by « a later reading of ×1,4 on the same host », unreconciled. **No such reading
+exists**: every recorded first-run badge in the repo is ×1,9, and the only other figure — ×1,2 — is
+ticket 30's `D_target` 6 leg *after* a scenario change, which is not the first-run screen. There was
+nothing to reconcile.
+
+**Lands on** `spec.md` (four sites), `docs/conventions/testing.md`, ticket 30 item 1, and
+`src/lib/layout/contract.test.ts`, whose first-run case already asserted the app's identity and whose
+docblock had been carrying « reconciling it is an open spec decision ».
+
+---
+
+## J · Two § 7 readings about the scrub track, settled together
+
+**2026-08-15, by the repo owner**, on the evidence of
+[ticket 31](./issues/31-shell-and-suppressed-output-browser-pass.md)'s **D1** and its « Left open for
+the user ». **Amends** § 7's « Aucun résultat » heading and *L'exception géométrique*, and adds a
+scrub to § 7's *round earlier*.
+
+**Reading 1 — the track stays live under « Aucun résultat ».** Three sentences of the contract said
+the track stays live and two said it goes inert. The two that said inert were **headings describing a
+sub-case**: § 7's own « … et la seule piste de scrub inerte », and « Saisie en cours »'s « the app's
+second inert scrub track ». Read as properties of the whole state they make the other three false;
+read as what they are, all five are true at once.
+
+**The decision: « Aucun résultat » keeps its scrub track — pointer and typed `x` alike — and
+inertness is scoped to the two states that earn it.** In this state the **geometry is still valid and
+the cable is drawn**; only rider dynamics failed. `x` selects a *view*, which § 3 already says, so
+scrubbing moves a viewpoint over a cable the app can draw. The two inert states are **L'exception
+géométrique** (structural: no `x` domain exists to point into) and **« Saisie en cours »** (transient:
+lasts exactly as long as the caret). This is what ships, so **no code changed** — the headings did.
+The « glisser pour déplacer » label stays truthful and the typed `x` is answered the same way, which
+is what makes the three questions one decision.
+
+- **Rejected: inert under any blocking error.** It contradicts § 7's « the strip is the app's only
+  pointer input path and **it may never stop being one** », and it still needs the NaN guard, so it
+  buys nothing the geometric exception was not already buying.
+
+**Reading 2 — a scrub is a prefill.** A pointer scrub wrote `x=44.28985507246377` into the URL while
+the field displayed « 44,3 ». § 7's *Precision — refuse the trade, and round earlier* says « a prefill
+writes the **displayed** value into state, never the underlying float » and names the tightness switch
+and « Recalculer » as the only inputs that are not typed. **A scrub is the third**, and the rule did
+not say which side of the line it fell on.
+
+**The decision: it is a prefill.** `roundToDisplay("x_D", …)` in `scrub()` — the same primitive every
+other prefill uses — applied *after* the sweep-step snap, so what state holds is what the strip
+prints. Verified: the field reads « 41,3 » and the URL carries `x=41.3`. At 1500 m the correction is
+under 0,05 m, a twenty-fourth of a pixel, so the snap keeps its whole purpose. **The typed path is
+untouched** — a typed position is exact, and § 5 says so.
+
+- **Rejected: leaving it verbatim** — 17-digit addresses, and two links to the same visible position
+  differ.
+- **Rejected: rounding at serialisation for `x` alone** — contradicts « round earlier » in as many
+  words.
+
+---
+
+## K · The keyboard's focus-into-view belongs to the platform
+
+**2026-08-15, by the repo owner**, on the evidence of
+[ticket 35](./issues/35-narrow-keyboard-browser-pass.md)'s defect 1 and its re-verification.
+**Amends** ticket 35's acceptance item 2 and settles the § 5 *Keyboard, four pieces* question left
+open beside piece 3.
+
+**What was measured.** The `scroll-pb-[var(--kb,0px)]` fix closed the leg where a field is focused
+*under* an inset that is already up — 181,5 px of clipping down to nothing at 390 × 664. What it does
+not close is the **device ordering**: focus first, keyboard second, where `aside.scrollTop` is
+bit-identical across the inset's arrival because nothing re-runs the centring. Two options survived:
+**(a)** re-run the centring on an inset change, **(b)** leave it to the platform.
+
+**The decision: (b), recorded as accepted rather than fixed.** Every mobile browser has scrolled the
+focused editable into view on keyboard open since long before `visualViewport`; the `--kb` fallback
+exists to give the Rail **bottom padding** on platforms that ignore `interactive-widget`, not to
+replace focus-into-view. Option (a) adds a trigger § 5's piece 3 does not have, and would have to
+decide whether it may move the Rail under a finger mid-gesture. **This host cannot fire the platform
+behaviour to prove it either way**, and that is stated rather than converted into a measurement.
+
+**Accepted with it: the `#rail-xD` residual.** Its `scroll-margin-top` *is* `--pinned-clearance`,
+164 px in `pinned-x`, so its scroll-margin box is 192 px against a 164 px (390 × 664) or 150 px
+(landscape) viewing region, and `block: 'center'` pushes the field **13,5 / 20,5 px** past the fold.
+Accepted because **the clipped control is the redundant copy**: in `pinned-x` the View Strip is fully
+visible 44 px above it, carrying the same `x` value and editable — which is the entire reason § 5
+minted that state. It is a residual and not a regression: without the scroll padding the same
+postures clip by 181,5 and 140,5 px.
+
+**Ticket 35 item 2 is reworded to the elected policy and ticked.** Its previous wording — « leaves
+usable Rail space **rather than covering focused field** » — encoded the assumption this amendment
+rejects, that the app owns focus-into-view. Leaving it unticked would file a decision as a defect.
+
+**A companion ruling, recorded here because it has no other home: `contract.test.ts`'s source-text
+assertions.** They split in two. The **prohibition and uniqueness greps** (no `useMediaQuery(`
+anywhere · `matchMedia(` in exactly one file · one file reads a window height · no `vh` unit in a
+chart band) lock architectural rules, are formatter-proof, and are exactly what a `node` suite can
+check — **kept as they are**. The **class-string matches** assert rendered markup by source text and
+had already been rewritten once to survive `oxfmt`'s class sorting — **kept in intent, but they no
+longer match sorted class lists**: the Rail's `--kb` guard now splits that element's own class list
+on whitespace, which the formatter is free to reorder and rewrap, and which cannot be satisfied by
+the two tokens merely being *discussed* in the comment above the element. **No new source-text
+assertion is added**, which is why amendment H's fix carries a docblock and browser evidence instead
+of a guard.

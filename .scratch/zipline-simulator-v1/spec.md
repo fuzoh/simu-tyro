@@ -2417,6 +2417,10 @@ or tapping the header (chevron, `aria-label` « Afficher le profil »).
   focusing the `x` field would collapse away the very field being typed into. With it the user
   types a position and watches « Garde min » move with the keyboard open — the best argument
   available for putting `x` in the View Strip.
+  **« tant que le champ `x` a le focus » is read literally and is *not* widened to the row's other
+  controls** — a press on those cancels `mousedown`'s own focus shift instead, so the caret never
+  leaves the field and there is nothing to collapse out from under the gesture. Voir
+  [amendment H](../zipline-simulator-v1-build/AMENDMENTS.md).
 - **Unmissability survives the collapse** because signals 1 and the printed « Garde min » number
   are the two **non-positional** signals — the two that do not need the plot.
 - **The pinned header's banner slot carries whichever occupant precedence gives it, never only a
@@ -2438,7 +2442,10 @@ At 342 px of inner width and `text-[11px]`, full labels need 93 + 76 + 111 + 128
 breakpoint) the toggles read « à vide » and « corde » and the peek control reads « ×1 », each
 keeping its full string as `aria-label` and `title`: 59 + 48 + 44 + 128 + 24 = **303 px**,
 inside
-342. The row is 44 px tall, so every control in it is a legal touch target.
+342. The row is 44 px tall, so every control in it is a legal touch target — an inference the
+shipped controls did not support until
+[amendment H](../zipline-simulator-v1-build/AMENDMENTS.md): they are 32 px of *visual* inside a
+44 px *hit box*, and « ×1 » is the 44 px this arithmetic already budgets for it.
 
 - **Abbreviating rather than wrapping to two rows**: 44 px out of `MIN_RAIL`, the tightest
   budget in the app, to avoid abbreviating two layer names.
@@ -2600,9 +2607,11 @@ confirmed once the real layout exists (and before the prototype is deleted):
 - **The banner heights 44 / 60 / 76 px** at the three budgets.
 - **The View Strip's label widths** (the 432 px / 303 px arithmetic above).
 - **The three pixel budgets** at 390×664, 768×1024 and 1440×900, each summing to the viewport.
-- The first-run screen's auto-fit VE, measured at **≈ ×1,5** on a 1080×420 plot — the first
-  concrete point on the band the app actually ships, inside the Plot Aspect Band and clear of
-  the ×1 floor.
+- The first-run screen's auto-fit VE, measured at **×1,86 at aspect 0,42 on the 1,1 L domain**
+  (badge « ×1,9 »), at and below § 5's reference chart column — the first concrete point on the
+  band the app actually ships, inside the Plot Aspect Band and clear of the ×1 floor. Voir
+  [amendment I](../zipline-simulator-v1-build/AMENDMENTS.md); the ≈ ×1,5 this line used to carry
+  was arithmetic from two superseded inputs.
 
 
 ---
@@ -3368,8 +3377,11 @@ a carve-out with its reason; do not reproduce it as an inconsistency.
 #### Precision — refuse the trade, and round earlier
 
 The URL carries only **inputs**, and inputs are typed at field precision (`12`, `120`, `1,2`,
-`6,0`). The only inputs that are not typed are those pre-filled from a computed read-out — the
-tightness mode switch and « Recalculer » on a stale Override. So the rule moves upstream of
+`6,0`). The inputs that are not typed are those pre-filled from a computed read-out — the
+tightness mode switch and « Recalculer » on a stale Override — **and a pointer scrub of `x_D`,
+which is one of them** ([amendment J](../zipline-simulator-v1-build/AMENDMENTS.md)): a drag is no
+more typed than a prefill is, so it writes the displayed position and not the sweep step's own
+float. The **typed** `x` is untouched by this and stays exact. So the rule moves upstream of
 serialisation:
 
 > **A prefill writes the *displayed* value into state, never the underlying float.**
@@ -4057,9 +4069,10 @@ Three consequences, each of which is a rejection worth keeping:
 
 **When the Clearance Gate fails, the strip keeps its axes and stays a scrub track.** `x` maps to
 rider position whether or not clearance data exists; ticket 07 §2 made the strip the app's only
-pointer input path and it may never stop being one. The single exception is written down under
-« Aucun résultat » below — implement the keep-the-scrub-track rule unconditionally and someone
-computes a scale over a NaN domain.
+pointer input path and it may never stop being one. The single **structural** exception is
+written down as *L'exception géométrique*, a sub-case of « Aucun résultat » below — implement the
+keep-the-scrub-track rule unconditionally and someone computes a scale over a NaN domain.
+« Aucun résultat » itself does **not** take the track away; only that sub-case does.
 
 ### Deux états par champ — et un troisième message que le widget élu crée
 
@@ -4183,10 +4196,10 @@ the split exists to prevent.
   space for a decorative state* — and freezing makes an earlier draft's exemption list (danger
   bands and the red cable/rider held at full strength inside a dimmed chart) unnecessary:
   nothing fades in the first place.
-- **Scrubbing goes inert**, pointer and typed `x` alike. This is the app's second inert scrub
-  track, and it is a different case from the first: the Clearance-Gate protection above keeps
-  the track live because the Sweep is still *valid*, whereas here the Sweep is stale by
-  definition, so scrubbing would let the user **generate new stale numbers** rather than read
+- **Scrubbing goes inert**, pointer and typed `x` alike — the app's one **transient** inert
+  track, as against **L'exception géométrique**'s structural one, and those two are the whole
+  list. It is a different case from the Clearance-Gate protection above, which keeps the track
+  live because the Sweep is still *valid*, whereas here the Sweep is stale by definition, so scrubbing would let the user **generate new stale numbers** rather than read
   the ones already on screen. The exact typed-`x` solve cannot run on an incomplete input set
   anyway.
 - **The verdict banner is suppressed** (rank 3) — the same slot behaviour as no-regime, **not a
@@ -4204,7 +4217,7 @@ violent and punishes correct behaviour — clearing a field to retype it is how 
 works. And *suspending the URL write rather than keeping it live*, which would publish a
 half-typed scenario into the address bar and into « Copier le lien ».
 
-### « Aucun résultat » — une cause, trois échos, et la seule piste de scrub inerte
+### « Aucun résultat » — une cause, trois échos, et une piste de scrub qui reste vivante
 
 Trigger: a **committed** invalid value (typed `−5`, or arrived in a link) **or** any of the
 three refusals below.
@@ -4232,6 +4245,15 @@ the banner in view:
 **Inputs still draw**: terrain, both anchors, the span markers, the 5 % margin. **Absent**: the
 cable, the unloaded line, the clearance curve, the danger bands, the rider marker.
 
+**The scrub track stays live here** — pointer *and* typed `x` — and that is deliberate: the
+geometry is still valid in this state, so `x` selects a *view* over a cable the app can draw, and
+§ 3 already says a viewpoint is not a computation input. Inertness is scoped to the two states
+that earn it, and neither is this one: **L'exception géométrique** below, where no `x` domain
+exists to point into, and « Saisie en cours » above, where the freeze is transient and lasts as
+long as the caret. Voir [amendment J](../zipline-simulator-v1-build/AMENDMENTS.md), which settled
+this: three passages of this section said the track stays live and two headings said it goes
+inert, and the headings were the ones describing a sub-case rather than the state.
+
 The five read-out cells are **replaced by one line spanning the row**, keeping the row's height
 (the two-row ≈104 px band, so nothing jumps). *One spanning line rather than « — » per cell*,
 because that glyph is spent on `Indéterminé` — *attempted, unavailable* — and reusing it for
@@ -4245,9 +4267,12 @@ When `L` itself is invalid there is **no shared x domain at all** — it is defi
 into. Both plots then render an empty frame with **no axis ticks** and one centred line « Portée
 invalide — aucun tracé possible. », and **pointer input is inert**.
 
-This is the **only** state in the app where the strip is not a pointer path. It is scoped to `L`
-/ `h` / station failures, and **it has to be written down as an exception** or someone
-implements the keep-the-scrub-track rule unconditionally and computes a scale over a NaN domain.
+This is the only state where the strip is **structurally** not a pointer path — there is no
+domain to point into, so the track cannot exist rather than choosing not to respond. That is what
+separates it from « Saisie en cours », whose freeze is *transient* and lasts exactly as long as
+the caret sits in a field. It is scoped to `L` / `h` / station failures, and **it has to be
+written down as an exception** or someone implements the keep-the-scrub-track rule
+unconditionally and computes a scale over a NaN domain.
 
 ### Les trois refus
 
@@ -5042,10 +5067,10 @@ pinned yet**, since the regime is pinned first only once one is chosen. `EA` get
 (well-attested *and* editable).
 
 **Chart Block on first paint.** Cable drawn; « corde A–B » **on** and « ligne à vide » **off**;
-`x` domain **[−3,75 ; 153,75] m** (span + 5 %); `z` extent 30 m (anchor A top at 0 down to base
-B at −30) with 12 % margins ⇒ 37,2 m over 157,5 m, i.e. **auto-fit VE ≈ ×1,5** measured at a
-1080×420 px plot box — inside the **Plot Aspect Band [0.35, 0.50]** and clear of the **×1
-floor**, so the badge reads a plain exaggeration rather than the « vraie échelle » clamp state
+`x` domain **[−7,5 ; 157,5] m** (the shared 1,1 L domain ticket 06 widened it to); `z` extent
+30 m (anchor A top at 0 down to base B at −30) with 12 % margins ⇒ 37,2 m over **165 m**, i.e.
+**auto-fit VE ×1,86** — `0,42 × 165 ÷ 37,2 = 1,86290`, the badge reading « ×1,9 » — inside the
+**Plot Aspect Band [0.35, 0.50]** and clear of the **×1 floor**, so the badge reads a plain exaggeration rather than the « vraie échelle » clamp state
 (voir § 5 — visualisation et mise en page, *Exagération verticale*). No danger band, no
 violation marker, and the **handle lane is reserved but empty** in manual mode.
 
@@ -5543,9 +5568,11 @@ artifact, the third because the prototype is the only place the comparison can b
    to the viewport), the banner heights **44 / 60 / 76 px** and the View Strip's label widths.
    These are computed from the prototype's Tailwind classes, *not rendered* — the only numbers
    in the layout contract that are not measured on the artifact.
-3. **The first-run screen's auto-fit VE confirmed at ≈ ×1,5** on a 1080×420 plot — the first
-   concrete point on the published ×1…×5,5 band that the app actually ships, and a check that it
-   sits inside the Plot Aspect Band [0.35, 0.50] and clear of the ×1 floor.
+3. **The first-run screen's auto-fit VE confirmed at ×1,86** — aspect 0,42 on the 1,1 L domain,
+   badge « ×1,9 », at and below § 5's reference chart column — the first concrete point on the
+   published ×1…×5,5 band that the app actually ships, and a check that it sits inside the Plot
+   Aspect Band [0.35, 0.50] and clear of the ×1 floor. Voir
+   [amendment I](../zipline-simulator-v1-build/AMENDMENTS.md).
 
 Then delete `src/routes/prototype.profile-view.tsx` **and** `src/routes/-prototype-07/` (nine
 files) and let `@tanstack/router-plugin` regenerate `src/routeTree.gen.ts` — never hand-edit it.
@@ -5807,7 +5834,7 @@ domain.
 
 **What jsdom cannot decide, and must therefore not be tested there:** jsdom has no layout, so
 every element measures 0×0 and `useSize` never fires. The three pixel budgets, the banner
-heights (44 / 60 / 76 px), the View Strip's label widths and the first-run VE (≈ ×1,5) are
+heights (44 / 60 / 76 px), the View Strip's label widths and the first-run VE (×1,86, badge « ×1,9 ») are
 **manual re-checks in a real browser at A12**, listed in P3's deletion gate. *Writing them as
 jsdom tests would produce a suite that passes on a broken layout — worse than no test, because
 it reads as coverage.*
