@@ -133,6 +133,13 @@ export const QUANTITIES = {
   /** `Station A / B`, m — the file's own grain (`Distance` is written to 0,1 m). */
   station: { unit: "m", decimals: 1 },
   /**
+   * `Alt. base A / B`, m — the ground altitude § 4's anchor-placement block prints beside `Portée`
+   * and `Dénivelé`. The grain is that block's own printed « 540,4 m » — the file's `Altitude`
+   * column, written to 0,1 m, exactly as `Station` reads `Distance`. A read-out, never a field:
+   * `h` already carries the difference these two altitudes make, so no solve consumes them.
+   */
+  zBase: { unit: "m", decimals: 1 },
+  /**
    * `Flèche à vide cible` `D_target`, m — **prefilled from a read-out**, so 1 decimal would cost
    * ±0,05 m of garde per round trip through the tightness mode switch.
    */

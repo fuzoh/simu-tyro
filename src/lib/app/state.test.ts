@@ -206,6 +206,62 @@ describe("initialAppState — § 8's mount order", () => {
       expect(initialAppState({ query: CANONICAL_QUERY, session: null }).link.xClamped).toBe(false);
     });
   });
+
+  describe("an arriving `tr` is a profile, so it is decoded and not merely carried", () => {
+    /** A link of an imported scenario: the two stations, and the payload they stand on. */
+    const IMPORTED_QUERY = `?v=1&sa=0&sb=200&tr=${TRACE}${completeTail()}`;
+
+    it("holds the decoded Trace, so the span the stations describe exists", () => {
+      // Without it `geometry.source === "trace"` stands beside `trace: null` — stations on nothing,
+      // no `Portée`, no `Dénivelé`, no ground, and « (aucun tracé) » on the identity line.
+      const state = initialAppState({ query: IMPORTED_QUERY, session: null });
+
+      expect(state.scenario.geometry).toMatchObject({ source: "trace", sa: 0, sb: 200 });
+      expect(state.trace?.d).toEqual(TRACE_DATA.d);
+      expect(state.trace?.z).toEqual(TRACE_DATA.z);
+      // § 4's third identity state: the filename does not travel, so its absence *is* « tracé reçu
+      // par lien » rather than a blank the UI has to guess at.
+      expect(state.trace?.fileName).toBeNull();
+    });
+
+    it("keeps the Session's own file when the link carries that same profile", () => {
+      // § 8: « The Session keeps the filename, since that is the user's own session. » Reloading a
+      // link built from your own import may not rename your file « tracé reçu par lien ».
+      const session = storedSession();
+      session.scenario.geometry = { source: "trace", trace: TRACE, sa: 0, sb: 200 };
+      const cached = { d: TRACE_DATA.d, z: TRACE_DATA.z, dev: 0, fileName: "pont.csv" };
+      const state = initialAppState({
+        query: IMPORTED_QUERY,
+        session: { ...session, trace: cached },
+      });
+
+      expect(state.trace).toBe(cached);
+    });
+
+    it("decodes rather than adopting a cached Trace the link does not name", () => {
+      // The payload is the identity test. A Session whose *active* geometry is manual has a Trace
+      // in memory, not on the line, and nothing says it is the one that just arrived.
+      const cached = { d: TRACE_DATA.d, z: TRACE_DATA.z, dev: 0, fileName: "pont.csv" };
+      const state = initialAppState({
+        query: IMPORTED_QUERY,
+        session: { ...storedSession(), trace: cached },
+      });
+
+      expect(state.trace).not.toBe(cached);
+      expect(state.trace?.fileName).toBeNull();
+    });
+
+    it("leaves the cached Trace alone when the link carries no `tr` at all", () => {
+      const cached = { d: TRACE_DATA.d, z: TRACE_DATA.z, dev: 0, fileName: "pont.csv" };
+      const state = initialAppState({
+        query: "?L=250&h=-40",
+        session: { ...storedSession(), trace: cached },
+      });
+
+      expect(state.trace).toBe(cached);
+      expect(state.scenario.geometry).toEqual({ source: "manual", L: 250, h: -40 });
+    });
+  });
 });
 
 /** The keys an imported link needs so that completion adds nothing and only the `L` row moves. */

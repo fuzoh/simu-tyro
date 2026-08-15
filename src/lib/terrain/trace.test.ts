@@ -4,7 +4,14 @@ import { zGroundAt } from "@/lib/sim";
 
 import type { Trace } from "./trace.ts";
 
-import { altitudeAt, deriveSpan, deriveTerrain, maxSpacing, traceExtent } from "./trace.ts";
+import {
+  altitudeAt,
+  deriveSpan,
+  deriveTerrain,
+  maxSpacing,
+  snapStation,
+  traceExtent,
+} from "./trace.ts";
 
 /**
  * The Trace and its one seam — « v1 build spec » § 4 (*La Trace est immuable ; le `Terrain` est
@@ -46,6 +53,34 @@ describe("traceExtent and maxSpacing", () => {
 
   test("a one-point trace has no spacing to report", () => {
     expect(maxSpacing(trace([12], [500]))).toBe(0);
+  });
+});
+
+describe("snapStation — § 4's pointer rule", () => {
+  test("takes the file's own nearest sample, never an interpolated station", () => {
+    expect(snapStation(RAMP, 62)).toBe(50);
+    expect(snapStation(RAMP, 88)).toBe(100);
+    expect(snapStation(RAMP, 150)).toBe(150);
+  });
+
+  test("halfway between two samples takes the lower one, so one position is one station", () => {
+    expect(snapStation(RAMP, 75)).toBe(50);
+    expect(snapStation(trace([0, 1.5, 3], [10, 11, 12]), 0.75)).toBe(0);
+  });
+
+  test("clamps to the extent, which is what makes the pointer path's error state unreachable", () => {
+    // § 4: « poignée glissée au-delà de l'extrémité ⇒ bornée à l'extrémité du tracé ». A typed 320
+    // still blocks with « Station hors du tracé » — that asymmetry is the whole rule.
+    expect(snapStation(RAMP, -40)).toBe(0);
+    expect(snapStation(RAMP, 320)).toBe(300);
+  });
+
+  test("snaps onto the file's frame, not onto a multiple of the spacing", () => {
+    // A trace that does not start at zero: `d` is the file's `Distance` column, and a dragged
+    // station is one of its values verbatim.
+    const offset = trace([12.4, 13.9, 15.4], [500, 501, 502]);
+    expect(snapStation(offset, 13.3)).toBe(13.9);
+    expect(snapStation(offset, 12.9)).toBe(12.4);
   });
 });
 

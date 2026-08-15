@@ -46,6 +46,7 @@
  */
 
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
+import type { RegimeId } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
@@ -197,6 +198,26 @@ export function culprits(grandeur: Grandeur, mode: CulpritMode): readonly FieldI
   return CULPRITS[`${grandeur}/${mode}`] ?? [];
 }
 
+/**
+ * The cause clause of § 8's « Régime × famille / usage » message row, for a régime that
+ * {@link isRegimeAvailable} has just rejected.
+ *
+ * § 10.1 disables a régime on **two independent conditions** — « seul *Secours textile 10:1* est
+ * désactivé — sous acier, **ou** sous `PERMANENTE` » — so the clause names the **mismatch**, never
+ * the state the Scenario happens to hold. Under `textile` + `PERMANENTE` the rope is this régime's
+ * own *precondition*: naming it would send the user to repair the one part already right, and the
+ * family breach § 10.4 files alongside it already names the rope. **Family first when both miss**,
+ * which keeps § 8's shipped steel string verbatim. `requires.usage` is `TEMPORAIRE` for every
+ * régime that constrains it, so a use-class miss can only ever be `PERMANENTE`.
+ */
+function unavailabilityCause(regime: RegimeId, family: "steel" | "textile"): string {
+  const { requires } = REGIMES[regime];
+  if (requires !== null && requires.family !== family) {
+    return family === "steel" ? "avec un câble acier" : "avec une corde textile";
+  }
+  return "en installation permanente";
+}
+
 /** Manual or imported geometry — the mode half of every (grandeur × mode) row. */
 function geometryMode(scenario: ScenarioDraft): "manual" | "trace" {
   return scenario.geometry.source;
@@ -309,9 +330,12 @@ export function evaluateGates({ scenario, trace, issues = [] }: GateInput): Gate
       kind: "invalid",
       field: "regime",
       alsoOutlined: [],
-      message: `⛔ Régime « ${REGIMES[scenario.regime].label} » indisponible avec ${
-        scenario.material.family === "steel" ? "un câble acier" : "une corde textile"
-      }.`,
+      // The cause clause names the **blocking condition**, not the family — see
+      // {@link unavailabilityCause}: reading the family alone blamed the rope this régime requires.
+      message: `⛔ Régime « ${REGIMES[scenario.regime].label} » indisponible ${unavailabilityCause(
+        scenario.regime,
+        scenario.material.family,
+      )}.`,
       fixes: [FIX["choisir-un-autre-regime"]],
     });
   }

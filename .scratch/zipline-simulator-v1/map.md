@@ -500,6 +500,61 @@ These came out of the charting grill and are not up for re-litigation inside a t
   thin spots so they read as *seen*. Two corrections to this map's own text came out of it: the
   Out-of-scope DAF entry (fixed above) and the frontier note below.
 
+### Taken during execution — the five user decisions of 2026-08-14
+
+<!-- not map tickets: build decisions that amend the spec, so each carries its pointer to the
+     lettered amendment that holds it. Listed here so the map is not read as the whole record. -->
+
+These were taken while building stage A12, not while charting, and they **amend the spec** — which is
+why they are lettered in
+[the build backlog's amendments](../zipline-simulator-v1-build/AMENDMENTS.md) rather than resolved as
+tickets here. Five decisions, two letters: three of them close a cost the other two opened.
+
+- [The zoom gate — a pinch is not a keyboard](../zipline-simulator-v1-build/AMENDMENTS.md#g--the-zoom-gate--a-pinch-is-not-a-keyboard)
+  — §5's keyboard piece 2 subtracts `visualViewport.height` from the layout height, but that height
+  **shrinks with `scale` too**, so a pinch was arithmetically indistinguishable from a keyboard and
+  **pinch-zooming the chart deleted the chart**. `keyboardInsetOf` now returns 0 whenever
+  `scale !== 1`, with §5's formula left verbatim below the gate. Scale-correcting the arithmetic and
+  giving `compactRequired` a floor were both rejected — the first diverges from the formula §5 writes
+  word for word, the second contradicts §5's « no threshold » outright. Evidence in
+  [ticket 28](../zipline-simulator-v1-build/issues/28-constrained-height-and-keyboard-modes.md).
+- [The plot's height is capped at §5's reference chart column](../zipline-simulator-v1-build/AMENDMENTS.md#f--the-plots-height-is-capped-at--5s-reference-chart-column)
+  — this map's own finding that VE must never read a window height had a consequence nobody had
+  written down: an aspect rule with **no ceiling** outgrows any viewport, so five ordinary 16:9
+  desktops opened with **no chart at all**, 1920 × 1080 missing by 1,3 px. The plot becomes
+  `min(0,42 × W_inner , 463,68 px)` — frozen at the value the rule itself reaches at the reference
+  column — so the block plateaus at 879,68 px and **nothing at or below the reference desktop moves**.
+  Still a width and nothing but a width, so the Skeleton stays correct. Evidence in
+  [ticket 28](../zipline-simulator-v1-build/issues/28-constrained-height-and-keyboard-modes.md) and
+  [ticket 29](../zipline-simulator-v1-build/issues/29-responsive-layout-browser-evidence.md).
+- [Short 16:9 laptops keep the pin, and budget C is untouchable](../zipline-simulator-v1-build/AMENDMENTS.md#f--the-plots-height-is-capped-at--5s-reference-chart-column)
+  — cost 3 of the cap, and **settled with no code change**: 1280 × 720, 1366 × 768 and 1512 × 850
+  open with the Pinned Safety Header, which is what it exists for. Their chart columns are *narrower*
+  than the reference, so their plots already sit under any ceiling ≥ 463,68 px and fitting them would
+  mean lowering the cap **below budget C's own value**. Lowering the cap (it moves the spec's own
+  reference desktop and invalidates budget C's evidence in tickets 27–29) and making the cap
+  height-aware (§5 and ticket 28 *forbid* a chart height derived from window height — the ×5,02 defect
+  this map found) were both rejected.
+- [The peek control is re-enabled where the cap is what cuts the cable](../zipline-simulator-v1-build/AMENDMENTS.md#f--the-plots-height-is-capped-at--5s-reference-chart-column)
+  — cost 2 of the cap, and the one that touched a **safety sentence**: above ~2295 px the cap could cut
+  the cable out of frame on a healthy line with **no ground contact and no verdict banner**, which is
+  exactly what §5 promises never happens. This map disabled the peek control « because the ×1 clamp is
+  already in force »; that stays true for a *data* clip and is now false for a *box* clip, so
+  `ClipCause` distinguishes the two and the control is enabled for the box clip alone. Widening the
+  Plot Aspect Band and giving box-clipping its own banner rank were rejected — the second would touch
+  the four-rank single-occupant banner contract tickets 26 and 27 froze. Evidence in
+  [ticket 30](../zipline-simulator-v1-build/issues/30-chart-fidelity-and-drag-evidence.md).
+- [16 px Rail numeric fields, so iOS stops auto-zooming them](../zipline-simulator-v1-build/AMENDMENTS.md#decision-5-2026-08-14--16-px-rail-numeric-fields-remove-the-trigger)
+  — the zoom gate's accepted cost turned out to be the **default** path on iOS, not a corner case:
+  Rail fields computed 12 px and the meta permits zoom, so the first tap into any field auto-zoomed
+  and §5's keyboard piece 2 was inactive for the rest of the session — on the one platform the `--kb`
+  fallback exists for. `text-base` (16 px computed) removes the trigger while **leaving pinch-zoom
+  available**; `maximum-scale=1` was rejected as an accessibility regression, and so was accepting the
+  cost. Its accepted cost was re-measurement, discharged in
+  [ticket 27](../zipline-simulator-v1-build/issues/27-pinned-safety-header.md) and
+  [ticket 29](../zipline-simulator-v1-build/issues/29-responsive-layout-browser-evidence.md): not one
+  budget moves. Residual, named: a manual pinch before focus still loses keyboard detection.
+
 ## Not yet specified
 
 Fog: in scope, heading toward the destination, not yet sharp enough to ticket.
@@ -543,7 +598,10 @@ table · 12's guard rail), or as one scope ruling below.
 destination artifact — [`spec.md`](./spec.md) — exists, and its own fog sweep confirmed nothing was
 left vague by accident (`pente locale`'s convention graduated into a decision in §5; two
 implementation-level choices with no owner are recorded in §11 as *deferred with their binding
-constraint*, not left open). What remains is execution, which this map deliberately does not carry.
+constraint*, not left open). What remains is execution, which this map deliberately does not carry —
+with one bookkeeping exception: where execution has had to **amend the spec**, the decision is
+lettered in [AMENDMENTS.md](../zipline-simulator-v1-build/AMENDMENTS.md) and pointed at from
+« Decisions so far » above, so the map never reads as the whole record when it is not.
 
 ## Out of scope
 
@@ -593,7 +651,7 @@ redrawn as a fresh effort.
 - **A print or report view, and any print stylesheet.** Ruled out while resolving
   [App shell and routing shape](./issues/13-app-shell-and-routing-shape.md) §1, which had raised a
   printable-report route as its own sub-question. Refused on
-  [ticket 08](./08-results-panel-and-provenance-warnings.md)'s verdict grammar rather than on
+  [ticket 08](./issues/08-results-panel-and-provenance-warnings.md)'s verdict grammar rather than on
   effort: that ticket spent five verdict states, a « Ce que cet outil ne calcule pas » block and a
   rule against ever saying « conforme » to stop the app implying a compliance certificate, and a
   print target hands all of it back — a printed page is precisely what gets read as an attestation,

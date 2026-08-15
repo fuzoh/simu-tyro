@@ -41,13 +41,19 @@ Stack, fixed: bun · TanStack Start (SSR for the document, `ssr: false` for the 
 · React 19 · Tailwind v4 (CSS-vars theme, no JS config) · shadcn/ui on Base UI ·
 **`@tanstack/react-form` · valibot** · Vitest 4, **`node` environment only**.
 
-> ⚠ **Four decisions here are superseded** by
+> ⚠ **Seven decisions here are superseded** by
 > [the build backlog's amendments](../zipline-simulator-v1-build/AMENDMENTS.md), taken after this
 > document was assembled: **A** Vitest is unit-only, no component tests, no jsdom · **B**
 > `agent-browser` owns point-to-point testing and § 10 A12's manual re-checks · **C** the TanStack
 > versions are the actual latest (still pinned), with a re-probe obligation on § 8's five measured
 > behaviours · **D** `@tanstack/react-form` owns form state and **valibot replaces the hand-rolled
-> `validateSearch`** — under § 8's four hard rules, unchanged. The paragraphs affected carry a pointer.
+> `validateSearch`** — under § 8's four hard rules, unchanged · **E** § 8's refusal is a **rendered
+> state, not a thrown error**, because the re-probe found a thrown `validateSearch` now answers 500
+> — the **200 is kept**, the throw is what goes · **F** § 5's plot height is **capped at the
+> reference chart column** (`min(0,42 × W_inner , 463,68 px)`), which leaves every number at or below
+> the reference desktop byte-identical and bounds the block for the first time · **G** § 5's keyboard
+> piece 2 is **gated on `visualViewport.scale`**, so a pinch is no longer read as a keyboard. The
+> paragraphs affected carry a pointer.
 > Everything else below stands.
 
 ### Table of contents
@@ -2187,6 +2193,15 @@ z in 144 px and the belly of the cable leaves the frame downward, **marked at th
   ground-contact case (measured: garde −169,67 m, `contact: "cable"`, for exactly this line), so
   **the picture is never cut without the banner saying the line is on the ground.**
 
+> ⚠ **Both sentences above stop holding *above* the reference chart column** —
+> [amendment F](../zipline-simulator-v1-build/AMENDMENTS.md#f--the-plots-height-is-capped-at--5s-reference-chart-column),
+> cost 2. Under the plot cap the third row becomes reachable **from the box** as well as from the
+> data: on a healthy line with metres to spare, measured at 2560 × 1440, the cable leaves the frame
+> with **no ground contact and no verdict banner at all**. The badge table below is **unchanged** and
+> stays three rows; the disclosure is badge row 3 plus § 5's non-positional printed « Garde min ».
+> The peek control is **re-enabled for that box clip only** — voir the pointer under « The peek
+> control, not a selector » just below.
+
 #### The peek control, not a selector
 
 - **The user-facing VE selector is dead**, on evidence: forcing ×20 at 1500 m throws the cable
@@ -2200,6 +2215,16 @@ z in 144 px and the belly of the cable leaves the frame downward, **marked at th
   gesture had no touch story at all. **Keyboard focus gets toggle semantics in both modes**
   (Space / Enter), since a held gesture has no keyboard equivalent.
 - **Disabled whenever the ×1 clamp is already in force** (rows 2 and 3 above).
+
+> ⚠ **One exception, and exactly one** —
+> [amendment F](../zipline-simulator-v1-build/AMENDMENTS.md#f--the-plots-height-is-capped-at--5s-reference-chart-column),
+> cost 2's *ADDRESSED* row: the control is **re-enabled when the plot cap is what cuts the cable**,
+> i.e. when the line is whole at the target aspect 0,42 and clipped only under the cap. It stays
+> **disabled** for row 2 (nothing is cut) and for a **data** clip (the cut is the line's own truth,
+> and it still arrives with « Câble au sol »). Held, it draws the auto-fit — **below** true scale —
+> and says so in the badge. The disable rule above is otherwise unchanged, and the cap is unreachable
+> at or below the reference column, so **nothing on a narrow screen or on the reference desktop
+> changes.**
 
 ### One shared x scale object, one `GUTTER`, one inverse
 
@@ -2248,6 +2273,18 @@ RAIL_HEADER    = 44 ; MIN_RAIL = 120
 > **Invariant: no chart dimension may read the window height.** Every band height is a function
 > of the chart column's inner width. This is what fixes narrow *and* desktop with one rule, and
 > it is also what makes the Skeleton correct at 390 px for free.
+
+> ⚠ **The plot's height gains a ceiling** —
+> [amendment F](../zipline-simulator-v1-build/AMENDMENTS.md#f--the-plots-height-is-capped-at--5s-reference-chart-column):
+> the plot is `min(PROFILE_ASPECT × W_inner , 463,68 px)`, frozen at the value this rule itself
+> reaches at the reference chart column (`W_inner` 1104). **The invariant above is untouched** — the
+> cap reads a width and nothing but a width, so the Skeleton stays correct — and **nothing at or
+> below the reference desktop moves**: all three pixel budgets and every narrow-screen number below
+> are the unclamped rule's own arithmetic, byte-identical. What it fixes is that the unbounded rule
+> put five ordinary 16:9 desktops on screen with **no chart at all** (1920 × 1080 missing by 1,3 px).
+> Above the reference the obtained aspect now falls below the **Plot Aspect Band**'s floor past a
+> 1372,8 px column — disclosed and directional, argued as cost 1 there. Three short desktops still
+> open pinned and that is **settled policy**, not a gap: cost 3.
 
 - **Aspect-derived height rather than a flex ratio, because `flex-[3]`/`flex-1` makes VE a
   function of window height** — which is *literally* how ×5,02 happened. One rule makes the
@@ -2512,6 +2549,17 @@ et coquille applicative):
    on older iOS Safari, which ignores the tag, it is what drives the `compact` state and the
    Rail's bottom padding. **There is no feature test for the meta tag, so a conditional listener
    is not on offer.**
+
+   > ⚠ **The subtraction is gated on `visualViewport.scale`** —
+   > [amendment G](../zipline-simulator-v1-build/AMENDMENTS.md#g--the-zoom-gate--a-pinch-is-not-a-keyboard):
+   > it returns **0 whenever `scale !== 1`**, because `visualViewport.height` shrinks with a pinch
+   > too, which made a zoom indistinguishable from a keyboard — and **pinch-zooming the chart deleted
+   > the chart**. The formula above is kept **verbatim below the gate** and is arithmetically
+   > transparent at scale 1, so « unconditional and self-neutralising », the no-threshold `compact`
+   > rule and every measured number stand. Its cost — a real keyboard on an already-zoomed page reads
+   > 0 — no longer sits on the **default** iOS path, since the Rail's numeric fields were taken to
+   > **16 px** (decision 5) so the first tap no longer auto-zooms; a manual pinch before focus still
+   > pays it.
 3. `scrollIntoView({ block: 'center' })` on field focus, inside the Rail's own scroller —
    `behavior` left at `auto`, **because a smooth scroll races the keyboard animation**.
 4. Fields are `<input type="text" inputMode="decimal">`, plus `enterKeyHint="done"`, and Enter
@@ -3450,6 +3498,17 @@ when the Trace arrived by link, because it cannot be re-imported.
 Throwing from `validateSearch` replaces the route component with `errorComponent` and sets
 `error.routerCode = 'VALIDATE_SEARCH'` (verified). That is a full-page outcome: right for a
 worthless link, wrong for one bad field.
+
+> ⚠ **The mechanism is superseded, the behaviour is not** —
+> [amendment E](../zipline-simulator-v1-build/AMENDMENTS.md#e--the-refusal-is-a-rendered-state-not-a-thrown-error--200-survives):
+> amendment C's re-probe found that on the pinned tree a thrown `validateSearch` under `ssr: false`
+> now answers **HTTP 500**, where the tree measured here answered 200. Since § 8 elected `ssr: false`
+> partly *because* the refusal arrived at 200, and § 7's refusal copy rests on it, **the throw is what
+> goes**: `validateSearch` **salvages the refusal into the validated search** as a `refused` marker
+> carrying the existing `RefusalKind` and returns normally, and the index route renders the refusal
+> surface as an ordinary component. **Status stays 200**, and the three refusal rows below keep their
+> specified behaviour exactly — read « `errorComponent` » in the table as « the refusal surface ». A
+> refusal is still whole-link, still checked on the **raw** bag before per-key salvage.
 
 | Cas | Comportement |
 | --- | --- |

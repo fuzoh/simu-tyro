@@ -154,6 +154,39 @@ describe("the Verdict Gate's régime × famille rule", () => {
     expect(report.passed.solve).toBe(true);
     expect(report.passed.clearance).toBe(true);
   });
+
+  test("under `PERMANENTE` the clause names the **use class**, never the régime's own rope", () => {
+    // § 10.1 disables this entry « sous acier, **ou** sous `PERMANENTE` », and ticket 34 found the
+    // second condition printing the first condition's shape: on `textile` + `PERMANENTE` the app
+    // read « indisponible avec une corde textile », blaming the family this régime *requires*. The
+    // rope is never the cause here — § 10.4's own breach, filed alongside, is the one that names it.
+    const report = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.material = { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 };
+        draft.regime = "secours10";
+      }),
+      trace: null,
+    });
+    const regimeError = report.errors.find((error) => error.field === "regime");
+    expect(regimeError?.message).toBe(
+      "⛔ Régime « Secours textile — 10:1 » indisponible en installation permanente.",
+    );
+    expect(regimeError?.message).not.toContain("corde textile");
+  });
+
+  test("the same régime under textile + `TEMPORAIRE` raises no cause clause at all", () => {
+    // Availability and its explanation read the same `requires`, so the sentence exists exactly
+    // when the predicate rejects — never on the pair the régime was written for.
+    const report = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.usage = "TEMPORAIRE";
+        draft.material = { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 };
+        draft.regime = "secours10";
+      }),
+      trace: null,
+    });
+    expect(report.errors.filter((error) => error.field === "regime")).toEqual([]);
+  });
 });
 
 describe("« No rope ships » — the two blanks a family flip lands on", () => {

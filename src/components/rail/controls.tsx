@@ -109,7 +109,44 @@ export function Row({
   );
 }
 
-/** § 3's elected widget. The value is a **string** throughout: the parse is a commit, not a read. */
+/**
+ * § 3's elected widget. The value is a **string** throughout: the parse is a commit, not a read.
+ *
+ * **`text-base` — 16 px — is load-bearing, not a type-scale preference. Decision of 2026-08-14, by
+ * the repo owner** (voir ticket 28's comments): WebKit zooms a user-scalable page *in* on focus of a
+ * text field whose computed font size is **below** 16 px, and does not zoom back out on blur. These
+ * fields used `text-xs` (12 px), and the viewport meta permits zoom on purpose
+ * (`src/routes/__root.tsx`, no `maximum-scale`, no `user-scalable=no`), so on an older iOS Safari the
+ * **first tap into any Rail field** put `visualViewport.scale ≠ 1` — which is exactly what
+ * `keyboardInsetOf` (`src/components/app/use-viewport.ts`) reads as « this is a pinch, not a
+ * keyboard ». § 5's keyboard piece 2 was therefore inactive for the rest of the session, on the one
+ * platform the `--kb` fallback exists for. 16 px removes the *trigger* and leaves pinch-zoom to the
+ * user; `maximum-scale=1` was rejected because it takes zoom away from whoever needs it to read a
+ * chart.
+ *
+ * **The box does not grow with the text**: `h-7` is 28 px of border box, and `text-base`'s 24 px line
+ * height still fits inside its 26 px content box, so no Rail row and no layout budget moves — measured
+ * at 390 × 664 and 1440 × 900 (ticket 28's dated note).
+ *
+ * **`px-1`, and it is the *width* half of the same decision.** 16 px mono advances 9,6 px per glyph
+ * against 12 px's 7,2, so the field's capacity fell from ~8 characters to ~6 and § 3's own values
+ * started being cut: at `w-20` with `px-2` (62 px of content box) « 1512,75 » measured `scrollWidth`
+ * **83** against `clientWidth` **78** — the second decimal of `L₀` sliced in half, and that decimal is
+ * the one § 3's *Display precision per quantity* exists to protect (« 1 déc. = 0,21 m de flèche,
+ * 0,20 m de garde, 8 % de la marge »), against a promise that « the field shows exactly what state
+ * holds ». Any span ≥ 1000 m under the `L₀` driver spends 7 characters, and § 5's published set has
+ * three such lines. **The gutter pays for it, not the box**: 4 px each side is 70 px of content, which
+ * fits every 7-character value § 3's decimals and hard ranges can produce, and the border box stays
+ * exactly 80 × 28 — so ticket 28's « pas un pixel » re-measurement still holds, unchanged, and the
+ * label column beside it does not move. **Residual, recorded rather than fixed**: 8 characters
+ * (« 12345,67 », `scrollWidth` 85) still clips. The first version of this note said reaching one took a
+ * value outside § 3's ranges, flagged ⛔ — false for `L₀`, and corrected here 2026-08-15 rather than left
+ * to mislead. `L₀`'s tier-one rule is `{ kind: "positive" }` with no upper bound (`src/lib/rail/fields.ts`),
+ * so « 12345,67 » commits by ordinary typing, reaches state and the link (`&lo=12345.67`), and is clipped
+ * **silently** — no `aria-invalid`, no ⛔. What keeps it out of practice is the physical range of spans, not
+ * a § 3 bound: an 8-character `L₀` needs a span near 10 km. The sentence *is* true of `H_target`, whose
+ * hard range does flag (« 123456,0 », 85 / 78, ⛔ shown) — which is how it came to be written here.
+ */
 export function NumericInput({
   id,
   value,
@@ -129,7 +166,7 @@ export function NumericInput({
     <input
       aria-invalid={invalid || undefined}
       className={cn(
-        "border-border h-7 w-20 rounded-md border bg-transparent px-2 text-right font-mono text-xs",
+        "border-border h-7 w-20 rounded-md border bg-transparent px-1 text-right font-mono text-base",
         invalid && "border-destructive",
       )}
       // Enter commits and blurs: on iOS there is otherwise no way to dismiss the keypad.

@@ -16,27 +16,29 @@
 
 import { useState } from "react";
 
+import type { ViewportFit } from "@/lib/layout/collapse.ts";
+
 import { ChartBlock } from "@/components/chart/chart-block.tsx";
 import { useChartWidth } from "@/components/chart/use-chart-width.ts";
 import { RailHeaderControls, RailInputs } from "@/components/rail/inputs.tsx";
 import { RailOutputs } from "@/components/rail/outputs.tsx";
 import { buildDiagnostic } from "@/lib/app/diagnostic.ts";
 import { linkStrip } from "@/lib/app/link-strip.ts";
+import { compactRequired, fitsWholeBlock } from "@/lib/layout/collapse.ts";
 
 import { Banner } from "./banner.tsx";
 import { LinkStripNotice } from "./link-strip.tsx";
 import { RailHeader, Shell } from "./shell.tsx";
 import { AppStoreProvider, useAppState } from "./store.tsx";
+import { useCollapse } from "./use-collapse.ts";
 import { useDeduced } from "./use-deduced.ts";
 import { useErrorSurfaces } from "./use-error-surfaces.ts";
-import { useKeyboardInset } from "./use-keyboard-inset.ts";
 import { usePersist } from "./use-persist.ts";
 import { useRailForm } from "./use-rail-form.ts";
 import { useScene } from "./use-scene.ts";
+import { useBandHeight, useViewport } from "./use-viewport.ts";
 
 export function App() {
-  useKeyboardInset();
-
   return (
     <AppStoreProvider>
       <Live />
@@ -61,6 +63,20 @@ export function App() {
 function Live() {
   const state = useAppState();
   const { ref, width } = useChartWidth();
+  /**
+   * The app's **one** viewport reading, and the `--kb` writer with it. It reports a height and a
+   * width to two predicates whose output is a *state*; nothing here sizes anything from either, and
+   * `src/lib/layout/contract.test.ts` holds that line against these files' own source.
+   */
+  const viewport = useViewport();
+  /**
+   * § 8's strip is the **one** thing the shell paints above the two columns, and above B2 its height
+   * comes straight out of the chart column's — so (c) is measured with it, not without. Ticket 31's
+   * **D3** is the term unspent: `data-fit="roomy"` at 1440 × 900 over a column 42 px too short, and
+   * « Garde min » clipped by the shell's `overflow-hidden`. `0` while there is no strip, which is
+   * also what dismissing it restores.
+   */
+  const chrome = useBandHeight();
   const scene = useScene();
   const deduced = useDeduced();
   /**
@@ -70,6 +86,26 @@ function Live() {
    */
   const [strip] = useState(() => linkStrip(state.link, state.scenario.unit));
   const rail = useRailForm(deduced);
+  /**
+   * § 5's Pinned Safety Header. **It does not read `rail.focused`**, and that is deliberate: the
+   * form's focus is *which numeric field is being edited* — « Saisie en cours »'s question, which
+   * never sees the pickers — while the collapse's is *is the caret in a Rail field at all*. One
+   * `focusin` on the Rail scroller answers the second for every control at once.
+   *
+   * **Its two height constraints are decided here and nowhere else**, from the app's one viewport
+   * reading and the same measured column width the charts are drawn from: (c), « the whole block
+   * cannot coexist with a usable Rail », and § 5's `compact` row under `--kb`. Both arrive as
+   * booleans, so no component below this line knows a viewport exists — and no band is sized from
+   * one, which is § 5's invariant.
+   */
+  const fit: ViewportFit = {
+    viewportWidth: viewport.width,
+    viewportHeight: viewport.height,
+    keyboardInset: viewport.keyboardInset,
+    columnWidth: width,
+    chromeHeight: chrome.height,
+  };
+  const collapse = useCollapse({ fits: fitsWholeBlock(fit), compact: compactRequired(fit) });
   /**
    * **The gates are applied here and nowhere else.** `useScene` derives the picture from the store,
    * which holds numbers, while a committed-invalid « −5 » lives in the form, which holds text — so
@@ -110,7 +146,11 @@ function Live() {
   return (
     <Shell
       chartRef={ref}
-      strip={<LinkStripNotice strip={strip} />}
+      collapse={collapse.state}
+      onRailFocus={collapse.onRailFocus}
+      onRailScroll={collapse.onRailScroll}
+      tight={collapse.tight}
+      strip={<LinkStripNotice bandRef={chrome.ref} strip={strip} />}
       rail={
         <>
           <RailHeader>
@@ -136,6 +176,11 @@ function Live() {
           // Sweep on screen is stale by definition, so scrubbing would let the user *generate* new
           // stale numbers rather than read the ones already there.
           inert={saisie !== null}
+          onPositionFocus={collapse.onPositionFocus}
+          onReveal={collapse.reveal}
+          // Under either height constraint the reveal cannot be granted, so the chevron publishes
+          // that instead of offering a press that changes nothing — voir `revealGrantable`.
+          revealGrantable={collapse.revealGrantable}
           solved={solved}
           width={width}
         />

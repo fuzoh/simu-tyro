@@ -14,7 +14,10 @@
  * - **The user-facing VE selector is dead.** Forcing ×20 at 1500 m throws the cable out of the top
  *   of the frame and collapses the terrain into a triangle: a manual selector is a loaded gun
  *   pointed at the chart's legibility. What ships is a **hold-to-peek** « ×1 vraie échelle », and
- *   it is **disabled whenever the ×1 clamp is already in force**.
+ *   it is **disabled whenever the ×1 clamp is already in force** — *except* where amendment F's
+ *   plot cap is what cut the cable out of that ×1 frame, where it reads « voir tout le câble » and
+ *   shows the whole cable instead (the user's **decision 4**; voir `peekMode` in
+ *   `@/lib/layout/contract.ts`).
  * - **Toggle under `@media (pointer: coarse)`, hold-to-peek on fine pointers**: press-and-hold on a
  *   coarse pointer collides with text selection, the context menu and scroll initiation. The query
  *   is § 5's own, the same one that widens the rider's hit radius, and it is read **at the event**
@@ -27,6 +30,7 @@
 
 import { useEffect, useState } from "react";
 
+import type { PeekMode } from "@/lib/layout/contract.ts";
 import type { LayerToggles } from "@/lib/session/session.ts";
 
 import { formatValue } from "@/lib/format/quantity.ts";
@@ -56,22 +60,46 @@ function coarsePointer(): boolean {
 /** How long § 3's clamp note stays up, ms. Long enough to read one line, short enough to be a note. */
 const CLAMP_NOTE_MS = 4000;
 
+/**
+ * The peek control's two labels, per mode — § 5's « ×1 vraie échelle », and the **decision 4** hold
+ * that puts a box-clipped cable back inside the frame. The label names *what pressing it does*, so
+ * the mode that no longer shows ×1 no longer says ×1; the disabled control keeps § 5's own words,
+ * because that is the row the spec's table describes.
+ */
+const PEEK_LABEL: Record<PeekMode, { full: string; short: string }> = {
+  off: { full: "×1 vraie échelle", short: "×1" },
+  "true-scale": { full: "×1 vraie échelle", short: "×1" },
+  fit: { full: "voir tout le câble", short: "tout" },
+};
+
 export function ViewStrip({
   layers,
   onLayers,
-  peekEnabled,
+  peek,
   peeking,
   onPeek,
+  onPositionFocus,
   xD,
   L,
   onX,
 }: {
   layers: LayerToggles;
   onLayers: (layers: LayerToggles) => void;
-  /** False when the ×1 clamp is already in force — the control is then **disabled, not hidden**. */
-  peekEnabled: boolean;
+  /**
+   * What a hold shows. `"off"` where the ×1 clamp is already in force and there is nothing to reveal
+   * — the control is then **disabled, not hidden** — and `"fit"` where amendment F's cap is what cut
+   * the cable out of a ×1 frame, which is the one case the user's **decision 4** hands back to it.
+   */
+  peek: PeekMode;
   peeking: boolean;
   onPeek: (peeking: boolean) => void;
+  /**
+   * § 5's `pinned + x`: while this row's own `x` holds the caret, the Pinned Safety Header keeps the
+   * row. Focusing it is **not** a collapse trigger — the field is inside the Chart Block, so it
+   * would be collapsing itself away — it only refuses to let a collapse the Rail caused take the
+   * row out from under the caret.
+   */
+  onPositionFocus: (focused: boolean) => void;
   /** The drawn position, m — already clamped into `[0, L]` by the scene. */
   xD: number;
   L: number;
@@ -100,10 +128,10 @@ export function ViewStrip({
       </button>
 
       <button
-        aria-label="×1 vraie échelle"
+        aria-label={PEEK_LABEL[peek].full}
         aria-pressed={peeking}
-        className={cn(CONTROL, "ml-auto", peeking && "bg-accent", !peekEnabled && "opacity-50")}
-        disabled={!peekEnabled}
+        className={cn(CONTROL, "ml-auto", peeking && "bg-accent", peek === "off" && "opacity-50")}
+        disabled={peek === "off"}
         // Hold on a fine pointer; a plain toggle under `(pointer: coarse)`, where a held gesture
         // has no room — and the same toggle from the keyboard, in both modes.
         onKeyDown={(event) => {
@@ -123,13 +151,13 @@ export function ViewStrip({
         onPointerUp={() => {
           if (!coarsePointer()) onPeek(false);
         }}
-        title="×1 vraie échelle"
+        title={PEEK_LABEL[peek].full}
         type="button"
       >
-        <Label full="×1 vraie échelle" short="×1" />
+        <Label full={PEEK_LABEL[peek].full} short={PEEK_LABEL[peek].short} />
       </button>
 
-      <PositionField L={L} onX={onX} xD={xD} />
+      <PositionField L={L} onFocusChange={onPositionFocus} onX={onX} xD={xD} />
     </>
   );
 }
@@ -155,7 +183,17 @@ export function ViewStrip({
  * ever fire where nothing moved. The other two paths are announced by the Rail's own
  * « Position du passager », which is where the geometry that shortened the span was typed.
  */
-function PositionField({ xD, L, onX }: { xD: number; L: number; onX: (metres: number) => void }) {
+function PositionField({
+  xD,
+  L,
+  onX,
+  onFocusChange,
+}: {
+  xD: number;
+  L: number;
+  onX: (metres: number) => void;
+  onFocusChange: (focused: boolean) => void;
+}) {
   const shown = formatValue("x_D", xD);
   const [draft, setDraft] = useState<string | null>(null);
   // A nonce rather than a boolean: a second clamp while the first note is up restarts its timer.
@@ -178,7 +216,14 @@ function PositionField({ xD, L, onX }: { xD: number; L: number; onX: (metres: nu
   }
 
   return (
-    <label className="relative ml-3 flex items-center gap-1 whitespace-nowrap">
+    <label
+      className="relative ml-3 flex items-center gap-1 whitespace-nowrap"
+      // **Before the blur, not after the focus.** Coming from the Rail's own « Position du
+      // passager » the block is in `pinned + x`; a tap here fires this, then the Rail field's
+      // `blur`, then this field's `focus` — and without the first the state would fall back to
+      // `pinned` in between, unmounting the strip out from under the tap on its way to it.
+      onPointerDown={() => onFocusChange(true)}
+    >
       {/* Mounted at all times so the live region can speak; absolute so the View Strip keeps its
           44 px, the tightest budget in the app. */}
       <span
@@ -193,8 +238,12 @@ function PositionField({ xD, L, onX }: { xD: number; L: number; onX: (metres: nu
         className="border-border h-8 w-16 rounded-md border bg-transparent px-2 text-right font-mono"
         enterKeyHint="done"
         inputMode="decimal"
-        onBlur={(event) => commit(event.target.value)}
+        onBlur={(event) => {
+          onFocusChange(false);
+          commit(event.target.value);
+        }}
         onChange={(event) => setDraft(event.target.value)}
+        onFocus={() => onFocusChange(true)}
         onKeyDown={(event) => {
           if (event.key !== "Enter") return;
           commit(event.currentTarget.value);

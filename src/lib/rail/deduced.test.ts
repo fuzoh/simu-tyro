@@ -197,6 +197,22 @@ describe("imported mode — `L` and `h` become read-outs of their own", () => {
     expect(span?.h).toBeCloseTo(-41.5, 9);
   });
 
+  test("« Alt. base A / B » travel with them — the ground under each anchor, not the tower top", () => {
+    // § 4's block prints them beside `Portée` and `Dénivelé`, and they are the profile's own
+    // altitudes: the two `hauteur d'ancrage` fields are already accounted for in `h` and may not be
+    // added again here.
+    const imported = scenario((draft) => {
+      draft.geometry = { source: "trace", trace: "p1.x", sa: 56, sb: 224 };
+      draft.anchors = { zA: 4, zB: 2.5 };
+    });
+    // Station 56 sits between samples 0 and 112: 540 − 20·(56/112) = 530.
+    expect(deduceValues(imported, TRACE).span?.bases).toEqual({ zBaseA: 530, zBaseB: 500 });
+  });
+
+  test("manual mode has no base altitudes — a straight ground line has no altitude to print", () => {
+    expect(deduceValues(scenario(), null).span?.bases).toBeNull();
+  });
+
   test("a degenerate placement has no span at all, and therefore no `corde`", () => {
     const degenerate = scenario((draft) => {
       draft.geometry = { source: "trace", trace: "p1.x", sa: 120, sb: 120 };

@@ -3,6 +3,7 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  defaultStringifySearch,
 } from "@tanstack/react-router";
 import { describe, expect, test } from "vitest";
 
@@ -686,5 +687,34 @@ describe("scenarioToSearch — the write side", () => {
     expect("reg" in scenarioToSearch(FIRST_RUN_SCENARIO)).toBe(false);
     const chosen = scenarioToSearch({ ...FIRST_RUN_SCENARIO, regime: "en15567" });
     expect(chosen.reg).toBe("en15567");
+  });
+
+  test("the emitted bag is in canonical order, in both families", () => {
+    // Regression, ticket 32: the textile branch inserted `mu` after `cls`/`mbl`, so the debounced
+    // address-bar write — which stringifies **this** bag's insertion order — put `mu` where
+    // `CANONICAL_KEYS` does not, and disagreed with `canonicalLink`'s string for the same Scenario.
+    const textile: Scenario = {
+      ...structuredClone<Scenario>(FIRST_RUN_SCENARIO),
+      material: { family: "textile", ropeClass: "hmpe", MBL: 300000, mu: 0.16, k: 22 },
+    };
+    const steel: Scenario = {
+      ...structuredClone<Scenario>(FIRST_RUN_SCENARIO),
+      material: {
+        family: "steel",
+        d: 12,
+        R0: 1770,
+        construction: "iwrc",
+        overrides: { MBF: 90740, EA: 69000000, mu: 0.5465 },
+      },
+    };
+    for (const scenario of [textile, steel, FIRST_RUN_SCENARIO]) {
+      const search = scenarioToSearch(scenario);
+      const emitted = Object.keys(search);
+      expect(emitted).toEqual([...CANONICAL_KEYS].filter((key) => emitted.includes(key)));
+      // The consequence, stated where a reader will look for it: « Copier le lien » builds its href
+      // with `canonicalLink`, the address bar gets this bag as-is, and § 7 requires the two strings
+      // to be identical (« two links to the same Scenario are then string-identical »).
+      expect(`/${defaultStringifySearch(search)}`).toBe(canonicalLink(search));
+    }
   });
 });

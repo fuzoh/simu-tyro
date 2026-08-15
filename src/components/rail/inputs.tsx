@@ -632,6 +632,23 @@ export function RailInputs({
             <>
               <ReadOut label="Portée" value={formatQuantity("L", deduced.span.L)} />
               <ReadOut label="Dénivelé" value={formatQuantity("h", deduced.span.h)} />
+              {/* § 4's anchor-placement block prints the two base altitudes **beside** `Portée` and
+                  `Dénivelé`: they are what says *where on the hill* the placement sits, and without
+                  them a station read-out is a number with no altitude behind it. One row each rather
+                  than the block's single « · »-joined line — the Rail is a 255 px column, and `·` is
+                  the sketch's layout, not its copy. */}
+              {deduced.span.bases !== null && (
+                <>
+                  <ReadOut
+                    label="Alt. base A"
+                    value={formatQuantity("zBase", deduced.span.bases.zBaseA)}
+                  />
+                  <ReadOut
+                    label="Alt. base B"
+                    value={formatQuantity("zBase", deduced.span.bases.zBaseB)}
+                  />
+                </>
+              )}
             </>
           )}
 

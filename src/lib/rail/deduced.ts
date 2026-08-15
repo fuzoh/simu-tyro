@@ -80,6 +80,14 @@ export type DeducedSpan = {
   readonly h: number;
   /** `√(L² + h²)`, m — compared against `L₀` in §5.4's bound, hence its 2 decimals. */
   readonly chord: number;
+  /**
+   * § 4's « Alt. base A » / « Alt. base B » — the ground altitude under each anchor, m, in the
+   * file's own frame. **`null` in manual mode**, which has no profile to read an altitude off: there
+   * the two `hauteur d'ancrage` fields sit on a straight line whose altitude is not a quantity the
+   * app knows. They are read-outs beside `Portée` and `Dénivelé`, and nothing downstream consumes
+   * them — `h` already carries the only difference they make.
+   */
+  readonly bases: { readonly zBaseA: number; readonly zBaseB: number } | null;
 };
 
 /** What one unloaded solve adds. Absent — never dashed — when the line does not solve. */
@@ -250,15 +258,15 @@ function deducedSpan(scenario: ScenarioDraft, trace: Trace | null): DeducedSpan 
   if (geometry.source === "manual") {
     const { L, h } = geometry;
     if (!Number.isFinite(L) || L <= 0 || !Number.isFinite(h)) return null;
-    return { L, h, chord: Math.hypot(L, h) };
+    return { L, h, chord: Math.hypot(L, h), bases: null };
   }
   if (trace === null || !(geometry.sb > geometry.sa)) return null;
-  const { L, h } = deriveSpan(
+  const { L, h, zBaseA, zBaseB } = deriveSpan(
     trace,
     { station: geometry.sa, height: scenario.anchors.zA },
     { station: geometry.sb, height: scenario.anchors.zB },
   );
-  return { L, h, chord: Math.hypot(L, h) };
+  return { L, h, chord: Math.hypot(L, h), bases: { zBaseA, zBaseB } };
 }
 
 /** What the solver consumes, or `null` while a textile draft still has § 9's blanks. */

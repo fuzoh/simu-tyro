@@ -93,6 +93,39 @@ export function altitudeAt(trace: Trace, station: number): number {
   return z[lo] + ((station - d[lo]) / (d[hi] - d[lo])) * (z[hi] - z[lo]);
 }
 
+/**
+ * § 4's pointer rule for the two Station handles: **pointer input snaps to a terrain sample, a typed
+ * station is exact and interpolates.** The justification is measured, not stylistic — 1 px ≈ 1,2 m at
+ * a 1500 m span, so there is no precision in a drag to preserve, while a station taken from a site
+ * survey must stay enterable to the metre.
+ *
+ * **Clamped to the trace's own extent**, which is what makes § 4's degenerate-placement row « poignée
+ * glissée au-delà de l'extrémité ⇒ bornée à l'extrémité du tracé — l'état d'erreur est inatteignable »
+ * true of the pointer path: a drag cannot produce « Station hors du tracé », while a typed station
+ * still blocks.
+ *
+ * @param trace the imported profile; `d` strictly increasing.
+ * @param station m, in file coordinates — where the pointer landed.
+ * @returns the file's own nearest sample. Exactly halfway between two, the **lower** one, so one
+ *   pointer position always yields one station.
+ */
+export function snapStation(trace: Trace, station: number): number {
+  const { d } = trace;
+  const last = d.length - 1;
+  if (!(station > d[0])) return d[0];
+  if (station >= d[last]) return d[last];
+
+  // The bracketing pair `d[lo] ≤ station < d[hi]`, `hi === lo + 1` on exit — `altitudeAt`'s walk.
+  let lo = 0;
+  let hi = last;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (d[mid] <= station) lo = mid;
+    else hi = mid;
+  }
+  return station - d[lo] > d[hi] - station ? d[hi] : d[lo];
+}
+
 /** The trace's own horizontal extent, m — `d[last] − d[0]`, the « sur *X* m » of § 6's copy. */
 export function traceExtent(trace: Trace): number {
   return trace.d[trace.d.length - 1] - trace.d[0];

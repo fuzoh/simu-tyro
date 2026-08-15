@@ -1,12 +1,12 @@
 # Scoutech v1 — build backlog
 
 Execution of [the v1 build spec](../zipline-simulator-v1/spec.md), **as amended** by
-[AMENDMENTS.md](./AMENDMENTS.md) — read that first, it supersedes the spec in four places. One ticket
+[AMENDMENTS.md](./AMENDMENTS.md) — read that first, it supersedes the spec in seven places. One ticket
 per stage of the spec's **§ 10 — Implementation order**. Original final three tickets were split for
 fresh-context delegation on 2026-08-13: **36 tickets** now live in `issues/`, numbered in dependency
 order.
 
-## The four amendments, in one line each
+## The seven amendments, in one line each
 
 | | Amendment | Lands on |
 | --- | --- | --- |
@@ -14,6 +14,13 @@ order.
 | **B** | **`agent-browser`** owns point-to-point app testing, and takes over § 10 A12's five manual re-checks | **29–35**, 22, 26, 27, 28, 36 |
 | **C** | TanStack versions are the **actual latest, still pinned** — with a re-probe of § 8's five measured behaviours | 15, 22 |
 | **D** | **`@tanstack/react-form`** for forms, **valibot** for data validation — valibot replaces the hand-rolled `validateSearch` under § 8's four unchanged rules | 15, 18, 20, 21, 24, 26 |
+| **E** | The refusal is a **rendered state, not a thrown error** — C's re-probe found a thrown `validateSearch` now answers 500, so the throw goes and **200 survives** | 20, 22, 26, 29 |
+| **F** | § 5's plot height is **capped at the reference chart column** (`min(0,42 × W_inner , 463,68 px)`) — nothing at or below the reference desktop moves, the block is bounded, and the **peek control is re-enabled where the cap is what cuts the cable** | 28, 29, 30 |
+| **G** | § 5's keyboard piece 2 is **gated on `visualViewport.scale`** — a pinch is no longer read as a keyboard — and the Rail's numeric fields go to **16 px** so iOS no longer auto-zooms them | 28, 35, 27, 29 |
+
+**A–D are 2026-08-12; E is 2026-08-13; F and G are 2026-08-14**, and F and G each carry more than one
+user decision, recorded beside the cost they close rather than as letters of their own. Amendment F's
+costs 2 and 3 and amendment G's decision 5 are **settled**, not open questions.
 
 **The spec is the contract.** These tickets carry the stage's deliverable, its gate and the
 non-obvious constraints that stage would otherwise get wrong — they never restate the spec's

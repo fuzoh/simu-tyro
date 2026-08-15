@@ -830,6 +830,12 @@ export function scenarioToSearch(scenario: Scenario): ValidatedSearch {
     if (overrides?.mu !== undefined) out.mu = overrides.mu;
   } else {
     out.fam = "tx";
+    // `mu` is inserted **before** `cls`/`mbl`, which is its one slot in {@link CANONICAL_KEYS}: it
+    // is the same key in both families, so it cannot also sit in the textile group. Insertion order
+    // *is* the emitted query string, and {@link canonicalLink} re-inserts in `CANONICAL_KEYS`
+    // order — emitting `mu` last here made « Copier le lien » and the address bar disagree as
+    // strings for a textile line, which is exactly the diffability § 7 buys with a canonical order.
+    out.mu = material.mu;
     out.cls =
       material.ropeClass === "pa-en1891a"
         ? "pa"
@@ -837,7 +843,6 @@ export function scenarioToSearch(scenario: Scenario): ValidatedSearch {
           ? "pes"
           : "hmpe";
     out.mbl = daN(material.MBL);
-    out.mu = material.mu;
     out.k = material.k;
   }
 

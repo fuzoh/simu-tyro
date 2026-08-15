@@ -20,8 +20,9 @@
  *
  * - **Never a merge.** A recognised key means the URL supplies the *whole* Scenario; the Session
  *   still supplies what a link never carries — the retained inactive Material Spec, the retained
- *   manual geometry, the cached Trace and the two layer toggles. A merge would yield the
- *   recipient's rope on the sender's span, a third scenario nobody authored.
+ *   manual geometry and the two layer toggles. A merge would yield the recipient's rope on the
+ *   sender's span, a third scenario nobody authored. The cached Trace is the one extra a link **can**
+ *   speak for, because `tr` *is* a profile: voir {@link linkTrace}.
  * - **The rewrite is content, never order.** `?h=-40&L=250` with nothing dropped is left exactly
  *   as typed: firing a `replace` for cosmetics would rewrite a URL the user is mid-way through
  *   editing. A bare `/` is never rewritten at all — bare `/` *means* « restore the Session », so a
@@ -53,6 +54,7 @@ import {
 } from "@/lib/scenario/first-run.ts";
 import { clampX, scenarioFromSearch } from "@/lib/scenario/from-search.ts";
 import { DEFAULT_LAYERS } from "@/lib/session/session.ts";
+import { decodeP1 } from "@/lib/url/p1.ts";
 import {
   completeFromDefaults,
   hasScenarioKey,
@@ -111,7 +113,11 @@ export type AppState = {
   readonly retainedMaterial: RetainedMaterial | null;
   /** The manual span an import displaced, restored by « Retirer le tracé ». */
   readonly retainedManual: RetainedManualGeometry | null;
-  /** The cached profile — cached even while inactive. Decoding a link's `tr` is A8's derivation. */
+  /**
+   * The cached profile — cached even while inactive, and **the decoded arriving `tr` when a link
+   * carried one**: `geometry.source === "trace"` with no Trace beside it is a screen with stations,
+   * no span and no ground — voir {@link linkTrace}.
+   */
   readonly trace: Trace | null;
   /** § 5's two toggles: Session-only, never in the URL. */
   readonly layers: LayerToggles;
@@ -309,9 +315,13 @@ export function initialAppState(input: MountInput): AppState {
 
   return {
     ...base,
-    // Wholesale: the link's Scenario, and the Session's own extras — the retained alternate, the
-    // cached Trace and the layer toggles are things a link never carries.
+    // Wholesale: the link's Scenario, and the Session's own extras — the retained alternate and the
+    // layer toggles are things a link never carries.
     scenario,
+    // The one Session extra a link *can* speak for: `tr` **is** a profile, so an arriving one is
+    // decoded here rather than left to the Session to happen to have.
+    trace:
+      completedSearch.tr === undefined ? base.trace : linkTrace(completedSearch.tr, input.session),
     link: {
       refused: null,
       dropped,
@@ -320,6 +330,30 @@ export function initialAppState(input: MountInput): AppState {
       rewrite: differs(raw, canonical) ? canonical : null,
     },
   };
+}
+
+/**
+ * The Trace an arriving `tr` names. **Without this the link is half-applied**: `scenarioFromSearch`
+ * reads `tr` into `geometry.source === "trace"`, so a recipient with no Session of their own would
+ * hold two stations, no profile to place them on and therefore no span at all — no `Portée`, no
+ * `Dénivelé`, no ground and the identity line reading « (aucun tracé) ».
+ *
+ * **The Session's own copy wins when it is the same profile**, which is § 8's « The Session keeps
+ * the filename, since that is the user's own session »: reloading a link you built from your own
+ * import must go on reading « *nom.csv* », not « tracé reçu par lien ». The test is the payload the
+ * Session stores beside its active imported geometry — the same string the address bar carries, held
+ * verbatim, so this compares two spellings of one profile and never re-encodes one to find out.
+ *
+ * @param tr the validated `p1.` payload. `decodeP1` cannot fail on it: `salvageSearch` has already
+ *   walked it structurally, and an undecodable or oversize one is a **refusal** that returns above.
+ * @returns the Session's Trace when the payload is its own, otherwise the decoded profile with
+ *   **no `fileName`** — which *is* § 4's third identity state, « tracé reçu par lien ».
+ */
+function linkTrace(tr: string, session: Session | null): Trace {
+  const cached = session?.trace ?? null;
+  const stored = session?.scenario.geometry;
+  if (cached !== null && stored?.source === "trace" && stored.trace === tr) return cached;
+  return { ...decodeP1(tr), fileName: null };
 }
 
 /** The Session, or § 9's shipped opening state. `firstRunDefaults()` is the one source of both. */

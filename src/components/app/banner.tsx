@@ -26,21 +26,28 @@ import type { VerdictState } from "@/lib/sim";
 
 import { CHOOSE_REGIME_LABEL, JUMP_LABEL } from "@/lib/app/banner.ts";
 import { DIAGNOSTIC_ACTION } from "@/lib/app/refusals.ts";
+import { CENTRE_IN_RAIL } from "@/lib/layout/collapse.ts";
 import { cn } from "@/lib/utils.ts";
 
 /**
  * § 7's one jump primitive, serving the banner's jump link, `[ Choisir un régime ]` and every Fix
  * Action that focuses rather than sets: scroll the target's rail section into view, then move DOM
  * focus to the control. `scroll-margin-top` on the control reserves the pinned header's height, so
- * the target never lands underneath it.
+ * the target never lands underneath it — the rule is `[id^="rail-"]` in `src/styles.css`, scoped to
+ * B2 and fed by the shell's `--pinned-clearance`.
  *
- * The Rail's sections are not collapsible in v1 — A12 owns the narrow-screen reflow — so
- * « force-open it if collapsed » has nothing to open yet and the primitive stays one call.
+ * The Rail's sections are not collapsible in v1 — the narrow-screen reflow keeps all five in flow,
+ * as one scroller — so « force-open it if collapsed » has nothing to open and the primitive stays
+ * one call. **The two mechanisms compose with no special case**: this scroll happens inside the
+ * Rail's own scroller and this focus lands on a Rail field, so pressing the link fires the Pinned
+ * Safety Header's triggers (a) and (b) itself and produces exactly the layout the message needs.
  */
 export function jumpToField(field: FieldId): void {
   const target = document.getElementById(`rail-${field}`);
   if (target === null) return;
-  target.scrollIntoView({ block: "center" });
+  // The **same** options object the Rail's own focus centring uses — one scroll behaviour in the
+  // app, `behavior` left at `auto` because a smooth scroll races the soft keyboard's animation.
+  target.scrollIntoView(CENTRE_IN_RAIL);
   target.focus();
 }
 
@@ -76,7 +83,11 @@ export function Banner({
   return (
     <div
       className={cn(
-        "flex h-full flex-wrap items-center gap-x-3 gap-y-1 py-1 text-xs",
+        // `compact:` is § 5's fourth row — « bandeau sur **une ligne** » — and it is the only thing
+        // the collapse asks of this file: no wrap, no vertical padding, and the sentence truncated
+        // rather than allowed to grow the 44 px row the form is owed. The occupant, its rank and its
+        // affordance are unchanged: a blocking summary keeps `[ voir la première ]` under a keyboard.
+        "compact:flex-nowrap compact:py-0 flex h-full flex-wrap items-center gap-x-3 gap-y-1 py-1 text-xs",
         blocking && "text-destructive",
         occupant.rank === 3 && "text-muted-foreground",
         occupant.rank === 4 && occupant.kind === "verdict" && VERDICT_TONE[occupant.state],
@@ -85,7 +96,7 @@ export function Banner({
       // Blocking states announce themselves; a verdict and a mid-edit mark are read, not alerted.
       role={blocking ? "alert" : undefined}
     >
-      <span className="min-w-0 flex-1">{occupant.text}</span>
+      <span className="compact:truncate min-w-0 flex-1">{occupant.text}</span>
 
       {occupant.rank === 1 && (
         <BannerButton

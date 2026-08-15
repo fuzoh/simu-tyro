@@ -21,6 +21,10 @@
  *   observer's seed is « not measured yet » rather than a guessed 900 px.
  * - **Pointer input snaps, typed input is exact.** Both paths land on the same one action, and the
  *   snap happens here — the scene has one rider path and no idea which device moved it.
+ * - **The collapse is not branched here.** § 5's Pinned Safety Header is the *same* tree with bands
+ *   dropped in CSS below B2 (`data-collapse` on the shell, the `pinned` variant in `styles.css`), so
+ *   this file contributes exactly two things to it: the chevron that asks for the profile back, and
+ *   the View Strip's own focus, which is what stops the strip collapsing itself away.
  */
 
 import type { ReactNode } from "react";
@@ -35,6 +39,7 @@ import {
   READ_OUT_CELLS,
   ReadOutCell,
   ReadOutCells,
+  RevealProfile,
   StripBand,
   ViewStripSlot,
 } from "@/components/app/shell.tsx";
@@ -47,7 +52,8 @@ import {
   createZScale,
   exaggeration,
   innerWidth,
-  PROFILE_ASPECT,
+  peekBadgeLabel,
+  plotAspect,
   PROFILE_CHROME,
   profileOuterHeight,
   profilePlotHeight,
@@ -55,6 +61,9 @@ import {
   veBadgeLabel,
 } from "@/lib/layout/contract.ts";
 import { GATE_CONSEQUENCE } from "@/lib/rail/gates.ts";
+import { applyField } from "@/lib/rail/values.ts";
+import { snapStation } from "@/lib/terrain/trace.ts";
+import { cn } from "@/lib/utils.ts";
 
 import { Profile } from "./profile.tsx";
 import { ClearanceStrip } from "./strip.tsx";
@@ -87,6 +96,9 @@ export function ChartBlock({
   clearance = true,
   frame,
   inert = false,
+  onPositionFocus,
+  onReveal,
+  revealGrantable = true,
   solved,
   width,
 }: {
@@ -119,6 +131,21 @@ export function ChartBlock({
    * `x` alike. The Sweep on screen is stale by definition, so scrubbing would generate new stale
    * numbers rather than read the ones already there. */
   inert?: boolean;
+  /**
+   * The View Strip's `x` taking or losing the caret — § 5's `pinned + x`. It is **not** a collapse
+   * trigger: the field lives inside the block, so collapsing on it would be the field collapsing
+   * itself away. It holds the strip open through a collapse the Rail caused.
+   */
+  onPositionFocus: (focused: boolean) => void;
+  /** « Afficher le profil » — the pinned header's one control. */
+  onReveal: () => void;
+  /**
+   * May the policy **grant** that request here? `false` under § 5's two height constraints, where
+   * the chevron would otherwise be a press that changes nothing — voir `revealGrantable` in
+   * `@/lib/layout/collapse.ts` and `RevealProfile`. It is a derived boolean like `inert`, not a
+   * viewport: no dimension in this file comes from it.
+   */
+  revealGrantable?: boolean;
   /** The expensive half — sweep plus the §11 pass — from the app's one `useSweep` seam. */
   solved: SceneBase | null;
   width: number | null;
@@ -137,15 +164,34 @@ export function ChartBlock({
     return rider === null ? null : { ...solved, rider };
   }, [solved, riderInput.xD]);
 
+  // **The two empty-band paths end the transient too**, and for the same reason the `"off"` band
+  // does below: they return *before* `ve` exists, so the reset keyed on the mode cannot run, and the
+  // View Strip — the control and its `aria-pressed` — is not rendered at all. A flag that outlives a
+  // window in which its own control does not exist comes back armed with nothing to have pressed it:
+  // measured at 2560 × 1440 on `?L=200&h=-40&za=12&zb=12&fl=6`, `Space`, then `L` = 0 (« Portée
+  // invalide — aucun tracé possible »), then `L` = 200 → « ×0,7 — sous la vraie échelle · câble
+  // entier », `aria-pressed="true"`, `activeElement` still the `L` field. Below true scale, unbidden,
+  // which is the direction § 5 calls worse than exaggeration « because it reads safe ».
+  if (peeking && (width === null || frame === null)) setPeeking(false);
   // Not measured yet: the bands keep their heights and hold their labels, which is the Skeleton's
   // own content. Nothing about the scenario is being said here.
-  if (width === null) return <EmptyBands banner={banner} />;
+  if (width === null) {
+    return <EmptyBands banner={banner} onReveal={onReveal} revealGrantable={revealGrantable} />;
+  }
   // § 8's *exception géométrique*, and **only** it: no shared x domain, so both plots are empty
   // frames with no axis ticks, they carry the cause line, and pointer input is inert. The read-out
   // row carries the **cause**, not the plots' line: something was attempted and was blocked, so
   // five bare labels would render the « nothing attempted » state of a state that is not it.
   if (frame === null) {
-    return <EmptyBands banner={banner} cause={NO_SPAN_LINE} cells={cause ?? null} />;
+    return (
+      <EmptyBands
+        banner={banner}
+        cause={NO_SPAN_LINE}
+        cells={cause ?? null}
+        onReveal={onReveal}
+        revealGrantable={revealGrantable}
+      />
+    );
   }
 
   const wInner = innerWidth(width);
@@ -155,13 +201,44 @@ export function ChartBlock({
   // the drawn ground and the two towers. Same policy, one term shorter.
   const zExtent = scene === null ? frame.zExtent : scene.zExtent;
   const ve = exaggeration({
-    plotAspect: PROFILE_ASPECT,
+    // **The obtained aspect, not the target.** They are the same number up to § 5's reference chart
+    // column and diverge above it, where amendment F freezes the plot's height: feeding 0,42 into a
+    // capped box would build a z scale taller than the box it draws in, so the cable would leave the
+    // frame while the badge went on claiming an auto-fit. `plotAspect` is the same `min` the band's
+    // own height is, so the drawing and the badge cannot disagree.
+    plotAspect: plotAspect(wInner),
     xSpan: x.domain[1] - x.domain[0],
     zDataSpan: zExtent.max - zExtent.min,
   });
-  // The peek is a **transient** and is never persisted; ×1 is what it shows, which is also why the
-  // control is disabled when the clamp already holds the drawing at ×1.
-  const drawnVe = peeking ? 1 : ve.ve;
+  // The peek is **never persisted** — no Session key, no URL key, gone on reload — but it is *not*
+  // only a hold: § 5 gives the control **toggle** semantics from the keyboard in **both** pointer
+  // modes and under `(pointer: coarse)`, so on those paths the drawing stands until the next press.
+  // What it shows is `ve.peek`: ×1 out of an auto-fit — § 5's own peek, and why the control is
+  // disabled when the clamp already holds the drawing at ×1 — or, where amendment F's cap is what cut
+  // the cable out of a ×1 frame, the auto-fit that fits the whole cable back into it (the user's
+  // **decision 4**). Nothing else in the app draws below ×1, and the badge names it in every case.
+  //
+  // **A hold is only in force while the mode still has something to show, and it *ends* there.** A
+  // resize or a new scenario can take the mode to `"off"` under a held control — which also disables
+  // it, so the release event may never arrive. Two things are owed at that moment, and they are not
+  // the same thing:
+  //
+  // 1. **The badge must not lie during the off window.** `held` is derived rather than read, so a
+  //    standing flag cannot print « sous la vraie échelle » over a ×1 drawing.
+  // 2. **The flag must not survive the off window.** Masking alone left the toggle paths — the
+  //    keyboard, in *both* pointer modes, and a coarse-pointer tap — latched *through* `"off"` and
+  //    re-arming on the way back: measured at 2560 × 1440 on `?L=200&h=-40&za=12&zb=12&fl=6`, `Space`
+  //    then a width excursion to 2000 and back restored « ×0,7 — sous la vraie échelle » with nothing
+  //    focused and nobody pressing. An unbidden *compression* in a clearance tool is the direction
+  //    § 5 calls worse than exaggeration, « because it reads safe ». `onLostPointerCapture` covers
+  //    the fine-pointer hold and only it, so the release the toggle paths never send is this one.
+  //
+  // Adjusted during render — React's own « state derived from new props » path — rather than in an
+  // effect: no extra commit, and the re-render lands before anything is painted. **This reset is one
+  // of two**; the other stands above the empty-band returns, which never reach `ve` at all.
+  if (peeking && ve.peek === "off") setPeeking(false);
+  const held = peeking && ve.peek !== "off";
+  const drawnVe = held ? (ve.peek === "fit" ? ve.autofit : 1) : ve.ve;
   const z = createZScale({
     plotTop: PROFILE_CHROME.badge,
     plotHeight,
@@ -187,6 +264,31 @@ export function ChartBlock({
     if (snapped !== null) moveRider(snapped);
   }
 
+  /**
+   * § 4's two Station handles. **The snap is the pointer path's whole rule** — `snapStation` takes
+   * the file's own nearest sample and clamps to the trace, so a drag cannot reach « Station hors du
+   * tracé » while a typed station still blocks. The metres arrive in the span frame, so `s_A` is what
+   * turns them into a station: at `x = 0` the pointer is on anchor A, whatever the file numbers it.
+   *
+   * `applyField` is the write, rather than a geometry patch built here, because it is the one path
+   * that brings `x_D`'s clamp along with a new span — « no route into a new span can forget it ».
+   */
+  function dragStation(anchor: "A" | "B", metres: number) {
+    const { geometry } = state.scenario;
+    if (inert || geometry.source !== "trace" || state.trace === null) return;
+    const next = applyField(
+      state.scenario,
+      anchor === "A" ? "sa" : "sb",
+      snapStation(state.trace, geometry.sa + metres),
+    );
+    // Two keys rather than the whole draft: the store's shallow merge is what keeps `sceneInputs`
+    // stable for everything this drag does not touch.
+    dispatch({
+      type: "scénario/modifié",
+      patch: { geometry: next.geometry, rider: next.rider },
+    });
+  }
+
   /** A typed position is exact, clamped into `[0, L]` because `x_D` selects a view. */
   function moveRider(metres: number) {
     if (frame === null || inert) return;
@@ -197,6 +299,13 @@ export function ChartBlock({
   }
 
   const rider = scene?.rider ?? null;
+  /**
+   * Does § 7's cause line **occupy** the row? With no solved half nothing was attempted, so the five
+   * cells are replaced by the one line — which means their labels go with their values. Where a
+   * traverse *did* solve (`solved !== null`) the row keeps its labels and reads « — » per cell:
+   * `Indéterminé`'s glyph, a different state, and not this one.
+   */
+  const replaced = rider === null && solved === null && cause !== undefined && cause !== null;
   const values: Record<string, ReadOutValue> | null =
     rider === null
       ? null
@@ -242,15 +351,24 @@ export function ChartBlock({
         <Profile
           badge={{
             // The badge describes **what is drawn**, so a peek says so in the same words the ×1
-            // clamp uses — and never « ×1,0 », which would read as a measurement of a rule.
-            label: peeking ? "Éch. verticale ×1 — vraie échelle" : veBadgeLabel(ve),
-            emphasised: peeking || ve.state !== "auto",
+            // clamp uses — and never « ×1,0 », which would read as a measurement of a rule. The
+            // `"fit"` peek is the one drawing below true scale, and `peekBadgeLabel` is where it says
+            // so rather than borrowing the ×1 row's words.
+            label: held ? peekBadgeLabel(ve) : veBadgeLabel(ve),
+            emphasised: held || ve.state !== "auto",
           }}
           bandHeight={profileOuterHeight(wInner)}
           clearance={clearance}
           frame={frame}
           layers={state.layers}
           onScrub={scrub}
+          // Manual mode passes nothing, and that **is** § 5's « bracket, non-interactive »: with no
+          // trace to snap to there is no station to place, and the same two rectangles stay inert.
+          onStation={
+            state.scenario.geometry.source === "trace" && state.trace !== null
+              ? dragStation
+              : undefined
+          }
           plot={{ top: PROFILE_CHROME.badge, height: plotHeight }}
           scene={scene}
           wide={wide}
@@ -275,18 +393,21 @@ export function ChartBlock({
           layers={state.layers}
           onLayers={(layers) => dispatch({ type: "calques/basculés", layers })}
           onPeek={setPeeking}
+          onPositionFocus={onPositionFocus}
           onX={moveRider}
-          peekEnabled={ve.peekEnabled}
-          peeking={peeking}
+          peek={ve.peek}
+          peeking={held}
           xD={rider === null ? clampToSpan(riderInput.xD, frame.L) : rider.step.xD}
         />
       </ViewStripSlot>
       <ReadOutCells scope={{ full: "à la position du passager", short: "à la position" }}>
         {READ_OUT_CELLS.map((cell) => (
           <ReadOutCell
-            className={cell.narrow}
+            className={cn(cell.narrow, cell.pinned)}
             key={cell.label}
-            label={values === null ? cell.label : values[cell.label].label}
+            // No label under the cause line: the row is **replaced** by it, and the box stays only
+            // to hold the row's height — voir `ReadOutCell`'s own `label`.
+            label={replaced ? undefined : values === null ? cell.label : values[cell.label].label}
           >
             {values !== null &&
               (values[cell.label].note ? (
@@ -306,12 +427,14 @@ export function ChartBlock({
         ))}
         {/* § 7's first echo. **One line spanning the row**, keeping the row's height so nothing
             jumps — not « — » per cell, which is `Indéterminé`'s glyph, and not an empty frame,
-            which reads as a rendering fault. */}
-        {values === null && solved === null && cause !== undefined && cause !== null && (
-          <p className="text-muted-foreground absolute inset-0 flex items-center px-3 text-xs">
+            which reads as a rendering fault. The five boxes above are label-less while it stands, so
+            the line *replaces* the cells instead of painting over them (ticket 31, **D2**). */}
+        {replaced && (
+          <p className="text-muted-foreground compact:hidden absolute inset-0 flex items-center px-3 text-xs">
             {cause}
           </p>
         )}
+        <RevealProfile grantable={revealGrantable} onClick={onReveal} />
       </ReadOutCells>
     </>
   );
@@ -326,9 +449,19 @@ function EmptyBands({
   banner,
   cause,
   cells = null,
+  onReveal,
+  revealGrantable = true,
 }: {
   banner?: ReactNode;
   cause?: string;
+  /**
+   * The pinned header's chevron. It is here too, because both of these states can be reached
+   * *while* the block is pinned — a link with an invalid span arrives on a phone — and a collapse
+   * with no way back is a collapse the user cannot undo.
+   */
+  onReveal: () => void;
+  /** Whether that way back can be *granted* — the same flag, for the same reason. */
+  revealGrantable?: boolean;
   /**
    * § 7's cause sentence for the read-out row. `null` for the pre-measurement frame, where nothing
    * was attempted and five bare labels are the correct rendering; a **sentence** under the
@@ -356,13 +489,21 @@ function EmptyBands({
       <ViewStripSlot />
       <ReadOutCells>
         {READ_OUT_CELLS.map((cell) => (
-          <ReadOutCell className={cell.narrow} key={cell.label} label={cell.label} />
+          <ReadOutCell
+            className={cn(cell.narrow, cell.pinned)}
+            key={cell.label}
+            // The pre-measurement frame keeps its five labels — nothing was attempted, and that *is*
+            // the Skeleton's own content. Under the geometric exception the cause line occupies the
+            // row instead, so the labels go with it (ticket 31, **D2**).
+            label={cells === null ? cell.label : undefined}
+          />
         ))}
         {cells !== null && (
-          <p className="text-muted-foreground absolute inset-0 flex items-center px-3 text-xs">
+          <p className="text-muted-foreground compact:hidden absolute inset-0 flex items-center px-3 text-xs">
             {cells}
           </p>
         )}
+        <RevealProfile grantable={revealGrantable} onClick={onReveal} />
       </ReadOutCells>
     </>
   );

@@ -58,6 +58,8 @@ const ROWS: ReadonlyArray<{ id: QuantityId; value: number; expected: string }> =
   { id: "anchorHeight", value: 12, expected: "12,0 m" },
   // No first-run value: the Stations exist in imported mode only, at the file's 0,1 m grain.
   { id: "station", value: 87.42, expected: "87,4 m" },
+  // § 4's own printed « Alt. base A 540,4 m » — an altitude in the file's frame, not a difference.
+  { id: "zBase", value: 540.44, expected: "540,4 m" },
   { id: "D_target", value: 6, expected: "6,00 m" },
   { id: "H_target", value: 2535.2, expected: "253,5 daN" },
   { id: "L0", value: 151.644, expected: "151,64 m" },
