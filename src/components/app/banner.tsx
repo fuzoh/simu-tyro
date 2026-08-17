@@ -24,6 +24,7 @@ import type { BannerOccupant } from "@/lib/app/banner.ts";
 import type { FieldId } from "@/lib/rail/fields.ts";
 import type { VerdictState } from "@/lib/sim";
 
+import { Button } from "@/components/ui/button.tsx";
 import { CHOOSE_REGIME_LABEL, JUMP_LABEL } from "@/lib/app/banner.ts";
 import { DIAGNOSTIC_ACTION } from "@/lib/app/refusals.ts";
 import { CENTRE_IN_RAIL } from "@/lib/layout/collapse.ts";
@@ -54,7 +55,7 @@ export function jumpToField(field: FieldId): void {
 /** The verdict's five states, as the two tints the rest of the app already uses for them. */
 const VERDICT_TONE: Record<VerdictState, string> = {
   "dans-les-limites": "text-foreground",
-  "marge-faible": "text-amber-600 dark:text-amber-400",
+  "marge-faible": "text-warning",
   "hors-limites": "text-destructive",
   "refuse-usage-interdit": "text-destructive",
   // *Attempted and unavailable* is not a failure of the line: it reads plainly, like the coverage
@@ -121,15 +122,18 @@ export function Banner({
   );
 }
 
-/** The slot's one affordance shape. A `<button>` in every case — the URL is write-only. */
+/**
+ * The slot's one affordance shape. A **button** in every case — the URL is write-only — and the
+ * registry's `outline` at `size="sm"`, which is the app's single 28 px control height. `.touch-44`
+ * is applied here, at the call site: § 5's fourth row is 44 px and the visual box is 28, so the
+ * overlay is what keeps a blocking summary's `[ voir la première ]` reachable under a thumb
+ * ([ticket 40](../../../.scratch/zipline-simulator-v1-build/issues/40-ui-coherence-and-shadcn-density.md)
+ * § 7.2). It is never baked into `ui/button.tsx`.
+ */
 function BannerButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button
-      className="border-border hover:bg-accent shrink-0 rounded-md border px-2 py-0.5 text-[11px]"
-      onClick={onClick}
-      type="button"
-    >
+    <Button className="touch-44 shrink-0" onClick={onClick} size="sm" variant="outline">
       {label}
-    </button>
+    </Button>
   );
 }

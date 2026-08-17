@@ -29,9 +29,27 @@ import type { ChangeEvent, ReactNode } from "react";
 
 import { useId } from "react";
 
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.tsx";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group.tsx";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { cn } from "@/lib/utils.ts";
 
-/** One labelled row of the Rail: control on the right, messages under the pair. */
+/**
+ * One labelled row of the Rail: control on the right, messages under the pair.
+ *
+ * The label + control pair is `ui/field.tsx`'s `Field`, re-tuned to this app's rhythm when it was
+ * added (`Field` `gap-1`) and passed `orientation="horizontal"` here — vertical only for
+ * {@link stacked}. **The messages sit outside the `Field`**, not inside it: a horizontal `Field` is
+ * one flex row, so a message declared as its child would land *beside* the control rather than
+ * under the pair. `FieldDescription` is likewise not used for them — its `last:mt-0` /
+ * `nth-last-2:-mt-1` rules assume a Field-internal stack and misfire in this wrapper's
+ * `flex-col gap-1`.
+ */
 export function Row({
   label,
   htmlFor,
@@ -59,50 +77,51 @@ export function Row({
   /** A second culprit of the same check: **error outline only**, no second copy of the message. */
   outlined?: boolean;
   /**
-   * Label above the control rather than beside it. A `<fieldset>` carries a UA
-   * `min-inline-size: min-content` and cannot shrink, so a multi-option {@link Choice} beside a
-   * wrapping label overlaps it at the Rail's 288 px.
+   * Label above the control rather than beside it — `Field`'s `vertical` orientation.
+   *
+   * It arrived as a workaround: {@link Choice} was a `<fieldset>`, and a `<fieldset>` carries a UA
+   * `min-inline-size: min-content` it cannot shrink below, so a multi-option choice beside a
+   * wrapping label overlapped it at the Rail's 288 px. `Choice` is a `RadioGroup` — a plain `<div>`
+   * — since ticket 40, so **the constraint is gone and the layout is kept**: three option labels
+   * beside a wrapping row label is still two columns too many at 288 px. The UA rule itself stays
+   * worth remembering, because it is why {@link Group} is not `FieldSet`.
    */
   stacked?: boolean;
 }) {
   return (
-    <div className="py-1">
-      <div className={cn("gap-2", stacked ? "flex flex-col" : "flex items-center")}>
+    <div className="flex flex-col gap-1 py-1">
+      <Field orientation={stacked ? "vertical" : "horizontal"}>
         {/* The label **wraps**, never truncates: at 288 px « Hauteur d'ancrage A » and its B twin
             would clip to the same string, and a control the user cannot tell apart is worse than
             a row two lines tall. */}
-        <label
-          className="text-muted-foreground min-w-0 flex-1 text-xs leading-tight"
+        <FieldLabel
+          className="text-muted-foreground min-w-0 flex-1 leading-tight"
           htmlFor={htmlFor}
           title={label}
         >
           {label}
-        </label>
+        </FieldLabel>
         {chip}
         <div
-          className={cn(
-            "flex items-center gap-1",
-            outlined && "ring-destructive rounded-sm ring-1",
-          )}
+          className={cn("flex shrink-0 items-center gap-1", outlined && "ring-destructive ring-1")}
         >
           {control}
           {hint !== undefined && (
-            <span className="text-muted-foreground w-8 shrink-0 text-[11px]">{hint}</span>
+            <span className="text-muted-foreground w-8 shrink-0 text-xs">{hint}</span>
           )}
         </div>
-      </div>
-      {message !== undefined && (
-        <p
-          className={cn(
-            "mt-0.5 text-[11px]",
-            message.blocking ? "text-destructive" : "text-muted-foreground",
-          )}
-        >
-          {message.text}
-        </p>
-      )}
+      </Field>
+      {message !== undefined &&
+        // ⛔ is a `FieldError` — `role="alert"`, so a blocking state announces itself. The empty
+        // state is **not** an error and must not: « Saisie en cours » is ordinary typing, and
+        // announcing it would make every cleared field feel like a fault.
+        (message.blocking ? (
+          <FieldError errors={[{ message: message.text }]} />
+        ) : (
+          <p className="text-muted-foreground text-xs">{message.text}</p>
+        ))}
       {warning !== undefined && warning !== null && (
-        <p className="mt-0.5 text-[11px] text-amber-600 dark:text-amber-400">⚠ {warning}</p>
+        <p className="text-warning text-xs">⚠ {warning}</p>
       )}
       {note}
     </div>
@@ -128,24 +147,31 @@ export function Row({
  * height still fits inside its 26 px content box, so no Rail row and no layout budget moves — measured
  * at 390 × 664 and 1440 × 900 (ticket 28's dated note).
  *
- * **`px-1`, and it is the *width* half of the same decision.** 16 px mono advances 9,6 px per glyph
- * against 12 px's 7,2, so the field's capacity fell from ~8 characters to ~6 and § 3's own values
- * started being cut: at `w-20` with `px-2` (62 px of content box) « 1512,75 » measured `scrollWidth`
- * **83** against `clientWidth` **78** — the second decimal of `L₀` sliced in half, and that decimal is
- * the one § 3's *Display precision per quantity* exists to protect (« 1 déc. = 0,21 m de flèche,
- * 0,20 m de garde, 8 % de la marge »), against a promise that « the field shows exactly what state
- * holds ». Any span ≥ 1000 m under the `L₀` driver spends 7 characters, and § 5's published set has
- * three such lines. **The gutter pays for it, not the box**: 4 px each side is 70 px of content, which
- * fits every 7-character value § 3's decimals and hard ranges can produce, and the border box stays
- * exactly 80 × 28 — so ticket 28's « pas un pixel » re-measurement still holds, unchanged, and the
- * label column beside it does not move. **Residual, recorded rather than fixed**: 8 characters
- * (« 12345,67 », `scrollWidth` 85) still clips. The first version of this note said reaching one took a
- * value outside § 3's ranges, flagged ⛔ — false for `L₀`, and corrected here 2026-08-15 rather than left
- * to mislead. `L₀`'s tier-one rule is `{ kind: "positive" }` with no upper bound (`src/lib/rail/fields.ts`),
- * so « 12345,67 » commits by ordinary typing, reaches state and the link (`&lo=12345.67`), and is clipped
- * **silently** — no `aria-invalid`, no ⛔. What keeps it out of practice is the physical range of spans, not
- * a § 3 bound: an 8-character `L₀` needs a span near 10 km. The sentence *is* true of `H_target`, whose
- * hard range does flag (« 123456,0 », 85 / 78, ⛔ shown) — which is how it came to be written here.
+ * **The box is `w-24`, and the 4 px extra over amendment G's 80 px is a measured repair, not a
+ * drift. Ticket 40, 2026-08-16.** The gutter used to be 4 px, and that gutter was the *width* half
+ * of the 16 px decision: 16 px mono advances 9,6 px per glyph against 12 px's 7,2, so `w-20` over
+ * the registry's 10 px gutter leaves **58 px of content box — six characters**. Any span ≥ 1000 m
+ * under the `L₀` driver spends **seven** (« 1512,75 », « 2000,00 »), and § 5's published set has
+ * three such lines: measured `scrollWidth` **87** against `clientWidth` **78**, the second decimal
+ * of `L₀` sliced in half. That decimal is the one § 3's *Display precision per quantity* exists to
+ * protect (« 1 déc. = 0,21 m de flèche, 0,20 m de garde, 8 % de la marge »), against a promise that
+ * « the field shows exactly what state holds » — and it clipped **silently**, with no `aria-invalid`
+ * and no ⛔, because `L₀`'s tier-one rule is `{ kind: "positive" }` with no upper bound
+ * (`src/lib/rail/fields.ts`).
+ *
+ * Two repairs existed and **both were measured at the 288 px Rail** rather than argued:
+ * re-instating `px-1` costs nothing but carves an exception out of § 6's padding rule, which
+ * [ticket 40](../../../.scratch/zipline-simulator-v1-build/issues/40-ui-coherence-and-shadcn-density.md)'s
+ * Gate greps out of `src/` outright; `w-24` keeps the rhythm and costs **2 px of total Rail height**
+ * — one label (`h_rider`) wraps to a second line, 546 px of rows becoming 548. **The rhythm was
+ * kept and the 2 px spent.** 96 px over a 10 px gutter is 74 px of content, 7,7 characters, so the
+ * seven-character case fits with a glyph to spare. Amendment G decision 5's lock is the **16 px
+ * type and the 28 px height**, both unchanged; the 80 px width it records was never the locked
+ * term.
+ *
+ * The View Strip's « x » field is `w-21`, not this, and the difference is deliberate: it renders
+ * `x_D` at one decimal — « 2000,0 », six characters — and § 5's 44 px row has 17 px of measured
+ * slack, which 96 px would spend for capacity that quantity never needs.
  */
 export function NumericInput({
   id,
@@ -163,12 +189,13 @@ export function NumericInput({
   onBlur: (raw: string) => void;
 }) {
   return (
-    <input
+    // `text-base` is passed **at the call site and wins**: `ui/input.tsx`'s base is `text-xs`, and
+    // the `md:text-xs` duplicate `base-lyra` ships — which tailwind-merge scores in a different
+    // conflict group and would have re-imposed 12 px at ≥768 px — was removed when the component
+    // was added. `aria-invalid` alone paints the invalid border; the registry owns that rule.
+    <Input
       aria-invalid={invalid || undefined}
-      className={cn(
-        "border-border h-7 w-20 rounded-md border bg-transparent px-1 text-right font-mono text-base",
-        invalid && "border-destructive",
-      )}
+      className="w-24 text-right font-mono text-base"
       // Enter commits and blurs: on iOS there is otherwise no way to dismiss the keypad.
       enterKeyHint="done"
       id={id}
@@ -208,25 +235,28 @@ export function Picker<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <select
-      className="border-border h-7 max-w-40 rounded-md border bg-transparent px-1 text-xs"
+    // **`native-select`, never `select`.** Base UI's `select` is a popup and would replace the OS
+    // picker on mobile — a behaviour change nobody decided. This one styles the native element.
+    <NativeSelect
+      className="max-w-40"
       id={id}
       onChange={(event) => onChange(event.target.value as T)}
+      size="sm"
       value={value}
     >
-      {value === "" && <option value="">— choisir —</option>}
+      {value === "" && <NativeSelectOption value="">— choisir —</NativeSelectOption>}
       {options.map((option) => (
-        <option disabled={option.disabled} key={option.value} value={option.value}>
+        <NativeSelectOption disabled={option.disabled} key={option.value} value={option.value}>
           {option.disabled === true ? `${option.label} — indisponible` : option.label}
-        </option>
+        </NativeSelectOption>
       ))}
-    </select>
+    </NativeSelect>
   );
 }
 
 /** Why an option cannot be chosen — one per row, in the row's own full-width note slot. */
 export function DisabledReason({ reason }: { reason: string }) {
-  return <p className="text-muted-foreground mt-0.5 text-[10px]">ℹ {reason}</p>;
+  return <p className="text-muted-foreground text-xs">ℹ {reason}</p>;
 }
 
 /** A two-or-three-way choice rendered in full, because the options are the teaching. */
@@ -242,37 +272,38 @@ export function Choice<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <fieldset className="flex flex-col gap-0.5">
+    // `RadioGroup` ships `gap-2`, which is § 6's *between rows* gap; these are options **inside** one
+    // row, so the call site says `gap-1`. Decided here rather than by a third re-tune of `ui/`.
+    //
+    // It also renders a `<div role="radiogroup">`, which retires the `<fieldset>` this control used
+    // to be — and with it the UA `min-inline-size: min-content` that {@link Row.stacked} exists to
+    // work around. `stacked` stays because label-above is still the right shape at 288 px.
+    <RadioGroup
+      className="gap-1"
+      name={name}
+      onValueChange={(next: unknown) => onChange(next as T)}
+      value={value}
+    >
       {options.map((option) => (
-        <label
-          className={cn(
-            "flex items-center gap-1.5 text-xs",
-            option.disabled === true && "text-muted-foreground",
-          )}
+        <Label
+          className={cn("gap-1", option.disabled === true && "text-muted-foreground")}
           key={option.value}
         >
-          <input
-            checked={value === option.value}
-            disabled={option.disabled}
-            name={name}
-            onChange={() => onChange(option.value)}
-            type="radio"
-            value={option.value}
-          />
+          <RadioGroupItem disabled={option.disabled} value={option.value} />
           <span>
             {option.label}
             {option.disabled === true && " — indisponible"}
           </span>
-        </label>
+        </Label>
       ))}
       {options
         .filter((option) => option.disabled === true && option.reason)
         .map((option) => (
-          <p className="text-muted-foreground pl-5 text-[10px]" key={`${option.value}-reason`}>
+          <p className="text-muted-foreground pl-5 text-xs" key={`${option.value}-reason`}>
             ℹ {option.reason}
           </p>
         ))}
-    </fieldset>
+    </RadioGroup>
   );
 }
 
@@ -287,22 +318,27 @@ export function Segmented<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div className="border-border flex overflow-hidden rounded-md border">
+    // `spacing={0}` is what makes a `ToggleGroup` *segmented*: the registry's own
+    // `data-[spacing=0]` rules collapse the shared borders and square every corner. **A driver has
+    // no empty state**, so pressing the pressed segment is ignored rather than clearing the group —
+    // Base UI reports the deselect as an empty array, and there is no « aucun » tightness driver.
+    <ToggleGroup
+      className="w-full"
+      onValueChange={(next: string[]) => {
+        const [picked] = next;
+        if (picked !== undefined) onChange(picked as T);
+      }}
+      size="sm"
+      spacing={0}
+      value={[value]}
+      variant="outline"
+    >
       {options.map((option) => (
-        <button
-          aria-pressed={value === option.value}
-          className={cn(
-            "flex-1 px-2 py-1 text-xs",
-            value === option.value ? "bg-accent font-medium" : "text-muted-foreground",
-          )}
-          key={option.value}
-          onClick={() => onChange(option.value)}
-          type="button"
-        >
+        <ToggleGroupItem className="flex-1" key={option.value} value={option.value}>
           {option.label}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }
 
@@ -324,19 +360,24 @@ export function Chip({
   const id = useId();
   return (
     <details className="relative shrink-0">
-      <summary
+      {/* `Badge` renders **as the `<summary>`**, which is the one composition that keeps the
+          disclosure working: `Badge` is a `useRender` span with no semantics of its own, where
+          `Button` *enforces* button semantics and would put `role="button"` on the summary. */}
+      <Badge
         className={cn(
-          "cursor-pointer list-none rounded px-1 text-[10px] whitespace-nowrap",
-          tone === "warning"
-            ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-            : "bg-muted text-muted-foreground",
+          "cursor-pointer list-none",
+          tone === "warning" ? "bg-warning/15 text-warning" : "bg-muted text-muted-foreground",
         )}
         id={id}
-      >
-        {tone === "warning" ? "⚠ " : ""}
-        {label}
-      </summary>
-      <p className="bg-popover border-border absolute right-0 z-10 mt-1 w-64 rounded-md border p-2 text-[11px] whitespace-pre-line shadow-md">
+        render={
+          <summary>
+            {tone === "warning" ? "⚠ " : ""}
+            {label}
+          </summary>
+        }
+        variant="secondary"
+      />
+      <p className="bg-popover border-border absolute right-0 z-10 mt-1 w-64 border px-3 py-2 text-xs whitespace-pre-line shadow-md">
         {detail}
       </p>
     </details>
@@ -364,17 +405,18 @@ export function ReadOut({
   children?: ReactNode;
 }) {
   return (
-    <div className="py-0.5">
-      <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-1 py-1">
+      <div className="flex items-center gap-1">
         <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs" title={label}>
           {label}
         </span>
         {chip}
-        {value !== null && <span className="font-mono text-xs">{value}</span>}
+        {/* A computed quantity: mono, and right-aligned because the label beside it is `flex-1`. */}
+        {value !== null && <span className="text-right font-mono text-xs">{value}</span>}
         {children}
       </div>
       {warning !== undefined && warning !== null && (
-        <p className="mt-0.5 text-[11px] text-amber-600 dark:text-amber-400">⚠ {warning}</p>
+        <p className="text-warning text-xs">⚠ {warning}</p>
       )}
     </div>
   );
@@ -383,12 +425,8 @@ export function ReadOut({
 /** A Fix Action. **Its label describes the effect of pressing it** — invariant 2's other half. */
 export function FixButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button
-      className="border-border hover:bg-accent rounded-md border px-2 py-0.5 text-[11px]"
-      onClick={onClick}
-      type="button"
-    >
+    <Button onClick={onClick} size="sm" type="button" variant="outline">
       {label}
-    </button>
+    </Button>
   );
 }

@@ -18,6 +18,8 @@ import { useState } from "react";
 
 import type { LinkStrip } from "@/lib/app/link-strip.ts";
 
+import { Button } from "@/components/ui/button.tsx";
+
 /** The dismiss control. Labelled by its **effect**, like every other action in the app. */
 const DISMISS_LABEL = "Masquer ce message";
 
@@ -42,24 +44,28 @@ export function LinkStripNotice({
 
   return (
     <div
-      className="border-border bg-muted/40 text-muted-foreground flex items-start gap-3 border-b px-4 py-2 text-[11px]"
+      // A full-bleed bar, so `px-3` — `docs/conventions/ui.md` § *Rhythm*.
+      className="border-border bg-muted/40 text-muted-foreground flex items-start gap-3 border-b px-3 py-2 text-xs"
       ref={bandRef}
       role="status"
     >
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         {strip.ignored !== null && <p>{strip.ignored}</p>}
         {strip.completed !== null && <p>{strip.completed}</p>}
         {strip.rewritten !== null && <p>{strip.rewritten}</p>}
       </div>
-      <button
+      {/* The dismiss control is the registry's square icon button — 28 px visually, 44 px to a
+          thumb through `.touch-44` applied here rather than baked into `ui/button.tsx`. */}
+      <Button
         aria-label={DISMISS_LABEL}
-        className="text-muted-foreground hover:text-foreground shrink-0 px-1"
+        className="touch-44 text-muted-foreground hover:text-foreground shrink-0"
         onClick={() => setDismissed(true)}
+        size="icon-sm"
         title={DISMISS_LABEL}
-        type="button"
+        variant="ghost"
       >
         ✕
-      </button>
+      </Button>
     </div>
   );
 }

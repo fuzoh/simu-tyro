@@ -87,6 +87,12 @@
   --accent: oklch(0.963 0.002 197.1);
   --accent-foreground: oklch(0.218 0.008 223.9);
   --destructive: oklch(0.577 0.245 27.325);
+  /* § 7's second severity, as a token rather than as fifty `amber-*` literals — amber-600 here and
+     amber-400 in `.dark`, with the foreground being the theme's own `--background`, which is what a
+     solid warning fill is readable against in each. **One** warning role, not two: `--destructive`
+     already covers both text and chip with a single token, and this mirrors it exactly. */
+  --warning: oklch(66.6% 0.179 58.318);
+  --warning-foreground: oklch(1 0 0);
   --border: oklch(0.925 0.005 214.3);
   --input: oklch(0.925 0.005 214.3);
   --ring: oklch(0.723 0.014 214.4);
@@ -95,7 +101,10 @@
   --chart-3: oklch(0.45 0.017 213.2);
   --chart-4: oklch(0.378 0.015 216);
   --chart-5: oklch(0.275 0.011 216.9);
-  --radius: 0.625rem;
+  /* Everything rectangular is square. `base-lyra`'s own `button` and `native-select` are already
+     `rounded-none` in every size variant, so a freshly-added component needs no patch, forever. The
+     derived steps below all `calc()` from this and therefore collapse with it. */
+  --radius: 0;
   --sidebar: oklch(0.987 0.002 197.1);
   --sidebar-foreground: oklch(0.148 0.004 228.8);
   --sidebar-primary: oklch(0.218 0.008 223.9);
@@ -122,6 +131,8 @@
   --accent: oklch(0.275 0.011 216.9);
   --accent-foreground: oklch(0.987 0.002 197.1);
   --destructive: oklch(0.704 0.191 22.216);
+  --warning: oklch(82.8% 0.189 84.429);
+  --warning-foreground: oklch(0.148 0.004 228.8);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.56 0.021 213.5);
@@ -143,6 +154,11 @@
 @theme inline {
   --font-sans: "Inter Variable", sans-serif;
   --font-heading: "Manrope Variable", sans-serif;
+  /* **No mono face is bundled** — amendment L. Digits therefore differ by platform, which is a
+     choice, and `CELL_WRAP_PX` budgets a 0,62 em advance for it rather than pretending otherwise.
+     Declared even though it is close to Tailwind's own default, because an absent declaration reads
+     identical to the bug ticket 40 opened on: « a typeface referenced and never loaded ». */
+  --font-mono: ui-monospace, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -160,6 +176,8 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -241,5 +259,48 @@
     .chart-grab {
       stroke-width: 22px;
     }
+  }
+}
+
+/**
+ * § 5's touch budget as **one** utility — « ≥ 44 px on a coarse pointer », a budget § 5 spends to the
+ * pixel (`59 + 48 + 44 + 128 + 24 = 303` in the View Strip) against an app whose one control height
+ * is **28 px visually**. It is the generalisation of the two places that already close that gap by
+ * hand: `view-strip.tsx`'s `after:-inset-y-1.5` on a 32 px button, and `.chart-grab`'s transparent
+ * stroke on the rider.
+ *
+ * The technique is theirs. **The visual does not grow** — a 44 px control leaves a 44 px row no
+ * padding at all — and the *hit box* is an empty `::after` centred on the element, which costs the
+ * layout nothing because an absolutely positioned box is out of flow, and costs a button nothing
+ * because generated content is the element's own hit surface. So a 28 × 28 icon button reaches
+ * 44 × 44 by bleeding 8 px past each edge and no neighbour moves.
+ *
+ * Three choices worth their line:
+ *
+ * - **`min-width`/`min-height` over a fixed 44 px**: the overlay is the element's *own* box wherever
+ *   that box is already legal, so a full-width row gets height alone and keeps its width.
+ * - **It owns `position: relative`**, since the overlay needs a containing block; applying it to an
+ *   already-positioned element is therefore not a thing to do.
+ * - **No `@media (pointer: coarse)` arm.** A touchscreen laptop reports `fine`, so the query would
+ *   miss exactly the machines that need it; a larger target costs a mouse nothing. `.chart-grab`
+ *   gates its *increase* on the query because it has a 36 px base to increase from — here the base
+ *   is the whole point.
+ *
+ * Applied at call sites and **never baked into a `src/components/ui/` component**: components stay
+ * re-`add`-able, and the touch policy stays one grep.
+ */
+@utility touch-44 {
+  position: relative;
+
+  &::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    min-width: 44px;
+    min-height: 44px;
+    content: "";
+    translate: -50% -50%;
   }
 }

@@ -53,6 +53,10 @@ import type { ParseFailure } from "@/lib/terrain/csv.ts";
 import { RailSection } from "@/components/app/shell.tsx";
 import { useAppDispatch, useAppState } from "@/components/app/store.tsx";
 import { browserStorage } from "@/components/app/use-persist.ts";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button, buttonVariants } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.tsx";
 import { COPY_INCOMPLETE, copyLink } from "@/lib/app/persist.ts";
 import { formatQuantity, formatValue } from "@/lib/format/quantity.ts";
 import {
@@ -83,6 +87,7 @@ import {
 } from "@/lib/sim";
 import { parseFailureMessage, parseProfileCsv, readFailure } from "@/lib/terrain/csv.ts";
 import { encodeP1 } from "@/lib/url/p1.ts";
+import { cn } from "@/lib/utils.ts";
 
 import {
   Chip,
@@ -295,7 +300,8 @@ export function RailInputs({
   /**
    * § 10.1's « une entrée indisponible montre sa raison », for the régime row. **One reason per
    * row, not one per disabled option** — `Picker`'s docblock argues that at 288 px, and the rule
-   * applies here even though this select is hand-rolled. Today at most one régime is ever
+   * applies here too — this select is spelled out rather than going through `Picker` only because
+   * it carries a ref for the « choisir un autre régime » Fix Action. Today at most one régime is ever
    * unavailable, so the first is the reason; if a second ever were, they would share a cause and
    * the sentence would be the same twice.
    */
@@ -341,8 +347,8 @@ export function RailInputs({
             />
             <Row
               control={
-                <select
-                  className="border-border h-7 max-w-44 rounded-md border bg-transparent px-1 text-xs"
+                <NativeSelect
+                  className="max-w-44"
                   id="rail-regime"
                   onChange={(event) =>
                     patch({
@@ -351,10 +357,11 @@ export function RailInputs({
                     })
                   }
                   ref={regimePicker}
+                  size="sm"
                   value={scenario.regime ?? ""}
                 >
                   {/* No default, and its absence is legitimate state — never a hole to fill. */}
-                  <option value="">— choisir —</option>
+                  <NativeSelectOption value="">— choisir —</NativeSelectOption>
                   {Object.values(REGIMES).map((regime) => {
                     const unavailable = !isRegimeAvailable(
                       regime.id,
@@ -362,14 +369,14 @@ export function RailInputs({
                       scenario.usage,
                     );
                     return (
-                      <option disabled={unavailable} key={regime.id} value={regime.id}>
+                      <NativeSelectOption disabled={unavailable} key={regime.id} value={regime.id}>
                         {/* `— indisponible` is `Picker`'s and `Choice`'s own convention, and it
                             says *that*; § 10.1's *why* is the row's note below. */}
                         {unavailable ? `${regime.label} — indisponible` : regime.label}
-                      </option>
+                      </NativeSelectOption>
                     );
                   })}
-                </select>
+                </NativeSelect>
               }
               htmlFor="rail-regime"
               label={FIELDS.regime.label}
@@ -387,7 +394,7 @@ export function RailInputs({
                   <>
                     {regimeReason !== null && <DisabledReason reason={regimeReason} />}
                     {regimeBreach !== undefined && regimeBreach.fixes.length > 0 && (
-                      <div className="mt-1 flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-1">
                         {regimeBreach.fixes.map((fix) => (
                           <FixButton
                             key={fix.id}
@@ -429,8 +436,11 @@ export function RailInputs({
               }}
               trace={trace}
             />
-            {/* A **button, not a drop zone**: the chart already carries three drag targets. */}
-            <input
+            {/* A **button, not a drop zone**: the chart already carries three drag targets. The
+                file element itself is never seen — it is the mechanism `Importer un profil…`
+                clicks — but it goes through the registry all the same, so « no `<input>` outside
+                `ui/` » stays one grep with no exception to remember. */}
+            <Input
               accept=".csv,text/csv"
               className="hidden"
               onChange={(event) => {
@@ -473,7 +483,7 @@ export function RailInputs({
               }
               note={
                 familyBreach !== undefined ? (
-                  <div className="mt-1 flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1">
                     {familyBreach.fixes.map((fix) => (
                       <FixButton key={fix.id} label={fix.label} onClick={() => runFix(fix.id)} />
                     ))}
@@ -808,7 +818,7 @@ export function RailInputs({
               never have the banner in view. It replaces the five solve-dependent rows — `L₀`,
               `H à vide`, la flèche à vide, `flèche / portée`, la tension permanente — and never
               `corde` or `w`, which are independent of a solve and stay above it. */}
-          {cause !== null && <p className="text-muted-foreground mt-1 text-[11px]">{cause}</p>}
+          {cause !== null && <p className="text-muted-foreground mt-1 text-xs">{cause}</p>}
         </div>
       </RailSection>
     </RailRow.Provider>
@@ -884,7 +894,7 @@ function NumericRow({
             <>
               {note}
               {breach !== undefined && breach.fixes.length > 0 && (
-                <div className="mt-1 flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1">
                   {breach.fixes.map((fix) => (
                     <FixButton key={fix.id} label={fix.label} onClick={() => runFix(fix.id)} />
                   ))}
@@ -955,9 +965,8 @@ export function RailHeaderControls({
 
   return (
     <div className="ml-auto flex items-center gap-2">
-      <select
+      <NativeSelect
         aria-label="Unité de force"
-        className="border-border h-7 rounded-md border bg-transparent px-1 text-xs"
         onChange={(event) =>
           // **A unit switch never writes state.** `u` selects how forces *read*, nothing more.
           dispatch({
@@ -965,28 +974,39 @@ export function RailHeaderControls({
             patch: { ...state.scenario, unit: event.target.value as ForceUnit },
           })
         }
+        size="sm"
         value={state.scenario.unit}
       >
-        <option value="daN">daN</option>
-        <option value="kN">kN</option>
-        <option value="kgf">kgf</option>
-      </select>
-      <button
-        className="border-border hover:bg-accent h-7 rounded-md border px-2 text-xs disabled:opacity-50"
+        <NativeSelectOption value="daN">daN</NativeSelectOption>
+        <NativeSelectOption value="kN">kN</NativeSelectOption>
+        <NativeSelectOption value="kgf">kgf</NativeSelectOption>
+      </NativeSelect>
+      <Button
         disabled={incomplete}
         onClick={() => void copy()}
+        size="sm"
         title={incomplete ? COPY_INCOMPLETE : undefined}
         type="button"
+        variant="outline"
       >
         Copier le lien
-      </button>
+      </Button>
       <details className="relative">
-        <summary className="border-border cursor-pointer list-none rounded-md border px-2 py-0.5 text-xs">
+        {/* `buttonVariants` as a class string, not `<Button render={<summary />}>`: Base UI's
+            `Button` **enforces button semantics** and would stamp `role="button"` on the summary,
+            which is the one element in this menu whose own semantics open the disclosure. Same
+            pattern as `__root.tsx` and `refusal.tsx`. */}
+        <summary
+          className={cn(
+            buttonVariants({ variant: "outline", size: "icon-sm" }),
+            "cursor-pointer list-none",
+          )}
+        >
           ⋯
         </summary>
-        <div className="bg-popover border-border absolute right-0 z-10 mt-1 w-64 rounded-md border p-2 shadow-md">
-          <button
-            className="hover:bg-accent w-full rounded px-1 py-1 text-left text-xs"
+        <div className="bg-popover border-border absolute right-0 z-10 mt-1 flex w-64 flex-col gap-1 border px-3 py-2 shadow-md">
+          <Button
+            className="h-auto w-full flex-col items-start gap-1 py-1 text-left whitespace-normal"
             onClick={() => {
               dispatch({ type: "scénario/réinitialisé" });
               // Back to a **bare** `/`, with `replace` — never `push`: a pushed entry would make
@@ -994,19 +1014,21 @@ export function RailHeaderControls({
               // are debounced and suspended under « Saisie en cours ».
               void navigate({ replace: true, search: {}, to: "/" });
             }}
+            size="sm"
             type="button"
+            variant="ghost"
           >
             <span className="font-medium">Réinitialiser le scénario</span>
             {/* The menu item states its own consequence — there is no confirmation, and that is a
                 decision: a dialog on a non-destructive action trains the user to click through the
                 one that guards real data loss. */}
-            <span className="text-muted-foreground block text-[11px]">
+            <span className="text-muted-foreground block text-xs font-normal">
               Revient aux valeurs de départ. Le tracé importé est retiré du terrain mais reste en
               mémoire.
             </span>
-          </button>
-          <button
-            className="hover:bg-accent text-destructive w-full rounded px-1 py-1 text-left text-xs"
+          </Button>
+          <Button
+            className="text-destructive h-auto w-full flex-col items-start gap-1 py-1 text-left whitespace-normal"
             onClick={() => {
               const storage = browserStorage();
               if (storage === null) return;
@@ -1020,19 +1042,21 @@ export function RailHeaderControls({
               if (!window.confirm(`${CLEAR_SESSION_CONFIRM}${extra}`)) return;
               clearSession(storage);
             }}
+            size="sm"
             type="button"
+            variant="ghost"
           >
             <span className="font-medium">Effacer la session</span>
-            <span className="text-muted-foreground block text-[11px]">
+            <span className="text-muted-foreground block text-xs font-normal">
               Supprime le tracé en mémoire, la spec conservée et les préférences d'affichage.
             </span>
-          </button>
+          </Button>
         </div>
       </details>
       {copied !== null && (
         // The outcome stands until the next copy, and is never dismissed on a timer: a refusal
         // that vanishes on its own is a refusal the reader may never have seen.
-        <span aria-live="polite" className="text-muted-foreground max-w-64 text-[11px]">
+        <span aria-live="polite" className="text-muted-foreground max-w-64 text-xs">
           {copied}
         </span>
       )}
@@ -1044,12 +1068,19 @@ export function RailHeaderControls({
 const CLEAR_SESSION_CONFIRM =
   "Effacer la session supprime le tracé en mémoire, la Material Spec conservée et les préférences d'affichage. Continuer ?";
 
-/** One of § 3's five `Paramètres` groups. */
+/**
+ * One of § 3's five `Paramètres` groups.
+ *
+ * A `<section>` with an `<h3>`, **not `ui/field.tsx`'s `FieldSet` / `FieldLegend`**: those render a
+ * `<fieldset>`, whose UA `min-inline-size: min-content` cannot shrink — the exact hazard
+ * {@link Row}'s `stacked` docblock records at the Rail's 288 px. The rows inside carry their own
+ * `py-1`, so the group adds no gap of its own.
+ */
 function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
-      <h3 className="text-foreground/70 text-[11px] font-semibold">{title}</h3>
-      <div className="mt-0.5">{children}</div>
+      <h3 className="text-foreground/70 text-xs font-semibold">{title}</h3>
+      <div className="mt-1">{children}</div>
     </section>
   );
 }
@@ -1078,35 +1109,23 @@ function FileControls({
   const cached = geometrySource === "manual" && trace !== null;
   const name = trace?.fileName;
   return (
-    <div className="mt-1">
+    <div className="flex flex-col gap-1 py-1">
       <div className="flex flex-wrap items-center gap-1">
-        <button
-          className="border-border hover:bg-accent rounded-md border px-2 py-0.5 text-[11px]"
-          onClick={onChoose}
-          type="button"
-        >
+        <Button onClick={onChoose} size="sm" type="button" variant="outline">
           Importer un profil…
-        </button>
+        </Button>
         {active && (
-          <button
-            className="border-border hover:bg-accent rounded-md border px-2 py-0.5 text-[11px]"
-            onClick={onRemove}
-            type="button"
-          >
+          <Button onClick={onRemove} size="sm" type="button" variant="outline">
             Retirer le tracé
-          </button>
+          </Button>
         )}
         {cached && (
-          <button
-            className="border-border hover:bg-accent rounded-md border px-2 py-0.5 text-[11px]"
-            onClick={onReuse}
-            type="button"
-          >
+          <Button onClick={onReuse} size="sm" type="button" variant="outline">
             Réutiliser ce tracé
-          </button>
+          </Button>
         )}
       </div>
-      <p className="text-muted-foreground mt-0.5 text-[11px]">
+      <p className="text-muted-foreground text-xs">
         {active
           ? // A link carries the payload but not the filename.
             (name ?? "tracé reçu par lien")
@@ -1117,11 +1136,11 @@ function FileControls({
             : "(aucun tracé)"}
       </p>
       {failure !== null && (
-        <div className="mt-1">
+        <div className="flex flex-col gap-1">
           {/* **Inline beneath the control, never in the banner slot** — nothing about the current
               line changed, and a rejected file leaves the current terrain untouched. */}
-          <p className="text-destructive text-[11px]">⛔ {parseFailureMessage(failure)}</p>
-          <div className="mt-1">
+          <p className="text-destructive text-xs">⛔ {parseFailureMessage(failure)}</p>
+          <div className="flex flex-wrap gap-1">
             <FixButton label="Choisir un autre fichier" onClick={onChoose} />
           </div>
         </div>
@@ -1207,10 +1226,13 @@ function DerivedRow({
       <div className="flex items-start justify-end gap-1">{chip}</div>
       {children}
       {stale && formula !== null && (
-        <div className="mt-0.5 flex flex-wrap items-center gap-2">
-          <span className="text-[11px] text-amber-600 dark:text-amber-400">
-            ⚠ la formule donne {formatQuantity(quantity, formula, unit)}
-          </span>
+        <div className="flex flex-wrap items-center gap-1">
+          {/* The stale marker is a chip, and the quantity inside it is mono like every other
+              computed value — the sentence around it is prose and stays sans. */}
+          <Badge className="bg-warning/15 text-warning" variant="secondary">
+            ⚠ la formule donne
+            <span className="font-mono">{formatQuantity(quantity, formula, unit)}</span>
+          </Badge>
           <FixButton label="Recalculer" onClick={onRecalculate} />
         </div>
       )}
@@ -1247,8 +1269,15 @@ function ClampNote({ event }: { event: ClampEvent }) {
   }, [event]);
 
   return (
-    <span aria-live="polite" className="text-muted-foreground block text-[11px]" role="status">
-      {shown === null ? "" : `position ramenée à la portée : 0 – ${formatValue("x_D", shown.L)} m`}
+    <span aria-live="polite" className="text-muted-foreground block text-xs" role="status">
+      {shown === null ? (
+        ""
+      ) : (
+        <>
+          position ramenée à la portée :{" "}
+          <span className="font-mono">0 – {formatValue("x_D", shown.L)}</span> m
+        </>
+      )}
     </span>
   );
 }
@@ -1262,5 +1291,5 @@ function ClampNote({ event }: { event: ClampEvent }) {
  */
 function AmbientNote({ text }: { text: string | null }) {
   if (text === null) return null;
-  return <p className="text-muted-foreground mt-0.5 text-[10px]">{text}</p>;
+  return <p className="text-muted-foreground text-xs">{text}</p>;
 }

@@ -26,6 +26,7 @@ import { flushSync } from "react-dom";
 
 import type { CollapseState } from "@/lib/layout/collapse.ts";
 
+import { Button } from "@/components/ui/button.tsx";
 import {
   CENTRE_IN_RAIL,
   centresOnFocus,
@@ -71,12 +72,22 @@ export const RAIL_SECTIONS = [
  * Below B1 they wrap to three columns in § 5's order — `T anc. A · T anc. B · Pente` over
  * `Garde min` (two columns) `· Flèche` — which is why each row carries its own narrow-width
  * placement rather than falling out of source order. **Wrapping a label is benign; clipping a value
- * is not**, and the value is what binds: `font-mono text-lg` needs ≈605 px for five cells.
+ * is not**, and the value is what binds: `font-mono text-lg` needs ≈622 px for five cells.
+ *
+ * **`624` is `CELL_WRAP_PX`, and it is written out because a Tailwind arbitrary container query
+ * cannot read a TypeScript constant.** `@/lib/layout/contract.ts` is the source of truth; every
+ * `@max-[624px]` / `@min-[624px]` in this file and in `view-strip.tsx` is that constant spelled by
+ * hand, and `contract.test.ts` builds its expected class strings from it so the two cannot drift.
+ * It moved 600 → 624 with [amendment
+ * L](../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md): the app ships **no mono face**,
+ * so the five cells are budgeted at the 0,62 em advance a bare `monospace` keyword realistically
+ * resolves to — `(9 × 18 × 0,62 + 24) × 5 ≈ 622` — instead of the 0,60 em § 5 assumed, and 600 was
+ * already five pixels under its own derivation.
  */
 export const READ_OUT_CELLS = [
   {
     label: "Garde min",
-    narrow: "@max-[600px]:order-4 @max-[600px]:col-span-2",
+    narrow: "@max-[624px]:order-4 @max-[624px]:col-span-2",
     /**
      * The Pinned Safety Header's **one live cell**: it *is* the row there, at one touch height
      * rather than {@link CELL_ROW}. It is « Garde min » and not one of the other four because
@@ -85,10 +96,10 @@ export const READ_OUT_CELLS = [
      */
     pinned: "pinned:h-[var(--pinned-cell)] pinned:flex-1",
   },
-  { label: "T anc. A", narrow: "@max-[600px]:order-1", pinned: "pinned:hidden" },
-  { label: "T anc. B", narrow: "@max-[600px]:order-2", pinned: "pinned:hidden" },
-  { label: "Pente", narrow: "@max-[600px]:order-3", pinned: "pinned:hidden" },
-  { label: "Flèche", narrow: "@max-[600px]:order-5", pinned: "pinned:hidden" },
+  { label: "T anc. A", narrow: "@max-[624px]:order-1", pinned: "pinned:hidden" },
+  { label: "T anc. B", narrow: "@max-[624px]:order-2", pinned: "pinned:hidden" },
+  { label: "Pente", narrow: "@max-[624px]:order-3", pinned: "pinned:hidden" },
+  { label: "Flèche", narrow: "@max-[624px]:order-5", pinned: "pinned:hidden" },
 ] as const;
 
 /** § 7's one `<noscript>` line: under `ssr: false` the app is a Skeleton forever without JS. */
@@ -121,7 +132,7 @@ const LAYOUT_VARS = {
   "--cell-row": `${CELL_ROW}px`,
   "--pinned-cell": `${PINNED_CELL}px`,
   // § 5's banner row, **all three of it**, because the créneau is a band like every other one: a
-  // function of the chart column's width and not of its own text. `--banner` carries the ≥ 600 px
+  // function of the chart column's width and not of its own text. `--banner` carries the ≥ 624 px
   // row and {@link BannerSlot}'s two container queries re-point it at the other two, on the same
   // two thresholds `bannerBudget()` uses — so the rendered slot *is* the term (c) budgets for, and
   // § 7's « the first real occupant lands with no reflow on hydration » holds at 390 px, where the
@@ -335,8 +346,10 @@ export function Shell({
 /** The Rail Header — the app's name plus the controls `__root.tsx` has no app bar for. */
 export function RailHeader({ children }: { children?: ReactNode }) {
   return (
-    <header className="flex h-[var(--rail-header)] shrink-0 items-center gap-2 px-4">
-      <span className="font-heading text-sm font-semibold tracking-tight">{APP_NAME}</span>
+    <header className="flex h-[var(--rail-header)] shrink-0 items-center gap-2 px-3">
+      {/* The app's name ranks by **weight and typeface**, not by size: `text-lg` is the header
+          cells' and nothing else's, and a fourth size for one word is how the eight came back. */}
+      <span className="font-heading text-xs font-semibold tracking-tight">{APP_NAME}</span>
       {children}
     </header>
   );
@@ -359,11 +372,11 @@ export function RailSection({
   children?: ReactNode;
 }) {
   return (
-    <section className="border-border border-t px-4 py-3">
+    <section className="border-border border-t px-3 py-3">
       <h2 className="font-heading text-muted-foreground flex flex-wrap items-baseline gap-x-2 text-xs font-semibold tracking-wide uppercase">
         {title}
         {aside !== undefined && aside !== null && (
-          <span className="text-muted-foreground/70 text-[10px] normal-case">{aside}</span>
+          <span className="text-muted-foreground/70 text-xs normal-case">{aside}</span>
         )}
       </h2>
       {children}
@@ -377,7 +390,7 @@ export function RailSection({
  * painting a band is a statement, and an empty verdict-coloured band reads as « rien à signaler ».
  *
  * **The reserved height is § 5's budget row for this width — 76 px below a 480 px column, 60 px
- * below 600, 44 px above — and not the height of whatever text happens to be in it.** Measured
+ * below 624, 44 px above — and not the height of whatever text happens to be in it.** Measured
  * before this was so (ticket 29, défaut 1): a flat `min-height: 44px` rendered 44 / 44 / 56 px at
  * one, two and three lines, so budget A summed to 507 against 540 and budget B to 545 against 561,
  * and `bannerBudget()` — the term collapse condition (c) spends — over-stated the block by 16–20 px.
@@ -392,7 +405,7 @@ export function RailSection({
  *   column's inner width ». A slot sized by its own text is a height that changes on a keystroke.
  *
  * It stays a `min-height`, so an occupant longer than its width's row still grows rather than
- * clipping, and the two thresholds are `CELL_WRAP_PX` (B1, 600) and `RAIL_REFLOW_PX − RAIL_WIDTH`
+ * clipping, and the two thresholds are `CELL_WRAP_PX` (B1, 624) and `RAIL_REFLOW_PX − RAIL_WIDTH`
  * (the column B2 itself produces, 480) — `bannerBudget()`'s own two, **no new breakpoint**.
  */
 export function BannerSlot({ children }: { children?: ReactNode }) {
@@ -404,8 +417,8 @@ export function BannerSlot({ children }: { children?: ReactNode }) {
     //
     // The two container queries re-point `--banner` rather than setting a second `min-height`, so
     // `compact:min-h-0` still wins the row it is owed at every width, and the ranges are disjoint —
-    // `[480, 600)` and `< 480` — so which of them applies is never a question of cascade order.
-    <div className="compact:min-h-0 compact:h-full compact:min-w-0 compact:flex-1 compact:overflow-hidden min-h-[var(--banner)] shrink-0 px-[var(--gutter)] @max-[480px]:[--banner:var(--banner-three-lines)] @min-[480px]:@max-[600px]:[--banner:var(--banner-two-lines)]">
+    // `[480, 624)` and `< 480` — so which of them applies is never a question of cascade order.
+    <div className="compact:min-h-0 compact:h-full compact:min-w-0 compact:flex-1 compact:overflow-hidden min-h-[var(--banner)] shrink-0 px-[var(--gutter)] @max-[480px]:[--banner:var(--banner-three-lines)] @min-[480px]:@max-[624px]:[--banner:var(--banner-two-lines)]">
       {children}
     </div>
   );
@@ -461,9 +474,7 @@ export function ProfileBand({
   return (
     <div className="pinned:hidden shrink-0" {...landing}>
       <div className="h-[var(--profile-badge)]">{badge}</div>
-      <div className="border-border mx-[var(--gutter)] h-[var(--profile-plot)] rounded-sm border">
-        {plot}
-      </div>
+      <div className="border-border mx-[var(--gutter)] h-[var(--profile-plot)] border">{plot}</div>
       <div className="h-[var(--handle-lane)]">{handles}</div>
       <div className="h-[var(--x-labels)]">{axis}</div>
     </div>
@@ -480,7 +491,7 @@ export function StripBand({ children }: { children?: ReactNode }) {
     return <div className="pinned:hidden h-[var(--strip)] shrink-0">{children}</div>;
   }
   return (
-    <div className="border-border pinned:hidden mx-[var(--gutter)] h-[var(--strip)] shrink-0 rounded-sm border" />
+    <div className="border-border pinned:hidden mx-[var(--gutter)] h-[var(--strip)] shrink-0 border" />
   );
 }
 
@@ -494,7 +505,11 @@ export function StripBand({ children }: { children?: ReactNode }) {
  */
 export function ViewStripSlot({ children }: { children?: ReactNode }) {
   return (
-    <div className="pinned-without-x:hidden flex h-[var(--view-strip)] shrink-0 items-center gap-3 px-[var(--gutter)] text-[11px]">
+    // `gap-2` and not `gap-3`: the row is one row of controls, and § 5's abbreviated width budget
+    // has 3 px of slack at 390 px once the `x` field is locked at 16 px — voir the re-derivation in
+    // `view-strip.tsx`. `text-xs` is the body size the whole row inherits; the `x` field opts back
+    // up to 16 px, because iOS Safari auto-zooms below it.
+    <div className="pinned-without-x:hidden flex h-[var(--view-strip)] shrink-0 items-center gap-2 px-[var(--gutter)] text-xs">
       {children}
     </div>
   );
@@ -502,7 +517,7 @@ export function ViewStripSlot({ children }: { children?: ReactNode }) {
 
 /**
  * The read-out row. Five cells in one row above B1, three columns in two rows below it —
- * `@max-[600px]` is the container query on the chart column, not on the viewport, because the
+ * `@max-[624px]` is the container query on the chart column, not on the viewport, because the
  * 288 px rail means the chart column is never the viewport.
  *
  * **In the Pinned Safety Header it stops being a grid**: four cells go, « Garde min » takes the row
@@ -522,7 +537,7 @@ export function ReadOutCells({
   scope?: { full: string; short: string };
 }) {
   return (
-    <div className="pinned:flex pinned:items-center compact:w-auto compact:h-full relative grid shrink-0 grid-cols-5 @max-[600px]:grid-cols-3">
+    <div className="pinned:flex pinned:items-center compact:w-auto compact:h-full relative grid shrink-0 grid-cols-5 @max-[624px]:grid-cols-3">
       {children}
       {/*
        * § 5's own scope label, « à la position du passager ». It is **inside** the row and costs it
@@ -535,11 +550,11 @@ export function ReadOutCells({
         // Gone in the pinned header, where it would land on {@link RevealProfile} and where the
         // row is one cell: a scope label distinguishes five values from the Rail's traverse
         // aggregate, and there is only one value left to distinguish.
-        <span className="text-muted-foreground/70 pinned:hidden absolute top-0 right-3 text-[10px]">
+        <span className="text-muted-foreground/70 pinned:hidden absolute top-0 right-3 text-xs">
           {/* Abbreviated below B1 for the same reason the View Strip's labels are: at 130 px of
               cell the full string would run over the neighbouring cell's own label. */}
-          <span className="@max-[600px]:hidden">{scope.full}</span>
-          <span className="@min-[600px]:hidden">{scope.short}</span>
+          <span className="@max-[624px]:hidden">{scope.full}</span>
+          <span className="@min-[624px]:hidden">{scope.short}</span>
         </span>
       )}
     </div>
@@ -590,7 +605,7 @@ export function RevealProfile({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       aria-controls={PROFILE_BAND_ID}
       // Not `disabled`: the request is still recorded, and a `disabled` button leaves the AT user
       // with a control that vanished from the tab order rather than one that explains itself.
@@ -598,14 +613,24 @@ export function RevealProfile({
       aria-expanded={false}
       aria-label={REVEAL_LABEL}
       // `order-last` because « Garde min » carries `order-4` below B1 and the row is a flex box
-      // here; `relative` because the « Aucun résultat » cause line is absolutely positioned over
-      // the row, and a way back out of the collapse may not sit under a sentence.
+      // here.
+      //
+      // **`size="icon-sm"` plus `.touch-44`, not a 44 px box.** The glyph is 28 px like every other
+      // control in the app, and the 44 px hit target the pinned row owes a coarse pointer comes from
+      // the utility's `::after` — the same split the View Strip's own controls make, and the reason
+      // the touch policy is one grep rather than a size variant per call site. The utility also
+      // carries the `position: relative` this button needs on its own account: the « Aucun
+      // résultat » cause line is absolutely positioned over the row, and a way back out of the
+      // collapse may not sit under a sentence.
       className={cn(
-        "pinned:flex relative order-last mr-3 hidden size-11 shrink-0 items-center justify-center rounded-md",
+        "pinned:flex touch-44 order-last mr-3 hidden shrink-0",
         // The unavailable state is *shown*, in the two channels a chevron has: the glyph's own
         // contrast and the cursor. No new French string — § 5's label is the label, and inventing
-        // copy for a state the spec never wrote down is a spec decision, not a repair.
-        grantable ? "hover:bg-accent" : "text-muted-foreground/50 cursor-not-allowed",
+        // copy for a state the spec never wrote down is a spec decision, not a repair. `ghost`
+        // carries the hover the available state wants, so the unavailable one has to take it back.
+        grantable
+          ? undefined
+          : "text-muted-foreground/50 hover:text-muted-foreground/50 cursor-not-allowed hover:bg-transparent",
       )}
       onClick={() => {
         flushSync(onClick);
@@ -616,11 +641,12 @@ export function RevealProfile({
       // Rail's `x` holds the caret — so `mousedown`'s own focus shift used to unmount the row above
       // it, move this button, and send the `click` to an ancestor. Voir `keepCaret`.
       onMouseDown={keepCaret}
+      size="icon-sm"
       title={REVEAL_LABEL}
-      type="button"
+      variant="ghost"
     >
       <span aria-hidden="true">⌄</span>
-    </button>
+    </Button>
   );
 }
 
@@ -648,7 +674,7 @@ export function ReadOutCell({
 }) {
   return (
     <div className={cn("flex h-[var(--cell-row)] flex-col justify-center px-3", className)}>
-      {label !== undefined && <span className="text-muted-foreground text-[11px]">{label}</span>}
+      {label !== undefined && <span className="text-muted-foreground text-xs">{label}</span>}
       {children}
     </div>
   );

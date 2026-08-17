@@ -26,9 +26,9 @@
  *   equivalent.
  * - **Below B1 the labels abbreviate rather than wrap** — 44 px out of `MIN_RAIL` is the tightest
  *   budget in the app — and each keeps its full string as `aria-label` and `title`.
- * - **The row's controls are 32 px of visual inside a 44 px hit target**, and a press here never
- *   moves the caret. Both are § 5 read literally rather than widened; voir `CONTROL` and
- *   `keepCaret` below, and amendment H.
+ * - **The row's controls are 28 px of visual inside a 44 px hit target**, and a press here never
+ *   moves the caret. Both are § 5 read literally rather than widened; voir `.touch-44` in
+ *   `src/styles.css`, `keepCaret` below, and amendment H.
  */
 
 import { useEffect, useState } from "react";
@@ -36,32 +36,33 @@ import { useEffect, useState } from "react";
 import type { PeekMode } from "@/lib/layout/contract.ts";
 import type { LayerToggles } from "@/lib/session/session.ts";
 
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { formatValue } from "@/lib/format/quantity.ts";
 import { keepCaret } from "@/lib/layout/collapse.ts";
 import { cn } from "@/lib/utils.ts";
 
-/** One control's two labels: the full string, and what it reads below 600 px of chart column. */
-function Label({ full, short }: { full: string; short: string }) {
+/**
+ * One control's two labels: the full string, and what it reads below B1 of chart column.
+ *
+ * **624 is `CELL_WRAP_PX`**, and it is B1 by *intent*, not by coincidence of literals: the strip
+ * abbreviates « at the same B1 threshold — no new breakpoint » (§ 5), which is the same constant the
+ * read-out cells wrap at. It moved 600 → 624 with [amendment
+ * L](../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md) — the app ships no mono face, so
+ * the five header cells are budgeted at a 0,62 em advance instead of 0,60. A Tailwind arbitrary
+ * container query cannot read the TypeScript constant, so the literal is duplicated here and in
+ * `shell.tsx`; `contract.ts`'s `CELL_WRAP_PX` is the source of truth and both move with it.
+ */
+function Abbr({ full, short }: { full: string; short: string }) {
   return (
     <>
-      <span className="@max-[600px]:hidden">{full}</span>
-      <span className="@min-[600px]:hidden">{short}</span>
+      <span className="@max-[624px]:hidden">{full}</span>
+      <span className="@min-[624px]:hidden">{short}</span>
     </>
   );
 }
-
-/**
- * § 5 states « the row is 44 px tall, **so** every control in it is a legal touch target ». That is
- * an inference, and the shipped controls did not support it: `h-8` is 32 px on **every** pointer
- * type (the app's one `@media (pointer: coarse)` rule is the rider's stroke width, nothing here).
- * The visual stays 32 px — growing it to 44 leaves the row no padding — and the **hit box** is what
- * reaches 44, through the same trick § 5 already uses for the rider's transparent stroke: an empty
- * `::after` bled 6 px past each edge, which the 44 px row absorbs exactly. It overlays the button's
- * own content, which costs a button nothing; the `x` field is *not* done this way, because an
- * overlay there would swallow the click that places the caret.
- */
-const CONTROL =
-  "border-border text-foreground relative flex h-8 items-center rounded-md border px-2 whitespace-nowrap after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-['']";
 
 /**
  * § 5's peek query, read at the event and never at render. A pointer handler only ever runs on the
@@ -86,6 +87,49 @@ const PEEK_LABEL: Record<PeekMode, { full: string; short: string }> = {
   fit: { full: "voir tout le câble", short: "tout" },
 };
 
+/** The two layer toggles' values, in § 5's order. A `LayerToggles` key, so the map below is total. */
+const LAYERS = ["unloadedLine", "chordAB"] as const satisfies readonly (keyof LayerToggles)[];
+
+/**
+ * § 5 states « the row is 44 px tall, **so** every control in it is a legal touch target ». That is
+ * an inference, and the shipped controls never supported it: the box was 32 px on **every** pointer
+ * type (the app's one `@media (pointer: coarse)` rule is the rider's stroke width, nothing here).
+ * The visual stays smaller than the row — growing it to 44 leaves the row no padding — and the
+ * **hit box** is what reaches 44, through `.touch-44`, the one utility that carries § 5's own
+ * transparent-stroke trick. The `x` field is *not* done that way: an overlay there would swallow
+ * the click that places the caret, so its `<Label>` stretches instead.
+ *
+ * **The visual box is now 28 px, not 32** — `size="sm"`, the app's one control height — so the
+ * overlay bleeds 8 px past each edge rather than 6. The **row is unchanged**: `VIEW_STRIP` is still
+ * 44 and `.touch-44` still lands inside it exactly.
+ *
+ * **The width budget, re-derived.** § 5 abbreviates below B1 and sums the abbreviated row against
+ * the 342 px of inner width a 390 px viewport leaves:
+ *
+ * ```
+ * 59 + 48 + 44 + 128 + 24 = 303   32 px box ·  8 px inline · 11 px label · 64 px field  (shipped)
+ * 67 + 55 + 44 + 153 + 20 = 339   28 px box · 10 px inline · 12 px label · 84 px field  (migrated)
+ * ```
+ *
+ * Three of the five terms moved, and none of them silently:
+ *
+ * - **the two toggles, 59 → 67 and 48 → 55.** The registry's inline padding is 2 px wider a side,
+ *   and 11 px → 12 px of label is +9 % on the glyphs — the two arbitrary sizes leave the DOM, and
+ *   12 px is the one body size.
+ * - **the `x` field, 128 → 153.** Its input is **locked at 16 px** (§ 7.1 / amendment G decision 5:
+ *   iOS Safari auto-zooms below it), and a 64 px box sized for 11 px cannot hold « 1500,0 » at 16.
+ *   At the 0,62 em advance amendment L budgets for an unbound `monospace`,
+ *   `6 × 16 × 0,62 + 20 + 2 ≈ 82`, so the box is `w-21` (84). The rest of the group scales with the
+ *   type, its three `gap-1`s do not.
+ * - **the gaps, 24 → 20.** The toggle pair is one `ToggleGroup` at § 6's in-row `gap-1` (4 px, was
+ *   12), and the row itself steps down to `gap-2`; the field's old `ml-3` goes — one spacing
+ *   mechanism between two controls, not two.
+ *
+ * « ×1 » keeps its `min-w-11`: that 44 is § 5's own figure for the abbreviated peek control, and its
+ * content (≈ 35 px at 12 px) does not reach it. 339 is inside 342 on § 5's own character-count
+ * arithmetic, which over-states — the shipped row computed 327 that way and **measured 288,33**
+ * (ticket 29) — so the real slack is wider than the 3 px printed here.
+ */
 export function ViewStrip({
   layers,
   onLayers,
@@ -121,41 +165,58 @@ export function ViewStrip({
 }) {
   return (
     <>
-      <button
-        aria-pressed={layers.unloadedLine}
-        className={cn(CONTROL, layers.unloadedLine && "bg-accent")}
-        onClick={() => onLayers({ ...layers, unloadedLine: !layers.unloadedLine })}
-        onMouseDown={keepCaret}
-        title="ligne à vide"
-        type="button"
+      {/* The two layer toggles are a genuine multi-select segmented control, so they are one
+          `ToggleGroup` rather than two `aria-pressed` buttons that happen to sit side by side —
+          `multiple`, because the two layers are independent. `gap-1` is § 6's in-row gap over the
+          registry's `spacing={2}`, decided at the call site as ticket 40 asks rather than re-tuned a
+          third time in `ui/`. */}
+      <ToggleGroup
+        className="gap-1"
+        multiple
+        onValueChange={(pressed) =>
+          onLayers({
+            unloadedLine: pressed.includes("unloadedLine"),
+            chordAB: pressed.includes("chordAB"),
+          })
+        }
+        value={LAYERS.filter((layer) => layers[layer])}
       >
-        <Label full="ligne à vide" short="à vide" />
-      </button>
+        <ToggleGroupItem
+          className="touch-44"
+          onMouseDown={keepCaret}
+          size="sm"
+          title="ligne à vide"
+          value="unloadedLine"
+          variant="outline"
+        >
+          <Abbr full="ligne à vide" short="à vide" />
+        </ToggleGroupItem>
 
-      <button
-        aria-pressed={layers.chordAB}
-        className={cn(CONTROL, layers.chordAB && "bg-accent")}
-        onClick={() => onLayers({ ...layers, chordAB: !layers.chordAB })}
-        onMouseDown={keepCaret}
-        title="corde A–B"
-        type="button"
-      >
-        <Label full="corde A–B" short="corde" />
-      </button>
+        <ToggleGroupItem
+          className="touch-44"
+          onMouseDown={keepCaret}
+          size="sm"
+          title="corde A–B"
+          value="chordAB"
+          variant="outline"
+        >
+          <Abbr full="corde A–B" short="corde" />
+        </ToggleGroupItem>
+      </ToggleGroup>
 
-      <button
+      <Button
         aria-label={PEEK_LABEL[peek].full}
         aria-pressed={peeking}
-        // `min-w-11` is § 5's own abbreviation arithmetic, restored: the row budgets
-        // `59 + 48 + 44 + 128 + 24 = 303`, and the **44** in it is this control abbreviated to
-        // « ×1 ». It shipped at 29,8 px, so the width was a spec figure missed while the height was
-        // a spec inference unmet. The 14,2 px come out of the row's 53,6 px of `ml-auto` slack.
-        className={cn(
-          CONTROL,
-          "ml-auto min-w-11 justify-center",
-          peeking && "bg-accent",
-          peek === "off" && "opacity-50",
-        )}
+        // **A `Button` and not a `Toggle`**: a `Toggle` owns `click` → `onPressedChange`, and this
+        // control's whole point is that a fine pointer *holds* it — `pointerdown` / `pointerup`
+        // with capture — while a coarse one toggles it. `aria-pressed` says what it is; the press
+        // semantics stay § 5's.
+        //
+        // `min-w-11` is § 5's own abbreviation arithmetic: the **44** in the row's width budget is
+        // this control abbreviated to « ×1 ». It shipped at 29,8 px, so the width was a spec figure
+        // missed while the height was a spec inference unmet. `size="sm"` does not reach it either
+        // (≈ 35 px at 12 px of « ×1 » plus `px-2.5`), so the floor stays.
+        className={cn("touch-44 ml-auto min-w-11", peeking && "bg-muted")}
         disabled={peek === "off"}
         // Hold on a fine pointer; a plain toggle under `(pointer: coarse)`, where a held gesture
         // has no room — and the same toggle from the keyboard, in both modes.
@@ -184,11 +245,12 @@ export function ViewStrip({
         onPointerUp={() => {
           if (!coarsePointer()) onPeek(false);
         }}
+        size="sm"
         title={PEEK_LABEL[peek].full}
-        type="button"
+        variant="outline"
       >
-        <Label full={PEEK_LABEL[peek].full} short={PEEK_LABEL[peek].short} />
-      </button>
+        <Abbr full={PEEK_LABEL[peek].full} short={PEEK_LABEL[peek].short} />
+      </Button>
 
       <PositionField L={L} onFocusChange={onPositionFocus} onX={onX} xD={xD} />
     </>
@@ -249,12 +311,17 @@ function PositionField({
   }
 
   return (
-    <label
+    <Label
       // `self-stretch` is this control's half of the 44 px hit target: the label is transparent, so
-      // filling the row's height costs nothing visually — the field keeps its 32 px box — and
-      // activating a label focuses the control it labels. **Not** the `::after` the buttons use: an
-      // overlay here would swallow the click that places the caret inside the field.
-      className="relative ml-3 flex items-center gap-1 self-stretch whitespace-nowrap"
+      // filling the row's height costs nothing visually — the field keeps its 28 px box — and
+      // activating a label focuses the control it labels. **Not** the `.touch-44` overlay the
+      // buttons carry: an overlay here would swallow the click that places the caret inside the
+      // field.
+      //
+      // `gap-1` over the registry's `gap-2` — § 6's in-row gap — and no `ml-3`: the row's own
+      // `gap-2` already separates this group from « ×1 », and two spacing mechanisms between the
+      // same two controls is the defect § 6 names.
+      className="relative flex items-center gap-1 self-stretch whitespace-nowrap"
       // **Before the blur, not after the focus.** Coming from the Rail's own « Position du
       // passager » the block is in `pinned + x`; a tap here fires this, then the Rail field's
       // `blur`, then this field's `focus` — and without the first the state would fall back to
@@ -265,14 +332,19 @@ function PositionField({
           44 px, the tightest budget in the app. */}
       <span
         aria-live="polite"
-        className="text-muted-foreground bg-background pointer-events-none absolute -top-5 right-0 rounded px-1"
+        className="text-muted-foreground bg-background pointer-events-none absolute -top-5 right-0 px-2.5"
         role="status"
       >
         {clamped === 0 ? "" : `position ramenée à la portée : 0 – ${formatValue("x_D", L)} m`}
       </span>
       <span className="text-muted-foreground">x</span>
-      <input
-        className="border-border h-8 w-16 rounded-md border bg-transparent px-2 text-right font-mono"
+      <Input
+        // **16 px, locked** — § 7.1 and amendment G decision 5: below it iOS Safari auto-zooms the
+        // viewport on focus. `ui/input.tsx` bases at `text-xs` and no longer carries the
+        // `md:text-xs` duplicate, so this override wins at every width rather than at phone widths
+        // only. `w-21` is what « 1500,0 » needs at 16 px against amendment L's 0,62 em advance —
+        // voir the row's width budget above.
+        className="w-21 text-right font-mono text-base"
         enterKeyHint="done"
         inputMode="decimal"
         onBlur={(event) => {
@@ -290,7 +362,11 @@ function PositionField({
         value={draft ?? shown}
       />
       <span className="text-muted-foreground">m</span>
-      <span className="text-muted-foreground/70">· {L > 0 ? Math.round((xD / L) * 100) : 0} %</span>
-    </label>
+      {/* The unit and the separator are prose and stay sans; the percentage is a computed quantity
+          and is mono, like every other number the engine produced. */}
+      <span className="text-muted-foreground/70">
+        · <span className="font-mono">{L > 0 ? Math.round((xD / L) * 100) : 0}</span> %
+      </span>
+    </Label>
   );
 }

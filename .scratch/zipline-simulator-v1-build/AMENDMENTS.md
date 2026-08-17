@@ -5,10 +5,11 @@
 2026-08-13 on ticket 15's re-probe, and **F** and **G** on 2026-08-14 during A12. **H–K** were taken
 2026-08-15, closing the last open decisions of the v1 build: the `pinned + x` row (**H**), the
 published first-run VE (**I**), § 7's two scrub readings (**J**), and the keyboard's focus-into-view
-with its companion ruling on `contract.test.ts` (**K**). They **supersede** the spec where they
+with its companion ruling on `contract.test.ts` (**K**). **L** was taken 2026-08-16, on ticket 40's
+UI-coherence pass, and moves § 5's B1 threshold. They **supersede** the spec where they
 collide, and the spec's affected paragraphs point here. Everything else in the spec stands.
 
-This file is the single source of truth for **all eleven**. Do not copy their content into a ticket —
+This file is the single source of truth for **all twelve**. Do not copy their content into a ticket —
 tickets link here. A build decision that amends the spec gets a letter here; one that only records
 how a ticket was executed does not.
 
@@ -825,3 +826,71 @@ on whitespace, which the formatter is free to reorder and rewrap, and which cann
 the two tokens merely being *discussed* in the comment above the element. **No new source-text
 assertion is added**, which is why amendment H's fix carries a docblock and browser evidence instead
 of a guard.
+
+---
+
+## L · The app ships no mono face, and B1 moves to 624 px
+
+**Taken 2026-08-16**, on the user report that opened
+[ticket 40](./issues/40-ui-coherence-and-shadcn-density.md) (« multiple fonts, multiple input and
+text sizes, different paddings ») and the interview that followed it.
+
+**Supersedes** § 5's B1 threshold — « largeur de la **colonne graphique** < 600 px » in the
+breakpoint table, the « ≈605 px for five cells » derivation beside it, and the 600 px figure in the
+§ 13 acceptance row. **B1 is now 624 px.**
+
+**The normative rules live in [`docs/conventions/ui.md` § *Design defaults*](../../docs/conventions/ui.md)**,
+not here — three type sizes, the mono rule, `--radius: 0`, `--warning`, the two-padding /
+three-gap rhythm, the 28 px control height, `.touch-44`, and « every control comes from `ui/` ».
+This letter records the **two decisions that amend the spec** and the **one correction** that
+changes what a future reader should believe.
+
+### 1 · No bundled mono, and what that costs B1
+
+Ticket 40 § 2 offered two options and recommended bundling a variable mono, on the argument that
+`contract.ts:69`'s width budget deserves a font it can be true about. **The elected option is the
+other one:** `--font-mono: ui-monospace, monospace`, no dependency, no ~40 kB, and digits that
+differ by platform **on purpose**.
+
+That is not free, and the price is paid here rather than hidden. § 5 derives B1 from a **0,6 em**
+advance: a nine-character value (« 12345 daN ») at `font-mono text-lg` needs ~97 px, plus 24 px of
+`px-3`, so five cells need ≈605 px — and the table then wrote the threshold as **600**, five pixels
+*under* its own requirement. With the face unbound, the realistic ceiling is **0,62 em** — Liberation
+Mono, DejaVu Sans Mono, Menlo, Courier New — which gives
+
+> `(9 × 18 × 0,62 + 24) × 5 ≈ 622 px`
+
+and the threshold is set to **624**, above its requirement rather than under it. A wider guard
+(0,65 em → 650) was rejected: it spends two rows of header on laptop widths that fit today, for a
+face a bare `monospace` keyword does not resolve to.
+
+**This moves `src/lib/`,** which ticket 40's own gate forbade. The gate is amended with the letter:
+`src/lib/layout/contract.ts` and `contract.test.ts` move **for this re-derivation and nothing else**.
+Leaving 600 in place would be knowingly shipping a constant derived from a font assumption the same
+commit chose to break.
+
+### 2 · Three DOM type sizes, not four
+
+Ticket 40 proposed four roles, the first being an 11 px `--text-2xs` token replacing the 10/11 px
+mix across 50 sites. **Elected: three** — 12 / 16 / 18 — with annotation ranking below body by
+`text-muted-foreground` and weight. At one step apart, 11 px against 12 px is a rank signal no
+reader can resolve, and a token minted for it is a fourth size the next diff will treat as licence
+for a fifth. The two locked sizes (§ 7.1's 16 px iOS floor, § 7.3's 18 px header cells) are
+unchanged; `text-sm` and `text-xl` leave the app entirely, error screens included.
+
+### 3 · The correction: the jitter ticket 40 describes cannot happen
+
+§ 2 argued that « the moment the scrub changes 2,44 to 2,4 the column jitters », and prescribed
+`tabular-nums`. **Both halves are wrong, and the second was nearly implemented.**
+
+`src/lib/format/quantity.ts` renders every quantity through `toFixed(displayDecimals(id))` and
+documents the property in its own header — « a row at 2 decimals renders « 6,00 », never « 6 » ».
+A value cannot lose a decimal. What *can* move a column is the **integer** digit count (817,1 →
+1017,1), which no formatter setting fixes. And `tabular-nums` is inert against either: mono is
+fixed-advance by definition.
+
+**Elected: right-align the value columns and accept the digit-count residual.** No `min-w`
+reservation — a 288 px rail does not spend permanent pixels against a value that may never appear —
+and **no `tabular-nums`**, because a rule whose stated reason is false is a rule the next reader
+deletes for the wrong reason. Anyone re-opening column stability reads this paragraph first: the
+defect it names is not the defect § 2 named.

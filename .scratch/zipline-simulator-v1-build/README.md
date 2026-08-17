@@ -6,6 +6,26 @@ per stage of the spec's **§ 10 — Implementation order**. Original final three
 fresh-context delegation on 2026-08-13: **36 tickets** now live in `issues/`, numbered in dependency
 order.
 
+**37 and 38 are review tickets, not build stages.** They come from the post-v1 algorithmic code
+review of 2026-08-15 (fixed point = root) and amend what tickets 06, 09, 11, 13 and 25 delivered:
+[37](./issues/37-engine-correctness-fixes.md) carries the five confirmed defects — one of which makes
+the garde read-out optimistic — and [38](./issues/38-engine-review-refinements.md) the dedupe and
+shape judgement calls. The review re-derived the § 15 fixtures independently and **every value
+reproduces**; neither ticket questions the solved shape.
+
+**39 is an investigation ticket.** [39](./issues/39-clearance-strip-investigation.md) opens the
+« Garde au sol » strip — a reported *surprising curve* and *wrong-looking scale*. The curve's W shape
+is measured as physical; the vertical scale, its ticks and the axis' behaviour when the curve is
+removed are what remain open.
+
+**40 is a presentation ticket.** [40](./issues/40-ui-coherence-and-shadcn-density.md) is the UI
+coherence pass — eight DOM text sizes, a `font-mono` bound to no loaded font, fifteen hand-rolled
+buttons beside a `src/components/ui/` holding one component nobody renders, and an un-tokenised
+warning colour. It settles **one density scale** and moves the chrome onto **shadcn components in
+their small variants**. It changes nothing in `src/lib/`, and it does **not** re-open the five
+load-bearing sizes it lists — amendment G's 16 px numeric field and § 5's 44 px touch budget
+foremost.
+
 ## The seven amendments, in one line each
 
 | | Amendment | Lands on |

@@ -494,7 +494,7 @@ function EmptyBands({
         <StripBand />
       ) : (
         <StripBand>
-          <div className="border-border mx-[var(--gutter)] h-full rounded-sm border">{line}</div>
+          <div className="border-border mx-[var(--gutter)] h-full border">{line}</div>
         </StripBand>
       )}
       <ViewStripSlot />

@@ -32,14 +32,24 @@ export function LinkRefusalSurface({ refusal }: { refusal: LinkRefusal }) {
     <Shell
       rail={<RailHeader />}
       chart={
-        <div className="flex flex-col items-start gap-4 py-16" role="alert">
-          <h1 className="font-heading text-xl font-semibold tracking-tight">{REFUSAL_TITLE}</h1>
-          <p className="text-muted-foreground text-sm">{refusalReasonLine(refusal)}</p>
+        <div className="flex flex-col items-start gap-3 py-16" role="alert">
+          {/* `text-lg`, the largest the app has: three DOM sizes, and **the error screens are not
+              an exception** (`docs/conventions/ui.md` § *Three type sizes*). */}
+          <h1 className="font-heading text-lg font-semibold tracking-tight">{REFUSAL_TITLE}</h1>
+          <p className="text-muted-foreground text-xs">{refusalReasonLine(refusal)}</p>
           {/* Labelled by its **effect**: the app is not empty, it opens on the first-run scenario.
               And there is no « ouvrir malgré tout » — the whole-or-nothing rule forbids a partial
               read, and `L`/`h` are derived from the terrain, so a trace-less application of an
-              imported link would fabricate geometry the sender never entered. */}
-          <Link className={buttonVariants()} replace search={{}} to="/">
+              imported link would fabricate geometry the sender never entered.
+
+              **It stays a `<Link>` wearing `buttonVariants`, and is not wrapped in `<Button>`.**
+              Base UI's button applies `role="button"` to whatever the `render` prop gives it as
+              soon as `nativeButton={false}` (`internals/use-button/useButton.js`), and leaving that
+              flag true logs a development error for a non-`<button>` element. Either way the anchor
+              stops announcing itself as a link, which this control *is*: it navigates. What the
+              ticket actually asked for — the app's one 28 px height instead of the variants'
+              32 px default — is `size: "sm"`, and it costs no semantics. */}
+          <Link className={buttonVariants({ size: "sm" })} replace search={{}} to="/">
             {REFUSAL_ACTION}
           </Link>
         </div>

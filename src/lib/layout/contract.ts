@@ -66,9 +66,25 @@ export const PINNED_CELL = 44;
 /**
  * B1 — « the read-out row can no longer fit five values », in **chart-column** width, not viewport:
  * the 288 px rail means the chart column is never the viewport, so this is a container query. The
- * *value* binds and not the label — `font-mono text-lg` needs ≈605 px for five cells.
+ * *value* binds and not the label.
+ *
+ * **624, and no longer § 5's 600** — amendment L, 2026-08-16
+ * (`../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md`). The app ships **no mono face**:
+ * `--font-mono` is `ui-monospace, monospace`, so the advance is the platform's and this constant
+ * budgets for the widest one a bare `monospace` keyword realistically resolves to — **0,62 em**
+ * (Liberation Mono, DejaVu Sans Mono, Menlo, Courier New) — rather than the 0,6 em § 5 derived with
+ * a bundled face in mind. Five nine-character cells (« 12345 daN ») at `font-mono text-lg`, each
+ * with its `px-3`:
+ *
+ * > `(9 × 18 × 0,62 + 24) × 5 ≈ 622 px`
+ *
+ * so the threshold sits **above** its own requirement. That is the whole edit: § 5's 600 sat five
+ * pixels **under** its own ≈605 px estimate, and a wider guard (0,65 em → 650) was rejected because
+ * it spends two rows of header on laptop widths that fit today, for a face the keyword does not
+ * resolve to. Changing the header cells' type, or the mono stack, changes this constant **and**
+ * `contract.test.ts`, in the same commit.
  */
-export const CELL_WRAP_PX = 600;
+export const CELL_WRAP_PX = 624;
 
 /** B2 — « an aspect-legal profile cannot coexist with the rail », in **viewport** width. */
 export const RAIL_REFLOW_PX = 768;

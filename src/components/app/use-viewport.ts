@@ -135,9 +135,12 @@ export type VisualViewportReading = {
  * `max-w-40`/`max-w-44` rather than `w-20` so it would move the Rail's own widths, and electing it
  * would be a policy nobody has decided.
  *
- * Plus **one text field outside the Rail**, the View Strip's « x » (11 px,
- * `src/components/chart/view-strip.tsx`), which decision 5 does not cover: it is not a Rail field, so
- * a tap straight into it can still zoom the page and re-open this cost. That is recorded, not fixed.
+ * Plus **one text field outside the Rail, and it is now closed**: the View Strip's « x »
+ * (`src/components/chart/view-strip.tsx`) was 11 px, which decision 5 does not cover — it is not a
+ * Rail field, so a tap straight into it could still zoom the page and re-open this cost. **Ticket 40
+ * put it on the 16 px `text-base` step** with the rest of the app's value/input role, so the residual
+ * this paragraph used to record no longer exists. The widening that paid for it — `w-16` → `w-21`,
+ * because 64 px cannot hold « 1500,0 » at 16 px — is re-derived in `view-strip.tsx`'s own budget.
  */
 export function keyboardInsetOf({
   layoutHeight,

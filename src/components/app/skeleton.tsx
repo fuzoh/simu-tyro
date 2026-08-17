@@ -52,7 +52,7 @@ export function Skeleton() {
           {RAIL_SECTIONS.map((title) => (
             <RailSection key={title} title={title} />
           ))}
-          <noscript className="px-4 py-3 text-sm">{NOSCRIPT_LINE}</noscript>
+          <noscript className="px-3 py-3 text-xs">{NOSCRIPT_LINE}</noscript>
         </>
       }
       chart={

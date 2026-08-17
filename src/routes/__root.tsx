@@ -46,9 +46,16 @@ export const Route = createRootRoute({
    * indistinguishable from a successful share.
    */
   notFoundComponent: () => (
-    <main className="mx-auto flex max-w-md flex-col items-start gap-4 p-6 pt-16">
-      <h1 className="font-heading text-xl font-semibold tracking-tight">Page introuvable.</h1>
-      <Link className={buttonVariants()} to="/">
+    <main className="mx-auto flex max-w-md flex-col items-start gap-3 p-6 pt-16">
+      {/* `text-lg`, like every other heading in the app: `docs/conventions/ui.md` § *Three type
+          sizes* has no « except on the error screens » clause, because that clause is how eight
+          sizes came back the first time. */}
+      <h1 className="font-heading text-lg font-semibold tracking-tight">Page introuvable.</h1>
+      {/* A `<Link>` wearing `buttonVariants`, deliberately **not** a `<Button render={<Link/>}>`:
+          Base UI's button puts `role="button"` on the rendered element once `nativeButton` is
+          false, and this control navigates — it is a link and must announce itself as one. The
+          `size: "sm"` is the app's one 28 px control height; the variants' default is 32. */}
+      <Link className={buttonVariants({ size: "sm" })} to="/">
         Ouvrir le simulateur
       </Link>
     </main>

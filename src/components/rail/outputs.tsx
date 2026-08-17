@@ -19,6 +19,13 @@
  *   cells undoes three tickets' worth of effort at once.
  * - **The banner is A11's slot, not this file's.** {@link Results.banner} carries the sentence and
  *   the state; the verdict *row* at the top of `Résultats` is the block's own headline.
+ * - **One size for everything but the headline value** — `docs/conventions/ui.md` § *Design
+ *   defaults*, settled by [amendment L](../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md)
+ *   decision 2. This file was the ticket's worst offender, mixing 10 px and 11 px across 17 sites
+ *   and drawing a computed value at three sizes. Everything here is `text-xs` — label, qualifier,
+ *   note, formula, provenance — **except {@link HeadlineRow}'s value, which is the block's one
+ *   `text-base`**. An annotation ranks below body by `text-muted-foreground` and weight; a smaller
+ *   size is how the eight came back.
  */
 
 import type { Deduced } from "@/lib/rail/deduced.ts";
@@ -31,6 +38,7 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 import { jumpToField } from "@/components/app/banner.tsx";
 import { RailSection } from "@/components/app/shell.tsx";
 import { useAppState } from "@/components/app/store.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import {
   LOAD_COMBINATION_FORMULA,
   NOT_COMPUTED_LINES,
@@ -91,11 +99,11 @@ function ResultsSection({ cause, results }: { cause: string | null; results: Res
           on `Indéterminé`, *tenté et indisponible*, and reusing it for *nothing attempted* collides
           with the distinction § 6 bought five verdict states to preserve. */}
       {results === null && cause !== null && (
-        <p className="text-muted-foreground mt-2 text-[11px]">{cause}</p>
+        <p className="text-muted-foreground mt-2 text-xs">{cause}</p>
       )}
       {results !== null && (
         <div className="mt-2">
-          <div className="border-border flex flex-col gap-1 border-b pb-2">
+          <div className="border-border flex flex-col gap-2 border-b pb-2">
             {results.rows
               .filter((row) => row.rank === "headline")
               .map((row) => (
@@ -104,20 +112,26 @@ function ResultsSection({ cause, results }: { cause: string | null; results: Res
           </div>
 
           {results.prompt !== null && (
-            <p className="text-muted-foreground mt-2 text-[11px]">
+            <p className="text-muted-foreground mt-2 text-xs">
               {results.prompt.before}
               {/* The emphasised phrase is the affordance: it focuses the picker, and there is no
-                  second button — `[ Choisir un régime ]` already lives in the banner. */}
-              <button
-                className="text-foreground font-medium underline underline-offset-2"
+                  second button — `[ Choisir un régime ]` already lives in the banner.
+
+                  It is a `ui/` `Button` like every other control, in the one variant that belongs
+                  *inside a sentence*: `link`, with the registry's box neutralised (`h-auto`, no
+                  inline padding) because a 28 px box mid-paragraph would break the line it is a
+                  word of. The colour is the emphasis the copy asks for, not the primary tint. */}
+              <Button
+                className="text-foreground h-auto px-0 font-medium underline underline-offset-2"
                 // The **one** jump primitive, shared with the banner's own `[ Choisir un régime ]`.
                 onClick={() => {
                   jumpToField("regime");
                 }}
-                type="button"
+                size="sm"
+                variant="link"
               >
                 {results.prompt.emphasis}
-              </button>
+              </Button>
               {results.prompt.after}
             </p>
           )}
@@ -132,9 +146,7 @@ function ResultsSection({ cause, results }: { cause: string | null; results: Res
 
           {results.grid.length > 0 && (
             <div className="mt-3">
-              <h3 className="text-foreground/70 text-[11px] font-semibold">
-                Critères × extrémités
-              </h3>
+              <h3 className="text-foreground/70 text-xs font-semibold">Critères × extrémités</h3>
               {results.grid.map((row) => (
                 <GridRow key={row.id} row={row} />
               ))}
@@ -146,15 +158,19 @@ function ResultsSection({ cause, results }: { cause: string | null; results: Res
   );
 }
 
-/** One of the four headline values: a larger body, at the top of the same block. */
+/**
+ * One of the four headline values. **The only `text-base` in the output half** (`ui.md` § *Three
+ * type sizes*): the label and the qualifier around it are `text-xs` like every other annotation in
+ * the app, and they rank below the value by colour, never by a size of their own.
+ */
 function HeadlineRow({ row }: { row: ResultRow }) {
   return (
     <div>
-      <span className="text-muted-foreground text-[11px]">{row.label}</span>
-      <div className="flex flex-wrap items-baseline gap-2">
+      <span className="text-muted-foreground text-xs">{row.label}</span>
+      <div className="flex flex-wrap items-baseline gap-1">
         <span className="font-mono text-base">{row.value}</span>
         {row.qualifier !== null && (
-          <span className="text-muted-foreground text-[11px]">{row.qualifier}</span>
+          <span className="text-muted-foreground text-xs">{row.qualifier}</span>
         )}
       </div>
     </div>
@@ -164,13 +180,15 @@ function HeadlineRow({ row }: { row: ResultRow }) {
 /** One detail row. « ↳ majoration dynamique » is a decomposition of the row above it. */
 function DetailRow({ row }: { row: ResultRow }) {
   return (
-    <div className={cn("flex items-baseline gap-2 py-0.5", row.indent && "pl-3")}>
+    <div className={cn("flex items-baseline gap-1 py-0.5", row.indent && "pl-3")}>
       <span className="text-muted-foreground min-w-0 flex-1 text-xs" title={row.label}>
         {row.label}
       </span>
+      {/* The label takes the slack, so the value sits flush right — that *is* amendment L's
+          right-aligned column, and it is reached without a `min-w` reservation. */}
       <span className="font-mono text-xs">{row.value}</span>
       {row.qualifier !== null && (
-        <span className="text-muted-foreground shrink-0 text-[10px]">{row.qualifier}</span>
+        <span className="text-muted-foreground shrink-0 text-xs">{row.qualifier}</span>
       )}
     </div>
   );
@@ -183,36 +201,37 @@ function DetailRow({ row }: { row: ResultRow }) {
  */
 function GridRow({ row }: { row: ResultGridRow }) {
   return (
-    <div className="mt-1.5">
-      <div className="flex flex-wrap items-baseline gap-2">
+    <div className="mt-2">
+      <div className="flex flex-wrap items-baseline gap-1">
         <span className="text-xs">{row.label}</span>
-        {row.note !== null && <span className="text-muted-foreground text-[11px]">{row.note}</span>}
+        {row.note !== null && <span className="text-muted-foreground text-xs">{row.note}</span>}
       </div>
-      {row.formula !== "" && <p className="text-muted-foreground text-[10px]">{row.formula}</p>}
-      {row.detail !== null && <p className="text-muted-foreground text-[10px]">{row.detail}</p>}
+      {row.formula !== "" && <p className="text-muted-foreground text-xs">{row.formula}</p>}
+      {row.detail !== null && <p className="text-muted-foreground text-xs">{row.detail}</p>}
       {row.cells.length > 0 && (
-        <div className="mt-0.5 flex flex-wrap gap-3">
+        <div className="mt-1 flex flex-wrap gap-3">
           {row.cells.map((cell) => (
             <div
               // § 6: « Le bandeau nomme la cellule gouvernante ». The grid must name it too, and
               // **not by weight and colour alone** — the banner's sentence is 300 px away, the
-              // colour already carries the *state*, and a 11 px mono value one notch bolder than
-              // its neighbour is not a distinction a reader can be asked to make.
+              // colour already carries the *state*, and a mono value one notch bolder than its
+              // neighbour is not a distinction a reader can be asked to make. The words « ←
+              // gouvernante » carry it, and they are the same 12 px as everything around them.
               aria-current={cell.governing ? "true" : undefined}
               className={cn(
-                "flex items-baseline gap-1.5",
+                "flex items-baseline gap-1",
                 cell.governing && "font-medium",
                 cell.state === "hors-limites" && "text-destructive",
-                cell.state === "marge-faible" && "text-amber-600 dark:text-amber-400",
+                cell.state === "marge-faible" && "text-warning",
               )}
               key={cell.end ?? "unique"}
             >
-              <span className="text-muted-foreground text-[10px]">
+              <span className="text-muted-foreground text-xs">
                 {cell.end === null ? "une seule cellule" : `ancrage ${cell.end}`}
               </span>
-              {cell.Tadm !== null && <span className="font-mono text-[11px]">{cell.Tadm}</span>}
+              {cell.Tadm !== null && <span className="font-mono text-xs">{cell.Tadm}</span>}
               <span className="font-mono text-xs">FS {cell.FS}</span>
-              {cell.governing && <span className="text-[10px]">← gouvernante</span>}
+              {cell.governing && <span className="text-xs">← gouvernante</span>}
             </div>
           ))}
         </div>
@@ -255,7 +274,7 @@ function ProvenanceSection({
         </div>
 
         <details>
-          <summary className="cursor-pointer list-none text-[11px] text-amber-700 dark:text-amber-300">
+          <summary className="text-warning cursor-pointer list-none text-xs">
             ⚠ {aggregate.summary}
             <span className="text-muted-foreground ml-1">▾</span>
           </summary>
@@ -274,12 +293,7 @@ function ProvenanceSection({
 function TerrainLine({ line }: { line: DisclosureLine }) {
   const glyph = { plain: "", ok: "✓ ", warn: "⚠ ", info: "ℹ " }[line.tier];
   return (
-    <div
-      className={cn(
-        "text-[11px]",
-        line.tier === "warn" ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground",
-      )}
-    >
+    <div className={cn("text-xs", line.tier === "warn" ? "text-warning" : "text-muted-foreground")}>
       <span>
         {glyph}
         {line.text}
@@ -296,10 +310,10 @@ function TerrainLine({ line }: { line: DisclosureLine }) {
 function AggregateRow({ entry }: { entry: AggregateEntry }) {
   return (
     <li
-      className={cn("flex items-center gap-2", entry.pinned && "border-border mb-1 border-b pb-1")}
+      className={cn("flex items-center gap-1", entry.pinned && "border-border mb-1 border-b pb-1")}
     >
-      <span className="text-muted-foreground min-w-0 flex-1 text-[11px]">{entry.label}</span>
-      {entry.value !== null && <span className="font-mono text-[11px]">{entry.value}</span>}
+      <span className="text-muted-foreground min-w-0 flex-1 text-xs">{entry.label}</span>
+      {entry.value !== null && <span className="font-mono text-xs">{entry.value}</span>}
       <Chip
         detail={entry.detail}
         label={entry.chip}
@@ -316,7 +330,7 @@ function AggregateRow({ entry }: { entry: AggregateEntry }) {
 function NotComputedSection() {
   return (
     <RailSection title="Ce que cet outil ne calcule pas">
-      <ul className="text-muted-foreground mt-2 flex flex-col gap-1 text-[11px]">
+      <ul className="text-muted-foreground mt-2 flex flex-col gap-1 text-xs">
         {NOT_COMPUTED_LINES.map((line, index) => (
           <li className="flex items-start gap-1" key={line}>
             <span>·</span>

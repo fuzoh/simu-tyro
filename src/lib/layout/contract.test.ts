@@ -165,8 +165,8 @@ describe("§ 5 — the layout contract", () => {
     expect(bannerBudget(0)).toBe(BANNER.threeLines);
     expect(bannerBudget(479)).toBe(BANNER.threeLines);
     expect(bannerBudget(480)).toBe(BANNER.twoLines);
-    expect(bannerBudget(599)).toBe(BANNER.twoLines);
-    expect(bannerBudget(600)).toBe(BANNER.oneLine);
+    expect(bannerBudget(623)).toBe(BANNER.twoLines);
+    expect(bannerBudget(624)).toBe(BANNER.oneLine);
     expect(bannerBudget(4000)).toBe(BANNER.oneLine);
     // The 32 px this replaces: a three-line term everywhere put the desktop block at 889 and
     // collapsed every viewport shorter than that, including a 1440×880 window whose rendered block
@@ -192,9 +192,17 @@ describe("§ 5 — the layout contract", () => {
     expect(stripOuterHeight(10_000)).toBe(200);
   });
 
-  it("B1 is exactly 600 px of chart column, not 601", () => {
-    expect(cellRows(600)).toBe(1);
-    expect(cellRows(599)).toBe(2);
+  it("B1 is exactly 624 px of chart column, not 625", () => {
+    // Amendment L: the threshold is `≥`, and it is 624 because the mono face is unbound and
+    // `(9 × 18 × 0,62 + 24) × 5 ≈ 622` is what five nine-character cells then need. § 5's 600 was
+    // five pixels *under* its own 605 px estimate — this one sits above its own 622.
+    expect(cellRows(624)).toBe(1);
+    expect(cellRows(623)).toBe(2);
+    // And the retired threshold is now firmly on the two-row side, which is the regression a
+    // re-introduced 600 would show up as here first.
+    expect(cellRows(600)).toBe(2);
+    expect(CELL_WRAP_PX).toBe(624);
+    expect(CELL_WRAP_PX).toBeGreaterThan((9 * 18 * 0.62 + 24) * 5);
   });
 
   it("the aspect is the same at every width up to the reference column — the invariant, stated as a test", () => {
@@ -360,11 +368,12 @@ describe("amendment F — the plot's ceiling at wide widths", () => {
     }
     // Never above the plateau, at any width at all — including the narrow arm, where the block's two
     // *step* terms make it non-monotone: at B1 the banner drops 16 px and the cells row 52, so a
-    // 600 px column budgets **less** than a 599 px one. That step is § 5's own and predates this.
+    // 624 px column budgets **less** than a 623 px one. That step is § 5's own and predates this;
+    // amendment L moved where it falls, not that it falls.
     for (let column = 100; column <= 4000; column += 13) {
       expect(chartBlockHeight(column)).toBeLessThanOrEqual(plateau);
     }
-    expect(chartBlockHeight(600)).toBeLessThan(chartBlockHeight(599));
+    expect(chartBlockHeight(624)).toBeLessThan(chartBlockHeight(623));
     // Above B1 there is no step left, so the block is monotone non-decreasing there — which is the
     // arm (c) bisects on a desktop, and what makes the comparison meaningful at all.
     let previous = 0;
