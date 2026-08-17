@@ -670,3 +670,143 @@ export function peekBadgeLabel(exaggerationValue: Exaggeration): string {
   const factor = exaggerationValue.autofit.toFixed(1).replace(".", ",");
   return `Éch. verticale ×${factor} — sous la vraie échelle · câble entier`;
 }
+
+// ─── The clearance strip's vertical domain — quantised, with a reserved negative band ──────────
+
+/**
+ * How many `step`s the positive side aims to hold. The ladder picks `step` from `hi / 3`, so a
+ * healthy strip carries three or four grid lines' worth of garde and never a prime-numbered axis.
+ */
+export const CLEARANCE_STEPS = 3;
+
+/**
+ * The reference domain drawn when there is **no curve at all** — « Aucun résultat », or a Clearance
+ * Gate breach. `strip.tsx`'s own rule is « it never stops being a pointer surface »; before this
+ * constant existed the empty case collapsed to `[0, 0]`, the zero line fell onto the frame's bottom
+ * edge and every tick was dropped, so the strip kept the *track* and lost the *axes*.
+ */
+export const CLEARANCE_EMPTY = { step: 2, top: 4 } as const;
+
+/** The strip's y domain and the ticks drawn on it — {@link clearanceDomain}. */
+export type ClearanceDomain = {
+  /** The tick grid's spacing, m — a 1-2-5 ladder value, never a data extreme. */
+  readonly step: number;
+  /** The domain's top, m: a whole number of {@link step}s at or above the worst garde. */
+  readonly top: number;
+  /** The domain's floor, m — negative. `−step` at rest, deeper only when a violation needs it. */
+  readonly floor: number;
+  /** The ticks to label, top → floor. Zero is drawn by the strip itself and is never in here. */
+  readonly ticks: readonly number[];
+  /** No finite value was given: this is {@link CLEARANCE_EMPTY}'s reference domain. */
+  readonly empty: boolean;
+};
+
+/** The 1-2-5 decade ladder, rounding **outward** — `1,76 → 2`, `6,1 → 10`, `0,04 → 0,05`. */
+function niceStep(raw: number): number {
+  if (!Number.isFinite(raw) || raw <= 0) return CLEARANCE_EMPTY.step;
+  const decade = 10 ** Math.floor(Math.log10(raw));
+  const mantissa = raw / decade;
+  const rounded = mantissa <= 1 ? 1 : mantissa <= 2 ? 2 : mantissa <= 5 ? 5 : 10;
+  return rounded * decade;
+}
+
+/**
+ * **The strip's y domain, quantised** — ticket 39, items 1, 2 and 4, and the user's decisions of
+ * 2026-08-17.
+ *
+ * What this replaces was `lo = min(0, …values)`, `hi = max(0, …values)` mapped edge to edge, and it
+ * failed in three ways that are one failure: **the axis was the data**. With no violation `lo` was
+ * exactly 0, so the zero line *was* the frame's bottom edge and read as furniture rather than as the
+ * threshold the whole chart exists to show; the instant one step went negative the baseline lifted
+ * and the entire curve jumped, which is **a scale change presented as a data change**; and the ticks
+ * were the extremes themselves, so they changed on every keystroke in the Rail and two scenarios
+ * whose gardes differ by a factor of four drew the same picture.
+ *
+ * The rule instead:
+ *
+ * - **`step` comes off a 1-2-5 ladder**, sized so the positive side holds ~{@link CLEARANCE_STEPS}
+ *   of them, and `top` is a whole number of steps at or above the worst garde. The axis therefore
+ *   changes in **discrete jumps** a reader can notice, and its labels are round.
+ * - **A negative band is always reserved**, `−step` deep, whether or not anything violates. That is
+ *   what nails zero to a constant pixel *per grid* and removes the jump. It costs the positive side
+ *   a quarter of the band — ~13 px at § 5's 96 px floor — and the strip is a categorical
+ *   zero-crossing device with a printed « Garde min » beside it, so resolution is the cheaper thing
+ *   to spend.
+ * - **The floor extends downward in whole steps** when a violation is deeper than the reserved band.
+ *   Zero moves *then* — rarely, and when it does the movement is itself the news.
+ * - **The floor tick is labelled only when something violates.** § 5's clearance failure is four
+ *   coordinated signals firing on a crossing; labelling the danger side before anything enters it
+ *   spends the alarm early. This is the one place two of the day's decisions collided — the empty
+ *   state was specified as « 4 m / 2 / 0 / −2 » — and the general rule won, so the reference domain
+ *   draws « 4 m / 2 / 0 » over a reserved but unlabelled band.
+ *
+ * No `d3-scale` and no charting library (`docs/conventions/ui.md` § charts): the ladder is eleven
+ * lines and the mapping to pixels stays in the strip, which is the only thing that knows its height.
+ *
+ * @param values the finite per-step gardes, m. Holes are dropped by the caller; a `null`-only
+ *   traverse and « Aucun résultat » are the same input here — none.
+ * @param wide chart column ≥ B1, the same threshold the caption shortens at. Narrow drops the mid
+ *   tick and nothing else: a violation's floor is labelled at every width.
+ */
+export function clearanceDomain({
+  values,
+  wide,
+}: {
+  values: readonly number[];
+  wide: boolean;
+}): ClearanceDomain {
+  const finite = values.filter((value) => Number.isFinite(value));
+  if (finite.length === 0) {
+    const { step, top } = CLEARANCE_EMPTY;
+    return {
+      step,
+      top,
+      floor: -step,
+      ticks: wide ? [top, top / 2] : [top],
+      empty: true,
+    };
+  }
+
+  const hi = Math.max(0, ...finite);
+  const lo = Math.min(0, ...finite);
+  // The ladder is sized on the whole excursion, not on `hi` alone: a line 40 m under the ground has
+  // no positive side to scale from, and its grid should still be readable.
+  const step = niceStep(Math.max(hi, -lo) / CLEARANCE_STEPS);
+  const top = Math.max(step, Math.ceil(hi / step) * step);
+  const floor = lo < -step ? -Math.ceil(-lo / step) * step : -step;
+
+  const ticks = wide ? [top, top / 2] : [top];
+  return {
+    step,
+    top,
+    floor,
+    // Labelled only under violation — voir the docblock's fourth rule.
+    ticks: lo < 0 ? [...ticks, floor] : ticks,
+    empty: false,
+  };
+}
+
+/**
+ * A tick's label — « 6 m » on the topmost, « 3 » and « −2 » below it.
+ *
+ * **Not `formatValue("clearance", …)`**, which is pinned at two decimals and would print « 6,00 »,
+ * defeating the quantisation: `docs/conventions/typescript.md`'s display-precision contract governs
+ * *values the user reads as data* — a prefill writes the displayed value into state and the
+ * stale-Override badge compares at display precision — and an axis tick is neither. It is chrome,
+ * so it gets a chrome formatter, and it lives here rather than in `strip.tsx` only so the ladder and
+ * its labels are pinned by the same `node` fixture.
+ *
+ * The unit rides the **top tick alone**: that is what discloses the scale — the gate's « stated
+ * somewhere the user can read » — and it is why no VE-style badge is needed here. There is no
+ * distortion factor to name once the axis says « 6 m ».
+ *
+ * @param tick the tick's value, m.
+ * @param withUnit true for the topmost tick only.
+ */
+export function clearanceTickLabel(tick: number, withUnit: boolean): string {
+  const rounded = Math.round(tick * 100) / 100;
+  const text = Number.isInteger(rounded)
+    ? String(rounded)
+    : rounded.toFixed((rounded * 10) % 1 === 0 ? 1 : 2);
+  return `${text.replace(".", ",").replace("-", "−")}${withUnit ? " m" : ""}`;
+}

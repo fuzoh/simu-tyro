@@ -12,6 +12,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import { formatValue } from "@/lib/format/quantity.ts";
+
 import {
   ANCHOR_TARGET,
   anchorTarget,
@@ -21,6 +23,9 @@ import {
   CELL_WRAP_PX,
   cellRows,
   chartBlockHeight,
+  CLEARANCE_EMPTY,
+  clearanceDomain,
+  clearanceTickLabel,
   createSharedX,
   createZScale,
   exaggeration,
@@ -919,6 +924,111 @@ describe("§ 5 — the anchor targets in the Handle Lane", () => {
     // « 44 px covers the first and last 12 % of the span » is exactly this ratio.
     expect(b.x - (a.x + a.width)).toBeGreaterThan(0);
     expect(ANCHOR_TARGET.width / innerWidth(390)).toBeCloseTo(0.1287, 4);
+  });
+});
+
+/**
+ * Ticket 39 — the clearance strip's y domain. Three claims, none of which a screenshot can settle:
+ * the ladder is discrete, the negative band is always reserved, and the empty case has axes.
+ *
+ * The pixel mapping stays in `strip.tsx` (only it knows its own height); what is pinned here is the
+ * domain the mapping is built from, and the labels that disclose it.
+ */
+describe("ticket 39 — the clearance strip's quantised y domain", () => {
+  it("the first-run traverse gets step 2, top 6 and a reserved floor at −2", () => {
+    // `h_min` 2,4399 and the two local maxima 5,1773 / 5,2746 — the ticket's own measured table.
+    const domain = clearanceDomain({
+      values: [3.9025, 5.1773, 2.4399, 5.2746, 3.9032],
+      wide: true,
+    });
+    expect(domain).toStrictEqual({
+      step: 2,
+      top: 6,
+      floor: -2,
+      ticks: [6, 3],
+      empty: false,
+    });
+    // Zero's height in the band is a function of the grid alone — `−floor / (top − floor)` — so it
+    // is the same pixel for every healthy scenario that lands on this step.
+    expect(-domain.floor / (domain.top - domain.floor)).toBeCloseTo(0.25, 9);
+  });
+
+  it("the axis changes in discrete jumps, not on every keystroke", () => {
+    // Four gardes spread over 0,4 m of worst-case: one grid, one picture, one set of labels.
+    const grids = [5.0, 5.27, 5.4, 5.99].map((hi) => clearanceDomain({ values: [hi], wide: true }));
+    for (const grid of grids)
+      expect({ step: grid.step, top: grid.top }).toStrictEqual({
+        step: 2,
+        top: 6,
+      });
+    // And it *does* move when the scenario really is a different size — the failure the old
+    // auto-fit had was that two scenarios differing by a factor of four drew the same picture.
+    expect(clearanceDomain({ values: [1.3], wide: true })).toMatchObject({ step: 0.5, top: 1.5 });
+    expect(clearanceDomain({ values: [21], wide: true })).toMatchObject({ step: 10, top: 30 });
+    expect(clearanceDomain({ values: [40.5], wide: true })).toMatchObject({ step: 20, top: 60 });
+  });
+
+  it("the negative band is reserved before anything violates, and labelled only after", () => {
+    const healthy = clearanceDomain({ values: [5.27, 2.44], wide: true });
+    expect(healthy.floor).toBe(-2);
+    expect(healthy.ticks).not.toContain(healthy.floor);
+
+    // One step into violation: the same grid, the same zero pixel, and now a floor label.
+    const violating = clearanceDomain({ values: [5.27, -0.4], wide: true });
+    expect({ step: violating.step, top: violating.top, floor: violating.floor }).toStrictEqual({
+      step: 2,
+      top: 6,
+      floor: -2,
+    });
+    expect(violating.ticks).toStrictEqual([6, 3, -2]);
+  });
+
+  it("a violation deeper than the band extends the floor in whole steps", () => {
+    // `contact: "rider"` — anchors A 12 / B 6 at flèche 6,0 ⇒ garde −1,53 m (spec § 15).
+    expect(clearanceDomain({ values: [4.0, -1.53], wide: true }).floor).toBe(-2);
+    // `contact: "cable"` — `L₀` 400 m on a 200 m span ⇒ −169,67 m, and nothing positive to scale
+    // from: the ladder sizes on the whole excursion, so the grid stays readable and the reserved
+    // positive side is one step — the drawing's message there is « the line is under the ground »,
+    // and the curve sits in the bottom quarter where that reads.
+    const drowned = clearanceDomain({ values: [-169.67], wide: true });
+    expect({ step: drowned.step, top: drowned.top, floor: drowned.floor }).toStrictEqual({
+      step: 100,
+      top: 100,
+      floor: -200,
+    });
+  });
+
+  it("no curve at all still has axes — the strip's own rule, in numbers", () => {
+    for (const values of [[], [Number.NaN]]) {
+      const domain = clearanceDomain({ values, wide: true });
+      expect(domain).toStrictEqual({
+        step: CLEARANCE_EMPTY.step,
+        top: CLEARANCE_EMPTY.top,
+        floor: -CLEARANCE_EMPTY.step,
+        ticks: [4, 2],
+        empty: true,
+      });
+    }
+    // Narrow drops the mid tick and nothing else — the same B1 threshold the caption shortens at.
+    expect(clearanceDomain({ values: [], wide: false }).ticks).toStrictEqual([4]);
+    expect(clearanceDomain({ values: [5.27], wide: false }).ticks).toStrictEqual([6]);
+    // …but a violation is labelled at every width: the floor is the news, not a nicety.
+    expect(clearanceDomain({ values: [5.27, -0.4], wide: false }).ticks).toStrictEqual([6, -2]);
+  });
+
+  it("the ticks are round, carry the unit on the top one only, and are never formatValue", () => {
+    expect(clearanceTickLabel(6, true)).toBe("6 m");
+    expect(clearanceTickLabel(3, false)).toBe("3");
+    expect(clearanceTickLabel(-2, false)).toBe("−2");
+    // A 2,5 grid — `hi / 3` lands on the ladder's 2,5 nowhere, but 0,5 and 0,05 steps do exist on
+    // small spans, and half of an odd top is one decimal rather than two.
+    expect(clearanceTickLabel(0.75, false)).toBe("0,75");
+    expect(clearanceTickLabel(1.5, true)).toBe("1,5 m");
+    // The minus is U+2212, the same glyph the app's numbers use, and never a hyphen.
+    expect(clearanceTickLabel(-200, false)).not.toContain("-");
+    // The point of the whole exercise: two decimals would have printed « 6,00 ».
+    expect(formatValue("clearance", 6)).toBe("6,00");
+    expect(clearanceTickLabel(6, false)).toBe("6");
   });
 });
 

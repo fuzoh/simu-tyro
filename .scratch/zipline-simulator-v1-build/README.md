@@ -13,10 +13,16 @@ the garde read-out optimistic — and [38](./issues/38-engine-review-refinements
 shape judgement calls. The review re-derived the § 15 fixtures independently and **every value
 reproduces**; neither ticket questions the solved shape.
 
-**39 is an investigation ticket.** [39](./issues/39-clearance-strip-investigation.md) opens the
-« Garde au sol » strip — a reported *surprising curve* and *wrong-looking scale*. The curve's W shape
-is measured as physical; the vertical scale, its ticks and the axis' behaviour when the curve is
-removed are what remain open.
+**39 is an investigation ticket.** [39](./issues/39-clearance-strip-investigation.md) opened the
+« Garde au sol » strip — a reported *surprising curve* and *wrong-looking scale*. The curve's W is
+measured as physical **and as a property of straight two-point terrain**: it reproduces on a textile
+line and on none of the three imported profiles, where the garde has one interior minimum off
+mid-span. The scale is now **quantised with a permanently reserved negative band** (`clearanceDomain()`
+in `contract.ts`), so the zero line no longer sits on the frame's bottom edge and no longer jumps when
+the first step goes negative. **Only item 5 remains open**, blocked on
+[37](./issues/37-engine-correctness-fixes.md): the §11 scan's noise is *visible* in the drawn curve —
+55 direction reversals where the shape has two — and re-measuring it before 37 lands would date the
+figure.
 
 **40 is a presentation ticket.** [40](./issues/40-ui-coherence-and-shadcn-density.md) is the UI
 coherence pass — eight DOM text sizes, a `font-mono` bound to no loaded font, fifteen hand-rolled

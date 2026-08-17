@@ -170,6 +170,12 @@ the two scales are *deliberately mismatched*, which is the whole point (« v1 bu
 - **No chart dimension may read the window height.** Every band height is a function of the chart
   column's inner width; the constants and the vertical-exaggeration policy (the aspect identity,
   the band, the ×1 floor) live in `contract.ts` and are unit-tested there.
+- **The clearance strip's y domain is quantised and always reserves a negative band** —
+  `clearanceDomain()` in `contract.ts`, ticket 39. `step` comes off a 1-2-5 ladder, `top` is a whole
+  number of steps, the floor is `−step` whether or not anything violates, and the ticks are grid
+  multiples carrying the unit on the topmost one. Never `min`/`max` of the data: an auto-fit strip
+  puts the zero line on the frame's bottom edge and then *moves* it the instant one step goes
+  negative, which presents a scale change as a data change on a safety drawing.
 - What the charts draw comes from `@/lib/chart/scene.ts` — a pure `Scenario → ChartScene`
   derivation, so the questions worth testing are `node` tests and the components stay thin.
 - **One sweep per parameter change, at the app root.** `useSceneBase()`

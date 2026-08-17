@@ -12,10 +12,14 @@
  *
  * - **It never stops being a pointer surface.** When the Clearance Gate fails the strip keeps its
  *   axes and stays a scrub track, `x` mapping to rider position whether or not clearance data
- *   exists.
+ *   exists. Its axes are {@link clearanceDomain}'s reference domain there, not a collapsed `[0, 0]`.
  * - **Gaps are drawn as an explicit discontinuity.** Under `Indéterminé` the steps that failed are
  *   holes in the curve — `line.defined()` over the sweep **grid**, not over the solved steps — and
  *   pointer input cannot land in one because it snaps to a solved step.
+ * - **The y domain is quantised and always reserves a negative band** — {@link clearanceDomain},
+ *   ticket 39. Zero is nailed to a constant pixel per tick grid so a first violation cannot present
+ *   a *scale* change as a *data* change, and the band below zero stays blank until something enters
+ *   it. Do not "simplify" this back to `min`/`max` of the data.
  */
 
 import type { PointerEvent as ReactPointerEvent } from "react";
@@ -25,7 +29,7 @@ import { area, line } from "d3-shape";
 import type { ChartScene, SceneFrame } from "@/lib/chart/scene.ts";
 import type { SharedX } from "@/lib/layout/contract.ts";
 
-import { formatValue } from "@/lib/format/quantity.ts";
+import { clearanceDomain, clearanceTickLabel } from "@/lib/layout/contract.ts";
 
 /** One point of the curve: a rider position and its worst clearance, or a hole where a step failed. */
 type Sample = { x: number; y: number | null };
@@ -34,23 +38,44 @@ type Sample = { x: number; y: number | null };
  * The curve, over the **grid** rather than over the solved steps. `sweep` copies each grid value
  * into its step verbatim, so the two match exactly and a failed step is a `null` — the hole the
  * discontinuity draws.
+ *
+ * A hole has no `x_D` of its own, and the two frames are **not** proportional: `s` is arc length
+ * along the cable and `x` is horizontal, so `(s / L₀) × L` misplaces a mid-span hole by ≈1,1 m on the
+ * first-run line (`L₀` 151,644 against `L` 150) and further on a slack one. So a hole's x is
+ * **interpolated between its two nearest solved neighbours' `x_D`** — monotone by construction,
+ * since `x_D` increases with `s` — and falls back to the arc fraction only at a run of holes that
+ * reaches an end of the grid, where there is no neighbour on one side. Ticket 39, item 6.
  */
 function samples(scene: ChartScene): Sample[] {
   const { grid, steps } = scene.traverse;
-  const out: Sample[] = [];
+  const solved: { s: number; x: number }[] = [];
+  const out: { s: number; x: number | null; y: number | null }[] = [];
   let next = 0;
   for (let i = 0; i < grid.length; i++) {
     const step = steps[next];
     if (step !== undefined && step.sD === grid[i]) {
-      out.push({ x: step.xD, y: scene.clearance.perStep[next] });
+      out.push({ s: grid[i], x: step.xD, y: scene.clearance.perStep[next] });
+      solved.push({ s: grid[i], x: step.xD });
       next++;
     } else {
-      // `x_D` is unknown for a step that never solved, so the hole is placed by interpolation on
-      // the span — it carries no value and is never read, only skipped.
-      out.push({ x: (grid[i] / scene.span.L0) * scene.L, y: null });
+      out.push({ s: grid[i], x: null, y: null });
     }
   }
-  return out;
+
+  // One forward walk: `at` is the first solved neighbour at or after the hole, `before` the last one
+  // at or before it. Both present ⇒ interpolate; one missing ⇒ the grid runs off an end.
+  let at = 0;
+  return out.map((point) => {
+    if (point.x !== null) return { x: point.x, y: point.y };
+    while (at < solved.length && solved[at].s < point.s) at++;
+    const after = solved[at];
+    const before = at > 0 ? solved[at - 1] : undefined;
+    if (before !== undefined && after !== undefined) {
+      const t = (point.s - before.s) / (after.s - before.s);
+      return { x: before.x + t * (after.x - before.x), y: null };
+    }
+    return { x: (point.s / scene.span.L0) * scene.L, y: null };
+  });
 }
 
 export function ClearanceStrip({
@@ -88,10 +113,9 @@ export function ClearanceStrip({
 
   const top = 20;
   const bottom = height - 10;
-  const hi = Math.max(0, ...values);
-  const lo = Math.min(0, ...values);
-  const span = hi - lo || 1;
-  const y = (metres: number) => bottom - ((metres - lo) / span) * (bottom - top);
+  const domain = clearanceDomain({ values, wide });
+  const y = (metres: number) =>
+    bottom - ((metres - domain.floor) / (domain.top - domain.floor)) * (bottom - top);
   const zero = y(0);
 
   const curve = line<Sample>()
@@ -132,24 +156,34 @@ export function ClearanceStrip({
           : "Garde au sol (m) — glisser"}
       </text>
 
-      {/* Zero is the line that matters, so it is drawn like one and labelled 6 px inside the pad. */}
-      <line className="stroke-border" x1={x.x(0)} x2={x.x(frame.L)} y1={zero} y2={zero} />
-      <text className="fill-muted-foreground text-[9px]" x={x.gutter - 6} y={zero - 2}>
+      {/* Zero is the threshold this whole chart exists to show a crossing of, so it is drawn in
+          `foreground` rather than in `border` — the token for gridlines that mean nothing — at a
+          hairline, which keeps it visually under the `stroke-2` curve. */}
+      <line className="stroke-foreground" x1={x.x(0)} x2={x.x(frame.L)} y1={zero} y2={zero} />
+      <text
+        className="fill-muted-foreground text-[9px]"
+        textAnchor="end"
+        x={x.gutter - 4}
+        y={zero - 2}
+      >
         0
       </text>
-      {/* Two clearance ticks at narrow, three when there is room — at the **same** B1 threshold,
-          so the strip needs no breakpoint of its own. A tick that would sit on the zero line is
+      {/* The grid's ticks, right-aligned **inside** the gutter — the previous labels ran on the
+          implicit `start` anchor from x = 18 and overlaid the first metres of the curve. Round
+          labels are ≤ 20 px at 9 px, so 24 px of gutter now holds them; `profile.tsx` sets its own
+          anchor at every tick for the same reason. A tick that would collide with the zero label is
           dropped rather than drawn twice. */}
-      {(wide ? [hi, (hi + lo) / 2, lo] : [hi, lo])
+      {domain.ticks
         .filter((tick) => Math.abs(y(tick) - zero) > 8)
-        .map((tick) => (
+        .map((tick, index) => (
           <text
             className="fill-muted-foreground text-[9px]"
             key={tick}
-            x={x.gutter - 6}
+            textAnchor="end"
+            x={x.gutter - 4}
             y={y(tick) + 3}
           >
-            {formatValue("clearance", tick)}
+            {clearanceTickLabel(tick, index === 0)}
           </text>
         ))}
 
