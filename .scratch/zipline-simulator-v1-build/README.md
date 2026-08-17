@@ -24,6 +24,23 @@ the first step goes negative. **Only item 5 remains open**, blocked on
 55 direction reversals where the shape has two — and re-measuring it before 37 lands would date the
 figure.
 
+**41 re-opened the strip's *quantity*, not 39's reading, and closed 2026-08-17.**
+[41](./issues/41-clearance-curve-plots-the-envelope.md) came from a second user report of the same
+day: the curve rises while the passenger descends at both ends, the dimension line is not under the
+passenger, the y axis tops out at 10 m on a line whose passenger arrives 17,9 m above the ground, and
+the curve goes flat while the passenger climbs three metres. **One cause:** the strip plots § 11's
+*inner minimum over the whole line* on an axis that reads « selon la position du passager ». The
+engine is right and 39's W is still physical. **The curve kept its quantity** — putting the garde
+under the passenger on the same linear axis is refuted by measurement, not by layout: on
+`example-profile-trace1.csv` at ancrages 12 / 2 every one of the 260 rider positions violates, the
+envelope minimum runs −0,36 m against a ridge while the passenger flies a valley at +62,6 m, and one
+shared domain leaves the zero crossing **0,2 px** tall at the reference column. What landed instead is
+**shape B+**: the strip's caption, `aria` and the read-out cell now name the *line's* minimum
+(« Garde min. ligne »), and the passenger's own garde is drawn where it is metrically true — a second
+clearance dimension on the **profile** at `x_D`, self-hiding under the same
+`max(1 m, 1 % de la portée)` bit that relabels the cell. It carries **amendment M**, because § 5 fixes
+both caption strings verbatim and the cell's label in five places. `src/lib/sim/**` untouched.
+
 **40 is a presentation ticket.** [40](./issues/40-ui-coherence-and-shadcn-density.md) is the UI
 coherence pass — eight DOM text sizes, a `font-mono` bound to no loaded font, fifteen hand-rolled
 buttons beside a `src/components/ui/` holding one component nobody renders, and an un-tokenised

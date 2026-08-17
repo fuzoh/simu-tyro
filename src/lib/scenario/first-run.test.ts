@@ -323,7 +323,7 @@ describe("the opening state — § 9's measured table, from FIRST_RUN_SCENARIO",
     expect(opening.verdict.ends.A.FS).toBeLessThan(opening.verdict.ends.B.FS);
   });
 
-  test("x_D 75,0 m sits inside max(1 m, 1 % de la portée) of the minimum — « Garde min », plainly", () => {
+  test("x_D 75,0 m sits inside max(1 m, 1 % de la portée) of the minimum — « Garde min. ligne », plainly", () => {
     // 0,9 m from 74,1: the clearance cell must not relabel itself to a position scope on first
     // paint. This is why the rider ships at `L/2` and why the two blocks read 2,49 and 2,44.
     const window = Math.max(1, 0.01 * opening.L);

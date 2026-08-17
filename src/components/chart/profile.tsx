@@ -12,6 +12,11 @@
  * - **Always on**: terrain, the loaded cable, both anchors, the rider with its `h_rider` envelope,
  *   the clearance dimension line, the VE badge, and the danger bands *whenever a violation exists*.
  *   The bands **self-hide**, so they are never chrome.
+ * - **Two clearance dimensions, and the second one self-hides too.** The governing dimension is
+ *   drawn at §11's minimum wherever it sits; the passenger's own garde is drawn at `x_D`, and **only
+ *   while `relabel` says the two are further apart than `max(1 m, 1 % de la portée)`** (ticket 41).
+ *   This plot is where that second quantity belongs: it has a z scale, the ground and the passenger,
+ *   and the strip's y axis measurably cannot hold both — voir `scene.ts`.
  * - **Exactly two toggles**: « ligne à vide » (off) and « corde A–B » (on), both from the Session.
  * - **The rider envelope stays metric** — never drawn at a minimum pixel size. At 1500 m it is
  *   ~5 px tall, and a non-metric glyph would misrepresent the one measurement the tool exists to
@@ -60,8 +65,8 @@ export function Profile({
 }: {
   /**
    * May the clearance layers be drawn? A Clearance Gate breach removes **the garde and its curve
-   * alone** (§ 7), which here is the dimension line, the danger bands and signal 4's cable-red —
-   * every one of them computed from the anchor height or the envelope the gate has refused. The
+   * alone** (§ 7), which here is **both** dimension lines, the danger bands and signal 4's cable-red
+   * — every one of them computed from the anchor height or the envelope the gate has refused. The
    * cable, both anchors and the terrain carry on: that is the whole reason the gates are three.
    */
   clearance?: boolean;
@@ -129,6 +134,24 @@ export function Profile({
       if (event.currentTarget.hasPointerCapture(event.pointerId)) scrub(event);
     },
   };
+
+  /**
+   * One clearance dimension's endpoints — « **from the drawn ground at `atX`, up by the value** ».
+   *
+   * Both dimension lines go through it, so the convention cannot drift between them — which is
+   * ticket 41's own theme one level down: a garde is a length, and the drawn length has to *be* the
+   * number rather than be re-derived from the cable's pixels. A negative garde therefore draws
+   * **below** the ground, never clamped, in both of them.
+   *
+   * The drawn ground and the engine's `Terrain` are the same data inside `[0, L]` (`scene.ts` holds
+   * the ends exactly as `zGroundAt` does), so reading `groundAt` here does not make the drawn length
+   * disagree with the number `scene.ts` computed.
+   */
+  function dimension(atX: number, hClear: number) {
+    const base = groundAt(ground, atX);
+    const at = x.x(atX);
+    return { x1: at, x2: at, y1: z.y(base), y2: z.y(base + hClear) };
+  }
 
   /**
    * One Station handle's drag. **The press only takes the pointer** — unlike the rider's, which
@@ -260,10 +283,48 @@ export function Profile({
                   rider.worst.hClear < 0 ? "stroke-destructive" : "stroke-muted-foreground",
                 )}
                 strokeDasharray="2 2"
-                x1={x.x(rider.worst.atX)}
-                x2={x.x(rider.worst.atX)}
-                y1={z.y(groundAt(ground, rider.worst.atX))}
-                y2={z.y(groundAt(ground, rider.worst.atX) + rider.worst.hClear)}
+                {...dimension(rider.worst.atX, rider.worst.hClear)}
+              />
+            )}
+
+            {/* **The passenger's own garde** — ticket 41. The reported symptom was that the strip's
+                curve *rises* while the passenger visibly descends toward the ground; it is right —
+                the curve is §11's minimum over the whole line, and a rider near an anchor lifts
+                mid-span — but the app drew that second quantity nowhere, so the reader was computing
+                it by eye off this plot and reading the answer off a curve that does not carry it.
+                `SceneRider`'s `underRider` carries it now, dimensioned the same way its sibling above
+                is: from the drawn ground up by the value, so the drawn length **is** the number and
+                neither line re-derives a garde from pixels.
+
+                Gated on `relabel`, the bit that already relabels the cell « Garde min. ligne (à x
+                49 m) »: inside `max(1 m, 1 % de la portée)` the two dimensions coincide and a second
+                stroke 0,3 m away reads as a drawing fault, so the drawing and the label fire
+                together.
+
+                **Never red on its own account**, and § 5's four coordinated signals gain no fifth
+                member here: `underRider` is one candidate in `worst.hClear`'s own minimum, so a
+                negative garde under the rider means a negative `worst.hClear`, and signal 4 has
+                already turned the cable and the rider red. That holds *in exact arithmetic*; the
+                shipped scan can report `worst.hClear` up to 99 mm above `underRider` (the kink its
+                grid never lands on — voir `SceneRider.underRider`), so there is a sub-decimetre window
+                where this line dips below the ground while the cable is still black. It is **≤1,2 px
+                of line** at § 5's reference column, it is ticket 37's residual and not a state of its
+                own, and colouring it here would mint a signal § 5 did not.
+
+                **No leader between the two, and that is measured rather than a taste** (browser
+                evidence, this ticket): both dimensions' tops sit on *one* curve — the cable offset
+                down by `h_rider` — because `worst.hClear` is `z_cable(atX) − z_ground − h_rider` and
+                `underRider` is the same three terms at `x_D`. Any straight connector between them is
+                therefore a **chord of the cable**, and it measured **7,63 px** from the `stroke-2`
+                cable at the reference column with the rider at an anchor — ≈2,4 px once the plot
+                scales to 390 px, which is a dotted line shadowing the subject. The two dimensions
+                standing at two `x`s, plus the cell's own « (à x 74,3 m) », are the two channels that
+                say the number is not under the passenger. */}
+            {clearance && rider.relabel && (
+              <line
+                className="stroke-muted-foreground/60"
+                strokeDasharray="1 3"
+                {...dimension(rider.step.xD, rider.underRider)}
               />
             )}
 

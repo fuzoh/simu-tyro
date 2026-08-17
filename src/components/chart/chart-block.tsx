@@ -321,18 +321,22 @@ export function ChartBlock({
     rider === null
       ? null
       : {
-          "Garde min": clearance
+          // `rider.worst.hClear` is §11's minimum **over the whole line** at this rider position,
+          // and the label says `ligne` for that reason — ticket 41. It is the same number the
+          // strip's curve carries, and it is **not** the garde under the passenger, which the
+          // profile dimensions at `x_D` and nothing prints.
+          "Garde min. ligne": clearance
             ? {
                 label: rider.relabel
-                  ? `Garde min (à x ${formatValue("extremumX", rider.worst.atX)} m)`
-                  : "Garde min",
+                  ? `Garde min. ligne (à x ${formatValue("extremumX", rider.worst.atX)} m)`
+                  : "Garde min. ligne",
                 value: formatQuantity("clearance", rider.worst.hClear),
                 note: false,
               }
             : // The one cell a Clearance Gate breach takes: it says **why** rather than printing a
               // number computed from the refused anchor height, and rather than « — », which is
               // `Indéterminé`'s glyph — *tenté, indisponible* — and not this state.
-              { label: "Garde min", value: GATE_CONSEQUENCE.clearance, note: true },
+              { label: "Garde min. ligne", value: GATE_CONSEQUENCE.clearance, note: true },
           "T anc. A": {
             label: "T anc. A",
             value: formatQuantity("Tstatic", rider.step.TA, unit),

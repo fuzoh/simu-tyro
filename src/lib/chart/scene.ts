@@ -39,6 +39,13 @@
  * - **The clearance cell reports §11's inner minimum at the current rider position**, and the
  *   dimension line is drawn wherever that minimum actually sits — which is why it can step sideways
  *   onto a bump the rider has already passed.
+ * - **Two clearances, and only one of them is a criterion.** {@link SceneRider.worst} is §11's
+ *   reducer — the strip's curve, the read-out cell, the deficit fill and the zero crossing are all
+ *   it, because it is what fails. {@link SceneRider.underRider} is the passenger's own garde, drawn
+ *   by `profile.tsx` and judged by nothing. Ticket 41 measured why they may not share the strip's y
+ *   axis: on an imported profile the passenger flies a valley at **+62,6 m** while the envelope
+ *   minimum sits at **−0,36 m** against a ridge, so one linear axis leaves the crossing this whole
+ *   Chart Block exists to show **0,2 px** tall at § 5's reference column.
  * - **Terrain enters at one joint.** `deriveTerrain` builds the engine's `Terrain` over `[0, L]`;
  *   the *drawn* ground spans the whole shared domain, holding the ends exactly as `zGroundAt` does.
  */
@@ -67,6 +74,7 @@ import {
   solveSpan,
   sweep,
   sweepStep,
+  zGroundAt,
 } from "@/lib/sim";
 import { altitudeAt, deriveSpan, deriveTerrain } from "@/lib/terrain/trace.ts";
 
@@ -97,8 +105,30 @@ export type SceneRider = {
   /** §11's **inner** minimum at this rider position: the worst clearance, and where it sits. */
   readonly worst: { readonly hClear: number; readonly atX: number };
   /**
+   * « Garde sous le passager », m — `z_D − z_ground(x_D) − h_rider`, the clearance under the rider's
+   * **own feet** rather than at {@link worst}'s governing point.
+   *
+   * It is **not** a second criterion and nothing judges it: it exists because it is the quantity the
+   * reader computes by eye off the profile — passenger glyph against filled terrain — and until
+   * ticket 41 the app drew it nowhere while the strip's curve, on an axis captioned « selon la
+   * position du passager », carried {@link worst} instead. `profile.tsx` dimensions it at `x_D`; the
+   * strip and the read-out cell stay {@link worst}'s, which is what §11 reduces and §10 judges.
+   *
+   * `underRider ≥ worst.hClear` **by construction** — it is `h_clear` evaluated at `x = x_D`, one
+   * candidate in the inner minimum. The shipped scan violates that by up to **99 mm**, on roughly half
+   * the sweep's steps (142 / 260 on the first-run line, 123 / 260 at ancrages 12 / 20), because its 60
+   * uniform samples in `s` never land on the trolley kink, which is the loaded catenary's own low
+   * point. That is
+   * [ticket 37](../../../.scratch/zipline-simulator-v1-build/issues/37-engine-correctness-fixes.md)
+   * item 1 measured from the chart, worth ≈0,5 px at § 5's reference column, and **not** ticket 41's
+   * to fix.
+   */
+  readonly underRider: number;
+  /**
    * Is the worst point further than `max(1 m, 1 % de la portée)` from the rider? The cell relabels
-   * itself « Garde min (à x 101 m) » only then, so the ordinary case reads plainly.
+   * itself « Garde min. ligne (à x 101 m) » only then, so the ordinary case reads plainly — **and
+   * the same bit gates the profile's second dimension line**, so the drawing and the label say « the
+   * number is not under the passenger » together or not at all (ticket 41).
    */
   readonly relabel: boolean;
   /** Signal 4 — « suis-je dans la zone en ce moment ? ». Cable-red is reserved for this. */
@@ -480,6 +510,10 @@ export function placeRider(base: SceneBase, requestedXD: number): SceneRider | n
     step,
     cable: polyline(sampleCable(state, CABLE_SAMPLES)),
     worst,
+    // The same three terms as §11's `h_clear`, read at the rider's own `x` instead of minimised
+    // over the line — voir {@link SceneRider.underRider}. `z_D` is exact here (the trolley sits on
+    // the kink), so this is the one clearance in the app that carries no scan error at all.
+    underRider: step.zD - zGroundAt(terrain, step.xD) - hRider,
     // « Only when the worst point is further than max(1 m, 1 % of span) from the rider », which is
     // why the first-run rider ships 0,9 m from the traverse minimum: the cell must not relabel
     // itself on first paint.

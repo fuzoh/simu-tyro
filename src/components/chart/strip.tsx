@@ -8,6 +8,25 @@
  * also why **no `<input type="range">` exists anywhere in the app** — a rail slider maps to nothing
  * spatially, and this axis *already is* rider position.
  *
+ * **What the curve is, stated because it was read wrong** — ticket 41. `y` is §11's inner minimum
+ * **over the whole line** at that rider position, `min over x of h_clear(x; x_P)`; `x` is the rider
+ * position that parameterises it. So the curve is a function *of* the passenger's position and its
+ * value is **not** the passenger's own garde, which is `profile.tsx`'s dimension line at `x_D`. The
+ * caption, the axis and that cell all name the line's minimum for that reason. Three consequences
+ * are honest and are **not** defects: the curve rises at both ends while the passenger descends (a
+ * rider near an anchor raises `H`, which lifts mid-span, so the worst point on the line gains
+ * clearance exactly while the rider loses it — ticket 39 measured this and closed it as physical);
+ * the y axis tops out at the *envelope's* ceiling, which is below the passenger's garde near an
+ * anchor; and the curve can go flat over metres of traverse where the passenger is climbing.
+ *
+ * **Why the passenger's garde may not simply be a second stroke in here**, measured on ticket 41's
+ * scenarios: the two quantities are not the same order of magnitude. On an imported profile the
+ * passenger flies a valley at **+62,6 m** while the envelope minimum sits at **−0,36 m** against a
+ * ridge, so one shared linear domain leaves the envelope curve **0,2 px** tall at § 5's reference
+ * column — 100 % of the crossing gone — and 67 % gone on a violating manual line at 390 px. The
+ * deficit fill, the zero crossing and {@link clearanceDomain}'s input therefore stay this one
+ * quantity, which is the one that fails and the one §10's verdict judges.
+ *
  * Two rules that outlive any redesign of it:
  *
  * - **It never stops being a pointer surface.** When the Clearance Gate fails the strip keeps its
@@ -31,7 +50,10 @@ import type { SharedX } from "@/lib/layout/contract.ts";
 
 import { clearanceDomain, clearanceTickLabel } from "@/lib/layout/contract.ts";
 
-/** One point of the curve: a rider position and its worst clearance, or a hole where a step failed. */
+/**
+ * One point of the curve: a rider position and **the line's** worst clearance at it, or a hole where
+ * a step failed. Not the garde under the rider — voir the module docblock.
+ */
 type Sample = { x: number; y: number | null };
 
 /**
@@ -137,7 +159,7 @@ export function ClearanceStrip({
 
   return (
     <svg
-      aria-label="Garde au sol selon la position du passager"
+      aria-label="Garde au sol minimale de la ligne selon la position du passager"
       className="block h-full w-full touch-pan-y select-none"
       height={height}
       onPointerDown={(event) => {
@@ -151,9 +173,14 @@ export function ClearanceStrip({
       width={x.width}
     >
       <text className="fill-muted-foreground text-[10px]" x={x.gutter} y={12}>
+        {/* The caption names **both** scopes, because naming one is how the curve came to be read as
+            the other: « de la ligne » is what `y` reduces over, « selon la position du passager » is
+            what `x` is. The narrow variant keeps the first and drops the second — the axis itself is
+            rider position and the marker is on it, while the y quantity has nothing else on screen
+            saying what it minimises over. Ticket 41. */}
         {wide
-          ? "Garde au sol (m) selon la position du passager — glisser pour déplacer"
-          : "Garde au sol (m) — glisser"}
+          ? "Garde min. de la ligne (m) selon la position du passager — glisser pour déplacer"
+          : "Garde min. de la ligne (m) — glisser"}
       </text>
 
       {/* Zero is the threshold this whole chart exists to show a crossing of, so it is drawn in

@@ -18,6 +18,7 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { exaggeration, PLOT_ASPECT_BAND, PROFILE_ASPECT, VE_BAND } from "@/lib/layout/contract.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
+import { CLEARANCE } from "@/lib/sim";
 
 import {
   buildScene,
@@ -82,7 +83,7 @@ describe("the first-run scene — § 9's opening screen, drawn", () => {
     expect(snapped).not.toBe(75);
   });
 
-  it("reads « Garde min » plainly on first paint — the cell does not relabel itself", () => {
+  it("reads « Garde min. ligne » plainly on first paint — the cell does not relabel itself", () => {
     // 0,9 m from the traverse minimum, inside `max(1 m, 1 % de la portée)`. This is *why* the
     // shipped rider sits at `L/2`.
     expect(first.rider.relabel).toBe(false);
@@ -193,6 +194,113 @@ describe("clearance failure — the four signals' inputs", () => {
     const slack = scene(deepSlack());
     expect(slack.clearance.contact).toBe("cable");
     expect(slack.clearance.hMin).toBeCloseTo(-169.67, 1);
+  });
+});
+
+/**
+ * Ticket 41 — the two clearances, and which of them is a criterion.
+ *
+ * `worst` is §11's inner minimum over the whole line at this rider position: the strip's curve, the
+ * read-out cell, the deficit fill and the zero crossing. `underRider` is the garde under the
+ * passenger's own feet, drawn by `profile.tsx` and judged by nothing. The reported symptom was the
+ * two being confused, so what is pinned here is that they are **different numbers with a fixed
+ * ordering**, and that the bit which gates the drawing fires exactly where they diverge.
+ */
+describe("ticket 41 — the line's minimum against the garde under the passenger", () => {
+  /** The solved half a rider is placed on — the `null` arm is « Aucun résultat », not these cases. */
+  function solved(scenario: ScenarioDraft) {
+    const built = buildSceneBase(sceneInputs(scenario, null));
+    if (built === null) throw new Error("expected a solvable base");
+    return built;
+  }
+
+  const base = solved(firstRunDefaults());
+  /** Ticket 41's scenario **B** — « ancrage d'arrivée à 20 m », the reported line. */
+  const tall = solved({ ...firstRunDefaults(), anchors: { zA: 12, zB: 20 } });
+
+  function at(from: ReturnType<typeof solved>, xD: number) {
+    const placed = placeRider(from, xD);
+    if (placed === null) throw new Error(`expected a rider at x_D ${xD}`);
+    return placed;
+  }
+
+  it("at an anchor the passenger's garde is that anchor's own height, less h_rider", () => {
+    // The frame check that makes every other figure here readable: at `x_D` 0 the trolley sits on
+    // anchor A's top, so the garde under it is `z_A − h_rider` exactly and depends on no solve at
+    // all. It is also the sharpest form of the reported symptom — the passenger arrives 17,90 m
+    // above the ground while the curve beneath them reads 7,22.
+    expect(at(base, 0).underRider).toBeCloseTo(12 - 2.1, 5);
+    expect(at(base, 150).underRider).toBeCloseTo(12 - 2.1, 5);
+    expect(at(tall, 150).underRider).toBeCloseTo(20 - 2.1, 4);
+    expect(formatQuantity("clearance", at(tall, 150).underRider)).toBe("17,90 m");
+    // And the curve there is the *unloaded line's* own minimum, 74 m away — ticket 39's measurement,
+    // reached through `placeRider` rather than through the sweep.
+    expect(formatQuantity("clearance", at(tall, 150).worst.hClear)).toBe("7,22 m");
+    // `atX` is a **position of a scanned extremum**, so `testing.md`'s bar for it is absolute at
+    // **2× the sample spacing** — `L₀ / CLEARANCE.samplesPerStep` — and not the value's own digits.
+    // Measured 49,28 m; asserting that to two decimals would claim a resolution the scan grid does
+    // not have. What the case needs anyway is that it is nowhere near the rider at `x_D` 150.
+    const spacing = tall.span.L0 / CLEARANCE.samplesPerStep;
+    expect(Math.abs(at(tall, 150).worst.atX - 49.28)).toBeLessThan(2 * spacing);
+    expect(at(tall, 150).step.xD - at(tall, 150).worst.atX).toBeGreaterThan(100);
+  });
+
+  it("the two differ on the shipped screen, and the printed one is the optimistic one", () => {
+    // `underRider ≥ worst.hClear` is the true ordering — the garde under the rider is `h_clear` at
+    // `x = x_D`, one candidate in the inner minimum. On the first-run screen the shipped scan
+    // reports it **65 mm the other way**, because its 60 uniform samples in `s` never land on the
+    // trolley kink, which is the loaded catenary's own low point. That is ticket 37 item 1 measured
+    // from the chart; ≈0,5 px at § 5's reference column, and not ticket 41's to fix.
+    const here = at(base, 75);
+    expect(formatQuantity("clearance", here.worst.hClear)).toBe("2,48 m");
+    expect(formatQuantity("clearance", here.underRider)).toBe("2,42 m");
+    // `[MEASURED]` tier — `max(1e-3 · |expected|, 0,5 · 10⁻ᵈ)` for a value recorded to `d` decimals,
+    // so the record carries the digits the assertion asks for rather than the other way round.
+    expect(here.worst.hClear - here.underRider).toBeCloseTo(0.06455, 4);
+  });
+
+  it("the ordering holds over the whole traverse, to the scan's own error", () => {
+    // **`worst.hClear ≤ underRider` is the invariant** — the inner minimum cannot exceed one of its
+    // own candidates — and the bound is the scan's error, not zero, because its 60 uniform samples in
+    // `s` never land on the trolley kink. This is the guard against a wrong `underRider`: a sign slip,
+    // a missing `h_rider` or the drawn ground read instead of the engine's all leave the excess in
+    // metres. **One-sided on purpose.** The other direction is physical and unbounded — a rider at an
+    // anchor has 5,995 m more under their feet than the line's worst point on the first-run scenario —
+    // so `Math.abs` here would assert that legitimate gap away.
+    //
+    // It also does **not** pin ticket 37's defect as present: 37's fix moves the excess toward zero
+    // and this case only gets safer. Today it is 99,3 mm at ancrages 12 / 20 (`x_D` 40,01) and 88,5 mm
+    // on the first-run line (`x_D` 65,01) — recorded here rather than asserted, so nothing in this
+    // suite has to change when the engine's does.
+    for (const from of [base, tall]) {
+      let excess = 0;
+      let gap = 0;
+      for (const step of from.traverse.steps) {
+        const placed = placeRider(from, step.xD);
+        if (placed === null) continue;
+        excess = Math.max(excess, placed.worst.hClear - placed.underRider);
+        gap = Math.max(gap, placed.underRider - placed.worst.hClear);
+      }
+      expect(excess).toBeLessThan(0.1);
+      // And the legitimate direction is really there — metres of it, which is the whole reason the
+      // profile draws the second dimension at all.
+      expect(gap).toBeGreaterThan(1);
+    }
+  });
+
+  it("`relabel` gates the second dimension line, and fires where the two diverge", () => {
+    // Inside `max(1 m, 1 % de la portée)` the two dimensions coincide and one stroke is the whole
+    // truth; past it the profile draws a second one at `x_D` and the cell says « (à x 49 m) ». One
+    // bit, so the drawing and the label cannot disagree.
+    const middle = at(tall, 75);
+    expect(middle.relabel).toBe(false);
+    expect(Math.abs(middle.underRider - middle.worst.hClear)).toBeLessThan(0.1);
+
+    const tailEnd = at(tall, 148.84);
+    expect(tailEnd.relabel).toBe(true);
+    // 101,9 m of separation at the extreme; 9,476 m between the two numbers here.
+    expect(Math.abs(tailEnd.worst.atX - tailEnd.step.xD)).toBeGreaterThan(100);
+    expect(tailEnd.underRider - tailEnd.worst.hClear).toBeCloseTo(9.476, 2);
   });
 });
 

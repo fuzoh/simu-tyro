@@ -84,8 +84,9 @@ export const FIRST_RUN_SCENARIO = {
    * Gate input, so 120 kg is what keeps the opening screen solvable. `DAF` 1,2 is §8.2's
    * `[FIELD:SSF]` measured ceiling: a popover, **no « non confirmé » chip**. `x_D` = `L/2`, the
    * only neutral choice — and 0,9 m from the traverse minimum, inside the
-   * `max(1 m, 1 % de la portée)` rule, so the clearance cell reads plainly « Garde min » on first
-   * paint instead of relabelling itself.
+   * `max(1 m, 1 % de la portée)` rule, so the clearance cell reads plainly « Garde min. ligne » on
+   * first paint instead of relabelling itself — **and** the profile draws one clearance dimension
+   * rather than two, since ticket 41 gates its second one on the same bit.
    */
   rider: { mp: 120, hRider: 2.1, DAF: 1.2, xD: 75 },
 } as const satisfies Scenario;

@@ -1030,6 +1030,46 @@ describe("ticket 39 — the clearance strip's quantised y domain", () => {
     expect(formatValue("clearance", 6)).toBe("6,00");
     expect(clearanceTickLabel(6, false)).toBe("6");
   });
+
+  /**
+   * Ticket 41's decision, as arithmetic rather than as a paragraph: the strip's domain is fed the
+   * **line's** minimum alone, and the reason is that admitting the second quantity — the garde under
+   * the passenger — costs the crossing most of its band. What is pinned is the domain span, since
+   * that is what any fixed pixel height divides: `top − floor` doubling halves every excursion drawn
+   * in it, whatever the strip's own height turns out to be.
+   */
+  it("admitting the passenger's own garde to this domain would cost the crossing its band", () => {
+    // Ticket 41's scenario **B** — ancrages 12 / 20, the reported line. Envelope 7,223…8,923 m
+    // against a passenger who arrives with 17,896 m under their feet (`z_B` 20 − `h_rider` 2,1).
+    const envelope = [7.2235, 8.9227];
+    const withPassenger = [...envelope, 17.8963];
+
+    const line = clearanceDomain({ values: envelope, wide: true });
+    const both = clearanceDomain({ values: withPassenger, wide: true });
+    expect({ step: line.step, top: line.top, floor: line.floor }).toStrictEqual({
+      step: 5,
+      top: 10,
+      floor: -5,
+    });
+    expect({ step: both.step, top: both.top, floor: both.floor }).toStrictEqual({
+      step: 10,
+      top: 20,
+      floor: -10,
+    });
+    // 15 m of domain against 30 — the envelope curve is drawn at **half** the pixels, at every width
+    // and every strip height, and this is the mild case.
+    expect(both.top - both.floor).toBe(2 * (line.top - line.floor));
+
+    // The case that decides it. `example-profile-trace1.csv` with ancrages 12 / 2: every one of the
+    // 260 rider positions violates, the envelope minimum runs −0,364…−0,115 m against a ridge, and
+    // the passenger flies a valley at +62,6 m. 0,6 m of domain against 150 — the crossing keeps
+    // **1/250** of its band, which at § 5's reference column is 60,8 px becoming 0,2.
+    const ridge = clearanceDomain({ values: [-0.3638, -0.1152], wide: true });
+    const valley = clearanceDomain({ values: [-0.3638, -0.1152, 62.6019], wide: true });
+    expect(ridge.top - ridge.floor).toBeCloseTo(0.6, 9);
+    expect(valley.top - valley.floor).toBe(150);
+    expect((valley.top - valley.floor) / (ridge.top - ridge.floor)).toBeCloseTo(250, 6);
+  });
 });
 
 /**

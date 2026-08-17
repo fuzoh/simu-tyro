@@ -28,11 +28,14 @@
  *   conforme », and it **always names the chosen régime inside the sentence**, so the claim is about
  *   the rule the user picked rather than about the law. That, the five states and « ce que cet outil
  *   ne calcule pas » are the three things that keep the app from reading as an attestation.
- * - **Scope discipline: traversée against position.** « Garde min (traversée) » and the strip's
- *   « Garde min (à x 101 m) » are two different numbers under near-identical labels, and only the
- *   first is what the verdict judges. Three redundant channels carry the distinction, and this
- *   module owns two of them: the section's « sur toute la traversée » and the `(traversée)`
+ * - **Scope discipline: traversée against position.** « Garde min (traversée) » and the read-out
+ *   row's « Garde min. ligne (à x 101 m) » are two different numbers under near-identical labels, and
+ *   only the first is what the verdict judges. Three redundant channels carry the distinction, and
+ *   this module owns two of them: the section's « sur toute la traversée » and the `(traversée)`
  *   parenthesis on each label. The third — « à la position du passager » — is the read-out row's.
+ *   The row's own label gained `ligne` with **amendment M** (ticket 41), which widens the gap between
+ *   the two rather than touching either channel here: `ligne` reduces over `x`, `traversée` over
+ *   `x_P`.
  *   The aggregates additionally **name the rider position that produced them**, which is what makes
  *   2,49 m and 2,44 m read as two answers rather than as a rounding bug.
  * - **The grid's empty cells are legitimate.** `T adm` is per end because `η_t` is; the

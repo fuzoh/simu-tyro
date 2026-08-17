@@ -176,6 +176,15 @@ the two scales are *deliberately mismatched*, which is the whole point (« v1 bu
   multiples carrying the unit on the topmost one. Never `min`/`max` of the data: an auto-fit strip
   puts the zero line on the frame's bottom edge and then *moves* it the instant one step goes
   negative, which presents a scale change as a data change on a safety drawing.
+- **The strip's curve is the *line's* minimum, and the passenger's own garde is the profile's** —
+  ticket 41. `y` is § 11's inner minimum over the whole line at that rider position, so the strip's
+  caption, its `aria-label` and the « Garde min. ligne » cell all name that scope; the garde under the
+  rider's feet (`SceneRider.underRider`) is a second clearance dimension on the **profile** at `x_D`,
+  self-hiding under the same `max(1 m, 1 % de la portée)` bit that relabels the cell. The two may not
+  share the strip's y axis: they differ by two orders of magnitude on real relief — an imported profile
+  at low anchors has every rider position violating at −0,36 m while the passenger flies a valley at
+  +62,6 m — so one linear domain leaves the zero crossing **0,2 px** tall. Whatever the curve is,
+  `clearanceDomain()` is fed **that** quantity and nothing else.
 - What the charts draw comes from `@/lib/chart/scene.ts` — a pure `Scenario → ChartScene`
   derivation, so the questions worth testing are `node` tests and the components stay thin.
 - **One sweep per parameter change, at the app root.** `useSceneBase()`

@@ -6,10 +6,12 @@
 2026-08-15, closing the last open decisions of the v1 build: the `pinned + x` row (**H**), the
 published first-run VE (**I**), § 7's two scrub readings (**J**), and the keyboard's focus-into-view
 with its companion ruling on `contract.test.ts` (**K**). **L** was taken 2026-08-16, on ticket 40's
-UI-coherence pass, and moves § 5's B1 threshold. They **supersede** the spec where they
-collide, and the spec's affected paragraphs point here. Everything else in the spec stands.
+UI-coherence pass, and moves § 5's B1 threshold. **M** was taken 2026-08-17, on ticket 41's second
+strip report, and moves § 5's two strip captions, the read-out cell's label and its Layers list. They
+**supersede** the spec where they collide, and the spec's affected paragraphs point here. Everything
+else in the spec stands.
 
-This file is the single source of truth for **all twelve**. Do not copy their content into a ticket —
+This file is the single source of truth for **all thirteen**. Do not copy their content into a ticket —
 tickets link here. A build decision that amends the spec gets a letter here; one that only records
 how a ticket was executed does not.
 
@@ -894,3 +896,66 @@ reservation — a 288 px rail does not spend permanent pixels against a value th
 and **no `tabular-nums`**, because a rule whose stated reason is false is a rule the next reader
 deletes for the wrong reason. Anyone re-opening column stability reads this paragraph first: the
 defect it names is not the defect § 2 named.
+
+---
+
+## M · The strip's curve names the *line's* minimum, and the rider's garde is the profile's
+
+**Taken 2026-08-17**, on the second user report about the « Garde au sol » strip and the four
+decisions that closed [ticket 41](./issues/41-clearance-curve-plots-the-envelope.md) (« the graph
+rises while the passenger gets closer to the floor »).
+
+**Supersedes**, all in § 5:
+
+| | § 5 says | Now |
+| --- | --- | --- |
+| the strip's two captions, **verbatim** | « Garde au sol (m) selon la position du passager — glisser pour déplacer » above B1, « Garde au sol (m) — glisser » below | « **Garde min. de la ligne** (m) selon la position du passager — glisser pour déplacer », « **Garde min. de la ligne** (m) — glisser ». The `aria-label` follows: « Garde au sol **minimale de la ligne** selon la position du passager » |
+| the read-out cell's label — both budget diagrams, the `pinned` and `compact` rows, the three-column wrap sketch, and § 6's relabel | « Garde min », « Garde min (à x 1010 m) » | « **Garde min. ligne** », « **Garde min. ligne** (à x 1010 m) » |
+| *Layers — a fixed always-on set*, « Always on: … **the clearance dimension line** » | one dimension line | **two**, the second self-hiding — voir 2 below |
+
+**Not superseded, and load-bearing:** the Rail's « Garde min (traversée) », the read-out row's
+« à la position du passager », and § 5's « Garde min and its position qualifier are non-negotiable at
+every width ». All three stand, and the rename **sharpens** the scope discipline § 6 rests on rather
+than touching it — `ligne` reduces over `x`, `traversée` over `x_P`.
+
+### 1 · Why the strings moved: the curve and the cell were being read as the rider's own garde
+
+The strip plots §11's **inner minimum over the whole line** at each rider position, and the read-out
+cell prints that same number. The axis it sits on and the row above it read « selon la position du
+passager » / « à la position du passager » — which means *for* that position, and was read as *under*
+that passenger. Four reported symptoms follow from that one reading, and ticket 41 measures all four.
+The engine is right: §11's reducer, its §15 fixtures and the aggregate `h_min` the verdict judges are
+untouched, and so is `clearanceDomain`.
+
+### 2 · Why the second quantity is a dimension line on the profile, not a second stroke in the strip
+
+**The two quantities are not the same order of magnitude, and one linear axis destroys the smaller
+one.** The strip's own y domain fed the envelope alone, against a domain that also admits the garde
+under the rider — the envelope curve's drawn height, same strip, same width:
+
+| Scenario | column | envelope-only | shared axis |
+| --- | --- | --- | --- |
+| ancrages 12 / 20 | 390 | 14,9 px | 7,5 px |
+| violating 12 / 6 | 390 | 42,5 px | 14,2 px |
+| `example-profile-trace1.csv`, ancrages 12 / 2 | 1152 | 60,8 px | **0,2 px** |
+
+On that imported profile all 260 rider positions violate, the envelope minimum runs −0,36 m against a
+ridge, and the rider flies a valley at **+62,6 m**. § 5's deciding argument for the whole Chart Block
+is that « **a zero crossing is categorical** »; a shared axis leaves that crossing a flat line on the
+floor of the strip, so **it may not be shared**. `clearanceDomain`'s input stays the quantity the curve
+draws — feeding it one and drawing another is the defect ticket 41 opened.
+
+The rider's own garde goes where it is metrically true instead: a **second clearance dimension line on
+the profile at `x_D`**, which already has a z scale, the ground and the rider. It self-hides on
+`rider.relabel` — § 5's own `max(1 m, 1 % de la portée)` bit — so the ordinary mid-span case draws one
+dimension under one plain label, exactly as § 5 wrote it, and the drawing and the label fire together.
+
+**No leader between the two dimensions, and that is measured rather than a taste.** Both dimensions'
+tops lie on *one* curve — the cable offset down by `h_rider` — so any straight connector between them
+is a **chord of the cable**: measured at **7,63 px** from the `stroke-2` cable with the rider at an
+anchor, ≈2,4 px once the plot scales to 390 px. § 5's « a tint plus an edge, never a texture over the
+subject » is the same instinct one level down.
+
+**No printed number for it, at any width.** § 5 fixes five read-out cells and killed in-plot read-outs
+for occlusion — « C's follow-the-rider tooltip covers the cable it describes » — so a sixth cell would
+re-open B1, the `pinned` row and the `compact` row for one number. The dimension line carries it.

@@ -86,11 +86,28 @@ export const RAIL_SECTIONS = [
  */
 export const READ_OUT_CELLS = [
   {
-    label: "Garde min",
+    /**
+     * **« Garde min. ligne » and no longer « Garde min »** — ticket 41,
+     * [amendment M](../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md), which supersedes the
+     * label § 5 fixed in its two budget diagrams, its `pinned` and `compact` rows and its
+     * three-column wrap sketch. The cell prints `rider.worst.hClear`, which is §11's minimum **over
+     * the whole line** at the current rider position, and the row's own « à la position du passager »
+     * was being read as *under* the passenger rather than *for* that position. `ligne` is the scope
+     * the strip's caption and the profile's governing dimension line now name too, and it is what
+     * separates this cell from the Rail's « Garde min (traversée) » — `ligne` reduces over `x`,
+     * `traversée` over `x_P`.
+     *
+     * The label is also the record key and the React key. **Measured, because this row is the app's
+     * tightest budget:** the longest form « Garde min. ligne (à x 74,3 m) » renders on **one 16 px
+     * line** in the 44 px `pinned` row at 390 px with the value's box bottom flush to the row's, and
+     * the same in `compact` at 390 × 400 — so the rename spends none of § 5's height. Prose elsewhere
+     * that discusses « the Garde min cell » as a layout occupant means this one.
+     */
+    label: "Garde min. ligne",
     narrow: "@max-[624px]:order-4 @max-[624px]:col-span-2",
     /**
      * The Pinned Safety Header's **one live cell**: it *is* the row there, at one touch height
-     * rather than {@link CELL_ROW}. It is « Garde min » and not one of the other four because
+     * rather than {@link CELL_ROW}. It is the garde and not one of the other four because
      * unmissability survives the collapse through the two **non-positional** signals — the banner
      * and this printed number, the two that do not need the plot.
      */
