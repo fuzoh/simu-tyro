@@ -34,3 +34,17 @@ rewrite.
 | Styling, Tailwind v4, shadcn | [docs/conventions/ui.md](docs/conventions/ui.md) |
 | TypeScript, imports, formatting | [docs/conventions/typescript.md](docs/conventions/typescript.md) |
 | Tests | [docs/conventions/testing.md](docs/conventions/testing.md) |
+
+## Agent skills
+
+### Issue tracker
+
+Local markdown: issues and specs live under `.scratch/<feature-slug>/`. See [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
+
+### Triage labels
+
+The five canonical roles, unrenamed, written as a `Status:` line in each issue file. See [docs/agents/triage-labels.md](docs/agents/triage-labels.md).
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See [docs/agents/domain.md](docs/agents/domain.md).
