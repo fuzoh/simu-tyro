@@ -123,9 +123,13 @@ ordering all match.
       the direction of each change stated.
 - [x] `sweep()` and `evaluateClearance` stay inside ticket 09's p95 budget (≤ 0,6 ms / ≤ 1,7 ms).
 - [x] Seeds read § 6.1 one way; `solve.ts:228` is decided on its own derivation, not by analogy.
+      **Both decided against this ticket's prescription** — the four seeds already read it one way
+      and the prescribed patch broke it (voir ## Comments).
 - [x] § 13.1's 6 mm triple is settled in the theory doc, and `steel.test.ts`'s docblock no longer
       cites a record that does not exist.
-- [x] No `toFixed` outside `src/lib/format/quantity.ts`.
+- [~] No `toFixed` outside `src/lib/format/quantity.ts` — `results.ts` closed; `provenance.ts:161`
+      left standing and disclosed, because it needs a § 3 decision this ticket does not carry
+      (voir ## Comments).
 - [x] `bun run typecheck`, `bun run lint-type-aware` and the unit suite pass.
 
 ## Comments
@@ -146,7 +150,8 @@ absorbs.
 
 Measured on 150 m at flèche à vide 6,0 m, acier 12 mm IWRC, ancrages 12 / 12 m, `h_rider` 2,1 m,
 260 pas — the ticket's own case did not state its anchor heights, so this is the same geometry
-re-stated:
+re-stated (the ticket's own §1 case is not reproducible as written — 13,07 m of garde needs anchor
+heights it does not state):
 
 | dénivelé | scan as shipped | the rider node | error |
 | --- | --- | --- | --- |
@@ -165,12 +170,17 @@ passes. It now recovers **0,00 mm** and **0,13 mm** — on smooth ground the tra
 
 | row | before | after | move |
 | --- | --- | --- | --- |
-| first-run traversée | 2,44 m à x 74,1 | **2,42 m à x 74,4** | −21 mm |
-| dénivelé 0 / −18 / −40 / −60 | 2,46 / 2,44 / 2,37 / 2,25 | **2,43 / 2,42 / 2,34 / 2,22** | −25 / −23 / −27 / −27 mm |
-| flèche 5 / 6 / 7 / 8 | 3,39 / 2,44 / 1,44 / 0,40 | **3,37 / 2,42 / 1,41 / 0,37** | −25 / −23 / −25 / −26 mm |
-| ancrages 12 / 6, flèche 6 | −1,53 m | **−1,55 m** | −19 mm |
-| `L₀` 400 m sur 200 m | −169,67 m | **−170,24 m** | −0,57 m |
-| `L₀` 200,5 m | −7,59 m | **−7,61 m** | −21 mm |
+| first-run traversée | 2,442178 m à x 74,1170 | **2,42 m à x 74,4** | −23,06 mm, +0,314 m |
+| dénivelé 0 / −18 / −40 / −60 | 2,457865 / 2,442178 / 2,366094 / 2,246617 | **2,43 / 2,42 / 2,34 / 2,22** | −23,00 / −23,06 / −23,23 / −23,70 mm |
+| flèche 5 / 6 / 7 / 8 | 3,385605 / 2,440163 / 1,440832 / 0,403679 | **3,37 / 2,42 / 1,41 / 0,37** | −20,18 / −23,07 / −26,12 / −29,30 mm |
+| ancrages 12 / 6, flèche 6 | −1,530257 m | **−1,55 m** | −18,27 mm |
+| `L₀` 400 m sur 200 m | −169,667110 m | **−170,24 m** | −569,44 mm |
+| `L₀` 200,5 m | −7,587399 m | **−7,61 m** | −23,12 mm |
+
+Each delta is the *exact* difference between the two scans, not a subtraction from the rounded
+record — a delta formed against a 2-decimal record carries ±5 mm of that record's own rounding, and
+the first pass of this table did exactly that and mis-stated six of the ten. The « before » column
+therefore carries six digits where the fixture carries two.
 
 The deep-slack row moves furthest because 200 m of slack drops the kink's corner far below the chord
 its two neighbours span. Re-recorded in `__fixtures__/theory-15.ts` with the direction on each row,
@@ -200,21 +210,42 @@ against 3,07 / 2,33 / 2,17 before, with p50 unmoved (2,04 / 2,08 / 1,90 against 
 the first-run curve had 55 direction reversals where the shape has two, and it now has **3**. 39's
 item 5 can be re-measured on this tree.
 
-#### 2 · § 6.1's `V_B`, and what `solve.ts:228` turned out to be
+#### 2 · § 6.1's `V_B` — **the ticket's diagnosis is refuted, and the code is unchanged**
 
-The Peyrot–Goulois seed now reads `V₀ = V_B − w·L₀ − ΣP`. **`solve.ts:228` was checked on the bar
-iterate's own derivation and is correct**: `straightBarIterate` splits the self-weight evenly
-between the ends (`V₀ = T·h/d − w·L₀/2`, which returns § 4.1's exact `−w·L₀/2` on a level span), so
-`bar.V0 − ΣP/2` is exactly `T·h/d − (w·L₀ + ΣP)/2` — the symmetric-split family § 5.2's parabolic
-seed and the fallback also belong to. Two forms, two derivations, both right; what was wrong was one
-function carrying § 6.1's inversion with the other family's factor. Both readings are now asserted
-**as shifts** (`−ΣP` and `−ΣP/2`) rather than by restating § 5.2 in a test, so neither can be copied
-onto the other again.
+The ticket reads `VB - w*L0 - P/2` as § 6.1's inversion with a halved `ΣP` and prescribes
+`VB - w*L0 - P`. That prescription was implemented, then **reverted**, because the premise does not
+hold: § 5.2's `V₀,B = (w/2)·(h/tanh λ₀ + L₀)` carries **no `P`** — it is `V_B` at `ΣP = 0`, and its
+`w·L₀/2` prefactor *is* the symmetric split. § 6.1 then gives
+`V₀ = (V_B,unloaded + ΣP/2) − w·L₀ − ΣP = V_B,unloaded − w·L₀ − ΣP/2`, which is the line that was
+already there.
 
-Impact was robustness, as the review said — with one visible trace: `sweep.test.ts`'s one-sided-θ
-identity moved from 4,5×10⁻¹³ to 4,5×10⁻¹² of its analytic value, a different seed converging to a
-different point inside § 5.3's `‖r‖ ≤ 10⁻⁸`. Its bar now states the solver's tolerance (11 decimals)
-instead of the old seed's luck (12). No § 15 value moved.
+The check that decides it needs no solver at all — a level span with the trolley at mid-span, where
+symmetry fixes `V₀ = −(w·L₀ + ΣP)/2` exactly. `L` 100 m, `L₀` 101 m, `w` 5,36 N/m, `ΣP` 1177,2 N:
+
+| | `V₀` |
+| --- | --- |
+| symmetry, exact | **−859,280000** |
+| `solveSpan`, converged | −859,280000 |
+| `V_B − w·L₀ − ΣP/2` (what shipped, and ships) | **−859,280000** |
+| `V_B − w·L₀ − ΣP` (what the ticket prescribed) | −1447,880000 — **off by `ΣP/2` = 588,6 N** |
+
+So **all four seeds already read § 6.1 one way**: the symmetric split, reached through § 5.2's `V_B`
+in one and through the bar's own derivation in the other. `solve.ts:228` is confirmed correct on the
+bar's derivation, exactly as the ticket asked — but for the reason that makes the *other* line
+correct too, not as an exception to it.
+
+The prescribed patch was measurably worse, which is how it was caught: it cost Z4 and Z5 an
+iteration (6 → 7), moved their converged `H` by 4,1×10⁻⁴ N and 6,5×10⁻⁴ N — inside § 5.3's
+`‖r‖ ≤ 10⁻⁸` but **not bit for bit**, breaking this ticket's own gate — and pushed `sweep.test.ts`'s
+one-sided-θ identity from *exactly* 0 to 4,5×10⁻¹² of its analytic value, which is what forced a
+12 → 11 decimal relaxation there. All of that is reverted: Z4/Z5 are back to
+`H = 7898,162877906`, `V₀ = −1091,000000000` in 6 iterations, θ passes at 12 decimals again, and
+§ 15 reproduces bit for bit.
+
+What the ticket does buy is that the reading is now **pinned rather than inferred**: the derivation
+is in `seedIterates`' comment, and three cases assert it — the exact symmetric check above, the
+`−ΣP/2` shift on a § 15 row, and the bar's independent route to the same constant. A future reader
+re-diagnosing this line has to get past a test that names the number.
 
 #### 3 · § 13.1's 6 mm triple — the doc was wrong, and now says so
 
@@ -232,12 +263,18 @@ carries its own reason (§ 3's `k` is textile relative stiffness, a different gr
 letter). Byte-identical at all five call sites, verified in the browser too: « Dans les limites —
 EN 15567-1 (k = 3,0) », « exigé 3,0 », « Tension totale — k = 3,0 ».
 
-**On the gate's « no `toFixed` outside `quantity.ts` »:** `rg -n toFixed src/` leaves two non-test
-sites, and the judgement is that neither formats a *quantity*. `terrain/provenance.ts`'s `fr()`
-renders § 6 **prose** figures — a spacing and a deviation — that § 3's table has no row for, and its
-docblock already says so; `layout/contract.ts`'s three are the VE badge and pixel arithmetic, not
-grandeurs. Both are outside defect 4's stated scope (`results.ts:667-669`) and are left where they
-are; if the invariant is meant literally rather than about quantities, that is a separate ticket.
+**On the gate's « no `toFixed` outside `quantity.ts` », which is why that box is `[~]` and not
+`[x]`:** `rg -n toFixed src/` leaves two non-test sites.
+
+- `layout/contract.ts:643, 670, 810` — the VE badge (`×4,7`) and `clearanceTickLabel`. **Defensible
+  and left alone**: a drawing exaggeration is not a physical quantity, and the tick label
+  deliberately drops trailing zeros (« 6 m », never « 6,00 m »), which the table cannot express.
+- `terrain/provenance.ts:161` — `fr()`, which renders a **max spacing** and a **lateral deviation**,
+  both lengths in metres, into user-visible copy. Its docblock's defence (« § 3's table has no row
+  for either ») is *word for word* the defence this ticket rejected for `divisor()`. On that reading
+  the box is **not satisfied**, and the honest answer is that closing it means adding two rows to
+  § 3's table, each needing a justified precision minimum — a § 3 decision, not a refactor, and one
+  this ticket does not carry. Left standing, stated here, and it wants a ticket of its own.
 
 #### 5 · § 4.3's near-taut guard — kept, with its path stated
 
@@ -264,3 +301,43 @@ cell** renders « Garde min. ligne 2,42 m » at 44 px with its box top flush to 
 passager à x 74,4 m » at 1440 × 900: the shipped read-out moved **in the conservative direction**
 and nothing else about it moved. The régime divisor, the manual-ground disclosure's re-recorded
 series and the imported-profile relabel were all re-read in the same session (figures above).
+
+### Independent review, and what it changed — 2026-08-28
+
+A second pass re-derived the numbers rather than reading them, and it earned its keep. Six things
+moved as a result; the review is recorded here because two of them contradict the ticket.
+
+1. **Defect 2 is refuted, not fixed.** The prescribed seed is off by `ΣP/2` against an exact
+   symmetric answer, and the patch broke this ticket's own « § 15 reproduces bit for bit » box.
+   Reverted; the derivation is now pinned by three cases. Voir § 2 above for the measurement.
+2. **Six of ten re-recorded deltas were wrong** by 2–5 mm, because they were formed against the
+   *rounded* old record instead of the old scan's exact value; two summary claims (« 19 to 27 mm »,
+   « the same two-and-a-half centimetres ») were false. Recomputed exactly, every row.
+   **All thirteen recorded *values* reproduced** — it was only the stated moves that were sloppy.
+3. **Four consumer sites still held pre-fix gardes**, one of them the user-visible manual-ground
+   disclosure with a test locking the superseded string — a green suite over a wrong safety figure,
+   the first-run lock's failure mode inverted. Closed in `937bc1d`.
+4. **`clearance.ts`'s tripwire figure was mis-edited** to « 260 × 61 ». The tripwire is the *grid*,
+   `CLEARANCE.samplesPerStep`, still 60 and defined in three other files; the per-step evaluation
+   count is 62, not 61. Restored, and the evaluation count stated separately.
+5. **The merge's ascending order was nearly true, not true.** `⌈s_D·n/L₀⌉` and the grid expression
+   round differently, so an `s_D` within an ulp of a grid point could emit a sequence stepping back
+   ≈10⁻¹⁴ m — 6 cases in 100 005 brute-forced `(s_D, n)` combinations. Physically nil, but the
+   terrain cursor's docblock *relies* on the order, so the index is now corrected against the grid
+   values themselves. Two comparisons per step.
+6. **Three smaller ones**, all taken: `quantity.test.ts`'s « one case per row of § 3's table » is
+   false now that `regimeK` exists and says so; `steel.test.ts`'s new cases asserted 4–5 decimals
+   taken from the implementation and now assert § 13.1's own two; and `solve.ts`'s near-taut floors
+   were labelled as the shipped rope's when the line measured carries `w` 5 N/m, not 5,36.
+   `scene.test.ts`'s exact float equality between two independently-computed paths is a
+   `toBeCloseTo(…, 12)`.
+
+Verified and left alone: the merge is correct at `s_D = 0`, `s_D = L₀`, `s_D` on a grid point and
+`samplesPerStep = 1`; a duplicated sample changes no reported number (a minimum is idempotent, and
+the terrain cursor has already consumed everything a zero-width segment could see); the scan is
+exactly `samplesPerStep + 2` evaluations; the 0,00 / 0,13 / 0,000 mm figures reproduce; and gate
+box 3 re-measures independently at `sweep()` p95 **0,382 ms** and `evaluateClearance` p95
+**0,914 ms**, inside ticket 09's ≤ 0,6 / ≤ 1,7 ms.
+
+Final state: `bun run typecheck` and `bun run lint-type-aware` clean, **1360 unit cases** green,
+§ 15 bit for bit (`Z3 H = 1286,378149147`, `Z4`/`Z5` `H = 7898,162877906` in 6 iterations).
