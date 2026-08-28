@@ -70,19 +70,27 @@ describe("§13.1's factors are transcribed once", () => {
 });
 
 describe("§13.1's 6 mm 6×19 triple, recomputed from K — §14 #21", () => {
-  // Doc §13.1's attested 12,9 / 14,4 / 21,0 kN pair does not reproduce under `K·d²·R₀/1000`
-  // and is demoted there to `[UNVERIFIED:R2]`. These three are what the formula ships instead —
-  // code-derived, so exact/tight, not `measuredOffBy`'s ticket-precision floor.
-  test("1770 fibre-core is 21,03 kN", () => {
-    expect(steelFormula(6, 1770, "fibre-core").MBF / 1000).toBeCloseTo(21.0276, 4);
+  // Doc §13.1's attested 12,9 / 14,4 / 21,0 kN triple does not reproduce under `K·d²·R₀/1000`
+  // and is demoted there to `[UNVERIFIED:R2]` (§14 #21). These three are what § 13.1 records in its
+  // place, **at the two decimals it records them to** — the expectations are the doc's digits, not
+  // the implementation's, which is the direction `docs/conventions/testing.md` fixes. The half-ulp
+  // of that last digit is the bar: ±5 N.
+  //
+  // Not tautological against the `K`-factor cases above: those pin `STEEL.K`, these pin the whole
+  // chain `(d, R₀, construction) → MBF` at the one diameter § 13.1 attests, including the `/1000`
+  // kN→N conversion and the `d²` in mm² that the docblock calls out as the two implicit units.
+  const kN = (r: SteelSpec["R0"], c: SteelSpec["construction"]) => steelFormula(6, r, c).MBF / 1000;
+
+  test("1770 fibre-core is § 13.1's 21,03 kN", () => {
+    expect(kN(1770, "fibre-core")).toBeCloseTo(21.03, 2);
   });
 
-  test("1770 âme métallique (IWRC) is 22,68 kN", () => {
-    expect(steelFormula(6, 1770, "iwrc").MBF / 1000).toBeCloseTo(22.68432, 5);
+  test("1770 âme métallique (IWRC) is § 13.1's 22,68 kN", () => {
+    expect(kN(1770, "iwrc")).toBeCloseTo(22.68, 2);
   });
 
-  test("1960 fibre-core is 23,28 kN", () => {
-    expect(steelFormula(6, 1960, "fibre-core").MBF / 1000).toBeCloseTo(23.2848, 4);
+  test("1960 fibre-core is § 13.1's 23,28 kN", () => {
+    expect(kN(1960, "fibre-core")).toBeCloseTo(23.28, 2);
   });
 });
 

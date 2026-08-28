@@ -38,12 +38,15 @@ import {
 
 const ALL_UNITS: readonly ForceUnit[] = ["daN", "kN", "kgf"];
 
-/** Every row of the table, in § 3's order. */
+/** Every row of the table, in the module's own order — § 3's, plus `regimeK`. */
 const ALL_IDS = Object.keys(QUANTITIES) as QuantityId[];
 
 /**
- * One case per row of § 3's table, in its order, valued from the spec's own « Premier
- * lancement » column wherever it has one. The four rows the column leaves empty or dashed
+ * One case per row of {@link QUANTITIES}, in its order, valued from the spec's own « Premier
+ * lancement » column wherever it has one. That is **§ 3's table plus one row**: `regimeK` is the
+ * régime's safety divisor, which § 3 has no row for because it spends `k` on textile relative
+ * stiffness — voir its own comment in the table, and ticket 37 defect 4 for why it is a
+ * `QuantityId` rather than a second rounding site. The four rows the column leaves empty or dashed
  * (`Station`, `MBL`, `T adm`, `Réserve de tension`) take § 3's or § 6's quoted figures instead.
  *
  * `value` is always the row's **canonical** unit — § 3's SI storage: metres, mm, kg, kg/m,
