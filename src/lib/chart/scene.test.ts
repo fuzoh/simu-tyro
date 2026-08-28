@@ -18,7 +18,7 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { exaggeration, PLOT_ASPECT_BAND, PROFILE_ASPECT, VE_BAND } from "@/lib/layout/contract.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
-import { CLEARANCE } from "@/lib/sim";
+import { CLEARANCE, evaluateClearance } from "@/lib/sim";
 
 import {
   buildScene,
@@ -87,8 +87,9 @@ describe("the first-run scene — § 9's opening screen, drawn", () => {
   });
 
   it("reads « Garde min. ligne » plainly on first paint — the cell does not relabel itself", () => {
-    // 0,9 m from the traverse minimum, inside `max(1 m, 1 % de la portée)`. This is *why* the
-    // shipped rider sits at `L/2`.
+    // Inside `max(1 m, 1 % de la portée)`, which is *why* the shipped rider sits at `L/2`. Since
+    // ticket 37 the rider's own inner minimum **is** its node, 0,000 m away against 0,9 m before,
+    // so the margin the bit is holding is the whole 1,5 m.
     expect(first.rider.relabel).toBe(false);
     expect(Math.abs(first.rider.worst.atX - first.rider.step.xD)).toBeLessThan(1);
   });
@@ -311,6 +312,111 @@ describe("ticket 41 — the line's minimum against the garde under the passenger
     // 101,9 m of separation at the extreme; 9,476 m between the two numbers here.
     expect(Math.abs(tailEnd.worst.atX - tailEnd.step.xD)).toBeGreaterThan(100);
     expect(tailEnd.underRider - tailEnd.worst.hClear).toBeCloseTo(9.476, 2);
+  });
+});
+
+/**
+ * Ticket 39 item 5 — **the strip's curve is the shape, not the scan.**
+ *
+ * The reported symptom was a curve visibly rougher than the two-reversal W it draws: 55 direction
+ * reversals on the first-run traverse and 79 on the textile line, worst adjacent step 43,1 / 63,7 mm,
+ * under a read-out printing two decimals. It was §11's scan missing the trolley kink — ticket 37
+ * item 1 — and what is pinned here is the closure, at the one place the curve is data: the same
+ * traverse re-scanned at **ten times the resolution** must draw the same picture.
+ *
+ * `perStep` **is** what `strip.tsx` plots, and `perStepX` is where `profile.tsx` stands its clearance
+ * dimension, so both live here rather than in `clearance.test.ts`: the claim is about the drawing.
+ */
+describe("ticket 39 item 5 — the curve against a ten-times-finer scan", () => {
+  /** Ticket 39's own textile line: the same span on HMPE, `MBL` 100 kN, `μ` 0,113. */
+  const textile: ScenarioDraft = {
+    ...firstRunDefaults(),
+    usage: "TEMPORAIRE",
+    material: { ...FIRST_RUN_RETAINED_TEXTILE.spec, MBL: 100_000, mu: 0.113 },
+    terminations: FIRST_RUN_RETAINED_TEXTILE.terminations,
+  };
+
+  /**
+   * Direction reversals along the drawn curve — the measure the symptom was reported in. Equal
+   * consecutive values carry no direction and are skipped, so a flat run is not a reversal.
+   */
+  function reversals(values: Float64Array): number {
+    let count = 0;
+    let previous = 0;
+    for (let i = 1; i < values.length; i++) {
+      const delta = values[i] - values[i - 1];
+      if (delta === 0) continue;
+      if (previous !== 0 && Math.sign(delta) !== previous) count++;
+      previous = Math.sign(delta);
+    }
+    return count;
+  }
+
+  /** The same traverse, re-reduced at `samplesPerStep` × 10 — the reference the curve is judged by. */
+  function fine(built: ReturnType<typeof scene>) {
+    return evaluateClearance(
+      built.span,
+      built.P,
+      built.traverse.steps,
+      built.terrain,
+      built.hRider,
+      10 * CLEARANCE.samplesPerStep,
+    );
+  }
+
+  it.each([
+    ["acier", firstRunDefaults()],
+    ["textile", textile],
+  ])("draws %s's three reversals, and the fine scan draws the same three", (_name, scenario) => {
+    // Three, where the W's own shape has two: the third is the flank maximum's flat top, and it is
+    // in the fine scan too. Both counts were 55 / 79 before ticket 37. Asserted as equality with the
+    // reference rather than as a threshold — the claim is « the curve is the shape », and a curve
+    // that reversed 5 times in both scans would satisfy a threshold while failing the claim.
+    const built = scene(scenario);
+    expect(reversals(built.clearance.perStep)).toBe(3);
+    expect(reversals(fine(built).perStep)).toBe(reversals(built.clearance.perStep));
+  });
+
+  it("agrees with the fine scan below the read-out's last digit, and on `h_min` to the bit", () => {
+    // Ticket 39 measured 87 mm of worst per-step difference and **+18,5 mm on `h_min` itself,
+    // non-conservative**. Both collapse: the per-step curve is within 2 mm — a quarter of the
+    // read-out's last printed digit, and ≈0,005 px at § 5's reference column — and `h_min` is
+    // **exactly** the fine scan's on both manual lines, because § 4's straight ground puts the
+    // traverse minimum on the rider's own node, which both scans sample.
+    for (const scenario of [firstRunDefaults(), textile]) {
+      const built = scene(scenario);
+      const reference = fine(built);
+      let worst = 0;
+      for (let i = 0; i < built.clearance.perStep.length; i++) {
+        worst = Math.max(worst, Math.abs(built.clearance.perStep[i] - reference.perStep[i]));
+      }
+      expect(worst).toBeLessThan(0.002);
+      expect(built.clearance.hMin).toBe(reference.hMin);
+    }
+  });
+
+  it("quantises the dimension line's `x`, and only its `x` — documented, not removed", () => {
+    // The half of item 5 that stays: `perStepX` is a **scanned vertex**, so `profile.tsx`'s
+    // clearance dimension stands on the scan grid rather than on the true argmin. On § 4's straight
+    // ground it is mostly the rider's own node now and follows the rider smoothly; where it is not,
+    // it is a cable vertex `L₀ / 60` ≈ 2,53 m away. `testing.md`'s « positions of scanned extrema »
+    // tier — absolute, 2× the sample spacing — is therefore the bar, and the value the dimension
+    // draws carries none of it (the case above). Removing it costs a root-find in `clearance.ts`'s
+    // inner loop; voir its docblock.
+    const built = scene(firstRunDefaults());
+    const reference = fine(built);
+    const spacing = built.span.L0 / CLEARANCE.samplesPerStep;
+    let displaced = 0;
+    let onRiderNode = 0;
+    for (let i = 0; i < built.clearance.perStepX.length; i++) {
+      displaced = Math.max(
+        displaced,
+        Math.abs(built.clearance.perStepX[i] - reference.perStepX[i]),
+      );
+      if (built.clearance.perStepX[i] === built.traverse.steps[i].xD) onRiderNode++;
+    }
+    expect(displaced).toBeLessThan(2 * spacing);
+    expect(onRiderNode).toBeGreaterThan(built.traverse.steps.length / 2);
   });
 });
 
