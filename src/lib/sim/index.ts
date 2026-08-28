@@ -100,16 +100,23 @@ export { resolveL0, unloadedSag } from "./parameterise.ts";
 // states rather than switching between two paths, and `results.test.ts` asserts it agrees with
 // `evaluateVerdict`'s own envelope on the shipped line — the drift this withholding guarded against
 // is the drift that test now watches.
+//
+// `scanTensionEnvelope` is exported for the same row and the same caller, and ticket 38 is why:
+// the Rail used to re-implement the worst-tension-per-end scan, so a régime-model change could
+// break the agreement from either side. The scan now has **one** owner; what the second caller
+// still owns is § 9's presentation choice, not the maximum.
 export type {
   CellState,
   Criterion,
   CriterionBasis,
   EndEnvelope,
+  EndTensionEnvelope,
   ObligationId,
   ProvenanceTag,
   RefusalId,
   Regime,
   RegimeId,
+  TensionEnvelopeScan,
   Termination,
   TerminationId,
   VerdictCell,
@@ -125,6 +132,7 @@ export {
   isRegimeAvailable,
   REGIMES,
   regimeUnavailableReason,
+  scanTensionEnvelope,
   TERMINATIONS,
   VERDICT,
 } from "./verdict.ts";
