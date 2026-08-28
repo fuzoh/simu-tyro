@@ -27,8 +27,9 @@
  *   not a sag. No grid uniform in `s` lands on it, and reading its two neighbours across a convex
  *   cable is optimistic by 19–27 mm on a 150 m span and by 0,57 m on 200 m of slack. So `s_D` is
  *   merged into every step's sample set: **one extra sample per step**, not a denser grid, so the
- *   frame budget is untouched. Ticket 37 defect 1; ticket 09's own residual bound was argued for
- *   the convexity and never covered the kink.
+ *   frame budget is untouched — the scan runs `samplesPerStep + 2` evaluations per step, and the
+ *   tripwire below is the *grid*, which is unchanged at 60. Ticket 37 defect 1; ticket 09's own
+ *   residual bound was argued for the convexity and never covered the kink.
  * - **Vertex-only evaluation, on *both* sets of vertices, and nobody densifies either.** The scan
  *   reads the sampled polyline's own vertices **and the terrain's own sample points** — voir § 4,
  *   « `evaluateClearance` scan[s] at the terrain's own sample points ». Both halves are load-
@@ -37,7 +38,7 @@
  *   vertices does not miss millimetres, it misses whole features — a 200-point profile on a 150 m
  *   span carries a vertex every 0,75 m against the cable's ≈2,5 m, and a ridge between two cable
  *   vertices reads as clear ground. `samplesPerStep` 60 against the sweep's 240 is the measured
- *   pair, and `260 × 61` is the bench tripwire — this reducer is the larger half of the frame
+ *   pair, and `260 × 60` is the bench tripwire — this reducer is the larger half of the frame
  *   budget (p95 ≤ 1,7 ms against `sweep()`'s ≤ 0,6 ms). The terrain half adds at most § 4's
  *   200-point export ceiling per step, and **nothing at all** for manual ground, whose two points
  *   are the cable's own ends.
@@ -176,7 +177,15 @@ export function evaluateClearance(
     // longer. Ascending order is what the terrain cursor below relies on, and a `s_D` that lands
     // on a grid point simply evaluates that point twice — a minimum is idempotent.
     const sD = rider.s < 0 ? 0 : rider.s > L0 ? L0 : rider.s;
-    const insertAt = Math.ceil((sD * samplesPerStep) / L0);
+    // `⌈s_D·n/L₀⌉` is the insertion index, corrected against the grid values themselves rather
+    // than trusted: the two expressions round differently, so for an `s_D` within an ulp of a grid
+    // point the ceiling can name the index on the wrong side and the emitted sequence would step
+    // back ≈10⁻¹⁴ m. Measured at 6 cases in 100 005 `(s_D, n)` combinations — physically nil, but
+    // the forward terrain cursor below is documented as relying on ascending order, so the order
+    // is made true rather than nearly true. Each guard moves at most one index.
+    let insertAt = Math.ceil((sD * samplesPerStep) / L0);
+    while (insertAt > 0 && (L0 * (insertAt - 1)) / samplesPerStep > sD) insertAt--;
+    while (insertAt < samplesPerStep && (L0 * insertAt) / samplesPerStep < sD) insertAt++;
 
     // `x(s)` is strictly increasing (`dx/ds = H/T > 0`, and `H > 0` on every solved step), so the
     // terrain's vertices are consumed once per step by a forward cursor rather than searched for.
