@@ -148,12 +148,14 @@ export function Profile({
    * disagree with the number `scene.ts` computed.
    *
    * **The length is exact; the `x` it stands at is not.** `worst.atX` is a scanned extremum's
-   * position, so the sibling line above stands on a scan vertex rather than on the true argmin —
-   * ≤ 1,26 m off on the shipped line, hopping by up to 2,53 m between consecutive scrub steps, while
-   * the *value* it draws moves ≤ 1,5 mm (ticket 39 item 5, measured; voir `SceneRider.worst`). The
+   * position, so the sibling line above stands on a scan vertex rather than on the true argmin: ≤
+   * 1,26 m off on the shipped line, and the garde at that x is within 1,5 mm of the true minimum
+   * (ticket 39 item 5, measured against a ten-times-finer scan; voir `SceneRider.worst`). The
    * dimension is therefore truthful where it stands — that x really does carry that garde — and only
-   * its placement carries the scan's resolution. The passenger's own line at `x_D` carries none of
-   * this: `x_D` is exact.
+   * its placement carries the scan's resolution. What a scrub *sees* is larger and is not this: the
+   * line can jump 2,53 m of `x` between consecutive steps, with 0,1 m of garde between them, because
+   * the governing point steps from the rider's own kink to a fixed feature of the line. The
+   * passenger's own dimension at `x_D` carries none of it: `x_D` is exact.
    */
   function dimension(atX: number, hClear: number) {
     const base = groundAt(ground, atX);

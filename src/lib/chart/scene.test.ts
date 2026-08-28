@@ -214,6 +214,14 @@ describe("clearance failure — the four signals' inputs", () => {
  * two being confused, so what is pinned here is that they are **different numbers with a fixed
  * ordering**, and that the bit which gates the drawing fires exactly where they diverge.
  */
+/** Ticket 39's own textile line: the shipped span on HMPE, `MBL` 100 kN, `μ` 0,113. */
+const ticket39Textile: ScenarioDraft = {
+  ...firstRunDefaults(),
+  usage: "TEMPORAIRE",
+  material: { ...FIRST_RUN_RETAINED_TEXTILE.spec, MBL: 100_000, mu: 0.113 },
+  terminations: FIRST_RUN_RETAINED_TEXTILE.terminations,
+};
+
 describe("ticket 41 — the line's minimum against the garde under the passenger", () => {
   /** The solved half a rider is placed on — the `null` arm is « Aucun résultat », not these cases. */
   function solved(scenario: ScenarioDraft) {
@@ -283,7 +291,12 @@ describe("ticket 41 — the line's minimum against the garde under the passenger
     // 40,01) and 88,5 mm on the first-run line (`x_D` 65,01), and both re-measure at 0,000 mm over
     // all 260 steps, because the rider's node is a sample of the inner minimum now. The bound stays
     // stated as a bound rather than tightened onto that zero — the scan's error is the contract.
-    for (const from of [base, tall]) {
+    //
+    // Ticket 39 item 5 re-measured the same zero on the textile line and on the three imported
+    // profiles. The textile one joins the loop here, since it needs no fixture; the imported three
+    // stay a measurement in the ticket, because reading `docs/references/` to re-assert a bound this
+    // case already carries would buy coverage of the loop, not of the claim.
+    for (const from of [base, solved(ticket39Textile), tall]) {
       let excess = 0;
       let gap = 0;
       for (const step of from.traverse.steps) {
@@ -318,9 +331,10 @@ describe("ticket 41 — the line's minimum against the garde under the passenger
 /**
  * Ticket 39 item 5 — **the strip's curve is the shape, not the scan.**
  *
- * The reported symptom was a curve visibly rougher than the two-reversal W it draws: 55 direction
- * reversals on the first-run traverse and 79 on the textile line, worst adjacent step 43,1 / 63,7 mm,
- * under a read-out printing two decimals. It was §11's scan missing the trolley kink — ticket 37
+ * The reported symptom was a curve visibly rougher than the W it draws: 55 direction reversals on
+ * the first-run traverse and 79 on the textile line, worst adjacent step 43,1 / 63,7 mm, under a
+ * read-out printing two decimals. A W has **three** — two flank maxima and one interior minimum —
+ * so 55 was the scan's noise on top of the shape, not the shape. It was §11's scan missing the trolley kink — ticket 37
  * item 1 — and what is pinned here is the closure, at the one place the curve is data: the same
  * traverse re-scanned at **ten times the resolution** must draw the same picture.
  *
@@ -328,14 +342,6 @@ describe("ticket 41 — the line's minimum against the garde under the passenger
  * dimension, so both live here rather than in `clearance.test.ts`: the claim is about the drawing.
  */
 describe("ticket 39 item 5 — the curve against a ten-times-finer scan", () => {
-  /** Ticket 39's own textile line: the same span on HMPE, `MBL` 100 kN, `μ` 0,113. */
-  const textile: ScenarioDraft = {
-    ...firstRunDefaults(),
-    usage: "TEMPORAIRE",
-    material: { ...FIRST_RUN_RETAINED_TEXTILE.spec, MBL: 100_000, mu: 0.113 },
-    terminations: FIRST_RUN_RETAINED_TEXTILE.terminations,
-  };
-
   /**
    * Direction reversals along the drawn curve — the measure the symptom was reported in. Equal
    * consecutive values carry no direction and are skipped, so a flat run is not a reversal.
@@ -366,10 +372,11 @@ describe("ticket 39 item 5 — the curve against a ten-times-finer scan", () => 
 
   it.each([
     ["acier", firstRunDefaults()],
-    ["textile", textile],
+    ["textile", ticket39Textile],
   ])("draws %s's three reversals, and the fine scan draws the same three", (_name, scenario) => {
-    // Three, where the W's own shape has two: the third is the flank maximum's flat top, and it is
-    // in the fine scan too. Both counts were 55 / 79 before ticket 37. Asserted as equality with the
+    // Three is the W's own count — maximum, minimum, maximum — measured at `x_D` 9,78 / 74,43 /
+    // 140,75 on the steel line and 3,46 / 74,30 / 147,29 on the textile one, with no flat run
+    // anywhere on either. Both counts were 55 / 79 before ticket 37. Asserted as equality with the
     // reference rather than as a threshold — the claim is « the curve is the shape », and a curve
     // that reversed 5 times in both scans would satisfy a threshold while failing the claim.
     const built = scene(scenario);
@@ -379,11 +386,12 @@ describe("ticket 39 item 5 — the curve against a ten-times-finer scan", () => 
 
   it("agrees with the fine scan below the read-out's last digit, and on `h_min` to the bit", () => {
     // Ticket 39 measured 87 mm of worst per-step difference and **+18,5 mm on `h_min` itself,
-    // non-conservative**. Both collapse: the per-step curve is within 2 mm — a quarter of the
-    // read-out's last printed digit, and ≈0,005 px at § 5's reference column — and `h_min` is
-    // **exactly** the fine scan's on both manual lines, because § 4's straight ground puts the
-    // traverse minimum on the rider's own node, which both scans sample.
-    for (const scenario of [firstRunDefaults(), textile]) {
+    // non-conservative**. Both collapse: the per-step curve is within 2 mm — a fifth of the
+    // read-out's last printed digit, and 0,02 px of the profile's 13,0 px/m at § 5's reference
+    // column, against the 1,29 px the old 99 mm was worth — and `h_min` is **exactly** the fine
+    // scan's on both manual lines, because § 4's straight ground puts the traverse minimum on the
+    // rider's own node, which both scans sample.
+    for (const scenario of [firstRunDefaults(), ticket39Textile]) {
       const built = scene(scenario);
       const reference = fine(built);
       let worst = 0;
