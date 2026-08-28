@@ -529,6 +529,40 @@ describe("§4.3's near-taut fallback — the straight elastic bar", () => {
   test("a slack line has no bar at all", () => {
     expect(straightBarIterate(spanOf(Z1.in))).toBeNull();
   });
+
+  test("the branch is reachable on the stretched side only, and needs no slack twin", () => {
+    // Ticket 37 defect 5, decided here rather than left implicit. §4.3 states the near-taut test as
+    // a property of the *catenary* — `asinh` ratios ill-conditioned below 10⁻⁴ — and the review
+    // observed that the guard cannot fire on a slack line, because the fallback it gates is the
+    // elastic bar and `T = (chord/L₀ − 1)·EA > 0` only where `L₀ < chord`. **The branch stays, with
+    // a reachable path**: the case above takes it, on the stretched side, where the bar *is* the
+    // answer. It needs no slack twin for two measured reasons.
+    //
+    // First, on the slack side `w·L₀/H` has a **floor** — a slack line's `H` is bounded by its own
+    // elastic stretch — and the floor is set by `EA`. At `L₀ = chord + 10⁻⁹` on a level 100 m span
+    // it measures 0,120 at the shipped 12 mm steel's `EA` 6,9 MN, 2,29×10⁻² at 1 GN and 2,29×10⁻³
+    // at 1 TN: § 4.3's 10⁻⁴ is first crossed near `EA` 10¹⁵ N, six orders above any rope. Second,
+    // where the band *is* reached Newton simply converges — 10¹⁵ N takes two damped iterations and
+    // 10¹⁸ N takes none — so there is nothing for a fallback to rescue.
+    const chord = 100;
+    const barely = spanOf({ L: chord, h: 0, L0: chord + 1e-9, w: 5, EA: 1e12 });
+    expect(straightBarIterate(barely)).toBeNull();
+    const { state, notes } = solved(barely);
+    expect(notes).not.toContain("near-taut-fallback");
+    expect(state.H).toBeGreaterThan(0);
+    // The floor, at the `EA` three orders above the shipped rope's: still two orders clear of the
+    // ill-conditioned band, so the branch has nothing to do here.
+    expect(isNearTaut(barely.w, barely.L0, state.H)).toBe(false);
+    expect((barely.w * barely.L0) / state.H).toBeCloseTo(2.29e-3, 5);
+
+    // And past the floor, where §4.3's condition really does hold on a slack line, the answer is
+    // still Newton's: no bar exists, no note is emitted, and the residual is met anyway.
+    const absurd = spanOf({ L: chord, h: 0, L0: chord + 1e-9, w: 5, EA: 1e18 });
+    expect(straightBarIterate(absurd)).toBeNull();
+    const beyond = solved(absurd);
+    expect(isNearTaut(absurd.w, absurd.L0, beyond.state.H)).toBe(true);
+    expect(beyond.notes).not.toContain("near-taut-fallback");
+  });
 });
 
 describe("injected: no-convergence, slack-limit and the reseeded note", () => {

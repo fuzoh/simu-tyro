@@ -99,7 +99,16 @@ export function chordBoundFloor(span: { L: number; h: number; EA: number }, stre
   return Math.hypot(span.L, span.h) / (1 + strength / span.EA);
 }
 
-/** §4.3's near-taut / low-weight test: the `asinh` ratios are ill-conditioned below `10⁻⁴`. */
+/**
+ * §4.3's near-taut / low-weight test: the `asinh` ratios are ill-conditioned below `10⁻⁴`.
+ *
+ * **Read on the stretched side only** — ticket 37 defect 5, decided rather than deleted. The
+ * fallback this gates is {@link straightBarIterate}, which exists only where `L₀ < chord`, so
+ * {@link solveSpan} can take it there and nowhere else. On a *slack* line `w·L₀/H` has a floor set
+ * by the line's own elastic stretch (0,120 at the shipped rope's `EA` 6,9 MN on a level 100 m span
+ * at `L₀ = chord + 10⁻⁹`, 2,29×10⁻³ at 1 TN), so § 4.3's threshold is first reachable near
+ * `EA` 10¹⁵ N — and where it *is* reached Newton converges unaided. No slack twin is owed.
+ */
 export function isNearTaut(w: number, L0: number, H: number): boolean {
   return (w * L0) / H < SOLVER.nearTautRatio;
 }
@@ -403,7 +412,8 @@ function toState(input: SpanInput, at: Iterate, iterations: number): SpanState {
  * 1. Tier-one refusals and §5.4's chord bound — before a single iteration, because both are
  *    statements about the input rather than about the iteration.
  * 2. §4.3's near-taut fallback, decided on the straight bar's own `H`: below `w·L₀/H = 10⁻⁴` the
- *    `asinh` ratios are ill-conditioned and the bar *is* the answer.
+ *    `asinh` ratios are ill-conditioned and the bar *is* the answer. A **stretched-line branch by
+ *    construction** — there is no bar on a slack one — voir {@link isNearTaut}.
  * 3. §5.2's seeds, tried in order, each one a §5.1 attempt with damping and §4.3's `H` clamp —
  *    at most five, which is §5.1's retry policy.
  *
