@@ -610,9 +610,15 @@ defaults do** — that is the boundary between test inputs and engineering data.
 ### 13.1 Family A — steel wire rope
 
 - **MBF**: `MBF [kN] = K · d² · R₀ / 1000` (d in mm, grade R₀ in N/mm²) with EN 12385-4
-  factors: 6×19 class `K = 0.330` (fibre core) / `0.356` (steel core); attested examples
-  6 mm 6×19: 12.9 kN (1770 FC), 14.4 kN (1770 IWRC), 21.0 kN (1960 FC)
-  `[STD-ATTESTED]` [R2 B15]. Full 10–20 mm tables: `[PAYWALLED]` — compute from K.
+  factors: 6×19 class `K = 0.330` (fibre core) / `0.356` (steel core) `[STD-ATTESTED]`
+  [R2 B15]. Full 10–20 mm tables: `[PAYWALLED]` — compute from K. The transcribed 6 mm
+  6×19 triple — 12.9 kN (1770 FC), 14.4 kN (1770 IWRC), 21.0 kN (1960 FC) — does **not**
+  reproduce from these K-factors and is demoted to `[UNVERIFIED:R2]` (§14 #21):
+  `K · d² · R₀ / 1000` gives 21.03 kN (1770 FC), 22.68 kN (1770 IWRC), 23.28 kN
+  (1960 FC), under the same K-factors whose 10 mm cross-check just below reproduces
+  exactly. The quoted "21.0 (1960 FC)" is in fact the 1770 FC computation, mislabelled;
+  12.9/14.4 kN match no `(K, R₀)` pairing tried. `MBF` is what the verdict divides by, so
+  the computed triple is what ships, not the transcription.
   ⚠ [R1 B15]'s per-diameter MBL table is inconsistent with these K-factors
   (e.g. 10 mm 7×19 1770 listed 65.8 kN vs `K·d²·R₀ ≈ 58–63 kN`) ⇒ `[UNVERIFIED:R1]`.
 - **Stiffness**: apparent rope modulus ≈ 60 % of wire ⇒ `E_app ≈ 100–130 GPa`
@@ -701,6 +707,7 @@ source-disciplined ("not found" stated explicitly) but made transcription errors
 | 18  | Tree-anchor stiffness (B6)                                                                    | numeric ranges                             | "no universal value exists"                                                                            | **R2**; R1 ranges = placeholders only                                                                                                                                                                                                                    |
 | 19  | DAF default                                                                                   | 1.25                                       | 1.2 (SSF measured ceiling)                                                                             | Default **1.2** `[FIELD:SSF]`, configurable; regimes §8.2                                                                                                                                                                                                |
 | 20  | Solver tolerance normalisation (C8)                                                           | `10⁻⁶` normalised by span                  | `10⁻⁶ m` absolute (MoorPy default)                                                                     | Compatible: absolute ≤ 1000 m, scaled beyond (§5.3)                                                                                                                                                                                                      |
+| 21  | 6 mm 6×19 attested MBF triple (B15)                                                           | —                                           | 12.9 kN (1770 FC), 14.4 kN (1770 IWRC), 21.0 kN (1960 FC)                                               | **Refuted by recomputation**: `K·d²·R₀/1000` with the shipped K-factors gives 21.03/22.68/23.28 kN — the same K-factors whose 10 mm cross-check (58–63 kN) reproduces exactly. Quoted "21.0 (1960 FC)" is the 1770 FC value, mislabelled; 12.9/14.4 kN match no `(K, R₀)` pairing. `[UNVERIFIED:R2]`; the computed triple ships, not the transcription                                                  |
 
 ---
 

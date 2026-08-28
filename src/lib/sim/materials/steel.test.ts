@@ -23,9 +23,11 @@ import { STEEL, deriveSteel, resolveSteelValues, steelFormula } from "./steel.ts
  *   all three — the pinned midpoints are not construction-indexed — and that split is what § 3's
  *   culprit table encodes. A fixture value alone would let it drift.
  *
- * Attested §13.1 examples that are **not** asserted here: the 6 mm 6×19 pairs (12,9 / 14,4 /
- * 21,0 kN). §13.1 itself records that a per-diameter MBL table and these `K`-factors disagree,
- * and `K` is what the spec ships — porting the pairs would assert the contradiction.
+ * §13.1's other attested triple — 6 mm 6×19 at 12,9 / 14,4 / 21,0 kN — does not reproduce from
+ * `K` and is demoted to `[UNVERIFIED:R2]` there (§14 #21), not asserted here as-is. What *is*
+ * asserted below is the recomputed triple the doc now ships instead: 21,03 / 22,68 / 23,28 kN,
+ * `K · d² · R₀ / 1000` at `d = 6`. These are code-derived, not `[MEASURED]` — asserted tightly with
+ * `toBeCloseTo`, not through `measuredOffBy`'s ticket-precision floor.
  */
 
 /**
@@ -64,6 +66,23 @@ describe("§13.1's factors are transcribed once", () => {
 
   test("g is 9,81 and unexposed", () => {
     expect(STEEL.g).toBe(CASE.in.g);
+  });
+});
+
+describe("§13.1's 6 mm 6×19 triple, recomputed from K — §14 #21", () => {
+  // Doc §13.1's attested 12,9 / 14,4 / 21,0 kN pair does not reproduce under `K·d²·R₀/1000`
+  // and is demoted there to `[UNVERIFIED:R2]`. These three are what the formula ships instead —
+  // code-derived, so exact/tight, not `measuredOffBy`'s ticket-precision floor.
+  test("1770 fibre-core is 21,03 kN", () => {
+    expect(steelFormula(6, 1770, "fibre-core").MBF / 1000).toBeCloseTo(21.0276, 4);
+  });
+
+  test("1770 âme métallique (IWRC) is 22,68 kN", () => {
+    expect(steelFormula(6, 1770, "iwrc").MBF / 1000).toBeCloseTo(22.68432, 5);
+  });
+
+  test("1960 fibre-core is 23,28 kN", () => {
+    expect(steelFormula(6, 1960, "fibre-core").MBF / 1000).toBeCloseTo(23.2848, 4);
   });
 });
 
