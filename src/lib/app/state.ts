@@ -53,6 +53,7 @@ import {
   firstRunDefaults,
 } from "@/lib/scenario/first-run.ts";
 import { clampX, scenarioFromSearch } from "@/lib/scenario/from-search.ts";
+import { spanOfGeometry } from "@/lib/scenario/geometry.ts";
 import { DEFAULT_LAYERS } from "@/lib/session/session.ts";
 import { decodeP1 } from "@/lib/url/p1.ts";
 import {
@@ -259,7 +260,7 @@ function withViewpoint(
   scenario: ScenarioDraft,
   geometry: ScenarioDraft["geometry"],
 ): ScenarioDraft {
-  const L = geometry.source === "manual" ? geometry.L : geometry.sb - geometry.sa;
+  const L = spanOfGeometry(geometry);
   return {
     ...scenario,
     geometry,

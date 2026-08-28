@@ -35,6 +35,7 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { roundToDisplay } from "@/lib/format/quantity.ts";
 import { clampX } from "@/lib/scenario/from-search.ts";
+import { spanOfGeometry } from "@/lib/scenario/geometry.ts";
 
 import type { Deduced } from "./deduced.ts";
 import type { FieldContext, FieldId } from "./fields.ts";
@@ -265,7 +266,7 @@ export function spanLength(scenario: ScenarioDraft): number | null {
 }
 
 function spanOf(geometry: Geometry): number | null {
-  const L = geometry.source === "manual" ? geometry.L : geometry.sb - geometry.sa;
+  const L = spanOfGeometry(geometry);
   return Number.isFinite(L) && L > 0 ? L : null;
 }
 
