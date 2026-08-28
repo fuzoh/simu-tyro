@@ -97,6 +97,19 @@ export const CLEARANCE = {
  * Inverting `x(s)` per terrain vertex would be exact and would cost a root-find in the inner loop;
  * millimetres, for the half of the frame budget that scales.
  *
+ * **`atX` and `perStepX` carry that same resolution, and ticket 09 recorded only the magnitude
+ * trade.** They are always a *scanned* vertex — a cable vertex, the rider's node, or a terrain point
+ * — never an interpolated argmin, so the **position** is quantised where the value is not. Measured
+ * on ticket 39 item 5 against a 600-sample scan of the same traverse: on § 4's straight two-point
+ * ground `perStepX` is the rider's own node on 142 of 260 steps (209 of 260 on a textile line) and a
+ * cable vertex `L₀ / 60` ≈ 2,53 m apart elsewhere, landing within **1,26 m** of the fine scan's
+ * answer while the value it indexes moves at most **1,5 mm**; on all three imported profiles the
+ * difference is **0,000 m**, because the governing point is a terrain vertex this scan evaluates
+ * exactly. That is deliberate and it is what `chart/profile.tsx` draws its clearance dimension at:
+ * `testing.md`'s « positions of scanned extrema » tier — absolute, 2× the sample spacing — is the
+ * bar every caller asserts `atX` at, and buying more would cost the same inner-loop root-find for a
+ * millimetre of value.
+ *
  * The scan is written against `xAt` / `zAt` on one reused {@link CableShape} rather than through
  * `sampleCable`: the two are the same arithmetic on the same vertices, and 260 discarded
  * `Float64Array`s per parameter change are 260 allocations this reducer does not have to make.
