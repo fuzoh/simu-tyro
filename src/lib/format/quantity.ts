@@ -212,6 +212,14 @@ export const QUANTITIES = {
   extremumX: { unit: "m", decimals: 1 },
   /** `FS effectif` — a safety factor, never a percentage. */
   FS: { unit: "", decimals: 2 },
+  /**
+   * `k` exigé par le régime — the safety divisor a régime fixes (3,0 sur tension totale, 5,0 sur
+   * charge suspendue): both are published constants, so 1 decimal reproduces them exactly, exactly
+   * as the textile `k` above does at the same precision. **Its own id**, not `k`: § 3's table
+   * already spends that name on textile relative stiffness, a different grandeur that happens to
+   * share a letter with a régime's divisor.
+   */
+  regimeK: { unit: "", decimals: 1 },
   /** `T adm` par extrémité, daN. Régime-dependent, therefore **absent** on the first screen. */
   Tadm: { unit: "force", decimals: 0 },
   /** `Réserve de tension`, daN — signed. Régime-dependent, absent on the first screen. */

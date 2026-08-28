@@ -54,7 +54,7 @@ import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { CellState, VerdictCell, VerdictResult, VerdictState } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
-import { DECIMAL_MARK, formatQuantity, formatValue } from "@/lib/format/quantity.ts";
+import { formatQuantity, formatValue } from "@/lib/format/quantity.ts";
 import { amplifiedTension, evaluateVerdict, REGIMES } from "@/lib/sim";
 
 import type { GateReport } from "./gates.ts";
@@ -663,12 +663,13 @@ function signed(id: "tensionReserve" | "Tdaf", value: number, unit: ScenarioDraf
 }
 
 /**
- * A régime's divisor, at one decimal — « k = 3,0 » and « exigé 3,0 », which are the two forms § 6
- * prints in a sentence. § 3's display-precision table has no row for it: `k` there is the textile
- * relative stiffness, a different grandeur that happens to share a letter.
+ * A régime's divisor — « k = 3,0 » and « exigé 3,0 », the two forms § 6 prints in a sentence.
+ * Renders through § 3's table like every other quantity, under its own id `regimeK` — kept
+ * distinct from the textile relative stiffness `k` that table already names. This wrapper exists
+ * only so the five call sites read `divisor(k)` rather than repeating the id.
  */
 function divisor(k: number): string {
-  return k.toFixed(1).replace(".", DECIMAL_MARK);
+  return formatValue("regimeK", k);
 }
 
 function row(

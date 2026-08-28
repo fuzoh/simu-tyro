@@ -89,6 +89,8 @@ const ROWS: ReadonlyArray<{ id: QuantityId; value: number; expected: string }> =
   { id: "clearance", value: 2.4399, expected: "2,44 m" },
   { id: "extremumX", value: 74.117, expected: "74,1 m" },
   { id: "FS", value: 8.8011, expected: "8,80" },
+  // The régime's own divisor — « k = 3,0 » / « exigé 3,0 » — distinct from the textile `k` above.
+  { id: "regimeK", value: 3, expected: "3,0" },
   // § 3's régime-dependent trio, quoted at EN 15567-1 / ACCT 10:1 — **absent** on first paint.
   { id: "Tadm", value: 27_220, expected: "2722 daN" },
   { id: "tensionReserve", value: -1110, expected: "-111 daN" },
