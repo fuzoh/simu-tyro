@@ -89,7 +89,7 @@ export function terrainDisclosure(source: TerrainSource): readonly DisclosureLin
         detail:
           "Sur un sol plan, garde ≈ lerp(hauteurs d'ancrage) − flèche chargée − enveloppe " +
           "passager : le dénivelé ne gagne aucune garde. Mesuré, à L, flèche et hauteurs " +
-          "constantes : garde min 2,46 / 2,44 / 2,37 / 2,25 m pour h = 0 / −18 / −40 / −60 m. " +
+          "constantes : garde min 2,43 / 2,42 / 2,34 / 2,22 m pour h = 0 / −18 / −40 / −60 m. " +
           "Une traversée de gorge modélisée à la main lit donc un échec qui n'existe pas — " +
           "mesuré −62,8 m sur une ligne de 1109 m. Importez un profil pour le relief réel.",
       },

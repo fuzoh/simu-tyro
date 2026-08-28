@@ -559,9 +559,11 @@ export function ReadOutCells({
       {/*
        * § 5's own scope label, « à la position du passager ». It is **inside** the row and costs it
        * no height, because at narrow the row ends up directly against the Rail's `Résultats` (« sur
-       * toute la traversée ») and the two genuinely differ from the first paint — measured, 2,49 m
-       * here against 2,44 m there. A row of its own would have broken the desktop budget, which
-       * sums to the viewport exactly.
+       * toute la traversée ») and the two are **different reductions**, `ligne` over `x` at one
+       * `x_P` against `traversée` over `x_P`. They read the same 2,42 m on first paint since ticket
+       * 37 put §11's scan on the rider's own node (2,49 against 2,44 before), and metres apart as
+       * soon as the passenger leaves mid-span — which is what the label is for. A row of its own
+       * would have broken the desktop budget, which sums to the viewport exactly.
        */}
       {scope !== undefined && (
         // Gone in the pinned header, where it would land on {@link RevealProfile} and where the

@@ -274,7 +274,7 @@ describe("contact: cable — deep slack converges, it is not a solver failure", 
     zs: Float64Array.from([given.zBaseA, given.zBaseB]),
   };
 
-  test("L₀ 400 m on a 200 m span ⇒ garde −169,67 m, coverage 1", () => {
+  test("L₀ 400 m on a 200 m span ⇒ garde −170,24 m, coverage 1", () => {
     const { traverse, clearance } = garde(spanOf(given, given.L0), given.P, bases, given.hRider);
     expect(traverse.coverage).toBe(measured.coverage);
     expect(measuredOffBy(clearance.hMin, measured.hMin, 2)).toBeLessThanOrEqual(1);
@@ -282,7 +282,7 @@ describe("contact: cable — deep slack converges, it is not a solver failure", 
     expect(clearance.hMin).toBeLessThan(0);
   });
 
-  test("the shallower slack — L₀ 200,5 m ⇒ −7,59 m — is already « Câble au sol »", () => {
+  test("the shallower slack — L₀ 200,5 m ⇒ −7,61 m — is already « Câble au sol »", () => {
     const { traverse, clearance } = garde(
       spanOf(given, given.L0Shallow),
       given.P,
@@ -311,7 +311,7 @@ describe("contact: rider — the envelope is crossed although the cable clears",
   const terrain = groundUnderAnchors(given.L, given.h, given.anchorHeightA, given.anchorHeightB);
   const { traverse, clearance } = garde(span, given.P, terrain, given.hRider);
 
-  test("anchors A 12 / B 6 at flèche 6,0 m ⇒ −1,53 m, coverage 1", () => {
+  test("anchors A 12 / B 6 at flèche 6,0 m ⇒ −1,55 m, coverage 1", () => {
     expect(traverse.coverage).toBe(measured.coverage);
     expect(measuredOffBy(clearance.hMin, measured.hMin, 2)).toBeLessThanOrEqual(1);
   });

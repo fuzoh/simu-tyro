@@ -694,7 +694,7 @@ describe("amendment F, cost 2 — the peek where the cap cuts the cable (décisi
 
   it("the data-reachable clip keeps its disabled control — « mou profond » is unchanged", () => {
     // § 5's own third-row case, cut at **every** legal aspect: the box has nothing to do with it, the
-    // cut is the line's own truth, and it arrives with « Câble au sol » (garde −169,67 m). Decision 4
+    // cut is the line's own truth, and it arrives with « Câble au sol » (garde −170,24 m). Decision 4
     // does not touch this row, and re-enabling the peek here would show a compression of a line that
     // is already on the ground.
     for (const aspect of [PLOT_ASPECT_BAND.min, PROFILE_ASPECT, PLOT_ASPECT_BAND.max]) {
@@ -984,13 +984,15 @@ describe("ticket 39 — the clearance strip's quantised y domain", () => {
   });
 
   it("a violation deeper than the band extends the floor in whole steps", () => {
-    // `contact: "rider"` — anchors A 12 / B 6 at flèche 6,0 ⇒ garde −1,53 m (spec § 15).
-    expect(clearanceDomain({ values: [4.0, -1.53], wide: true }).floor).toBe(-2);
-    // `contact: "cable"` — `L₀` 400 m on a 200 m span ⇒ −169,67 m, and nothing positive to scale
+    // `contact: "rider"` — anchors A 12 / B 6 at flèche 6,0 ⇒ garde −1,55 m (`[MEASURED]` ticket
+    // 37 §1, re-taken from ticket 14 §1's −1,53 m). The step floor is what is asserted, so the
+    // re-take moves the input and not the expectation.
+    expect(clearanceDomain({ values: [4.0, -1.55], wide: true }).floor).toBe(-2);
+    // `contact: "cable"` — `L₀` 400 m on a 200 m span ⇒ −170,24 m, and nothing positive to scale
     // from: the ladder sizes on the whole excursion, so the grid stays readable and the reserved
     // positive side is one step — the drawing's message there is « the line is under the ground »,
     // and the curve sits in the bottom quarter where that reads.
-    const drowned = clearanceDomain({ values: [-169.67], wide: true });
+    const drowned = clearanceDomain({ values: [-170.24], wide: true });
     expect({ step: drowned.step, top: drowned.top, floor: drowned.floor }).toStrictEqual({
       step: 100,
       top: 100,
