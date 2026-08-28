@@ -15,6 +15,7 @@ import { xAt, zAt } from "./catenary.ts";
 import { CLEARANCE, evaluateClearance } from "./clearance.ts";
 import { solveSpan } from "./solve.ts";
 import { sweep } from "./sweep.ts";
+import { zGroundAt } from "./terrain.ts";
 
 /**
  * §11's clearance reducer. **No §15 fixture covers this module** — inventing one is forbidden — so
@@ -23,9 +24,10 @@ import { sweep } from "./sweep.ts";
  *
  * Four things this file exists to pin down:
  *
- * - **The opening screen's garde, all four outputs at once**: 2,44 m at `x` 74,1 with
+ * - **The opening screen's garde, all four outputs at once**: 2,42 m at `x` 74,4 with
  *   `contact: "none"` and **0** steps in violation. A garde that drifts is the app's central
- *   read-out drifting.
+ *   read-out drifting. (2,44 m at `x` 74,1 before ticket 37 put §11's scan on the rider's own
+ *   node — the re-take is 21 mm *lower*, the conservative direction.)
  * - **The two sensitivities that forced the first-run geometry**: dénivelé buys no clearance
  *   (21 cm across 60 m of it) and flèche spends it metre-for-metre. They are one measurement
  *   about the *shape* of the output, and asserting only the shipped point would let both slopes
@@ -33,9 +35,11 @@ import { sweep } from "./sweep.ts";
  * - **Both contact kinds, because they are two separate verdicts.** Deep slack *converges* —
  *   « Câble au sol » is a clearance verdict, never a `SolveError` — and the passenger envelope is
  *   violated only **given `h_rider`**, which is why the two never collapse into one flag.
- * - **The inner minimum runs over the whole line.** On flat ground it is analytically the lowest
- *   cable vertex, which makes the ground-shift and `h_rider`-shift invariances exact — a fixture
- *   value alone would let a sign error through.
+ * - **The inner minimum runs over the whole line, and always includes the rider's own node.** On
+ *   flat ground it is analytically the lowest sampled vertex, which makes the ground-shift and
+ *   `h_rider`-shift invariances exact — a fixture value alone would let a sign error through. The
+ *   kink is a corner, not a sag: no uniform grid converges onto it, so §11 evaluates `s_D`
+ *   explicitly.
  *
  * `[MEASURED]` rows assert at `TOLERANCE.measured` **floored at the half-ulp of the recorded
  * value's own last digit**: 1e-3 relative on a garde recorded as « 0,40 m » is ±0,4 mm, which is
@@ -125,7 +129,7 @@ function stepsInViolation(perStep: Float64Array): number {
   return count;
 }
 
-describe("the first-run line — 2,44 m at x 74,1, contact none, 0 steps in violation", () => {
+describe("the first-run line — 2,42 m at x 74,4, contact none, 0 steps in violation", () => {
   const { in: given, out: measured } = FIRST_RUN_CLEARANCE;
   const span = spanOf(given, given.L0);
   const terrain = groundUnderAnchors(given.L, given.h, given.anchorHeight, given.anchorHeight);
@@ -136,15 +140,15 @@ describe("the first-run line — 2,44 m at x 74,1, contact none, 0 steps in viol
     expect(traverse.coverage).toBe(measured.coverage);
   });
 
-  test("garde min is 2,44 m", () => {
+  test("garde min is 2,42 m", () => {
     expect(measuredOffBy(clearance.hMin, measured.hMin, 2)).toBeLessThanOrEqual(1);
   });
 
-  test("it sits at x 74,1 m", () => {
+  test("it sits at x 74,4 m", () => {
     expect(measuredOffBy(clearance.atX, measured.atX, 1)).toBeLessThanOrEqual(1);
   });
 
-  test("the rider is at x 73,8 m at that step — 0,9 m away, so the cell does not relabel", () => {
+  test("the rider is at x 74,4 m at that step — on the worst point, so the cell does not relabel", () => {
     expect(
       measuredOffBy(traverse.steps[clearance.atStepIndex].xD, measured.atRiderX, 1),
     ).toBeLessThanOrEqual(1);
@@ -171,8 +175,10 @@ describe("the first-run line — 2,44 m at x 74,1, contact none, 0 steps in viol
   test("densifying the scan buys centimetres — 60 samples per step is the measured resolution", () => {
     // 600 refines 60: every coarse vertex is a dense vertex, so the dense minimum can only be
     // lower. What it recovers is the convexity between two vertices — the cable's own sag across
-    // one segment, plus the trolley kink no uniform grid lands on. Centimetres, never metres, and
-    // the frame budget scales with `steps × samplesPerStep`: nobody densifies this scan.
+    // one segment. The trolley kink is no longer part of it: ticket 37 forced `s_D` into the
+    // sample set, which is why what is left here is millimetres rather than the two centimetres
+    // it used to be. Centimetres, never metres, and the frame budget scales with
+    // `steps × samplesPerStep`: nobody densifies this scan.
     const dense = evaluateClearance(span, given.P, traverse.steps, terrain, given.hRider, 600);
     expect(dense.hMin).toBeLessThanOrEqual(clearance.hMin);
     expect(clearance.hMin - dense.hMin).toBeLessThan(0.05);
@@ -388,15 +394,141 @@ describe("an imported profile is scanned at its own sample points, not only the 
     // Refining the *cable* grid 60 → 4000 can only lower the minimum, and what it recovers is
     // bounded by the **cable** spacing, not by the terrain's: at a terrain vertex the ground is
     // exact and the cable is read off the bracketing segment's chord. If the terrain's vertices
-    // were missing from the coarse scan the gap here would be the ridge's own 5 m. Measured at
-    // **69 mm**, and it is the trolley kink rather than the convexity — the same effect the
-    // ticket's « measured correction » records at 18,5 mm on smooth ground, larger here only
-    // because this ridge sits where the kink passes. Centimetres, as § 4 claims; the kink is not
-    // added to the scan because 60 uniform samples *is* what every measured garde was taken on.
+    // were missing from the coarse scan the gap here would be the ridge's own 5 m. Ticket 09
+    // measured it at **69 mm** and named the trolley kink, not the convexity, as the cause;
+    // ticket 37 forced `s_D` into the sample set, and the residual re-measures at **0,13 mm** —
+    // the ridge still sits where the kink passes, but the kink is now evaluated. Two and a half
+    // orders below § 4's ≈5 mm claim, and the coarse scan stays the conservative of the two.
     const coarse = reduce(ridged);
     const dense = reduce(ridged, 4000);
     expect(dense.hMin).toBeLessThanOrEqual(coarse.hMin);
-    expect(coarse.hMin - dense.hMin).toBeLessThan(0.1);
+    expect(coarse.hMin - dense.hMin).toBeLessThan(0.001);
+  });
+});
+
+describe("the rider node is evaluated at every load position — §11's `x = x_P`", () => {
+  // § 11 fixes the worst point per load position **at `x = x_P`**, and the loaded low point *is*
+  // the trolley's kink: `z_cable` has a corner there, so no amount of uniform sampling in `s`
+  // converges onto it — the two neighbours of the vertex are read instead, and the cable is
+  // convex between them, so the miss is always in the **optimistic** direction. That direction is
+  // what separates this from the review's other four findings: it moved a safety read-out, not a
+  // seed. `s_D` is therefore forced into every step's sample set — one extra sample per step, not
+  // a denser grid.
+  const { in: given } = FIRST_RUN_CLEARANCE;
+  const span = spanOf(given, given.L0);
+  const traverse = sweep(span, given.P, given.sweepSteps);
+  const terrain = groundUnderAnchors(given.L, given.h, given.anchorHeight, given.anchorHeight);
+  const clearance = evaluateClearance(
+    span,
+    given.P,
+    traverse.steps,
+    terrain,
+    given.hRider,
+    given.samplesPerStep,
+  );
+
+  /** §11's `h_clear(x_P; x_P)` — the clearance **at** the step's own kink, exactly. */
+  function atRider(step: SweepStep): number {
+    const shape = {
+      H: step.H,
+      V0: step.V0,
+      w: span.w,
+      EA: span.EA,
+      loads: [{ P: given.P, s: step.sD }],
+    };
+    const x = xAt(shape, step.sD);
+    return zAt(shape, step.sD) - zGroundAt(terrain, x) - given.hRider;
+  }
+
+  test("the kink is a vertex the uniform grid never lands on — so the case is not vacuous", () => {
+    // If `s_D` fell on the grid the assertions below would hold for free. It does not: `s_D` is
+    // the arc the trolley has travelled, and the grid is 60 equal divisions of `L₀`. Only a step
+    // that parks the rider on an anchor can coincide.
+    const spacing = span.L0 / given.samplesPerStep;
+    let onGrid = 0;
+    for (const step of traverse.steps) {
+      const offset = step.sD % spacing;
+      if (Math.min(offset, spacing - offset) < 1e-9) onGrid++;
+    }
+    expect(onGrid).toBeLessThanOrEqual(2);
+    expect(traverse.steps.length).toBeGreaterThan(onGrid + 200);
+  });
+
+  test("no step reports a clearance above its own rider node", () => {
+    // The defect, stated as the property it violated: the reducer may not return a number the
+    // rider's own position refutes. Ticket 09's residual bound was argued for the *sag* between
+    // two vertices and does not cover a kink, which is why this is an inequality on every one of
+    // the 260 steps rather than a tolerance.
+    for (let i = 0; i < traverse.steps.length; i++) {
+      expect(clearance.perStep[i]).toBeLessThanOrEqual(atRider(traverse.steps[i]) + 1e-12);
+    }
+  });
+
+  test("refining the cable grid 60 → 4000 recovers nothing — the minimum is a sampled vertex", () => {
+    // Ticket 09 measured that residual at **18,5 mm** on smooth ground and named the kink as its
+    // cause. With `s_D` in the sample set the traverse minimum sits *on* a sampled vertex, so the
+    // residual re-measures at **0,00 mm** — refining the grid recovers nothing at all here — and
+    // the coarse scan is still the conservative of the two.
+    const dense = evaluateClearance(span, given.P, traverse.steps, terrain, given.hRider, 4000);
+    expect(dense.hMin).toBeLessThanOrEqual(clearance.hMin);
+    expect(clearance.hMin - dense.hMin).toBeLessThan(0.001);
+  });
+
+  describe("on a level span over flat ground the kink *is* the minimum, exactly", () => {
+    // §15's Z1 line: level, so the loaded low point is the kink itself over the whole middle of
+    // the traverse — the strongest form of the claim, an equality rather than a bound. Near either
+    // anchor the rider's own node is *not* the lowest point (the unloaded sag beyond it is), which
+    // is exactly why the fix adds `s_D` to the scan instead of replacing the scan with it.
+    const level = spanOf({ L: Z1.in.L, h: Z1.in.h, w: Z1.in.w, EA: Z1.in.EA }, Z1.in.L0);
+    const P = 1177;
+    const z = -8;
+    const flat: Terrain = { kind: "flat", z };
+    const levelTraverse = sweep(level, P, 240);
+    const levelClearance = evaluateClearance(
+      level,
+      P,
+      levelTraverse.steps,
+      flat,
+      2.1,
+      CLEARANCE.samplesPerStep,
+    );
+    const kinkAt = (step: SweepStep) =>
+      zAt(
+        { H: step.H, V0: step.V0, w: level.w, EA: level.EA, loads: [{ P, s: step.sD }] },
+        step.sD,
+      ) -
+      z -
+      2.1;
+
+    test("mid-traverse, the per-step minimum equals the rider node to the bit", () => {
+      for (const index of [60, 130, 200]) {
+        expect(levelClearance.perStep[index]).toBeCloseTo(kinkAt(levelTraverse.steps[index]), 12);
+      }
+    });
+
+    test("and the uniform grid alone read those steps 9 to 19 mm high", () => {
+      // The magnitude, recorded so a regression that quietly drops `s_D` again fails loudly
+      // rather than drifting: the grid's own minimum sits **above** the kink by this much.
+      for (const index of [60, 130]) {
+        const step = levelTraverse.steps[index];
+        const shape = {
+          H: step.H,
+          V0: step.V0,
+          w: level.w,
+          EA: level.EA,
+          loads: [{ P, s: step.sD }],
+        };
+        let gridMin = Number.POSITIVE_INFINITY;
+        for (let k = 0; k <= CLEARANCE.samplesPerStep; k++) {
+          const s =
+            k === CLEARANCE.samplesPerStep ? level.L0 : (level.L0 * k) / CLEARANCE.samplesPerStep;
+          gridMin = Math.min(gridMin, zAt(shape, s));
+        }
+        const missed = gridMin - z - 2.1 - levelClearance.perStep[index];
+        expect(missed).toBeGreaterThan(0.008);
+        expect(missed).toBeLessThan(0.02);
+      }
+    });
   });
 });
 
@@ -467,13 +599,16 @@ describe("flat ground — the three contact states, and the identities behind th
     expect([...profiled.perStep]).toEqual([...flat.perStep]);
   });
 
-  test("on flat ground the per-step minimum is the step's lowest cable vertex", () => {
+  test("on flat ground the per-step minimum is the step's lowest sampled vertex", () => {
+    // The sample set is the uniform grid **plus the step's own `s_D`** — §11 evaluates the load
+    // position itself, so the identity has to name the kink or it would re-assert the defect
+    // ticket 37 closed.
     const z = -8;
     const clearance = reduce(flatAt(z));
     for (const index of [0, 7, 130, traverse.steps.length - 1]) {
       const step = traverse.steps[index];
       const shape = { H: step.H, V0: step.V0, w: span.w, EA: span.EA, loads: [{ P, s: step.sD }] };
-      let lowest = Number.POSITIVE_INFINITY;
+      let lowest = zAt(shape, step.sD);
       for (let k = 0; k <= CLEARANCE.samplesPerStep; k++) {
         const s =
           k === CLEARANCE.samplesPerStep ? span.L0 : (span.L0 * k) / CLEARANCE.samplesPerStep;

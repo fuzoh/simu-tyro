@@ -42,7 +42,7 @@ import { FIRST_RUN_RETAINED_TEXTILE, FIRST_RUN_SCENARIO, firstRunDefaults } from
  *
  * ```
  * « 151,64 m » · « 253,5 daN » · « 6,00 m » · « 4,00 % » · « 2,90 % » · « 817,1 daN »
- * · « 927,9 daN » · « 7,48 m » · « 2,44 m » · « 8,80 » · « 9,06 »
+ * · « 927,9 daN » · « 7,48 m » · « 2,42 m » · « 8,80 » · « 9,06 »
  * ```
  *
  * and with them the **French decimal comma** and every row of the precision table. One collision
@@ -310,11 +310,15 @@ describe("the opening state — § 9's measured table, from FIRST_RUN_SCENARIO",
     expect(formatQuantity("loadedSag", opening.loadedSag)).toBe("7,48 m");
   });
 
-  test("« 2,44 m » — garde min, at x 74,1 m with the rider at x 73,8 m", () => {
-    expect(formatQuantity("clearance", opening.clearance.hMin)).toBe("2,44 m");
-    expect(formatQuantity("extremumX", opening.clearance.atX)).toBe("74,1 m");
+  test("« 2,42 m » — garde min, at x 74,4 m with the rider at x 74,4 m", () => {
+    // Re-recorded under ticket 37 defect 1: 2,44 m at x 74,1 m with the rider at x 73,8 m before
+    // §11's scan evaluated the rider's own kink. The garde moved **21 mm down** — conservative —
+    // and the worst point moved onto the rider's own position, which is where § 4's straight
+    // two-point ground puts it once the kink is sampled.
+    expect(formatQuantity("clearance", opening.clearance.hMin)).toBe("2,42 m");
+    expect(formatQuantity("extremumX", opening.clearance.atX)).toBe("74,4 m");
     const riderX = opening.traverse.steps[opening.clearance.atStepIndex].xD;
-    expect(formatQuantity("x_D", riderX)).toBe("73,8 m");
+    expect(formatQuantity("x_D", riderX)).toBe("74,4 m");
   });
 
   test("« 8,80 » / « 9,06 » — FS effectif, anchor A governing", () => {
@@ -324,8 +328,9 @@ describe("the opening state — § 9's measured table, from FIRST_RUN_SCENARIO",
   });
 
   test("x_D 75,0 m sits inside max(1 m, 1 % de la portée) of the minimum — « Garde min. ligne », plainly", () => {
-    // 0,9 m from 74,1: the clearance cell must not relabel itself to a position scope on first
-    // paint. This is why the rider ships at `L/2` and why the two blocks read 2,49 and 2,44.
+    // 0,57 m from 74,4: the clearance cell must not relabel itself to a position scope on first
+    // paint. This is why the rider ships at `L/2`; since ticket 37 the two blocks read the same
+    // 2,42 m there, and the window is what keeps the label stable rather than the digits.
     const window = Math.max(1, 0.01 * opening.L);
     expect(Math.abs(FIRST_RUN_SCENARIO.rider.xD - opening.clearance.atX)).toBeLessThan(window);
   });

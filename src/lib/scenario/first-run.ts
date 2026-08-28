@@ -32,7 +32,7 @@
  * - **No worked example ships** — no named scenario, no bundled trace, no « charger un exemple ».
  *   The first-run scenario *is* the worked example, and the three CSVs stay fixtures.
  * - **This module holds inputs only.** The opening state § 9 records — `L₀` 151,644 m, `H`
- *   253,5 daN, garde 2,44 m, FS 8,80 / 9,06 — is *computed* from these by the engine, never
+ *   253,5 daN, garde 2,42 m, FS 8,80 / 9,06 — is *computed* from these by the engine, never
  *   stored beside them: a second copy is a copy that can disagree with the solver. `first-run.test.ts`
  *   is where those figures are locked.
  */

@@ -115,7 +115,7 @@ describe("« Résultats sans régime » — the reduced row set", () => {
   test("the two numbers the app exists to produce are both live", () => {
     // Garde min is geometric fact — no `k` appears anywhere in §11 — and the tension envelope is
     // physics. All a régime adds is a divisor.
-    expect(valueOf(results, "clearance")).toBe("2,44 m");
+    expect(valueOf(results, "clearance")).toBe("2,42 m");
     expect(valueOf(results, "Tmax")).toBe("927,9 daN");
   });
 });
@@ -147,7 +147,7 @@ describe("the thirteen reported values, on the shipped line under EN 15567-1", (
     expect(valueOf(results, "verdict")).toBe("Dans les limites — EN 15567-1 (k = 3,0)");
     expect(valueOf(results, "FS")).toBe("8,80");
     expect(valueOf(results, "Tmax")).toBe("927,9 daN");
-    expect(valueOf(results, "clearance")).toBe("2,44 m");
+    expect(valueOf(results, "clearance")).toBe("2,42 m");
     expect(valueOf(results, "reserve")).toBe("+1794 daN");
     expect(valueOf(results, "TadmA")).toBe("2722 daN");
     expect(valueOf(results, "TadmB")).toBe("2722 daN");
@@ -217,10 +217,11 @@ describe("the thirteen reported values, on the shipped line under EN 15567-1", (
   });
 
   test("the aggregates name the rider position that produced them", () => {
-    // The cheap addition that carries the scope discipline: the strip reads 2,49 m at `x` 75,0
-    // while the Rail reads 2,44 m — two answers to two questions, not a rounding bug.
+    // The cheap addition that carries the scope discipline. Since ticket 37 put §11's scan on the
+    // rider's own node the two *round* to the same 2,42 m on the opening screen — the qualifier is
+    // what still says which question each answered, and away from `x_D` 75 the gap is metres.
     expect(results.rows.find((row) => row.id === "clearance")?.qualifier).toBe(
-      "passager à x 73,8 m",
+      "passager à x 74,4 m",
     );
     expect(results.rows.find((row) => row.id === "Tmax")?.qualifier).toBe(
       "ancrage A, passager à x 74,4 m",
@@ -244,7 +245,7 @@ describe("the thirteen reported values, on the shipped line under EN 15567-1", (
     expect(valueOf(kN, "Tmax")).toBe("9,279 kN");
     expect(valueOf(kN, "TadmA")).toBe("27,22 kN");
     // Lengths, percentages and the dimensionless `FS` are not forces.
-    expect(valueOf(kN, "clearance")).toBe("2,44 m");
+    expect(valueOf(kN, "clearance")).toBe("2,42 m");
     expect(valueOf(kN, "FS")).toBe("8,80");
   });
 });

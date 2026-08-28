@@ -22,6 +22,13 @@
  *   steps sideways onto a bump the rider has already passed. Under-the-rider-only was rejected
  *   measurably: it reads positive while that same rider position is in violation a few metres
  *   away, which the aggregate `h_min` then contradicts.
+ * - **The rider's own node is always evaluated.** § 11 fixes the worst point per load position
+ *   **at `x = x_P`**, and the loaded low point is the trolley's **kink** — a corner in `z_cable`,
+ *   not a sag. No grid uniform in `s` lands on it, and reading its two neighbours across a convex
+ *   cable is optimistic by 19–27 mm on a 150 m span and by 0,57 m on 200 m of slack. So `s_D` is
+ *   merged into every step's sample set: **one extra sample per step**, not a denser grid, so the
+ *   frame budget is untouched. Ticket 37 defect 1; ticket 09's own residual bound was argued for
+ *   the convexity and never covered the kink.
  * - **Vertex-only evaluation, on *both* sets of vertices, and nobody densifies either.** The scan
  *   reads the sampled polyline's own vertices **and the terrain's own sample points** — voir § 4,
  *   « `evaluateClearance` scan[s] at the terrain's own sample points ». Both halves are load-
@@ -30,7 +37,7 @@
  *   vertices does not miss millimetres, it misses whole features — a 200-point profile on a 150 m
  *   span carries a vertex every 0,75 m against the cable's ≈2,5 m, and a ridge between two cable
  *   vertices reads as clear ground. `samplesPerStep` 60 against the sweep's 240 is the measured
- *   pair, and `260 × 60` is the bench tripwire — this reducer is the larger half of the frame
+ *   pair, and `260 × 61` is the bench tripwire — this reducer is the larger half of the frame
  *   budget (p95 ≤ 1,7 ms against `sweep()`'s ≤ 0,6 ms). The terrain half adds at most § 4's
  *   200-point export ceiling per step, and **nothing at all** for manual ground, whose two points
  *   are the cable's own ends.
@@ -72,20 +79,22 @@ export const CLEARANCE = {
  *
  * Per step it rebuilds the step's cable from the span plus the step's own `(H, V₀, s_D)`, scans
  * it at `samplesPerStep + 1` vertices uniform in the **material** coordinate — the same grid
- * `sampleCable` lays down, and the grid every measured figure was taken on — **plus the terrain's
- * own sample points that fall between two of them** (§ 4), and records that step's worst
+ * `sampleCable` lays down — **plus the step's own `s_D`**, merged in ascending order, **plus the
+ * terrain's own sample points that fall between two of them** (§ 4), and records that step's worst
  * clearance and where it sits. The traverse minimum is the least of those.
  *
  * At a terrain vertex the ground is exact and the cable is read off the **chord** of the cable
  * segment bracketing it. `z_cable` is convex in `x`, so that chord sits above the cable by at most
  * that segment's own sag — the residual is bounded by the *cable* spacing rather than by the
  * terrain's, which is the property that matters: a feature the terrain resolves is *seen*, and only
- * its depth carries the error the whole scan already carries. Measured at **69 mm** on a 5 m ridge
- * placed where the trolley kink passes (against 18,5 mm on smooth ground), because the kink is the
- * one vertex no uniform grid lands on; § 4's ≈5 mm is the unloaded convexity alone. Inverting
- * `x(s)` per terrain vertex would be exact and would cost a root-find in the inner loop, and adding
- * the kink's own `s_D` to the scan would move every measured garde — 60 uniform samples *is* the
- * grid ticket 14 measured on. Centimetres either way, for the half of the frame budget that scales.
+ * its depth carries the error the whole scan already carries. Ticket 09 measured that residual at
+ * **69 mm** on a 5 m ridge placed where the trolley kink passes and at **18,5 mm** on smooth
+ * ground, and named the kink — the one vertex no uniform grid lands on — rather than the convexity
+ * as its cause. With `s_D` in the sample set (ticket 37 defect 1) both re-measure at **0,13 mm**
+ * and **0,00 mm**: what is left is § 4's unloaded convexity alone, and on smooth ground the
+ * traverse minimum sits *on* a sampled vertex, so refining the grid 60 → 4000 recovers nothing.
+ * Inverting `x(s)` per terrain vertex would be exact and would cost a root-find in the inner loop;
+ * millimetres, for the half of the frame budget that scales.
  *
  * The scan is written against `xAt` / `zAt` on one reused {@link CableShape} rather than through
  * `sampleCable`: the two are the same arithmetic on the same vertices, and 260 discarded
@@ -160,16 +169,27 @@ export function evaluateClearance(
     let stepMin = Number.POSITIVE_INFINITY;
     let stepMinX = Number.NaN;
 
+    // § 11 fixes the worst point per load position **at `x = x_P`**, and `s_D` is never on the
+    // uniform grid — it is the arc the trolley has travelled, the grid is equal divisions of
+    // `L₀`. So the kink is **merged into** the ascending sample sequence rather than replacing a
+    // sample: `insertAt` is how many uniform samples precede it, and the scan runs one sample
+    // longer. Ascending order is what the terrain cursor below relies on, and a `s_D` that lands
+    // on a grid point simply evaluates that point twice — a minimum is idempotent.
+    const sD = rider.s < 0 ? 0 : rider.s > L0 ? L0 : rider.s;
+    const insertAt = Math.ceil((sD * samplesPerStep) / L0);
+
     // `x(s)` is strictly increasing (`dx/ds = H/T > 0`, and `H > 0` on every solved step), so the
     // terrain's vertices are consumed once per step by a forward cursor rather than searched for.
     let g = 0;
     let xPrev = 0;
     let zPrev = 0;
 
-    for (let k = 0; k <= samplesPerStep; k++) {
-      // The last vertex is `L₀` exactly, so the scan closes on the far anchor rather than on a
-      // rounding of it — `sampleCable`'s own end condition.
-      const s = k === samplesPerStep ? L0 : (L0 * k) / samplesPerStep;
+    for (let k = 0; k <= samplesPerStep + 1; k++) {
+      // The uniform sample this position carries, or `-1` for the kink itself. The last uniform
+      // vertex is `L₀` exactly, so the scan closes on the far anchor rather than on a rounding of
+      // it — `sampleCable`'s own end condition.
+      const j = k < insertAt ? k : k === insertAt ? -1 : k - 1;
+      const s = j === -1 ? sD : j === samplesPerStep ? L0 : (L0 * j) / samplesPerStep;
       const x = xAt(shape, s);
       const z = zAt(shape, s);
       const above = z - zGroundAt(terrain, x);

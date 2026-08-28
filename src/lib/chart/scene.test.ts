@@ -58,9 +58,11 @@ describe("the first-run scene — § 9's opening screen, drawn", () => {
     expect(first.extent).toBeNull();
   });
 
-  it("reproduces the locked garde: 2,44 m at x 74,1 m, contact « none »", () => {
-    expect(formatQuantity("clearance", first.clearance.hMin)).toBe("2,44 m");
-    expect(formatQuantity("extremumX", first.clearance.atX)).toBe("74,1 m");
+  it("reproduces the locked garde: 2,42 m at x 74,4 m, contact « none »", () => {
+    // Re-recorded under ticket 37 defect 1 — 2,44 m at x 74,1 m before §11's scan evaluated the
+    // rider's own kink, so the shipped read-out moved **21 mm down**, the conservative direction.
+    expect(formatQuantity("clearance", first.clearance.hMin)).toBe("2,42 m");
+    expect(formatQuantity("extremumX", first.clearance.atX)).toBe("74,4 m");
     expect(first.clearance.contact).toBe("none");
     expect(first.traverse.grid.length).toBe(260);
     expect(first.traverse.coverage).toBe(1);
@@ -91,13 +93,15 @@ describe("the first-run scene — § 9's opening screen, drawn", () => {
   });
 
   it("the Position-scope garde is the rider's own minimum, not the traverse's", () => {
-    // The two scopes differ from the very first paint, which is why the read-out row carries its
-    // own « à la position du passager » label against the Rail's « sur toute la traversée ». § 5
-    // quotes ≈2,49 against 2,44 off the prototype; what binds here is the **relation** plus the
-    // string this chain actually prints — the last centimetre is `CLEARANCE.samplesPerStep`'s.
+    // The two scopes are two reductions — `ligne` over `x` at one `x_P`, `traversée` over `x_P` —
+    // which is why the read-out row carries its own « à la position du passager » label against the
+    // Rail's « sur toute la traversée ». § 5 quotes ≈2,49 against 2,44 off the prototype; what
+    // binds here is the **relation**, and since ticket 37 put `s_D` in the scan the two are
+    // **0,32 mm** apart on the opening screen and print the same string. The labels are about
+    // scope, not about the digits: the relation is what a sign slip would break.
     expect(first.rider.worst.hClear).toBeGreaterThan(first.clearance.hMin);
-    expect(first.rider.worst.hClear).toBeLessThan(first.clearance.hMin + 0.1);
-    expect(formatQuantity("clearance", first.rider.worst.hClear)).toBe("2,48 m");
+    expect(first.rider.worst.hClear).toBeLessThan(first.clearance.hMin + 0.01);
+    expect(formatQuantity("clearance", first.rider.worst.hClear)).toBe("2,42 m");
   });
 
   it("auto-fits inside the published band, clear of the ×1 floor", () => {
@@ -148,7 +152,7 @@ describe("the first-run scene — § 9's opening screen, drawn", () => {
 
 describe("clearance failure — the four signals' inputs", () => {
   /**
-   * `[MEASURED]` ticket 14 §1 — « hauteurs 12/6, flèche 6,0 ⇒ −1,53 m », on a 200 m span at `h`
+   * `[MEASURED]` ticket 37 §1 — « hauteurs 12/6, flèche 6,0 ⇒ −1,55 m », on a 200 m span at `h`
    * −25 m. The engine's own fixture for it lives in `src/lib/sim/__fixtures__/`, which app code may
    * not reach behind the barrel; what is checked here is that the **scene** lands on the same
    * number through the app's own chain.
@@ -157,7 +161,7 @@ describe("clearance failure — the four signals' inputs", () => {
 
   it("« Enveloppe passager traversée » — the verdict that is true only given h_rider", () => {
     expect(rider.clearance.contact).toBe("rider");
-    expect(rider.clearance.hMin).toBeCloseTo(-1.53, 2);
+    expect(rider.clearance.hMin).toBeCloseTo(-1.55, 2);
     // The traverse solves whole; only the clearance fails. « Câble au sol » would be a different
     // claim, and the two are separate verdicts because only this one depends on `h_rider`.
     expect(rider.traverse.coverage).toBe(1);
@@ -190,10 +194,12 @@ describe("clearance failure — the four signals' inputs", () => {
   });
 
   it("« Câble au sol » is the outer verdict — L₀ 400 m on a 200 m span", () => {
-    // `[MEASURED]` ticket 14 §1, and § 5's own « mou profond » line: garde −169,67 m.
+    // `[MEASURED]` ticket 37 §1, re-taken from ticket 14 §1's −169,67 m: garde −170,24 m. This is
+    // the row the rider node moved furthest — 0,57 m, down — because 200 m of slack drops the
+    // kink's corner far below the chord its two neighbours span. § 5's « mou profond » line.
     const slack = scene(deepSlack());
     expect(slack.clearance.contact).toBe("cable");
-    expect(slack.clearance.hMin).toBeCloseTo(-169.67, 1);
+    expect(slack.clearance.hMin).toBeCloseTo(-170.24, 1);
   });
 });
 
@@ -245,18 +251,18 @@ describe("ticket 41 — the line's minimum against the garde under the passenger
     expect(at(tall, 150).step.xD - at(tall, 150).worst.atX).toBeGreaterThan(100);
   });
 
-  it("the two differ on the shipped screen, and the printed one is the optimistic one", () => {
+  it("the two coincide on the shipped screen — ticket 37 item 1, from the chart", () => {
     // `underRider ≥ worst.hClear` is the true ordering — the garde under the rider is `h_clear` at
-    // `x = x_D`, one candidate in the inner minimum. On the first-run screen the shipped scan
-    // reports it **65 mm the other way**, because its 60 uniform samples in `s` never land on the
-    // trolley kink, which is the loaded catenary's own low point. That is ticket 37 item 1 measured
-    // from the chart; ≈0,5 px at § 5's reference column, and not ticket 41's to fix.
+    // `x = x_D`, one candidate in the inner minimum. The shipped scan used to report it **65 mm the
+    // other way** (2,48 m against 2,42 m, an excess of 0,06455 m), because its 60 uniform samples
+    // in `s` never landed on the trolley kink, the loaded catenary's own low point. Ticket 37
+    // defect 1 forced `s_D` into the sample set: at `x_D` 75 the inner minimum now *is* the rider's
+    // node, so the two are equal **to the bit** and the ordering is no longer violated at all.
     const here = at(base, 75);
-    expect(formatQuantity("clearance", here.worst.hClear)).toBe("2,48 m");
+    expect(formatQuantity("clearance", here.worst.hClear)).toBe("2,42 m");
     expect(formatQuantity("clearance", here.underRider)).toBe("2,42 m");
-    // `[MEASURED]` tier — `max(1e-3 · |expected|, 0,5 · 10⁻ᵈ)` for a value recorded to `d` decimals,
-    // so the record carries the digits the assertion asks for rather than the other way round.
-    expect(here.worst.hClear - here.underRider).toBeCloseTo(0.06455, 4);
+    expect(here.worst.hClear).toBe(here.underRider);
+    expect(Math.abs(here.worst.atX - here.step.xD)).toBeLessThan(1e-5);
   });
 
   it("the ordering holds over the whole traverse, to the scan's own error", () => {
@@ -268,10 +274,10 @@ describe("ticket 41 — the line's minimum against the garde under the passenger
     // anchor has 5,995 m more under their feet than the line's worst point on the first-run scenario —
     // so `Math.abs` here would assert that legitimate gap away.
     //
-    // It also does **not** pin ticket 37's defect as present: 37's fix moves the excess toward zero
-    // and this case only gets safer. Today it is 99,3 mm at ancrages 12 / 20 (`x_D` 40,01) and 88,5 mm
-    // on the first-run line (`x_D` 65,01) — recorded here rather than asserted, so nothing in this
-    // suite has to change when the engine's does.
+    // Ticket 37's fix drove the excess to **zero**: it was 99,3 mm at ancrages 12 / 20 (`x_D`
+    // 40,01) and 88,5 mm on the first-run line (`x_D` 65,01), and both re-measure at 0,000 mm over
+    // all 260 steps, because the rider's node is a sample of the inner minimum now. The bound stays
+    // stated as a bound rather than tightened onto that zero — the scan's error is the contract.
     for (const from of [base, tall]) {
       let excess = 0;
       let gap = 0;

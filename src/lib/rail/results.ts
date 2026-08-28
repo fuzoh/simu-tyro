@@ -36,8 +36,10 @@
  *   The row's own label gained `ligne` with **amendment M** (ticket 41), which widens the gap between
  *   the two rather than touching either channel here: `ligne` reduces over `x`, `traversée` over
  *   `x_P`.
- *   The aggregates additionally **name the rider position that produced them**, which is what makes
- *   2,49 m and 2,44 m read as two answers rather than as a rounding bug.
+ *   The aggregates additionally **name the rider position that produced them**, which is what keeps
+ *   the strip's number and the Rail's readable as two answers to two questions. Since ticket 37 put
+ *   §11's scan on the rider's own node the two *coincide* on the opening screen (2,42 m either
+ *   way); away from `x_D` 75 they part by metres, which is what the qualifier exists for.
  * - **The grid's empty cells are legitimate.** `T adm` is per end because `η_t` is; the
  *   suspended-load criterion is **one cell** whose numerator is `min(η_A, η_B)·MBF` — written out,
  *   because an implementer reading « FS ≥ 5 sur charge suspendue » alone writes `MBF/P`, scores 77
@@ -636,8 +638,10 @@ function coverageValue(base: SceneBase): string {
 
 /**
  * « les agrégats nomment la position du passager qui les produit » — the cheap addition that does
- * most of the scope discipline's work: « Garde min 2,44 m — passager à x 73,8 m » beside the
- * strip's 2,49 m at `x` 75,0 reads as two answers to two questions rather than as a rounding bug.
+ * most of the scope discipline's work: « Garde min. ligne 2,42 m — passager à x 74,4 m » says which
+ * question the number answered, so the strip's own reading at `x_D` 75,0 is a second answer rather
+ * than a rounding bug. On the opening screen the two agree to 0,3 mm since ticket 37; at ancrages
+ * 12 / 20 with the rider at the far anchor they read 7,22 m and 17,90 m.
  *
  * @returns `null` where the traverse has no such step — **never a « — »**, which is spent on
  *   `Indéterminé`. An absent position simply drops the clause.

@@ -294,6 +294,13 @@ export type ClearanceCase = {
  * numbers `CHORD_BOUND` carries, not §13.1's un-rounded `E_app·C·d²`: reproducing that chain here
  * would duplicate `materials/steel.ts` (which does not exist yet) inside a fixture, and the
  * rounding moves garde by 3×10⁻⁴ m — two orders below the `[MEASURED]` bar.
+ *
+ * **Every garde below was re-taken on 2026-08-28** — ticket 37 defect 1, `s_D` forced into
+ * §11's sample set so the rider's own kink is evaluated. The scan as shipped read the two
+ * neighbours of that vertex across a convex cable, so **every figure moved down**, by 19 to
+ * 27 mm on the 150 m rows and by 0,57 m on the deep-slack one: the re-take is the *conservative*
+ * direction throughout, and no row moved up. The `x` of the traverse minimum moved with it —
+ * on straight two-point ground the worst point now **is** the rider's own position.
  */
 const FIRST_RUN_LINE = {
   /** m */
@@ -321,20 +328,23 @@ const FIRST_RUN_LINE = {
  * `evaluateClearance(…, 60)`, `h_rider` 2,1 m — and it is the one row that pins **all four**
  * outputs at once: the value, its `x`, the contact state and the violation count.
  *
- * `atRiderX` is not decoration either: the first-run rider ships at `x = 75,0` because the worst
- * point sits 0,9 m away from it, inside the « relabel only beyond `max(1 m, 1 % of span)` » rule,
- * so the clearance cell must not rename itself on first paint.
+ * `atRiderX` is not decoration either: the worst point sits **on** the rider's own position now
+ * (0,9 m away before ticket 37's re-take), which is well inside the « relabel only beyond
+ * `max(1 m, 1 % of span)` » rule, so the clearance cell must not rename itself on first paint.
+ * The two coincide because § 4's manual ground is a straight line: on an imported profile they
+ * separate again, which is the whole of what ticket 41 settled.
  */
 export const FIRST_RUN_CLEARANCE = {
-  source: "[MEASURED] ticket 14 §1 — « Garde min (traversée) 2,44 m à x 74,1 m »",
+  source:
+    "[MEASURED] ticket 37 §1 — « Garde min (traversée) 2,42 m à x 74,4 m » (re-take of ticket 14 §1's 2,44 m à x 74,1 m)",
   in: { ...FIRST_RUN_LINE, L0: 151.644 },
   out: {
-    /** m */
-    hMin: 2.44,
-    /** m — where the traverse minimum sits. */
-    atX: 74.1,
-    /** m — the rider's own `x` at that step. */
-    atRiderX: 73.8,
+    /** m — 2,44 before the rider node entered the scan; 21 mm lower, conservative. */
+    hMin: 2.42,
+    /** m — where the traverse minimum sits; 74,1 before, +0,33 m along the line. */
+    atX: 74.4,
+    /** m — the rider's own `x` at that step. It **is** `atX` now: the kink is the worst point. */
+    atRiderX: 74.4,
     /** Sweep steps whose own minimum is negative. */
     stepsInViolation: 0,
     /** The traverse solved whole. */
@@ -345,7 +355,9 @@ export const FIRST_RUN_CLEARANCE = {
 
 /**
  * Finding 1 — **dénivelé buys no clearance**. Tilting the chord tilts the manual ground plane by
- * the same amount, so `h` cancels out of the difference and 44 m of it moves garde by 21 cm.
+ * the same amount, so `h` cancels out of the difference and 44 m of it moves garde by 21 cm. The
+ * slope survives ticket 37's re-take intact: all four rows dropped by the same two-and-a-half
+ * centimetres, so the *finding* is a property of the geometry, not of the scan's resolution.
  *
  * The four `L₀` are measured beside the four gardes; re-deriving them from the flèche target
  * would substitute this build's inverse for the one that took the measurement.
@@ -354,17 +366,17 @@ export const CLEARANCE_VS_DENIVELE = {
   source: "[MEASURED] ticket 14 §1 — « le dénivelé ne gagne aucune garde »",
   in: FIRST_RUN_LINE,
   out: {
-    /** m at `h` 0, `L₀` 150,583 m. */
-    h0: 2.46,
+    /** m at `h` 0, `L₀` 150,583 m — 2,46 before the re-take, 25 mm lower. */
+    h0: 2.43,
     L0AtH0: 150.583,
-    /** m at `h` −18, `L₀` 151,644 m. */
-    h18: 2.44,
+    /** m at `h` −18, `L₀` 151,644 m — 2,44 before, 23 mm lower. */
+    h18: 2.42,
     L0AtH18: 151.644,
-    /** m at `h` −40, `L₀` 155,757 m. */
-    h40: 2.37,
+    /** m at `h` −40, `L₀` 155,757 m — 2,37 before, 27 mm lower. */
+    h40: 2.34,
     L0AtH40: 155.757,
-    /** m at `h` −60, `L₀` 161,998 m. */
-    h60: 2.25,
+    /** m at `h` −60, `L₀` 161,998 m — 2,25 before, 27 mm lower. */
+    h60: 2.22,
     L0AtH60: 161.998,
   },
   contact: "none",
@@ -372,8 +384,9 @@ export const CLEARANCE_VS_DENIVELE = {
 
 /**
  * Finding 1's other half — **garde moves metre-for-metre with flèche**. One metre of sag buys or
- * spends one metre of clearance, which is why 2,44 m is the figure worth shipping: the first
- * parameter a user touches moves the app's central output visibly.
+ * spends one metre of clearance, which is why 2,42 m is the figure worth shipping: the first
+ * parameter a user touches moves the app's central output visibly. The four rows moved down
+ * together under ticket 37's re-take, so the unit slope is untouched.
  *
  * The driver is the **flèche à vide target**, not `L₀`; only `flèche 6` has its `L₀` on record
  * (151,644 m), which is what the other three are cross-checked through.
@@ -382,14 +395,14 @@ export const CLEARANCE_VS_FLECHE = {
   source: "[MEASURED] ticket 14 §1 — « un mètre de flèche déplace la garde d'un mètre »",
   in: FIRST_RUN_LINE,
   out: {
-    /** m at flèche à vide 5,0 m. */
-    fleche5: 3.39,
-    /** m at flèche à vide 6,0 m — the shipped line. */
-    fleche6: 2.44,
-    /** m at flèche à vide 7,0 m. */
-    fleche7: 1.44,
-    /** m at flèche à vide 8,0 m. */
-    fleche8: 0.4,
+    /** m at flèche à vide 5,0 m — 3,39 before the re-take, 25 mm lower. */
+    fleche5: 3.37,
+    /** m at flèche à vide 6,0 m — the shipped line; 2,44 before, 23 mm lower. */
+    fleche6: 2.42,
+    /** m at flèche à vide 7,0 m — 1,44 before, 25 mm lower. */
+    fleche7: 1.41,
+    /** m at flèche à vide 8,0 m — 0,40 before, 26 mm lower. */
+    fleche8: 0.37,
     /** m — the `L₀` measured at flèche 6,0, the only one on record. */
     L0AtFleche6: 151.644,
   },
@@ -399,7 +412,9 @@ export const CLEARANCE_VS_FLECHE = {
 /**
  * `contact: "cable"` — **deep slack converges**, it is not a solver failure. `L₀` 400 m on a
  * level 200 m span with anchor bases at −4 / −2,5 m returns coverage 1,000 and a garde of
- * −169,67 m: a line lying down is « Câble au sol », a clearance verdict, never a `SolveError`.
+ * −170,24 m: a line lying down is « Câble au sol », a clearance verdict, never a `SolveError`.
+ * This is the row ticket 37's re-take moved furthest — 0,57 m — because 200 m of slack puts the
+ * kink's corner far below the chord its two neighbours span.
  *
  * The same line at `L₀` 200,5 m is the shallower half of the same measurement, and it is already
  * `contact: "cable"` too — which is the point: `slack-limit` is unreachable from here.
@@ -423,10 +438,10 @@ export const GROUND_CONTACT_CABLE = {
     L0Shallow: 200.5,
   },
   out: {
-    /** m at `L₀` 400. */
-    hMin: -169.67,
-    /** m at `L₀` 200,5. */
-    hMinShallow: -7.59,
+    /** m at `L₀` 400 — −169,67 before the re-take, 0,57 m lower. */
+    hMin: -170.24,
+    /** m at `L₀` 200,5 — −7,59 before, 21 mm lower. */
+    hMinShallow: -7.61,
     /** Both slacks solve whole. */
     coverage: 1,
   },
@@ -442,7 +457,8 @@ export const GROUND_CONTACT_CABLE = {
  * it names the 2,1 m value and carries its « non confirmé » chip.
  */
 export const GROUND_CONTACT_RIDER = {
-  source: "[MEASURED] ticket 14 §1 — « hauteurs 12/6, flèche 6,0 ⇒ −1,53 m »",
+  source:
+    "[MEASURED] ticket 37 §1 — « hauteurs 12/6, flèche 6,0 ⇒ −1,55 m » (re-take of ticket 14 §1's −1,53 m)",
   in: {
     L: 200,
     h: -25,
@@ -458,8 +474,8 @@ export const GROUND_CONTACT_RIDER = {
     fleche: 6,
   },
   out: {
-    /** m */
-    hMin: -1.53,
+    /** m — −1,53 before the re-take, 19 mm lower. */
+    hMin: -1.55,
     /** The traverse solves whole; only the clearance fails. */
     coverage: 1,
   },
