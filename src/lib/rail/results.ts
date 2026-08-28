@@ -583,6 +583,8 @@ type Envelope = {
  */
 function envelopes(base: SceneBase, DAF: number): Envelope {
   const Tvide = { A: base.unloaded.TA, B: base.unloaded.TB };
+  // §10.1's suspended denominator rides along on the same pass and is dropped here: § 9 never
+  // prints it, and at a refused `DAF ≤ 0` it is a maximum of negatives with no meaning to print.
   const scan = scanTensionEnvelope(base.traverse.steps, base.unloaded, DAF);
 
   const A: EndFigures = {

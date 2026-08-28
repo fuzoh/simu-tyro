@@ -737,16 +737,22 @@ describe("the worst-tension-per-end scan, as one owner (ticket 38)", () => {
     return ends.map(([TA, TB]) => ({ sD: 0, xD: 0, zD: 0, H: 0, V0: 0, TA, TB, theta: 0 }));
   }
 
-  test("`evaluateVerdict` reports the scan's own figures, bit for bit", () => {
-    // The Rail calls this function for § 9's reduced row set; the verdict calls it for §10. If the
-    // two ever part, it is here that it shows — no agreement between two implementations is being
-    // asserted, because there is only one.
+  test("the scan is the traverse's maximum, checked against a second way of taking it", () => {
+    // Not `scan` against `evaluateVerdict` — since ticket 38 those are one function calling
+    // another, and asserting that pair would assert the implementation back to itself. `Math.max`
+    // over the array is an independent route to the same two numbers, and `indexOf` an independent
+    // route to the step they sit at.
     const scan = scanTensionEnvelope(firstRun.steps, firstRun.Tvide, F.DAF);
+    const TA = firstRun.steps.map((step) => step.TA);
+    const TB = firstRun.steps.map((step) => step.TB);
+    expect(scan.A.Tstatic).toBe(Math.max(...TA));
+    expect(scan.B.Tstatic).toBe(Math.max(...TB));
+    expect(scan.A.atStepIndex).toBe(TA.indexOf(scan.A.Tstatic));
+    expect(scan.B.atStepIndex).toBe(TB.indexOf(scan.B.Tstatic));
+    // And that the verdict reports it rather than re-deriving or post-processing it.
     const v = evaluateVerdict(firstRunInput("en15567"));
     expect(v.ends.A.Tstatic).toBe(scan.A.Tstatic);
     expect(v.ends.B.Tstatic).toBe(scan.B.Tstatic);
-    expect(v.ends.A.atStepIndex).toBe(scan.A.atStepIndex);
-    expect(v.ends.B.atStepIndex).toBe(scan.B.atStepIndex);
   });
 
   test("the suspended maximum runs over the steps **and** over the two ends", () => {
@@ -785,9 +791,27 @@ describe("the worst-tension-per-end scan, as one owner (ticket 38)", () => {
     });
   });
 
-  test("the **first** step reaching a tied maximum is the one named", () => {
-    const scan = scanTensionEnvelope(stepsOf([5000, 4000], [5000, 4000]), { TA: 0, TB: 0 }, 1.2);
+  test("the **first** step reaching a tied maximum is the one named, ends included", () => {
+    // Both comparisons are strict, at both ends and on the suspended denominator: a tie holds the
+    // earlier step, and a tie between the two ends holds `A`. Which end a figure is attributed to
+    // is printed beside it, so it may not depend on the order the loop happens to test in.
+    const scan = scanTensionEnvelope(stepsOf([5000, 4000], [5000, 4000]), { TA: 0, TB: 1000 }, 1.2);
     expect(scan.A.atStepIndex).toBe(0);
     expect(scan.B.atStepIndex).toBe(0);
+    expect(scan.suspended).toEqual({ value: 1.2 * 5000, atStepIndex: 0, end: "A" });
+  });
+
+  test("a refused `DAF ≤ 0` still gives the Rail its static envelope", () => {
+    // `evaluateVerdict` refuses a non-positive `DAF` outright, so this path is the Rail's alone:
+    // § 9 keeps « T max statique » and the garde on screen while the amplified rows go. The static
+    // maxima owe `DAF` nothing and must not move with it.
+    const steps = stepsOf([5000, 4000], [4800, 4500]);
+    const refused = scanTensionEnvelope(steps, { TA: 4600, TB: 4000 }, -1);
+    expect(refused.A).toEqual({ Tstatic: 5000, atStepIndex: 0 });
+    expect(refused.B).toEqual({ Tstatic: 4500, atStepIndex: 1 });
+    // The denominator inverts with the sign — it can never rise above zero, which is why § 9
+    // drops it rather than printing a « charge suspendue » that reads better the worse the line is.
+    expect(refused.suspended.value).toBeLessThanOrEqual(0);
+    expect(() => evaluateVerdict(firstRunInput("en15567", { DAF: -1 }))).toThrow(RangeError);
   });
 });

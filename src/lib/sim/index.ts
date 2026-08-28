@@ -110,7 +110,6 @@ export type {
   Criterion,
   CriterionBasis,
   EndEnvelope,
-  EndTensionEnvelope,
   ObligationId,
   ProvenanceTag,
   RefusalId,

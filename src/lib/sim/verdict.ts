@@ -509,18 +509,21 @@ export function amplifiedTension(Tvide: number, Tcharge: number, DAF: number): n
   return Tvide + DAF * (Tcharge - Tvide);
 }
 
-/** One end's static tension envelope over the traverse. */
-export type EndTensionEnvelope = {
-  /** The greatest **static** tension the traverse puts on this end, N. */
-  readonly Tstatic: number;
-  /** Which step carries it, indexed into the **solved** steps — `−1` for an empty traverse. */
-  readonly atStepIndex: number;
-};
-
-/** The traverse's tension envelope: both ends' static maxima and §10.1's suspended denominator. */
+/**
+ * The traverse's tension envelope: both ends' static maxima and §10.1's suspended denominator.
+ *
+ * The per-end shape is stated inline rather than named, because {@link EndEnvelope} — the *printed*
+ * envelope, with `T_vide`, `T_DAF` and `FS` on it — already carries that name's meaning, and two
+ * exported `End…Envelope` types for adjacent concepts is one reading error waiting to happen.
+ */
 export type TensionEnvelopeScan = {
-  readonly A: EndTensionEnvelope;
-  readonly B: EndTensionEnvelope;
+  readonly A: {
+    /** The greatest **static** tension the traverse puts on this end, N. */
+    readonly Tstatic: number;
+    /** Which step carries it, indexed into the **solved** steps — `−1` for an empty traverse. */
+    readonly atStepIndex: number;
+  };
+  readonly B: { readonly Tstatic: number; readonly atStepIndex: number };
   /**
    * `max over steps **and** ends of DAF·(T_chargé − T_vide)` — §10.1's `[REGULATOR]` denominator.
    * A caller printing only the per-end envelope ignores it; it rides along because it is the same
