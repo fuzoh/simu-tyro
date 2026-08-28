@@ -459,28 +459,50 @@ describe("§5.2's seeds", () => {
     }
   });
 
-  test("§6.1's identity, one reading: a load shifts Peyrot–Goulois' V₀ by exactly −ΣP", () => {
-    // § 6.1 fixes `V_B = V₀ + w·L₀ + ΣP`, so inverting it gives `V₀ = V_B − w·L₀ − ΣP`. § 5.2's
-    // `V₀,B` is stated for the **unloaded** line and carries no `P`, so the whole of ΣP lands on
-    // `V₀` — half of it is the § 6.1 identity read twice over. Asserted as the *shift* rather than
-    // by restating § 5.2 here, which would make the case a copy of the code it guards.
+  test("§6.1's identity, and it is exact where symmetry can check it", () => {
+    // § 6.1 fixes `V_B = V₀ + w·L₀ + ΣP`. § 5.2's `V₀,B` is stated for the **unloaded** line and
+    // carries no `P`, so it is `V_B` at `ΣP = 0`; the seed's `− ΣP/2` is what carries the load into
+    // the identity, not a halving of it. The check that decides it: on a level span with the
+    // trolley at mid-span, symmetry fixes `V₀ = −(w·L₀ + ΣP)/2` **exactly**, so the seed can be
+    // compared against an answer no solve is needed for.
+    //
+    // Ticket 37 defect 2 read the same line as § 6.1's inversion with a halved `ΣP` and prescribed
+    // `V_B − w·L₀ − ΣP`. That form misses this exact value by `ΣP/2` — 588,6 N on the case below —
+    // so the premise that this function carried two readings of § 6.1 is refuted here rather than
+    // acted on. **All four seeds read § 6.1 one way: the symmetric split.**
+    const w = 5.36;
+    const P = 1177.2;
+    const L0 = 101;
+    const level: SpanInput = { L: 100, h: 0, L0, w, EA: 6.9e6, loads: [{ P, s: L0 / 2 }] };
+    const exact = -(w * L0 + P) / 2;
+    const [seed] = seedIterates(level);
+    expect(seed.V0).toBeCloseTo(exact, 9);
+    // And the identity itself, on that exact pair: `V_B` is § 5.2's unloaded reaction plus `ΣP/2`.
+    const lambda = Math.sqrt(3 * ((L0 * L0) / (100 * 100) - 1));
+    const VB = (w / 2) * L0;
+    expect(exact + w * L0 + P).toBeCloseTo(VB + P / 2, 9);
+    expect(Number.isFinite(lambda)).toBe(true);
+    // The prescribed alternative, measured rather than argued about.
+    expect(Math.abs(VB - w * L0 - P - exact)).toBeCloseTo(P / 2, 9);
+  });
+
+  test("a load shifts Peyrot–Goulois' V₀ by −ΣP/2, and leaves H alone", () => {
+    // The shift, stated on a §15 row so the property is not read off one hand-built case: § 5.2's
+    // `H₀ = |w·L/(2λ₀)|` has no `P` in it at all, so the load moves one component only.
     const bare = spanOf(Z1.in);
     const P = 1177.2;
     const loaded: SpanInput = { ...bare, loads: [{ P, s: bare.L0 / 2 }] };
     const [bareSeed] = seedIterates(bare);
     const [loadedSeed] = seedIterates(loaded);
-    expect(loadedSeed.V0).toBeCloseTo(bareSeed.V0 - P, 9);
-    // § 5.2's `H₀ = |w·L/(2λ₀)|` has no `P` in it at all, so the load moves one component only.
+    expect(loadedSeed.V0).toBeCloseTo(bareSeed.V0 - P / 2, 9);
     expect(loadedSeed.H).toBe(bareSeed.H);
   });
 
-  test("and §4.3's bar seed shifts by −ΣP/2 — its own derivation, not the same reading", () => {
-    // The other family, and the reason § 6.1's identity does not settle every seed by analogy:
+  test("and §4.3's bar seed reaches the same split from its own derivation", () => {
+    // Checked in the same pass rather than by analogy, which is what the ticket asked for:
     // `straightBarIterate` splits the self-weight **evenly** between the ends (`V₀ = T·h/d −
-    // w·L₀/2`, which returns § 4.1's exact `−w·L₀/2` on a level span), so the consistent form
-    // there is `−(w·L₀ + ΣP)/2` — the bar's `V₀` less `ΣP/2`. § 5.2's parabolic seed is in the
-    // same family. Two forms, two derivations, both right; what was wrong was one function
-    // carrying § 6.1's inversion with the symmetric split's factor.
+    // w·L₀/2`, which returns § 4.1's exact `−w·L₀/2` on a level span), so the consistent form there
+    // is `−(w·L₀ + ΣP)/2` — the bar's `V₀` less `ΣP/2`. Same constant, independent derivation.
     const stretched = spanOf({ L: 200, h: -30, L0: 199, w: 5.36, EA: 6.9e6 });
     const P = 1177.2;
     const bar = straightBarIterate(stretched);
@@ -539,9 +561,10 @@ describe("§4.3's near-taut fallback — the straight elastic bar", () => {
     // answer. It needs no slack twin for two measured reasons.
     //
     // First, on the slack side `w·L₀/H` has a **floor** — a slack line's `H` is bounded by its own
-    // elastic stretch — and the floor is set by `EA`. At `L₀ = chord + 10⁻⁹` on a level 100 m span
-    // it measures 0,120 at the shipped 12 mm steel's `EA` 6,9 MN, 2,29×10⁻² at 1 GN and 2,29×10⁻³
-    // at 1 TN: § 4.3's 10⁻⁴ is first crossed near `EA` 10¹⁵ N, six orders above any rope. Second,
+    // elastic stretch — and the floor is set by `EA`. On the line this case builds (level 100 m,
+    // `w` 5 N/m, `L₀ = chord + 10⁻⁹`) it measures 0,120 at `EA` 6,9 MN — the shipped 12 mm steel's,
+    // though not its `w` — then 2,29×10⁻² at 1 GN and 2,29×10⁻³ at 1 TN: § 4.3's 10⁻⁴ is first
+    // crossed near `EA` 10¹⁵ N, six orders above any rope. Second,
     // where the band *is* reached Newton simply converges — 10¹⁵ N takes two damped iterations and
     // 10¹⁸ N takes none — so there is nothing for a fallback to rescue.
     const chord = 100;

@@ -426,13 +426,8 @@ describe("the sweep and the point load agree — one physics, reached two ways",
     const step = sweepStep(spanOf(Z4.in), Z4.in.P, Z4.out.sP);
     if (!step.ok) throw new Error("expected a solve");
     const { state } = step;
-    //
-    // **11 decimals, not 12**: the identity is exact, the *iterate* is not. `(H, V₀)` is only as
-    // sharp as §5.3's `‖r‖ ≤ 10⁻⁸` leaves it, so the two sides agree to ≈5×10⁻¹² and no further —
-    // and which side of 10⁻¹² they land on depends on the seed the attempt started from, which
-    // ticket 37 defect 2 corrected. The bar is the solver's convergence, never the identity's.
     const above = Math.atan2(state.V0 + state.w * Z4.out.sP + Z4.in.P, state.H);
-    expect(step.step.theta).toBeCloseTo(-above, 11);
+    expect(step.step.theta).toBeCloseTo(-above, 12);
     expect(step.step.theta).toBeLessThan(0);
   });
 

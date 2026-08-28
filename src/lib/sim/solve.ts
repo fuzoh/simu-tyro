@@ -105,9 +105,10 @@ export function chordBoundFloor(span: { L: number; h: number; EA: number }, stre
  * **Read on the stretched side only** — ticket 37 defect 5, decided rather than deleted. The
  * fallback this gates is {@link straightBarIterate}, which exists only where `L₀ < chord`, so
  * {@link solveSpan} can take it there and nowhere else. On a *slack* line `w·L₀/H` has a floor set
- * by the line's own elastic stretch (0,120 at the shipped rope's `EA` 6,9 MN on a level 100 m span
- * at `L₀ = chord + 10⁻⁹`, 2,29×10⁻³ at 1 TN), so § 4.3's threshold is first reachable near
- * `EA` 10¹⁵ N — and where it *is* reached Newton converges unaided. No slack twin is owed.
+ * by the line's own elastic stretch, and the floor is `EA`'s: on a level 100 m span at
+ * `L₀ = chord + 10⁻⁹` with `w` 5 N/m it measures 0,120 at `EA` 6,9 MN — the shipped 12 mm steel's —
+ * and 2,29×10⁻³ at 1 TN, so § 4.3's threshold is first reachable near `EA` 10¹⁵ N. Where it *is*
+ * reached Newton converges unaided. No slack twin is owed.
  */
 export function isNearTaut(w: number, L0: number, H: number): boolean {
   return (w * L0) / H < SOLVER.nearTautRatio;
@@ -218,15 +219,20 @@ export function seedIterates(input: SpanInput, warmStart?: Iterate): Iterate[] {
   // §5.2's Peyrot–Goulois seed: λ₀ = √(3·((L₀²−h²)/L² − 1)), H₀ = max(|w·L/(2λ₀)|, tol),
   // V₀,B = (w/2)·(h/tanh λ₀ + L₀). Real only on a slack line, which is where it is wanted.
   //
-  // `V₀` comes out of §5.2's `V_B` through §6.1's identity `V_B = V₀ + w·L₀ + ΣP`, inverted —
-  // so **the whole of ΣP**, not half of it. The symmetric split below is the other family: there
-  // `−(w·L₀ + ΣP)/2` is the consistent form, and reading one factor across is what ticket 37
-  // defect 2 closed.
+  // **`− ΣP/2`, and it is §6.1's identity rather than a halving of it.** § 5.2's `V₀,B` is stated
+  // for the *unloaded* line and carries no `P`, so it is `V_B` at `ΣP = 0`; the loaded `V_B` is
+  // larger, and for a load the seed treats as centred it is larger by `ΣP/2`. § 6.1 then gives
+  // `V₀ = (V_B,unloaded + ΣP/2) − w·L₀ − ΣP = V_B,unloaded − w·L₀ − ΣP/2`, which is exactly the
+  // line below. It is *exact* where it can be checked: on a level span with the trolley at
+  // mid-span, symmetry fixes `V₀ = −(w·L₀ + ΣP)/2` and this expression returns it to every digit,
+  // where `V_B,unloaded − w·L₀ − ΣP` misses it by `ΣP/2`. So **all four seeds read § 6.1 one way**
+  // — the symmetric split — and ticket 37 defect 2's premise that this one carried a second
+  // reading is refuted by measurement; voir the ticket's own `## Comments`.
   const excess = (L0 * L0 - h * h) / (L * L) - 1;
   if (excess > 0) {
     const lambda = Math.sqrt(3 * excess);
     const VB = (w / 2) * (h / Math.tanh(lambda) + L0);
-    push(Math.max(Math.abs((w * L) / (2 * lambda)), SOLVER.tolerance), VB - w * L0 - P);
+    push(Math.max(Math.abs((w * L) / (2 * lambda)), SOLVER.tolerance), VB - w * L0 - P / 2);
   }
 
   // §5.2's parabolic seed: H ≈ w·L²/(8·D_est), D_est = √(3·L·(L₀−chord)/8),
@@ -238,8 +244,9 @@ export function seedIterates(input: SpanInput, warmStart?: Iterate): Iterate[] {
   }
 
   // §4.3's straight elastic bar — the only seed defined when the line is stretched, not slack.
-  // `− ΣP/2` is the **bar's own** derivation, not §6.1's inversion: it splits the self-weight
-  // evenly between the ends, so `bar.V0 − ΣP/2` is exactly `T·h/d − (w·L₀ + ΣP)/2`.
+  // `− ΣP/2` on the **bar's own** derivation, checked in the same pass rather than by analogy: it
+  // splits the self-weight evenly between the ends, so `bar.V0 − ΣP/2` is exactly
+  // `T·h/d − (w·L₀ + ΣP)/2` — the same symmetric split, reached from the other direction.
   const bar = straightBarIterate(input);
   if (bar) push(bar.H, bar.V0 - P / 2);
 
