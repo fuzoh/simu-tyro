@@ -57,7 +57,7 @@ import type { CellState, VerdictCell, VerdictResult, VerdictState } from "@/lib/
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { formatQuantity, formatValue } from "@/lib/format/quantity.ts";
-import { amplifiedTension, evaluateVerdict, REGIMES } from "@/lib/sim";
+import { amplifiedTension, evaluateVerdict, REGIMES, scanTensionEnvelope } from "@/lib/sim";
 
 import type { GateReport } from "./gates.ts";
 
@@ -572,38 +572,30 @@ type Envelope = {
  *
  * **This is the one place the app amplifies a tension**, and it exists because § 9's reduced row
  * set prints `T max` **with no régime chosen**, where `evaluateVerdict` — which owns the same
- * arithmetic — is by contract not called at all. `results.test.ts` asserts the two agree on the
- * shipped line, so the second caller §10 could drift through is a caller CI watches.
+ * arithmetic — is by contract not called at all. The **scan** is no longer a second copy: since
+ * ticket 38 it is `scanTensionEnvelope`, the engine's own single pass, so what the app still owns
+ * here is the presentation choice — which end each of the two headlines names — and nothing about
+ * where the maximum sits.
  *
  * `T_DAF` is monotone in `T_chargé` for `DAF > 0`, so the amplified maximum sits at the same step
- * as the static one and the scan needs one pass.
+ * as the static one and the scan needs one pass. At `DAF ≤ 0` — a value a link can carry — the two
+ * orderings part, which is why `staticHeadline` is picked on `Tstatic` and never through `Tdaf`.
  */
 function envelopes(base: SceneBase, DAF: number): Envelope {
   const Tvide = { A: base.unloaded.TA, B: base.unloaded.TB };
-  const worst = { A: Number.NEGATIVE_INFINITY, B: Number.NEGATIVE_INFINITY };
-  const at = { A: -1, B: -1 };
-
-  for (let i = 0; i < base.traverse.steps.length; i++) {
-    const step = base.traverse.steps[i];
-    if (step.TA > worst.A) {
-      worst.A = step.TA;
-      at.A = i;
-    }
-    if (step.TB > worst.B) {
-      worst.B = step.TB;
-      at.B = i;
-    }
-  }
+  // §10.1's suspended denominator rides along on the same pass and is dropped here: § 9 never
+  // prints it, and at a refused `DAF ≤ 0` it is a maximum of negatives with no meaning to print.
+  const scan = scanTensionEnvelope(base.traverse.steps, base.unloaded, DAF);
 
   const A: EndFigures = {
-    Tstatic: worst.A,
-    Tdaf: amplifiedTension(Tvide.A, worst.A, DAF),
-    atStepIndex: at.A,
+    Tstatic: scan.A.Tstatic,
+    Tdaf: amplifiedTension(Tvide.A, scan.A.Tstatic, DAF),
+    atStepIndex: scan.A.atStepIndex,
   };
   const B: EndFigures = {
-    Tstatic: worst.B,
-    Tdaf: amplifiedTension(Tvide.B, worst.B, DAF),
-    atStepIndex: at.B,
+    Tstatic: scan.B.Tstatic,
+    Tdaf: amplifiedTension(Tvide.B, scan.B.Tstatic, DAF),
+    atStepIndex: scan.B.atStepIndex,
   };
   return {
     A,

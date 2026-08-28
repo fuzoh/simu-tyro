@@ -509,6 +509,95 @@ export function amplifiedTension(Tvide: number, Tcharge: number, DAF: number): n
   return Tvide + DAF * (Tcharge - Tvide);
 }
 
+/**
+ * The traverse's tension envelope: both ends' static maxima and §10.1's suspended denominator.
+ *
+ * The per-end shape is stated inline rather than named, because {@link EndEnvelope} — the *printed*
+ * envelope, with `T_vide`, `T_DAF` and `FS` on it — already carries that name's meaning, and two
+ * exported `End…Envelope` types for adjacent concepts is one reading error waiting to happen.
+ */
+export type TensionEnvelopeScan = {
+  readonly A: {
+    /** The greatest **static** tension the traverse puts on this end, N. */
+    readonly Tstatic: number;
+    /** Which step carries it, indexed into the **solved** steps — `−1` for an empty traverse. */
+    readonly atStepIndex: number;
+  };
+  readonly B: { readonly Tstatic: number; readonly atStepIndex: number };
+  /**
+   * `max over steps **and** ends of DAF·(T_chargé − T_vide)` — §10.1's `[REGULATOR]` denominator.
+   * A caller printing only the per-end envelope ignores it; it rides along because it is the same
+   * pass, and a second pass over the traverse to recover it would be the duplication this scan
+   * exists to remove.
+   */
+  readonly suspended: {
+    readonly value: number;
+    readonly atStepIndex: number;
+    readonly end: "A" | "B";
+  };
+};
+
+/**
+ * **The** worst-tension-per-end scan — one pass over the traverse, one owner.
+ *
+ * `evaluateVerdict` scores the régime against it, and A10's reduced row set prints `T max` from it
+ * **with no régime chosen**, where `evaluateVerdict` is by contract not called at all. Those are
+ * two callers of one envelope, not two envelopes: before ticket 38 the Rail re-implemented the
+ * scan and a test asserted the two agreed, which made a régime-model change able to break the
+ * agreement from either side.
+ *
+ * An **empty** traverse has no envelope: `Number.NEGATIVE_INFINITY` and `−1`, the reducer's own
+ * identity, left for the caller to read as the flag it is rather than folded into a `NaN` here —
+ * `evaluateVerdict` needs `NaN` in its printed rows, and the Rail does not.
+ *
+ * @param steps the **solved** sweep steps, in grid order.
+ * @param Tvide one unloaded solve per end, N — not a per-step quantity.
+ * @param DAF §8.2's dynamic amplification factor, read only by `suspended`.
+ */
+export function scanTensionEnvelope(
+  steps: readonly SweepStep[],
+  Tvide: { readonly TA: number; readonly TB: number },
+  DAF: number,
+): TensionEnvelopeScan {
+  let TstaticA = Number.NEGATIVE_INFINITY;
+  let TstaticB = Number.NEGATIVE_INFINITY;
+  let atA = -1;
+  let atB = -1;
+  let suspended = Number.NEGATIVE_INFINITY;
+  let suspendedAt = -1;
+  let suspendedEnd: "A" | "B" = "A";
+
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    if (step.TA > TstaticA) {
+      TstaticA = step.TA;
+      atA = i;
+    }
+    if (step.TB > TstaticB) {
+      TstaticB = step.TB;
+      atB = i;
+    }
+    const suspendedA = DAF * (step.TA - Tvide.TA);
+    if (suspendedA > suspended) {
+      suspended = suspendedA;
+      suspendedAt = i;
+      suspendedEnd = "A";
+    }
+    const suspendedB = DAF * (step.TB - Tvide.TB);
+    if (suspendedB > suspended) {
+      suspended = suspendedB;
+      suspendedAt = i;
+      suspendedEnd = "B";
+    }
+  }
+
+  return {
+    A: { Tstatic: TstaticA, atStepIndex: atA },
+    B: { Tstatic: TstaticB, atStepIndex: atB },
+    suspended: { value: suspended, atStepIndex: suspendedAt, end: suspendedEnd },
+  };
+}
+
 /** `FS_eff` against the régime's divisor — the only place the three cell states are decided. */
 function cellState(FS: number, k: number): CellState {
   if (FS < k) return "hors-limites";
@@ -589,39 +678,10 @@ export function evaluateVerdict(v: VerdictInput): VerdictResult {
   const { DAF, strength } = v;
   const etaMin = Math.min(v.eta.A, v.eta.B);
 
-  // One pass over the traverse: the static maximum per end, and the suspended-load denominator,
-  // which is a maximum over the steps **and** over the two ends.
-  let TstaticA = Number.NEGATIVE_INFINITY;
-  let TstaticB = Number.NEGATIVE_INFINITY;
-  let atA = -1;
-  let atB = -1;
-  let suspended = Number.NEGATIVE_INFINITY;
-  let suspendedAt = -1;
-  let suspendedEnd: "A" | "B" = "A";
-
-  for (let i = 0; i < v.steps.length; i++) {
-    const step = v.steps[i];
-    if (step.TA > TstaticA) {
-      TstaticA = step.TA;
-      atA = i;
-    }
-    if (step.TB > TstaticB) {
-      TstaticB = step.TB;
-      atB = i;
-    }
-    const suspendedA = DAF * (step.TA - v.Tvide.TA);
-    if (suspendedA > suspended) {
-      suspended = suspendedA;
-      suspendedAt = i;
-      suspendedEnd = "A";
-    }
-    const suspendedB = DAF * (step.TB - v.Tvide.TB);
-    if (suspendedB > suspended) {
-      suspended = suspendedB;
-      suspendedAt = i;
-      suspendedEnd = "B";
-    }
-  }
+  // One pass over the traverse, in the scan both callers share — the static maximum per end, and
+  // the suspended-load denominator, which is a maximum over the steps **and** over the two ends.
+  const scan = scanTensionEnvelope(v.steps, v.Tvide, DAF);
+  const suspended = scan.suspended.value;
 
   // An empty traverse has no envelope — `NaN` and `−1`, the same flag `evaluateClearance` returns
   // rather than a garde read off a traverse that never happened. `coverage` is 0 there, so the
@@ -645,8 +705,8 @@ export function evaluateVerdict(v: VerdictInput): VerdictResult {
   };
 
   const ends = {
-    A: envelope(v.Tvide.TA, TstaticA, atA, v.eta.A),
-    B: envelope(v.Tvide.TB, TstaticB, atB, v.eta.B),
+    A: envelope(v.Tvide.TA, scan.A.Tstatic, scan.A.atStepIndex, v.eta.A),
+    B: envelope(v.Tvide.TB, scan.B.Tstatic, scan.B.atStepIndex, v.eta.B),
   };
 
   const headlineEnd: "A" | "B" = empty || ends.A.Tdaf >= ends.B.Tdaf ? "A" : "B";
@@ -688,8 +748,8 @@ export function evaluateVerdict(v: VerdictInput): VerdictResult {
       suspendedLoad = {
         numerator,
         denominator: suspended,
-        atStepIndex: suspendedAt,
-        atEnd: suspendedEnd,
+        atStepIndex: scan.suspended.atStepIndex,
+        atEnd: scan.suspended.end,
       };
       cells.push({
         criterion: criterion.basis,

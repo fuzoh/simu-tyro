@@ -48,6 +48,22 @@ export type UseClass = "PERMANENTE" | "TEMPORAIRE";
  * retained alternate », so an imported line has `tr`/`sa`/`sb` and **no** `L`/`h`, and a manual
  * line has `L`/`h` and **no** `tr`. In imported mode `L` and `h` are *derived read-outs*, which
  * is why they are absent from that arm rather than optional in one flat shape.
+ *
+ * **`source` is read across the app — around 28 sites in eleven modules, not the four ticket 38
+ * item 4 counted — and that census is the reason it stays inline.** The sites fall in two kinds
+ * and neither wants a shared discriminant:
+ *
+ * - Those that **read an arm's fields** (`rail/deduced.ts`, `rail/values.ts`, `chart/scene.ts`,
+ *   `url/schema.ts`, `app/state.ts` …) depend on the **narrowing** `source` gives: it is this
+ *   union's discriminant, so `source === "manual"` is what makes `geometry.L` exist at all. A
+ *   helper returning a string takes that away and buys nothing.
+ * - Those that only ask **which mode is active** are already served — `rail/gates.ts`'s
+ *   `geometryMode` is that helper, module-private because a function whose body is one property
+ *   read earns nothing by travelling.
+ *
+ * What *was* owed is the third kind: a **derivation** the discriminant drives, stated twice. That
+ * one is now {@link spanOfGeometry} in `./geometry.ts`, and it is where a third geometry mode has
+ * to be taught the span. A branch that is neither a narrowing nor a mode label belongs beside it.
  */
 export type Geometry =
   /** Manual geometry: the ground is the straight line between the two anchor bases. */

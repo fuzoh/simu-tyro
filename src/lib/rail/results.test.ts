@@ -253,8 +253,10 @@ describe("the thirteen reported values, on the shipped line under EN 15567-1", (
 describe("the app's envelope against the engine's", () => {
   test("`amplifiedTension` and `evaluateVerdict` agree, to the printed digit", () => {
     // The reduced row set prints `T max` with **no régime chosen**, where `evaluateVerdict` is by
-    // contract not called — which is why the app owns a second caller of §8.2's formula. This is
-    // the test that makes that second caller safe.
+    // contract not called — which is why the app owns a second caller of §8.2's formula. Since
+    // ticket 38 the **scan** behind both is one function (`scanTensionEnvelope`), so what is left
+    // to watch here is the formula's second caller and the arguments it feeds: the envelope the
+    // app prints and the one the verdict scores are the same envelope, to the printed digit.
     const results = resultsOf({ regime: "en15567" });
     const verdict = results.verdict;
     if (verdict === null) throw new Error("expected a verdict");
