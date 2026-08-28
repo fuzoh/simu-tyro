@@ -146,6 +146,16 @@ export function Profile({
    * The drawn ground and the engine's `Terrain` are the same data inside `[0, L]` (`scene.ts` holds
    * the ends exactly as `zGroundAt` does), so reading `groundAt` here does not make the drawn length
    * disagree with the number `scene.ts` computed.
+   *
+   * **The length is exact; the `x` it stands at is not.** `worst.atX` is a scanned extremum's
+   * position, so the sibling line above stands on a scan vertex rather than on the true argmin: ≤
+   * 1,26 m off on the shipped line, and the garde at that x is within 1,5 mm of the true minimum
+   * (ticket 39 item 5, measured against a ten-times-finer scan; voir `SceneRider.worst`). The
+   * dimension is therefore truthful where it stands — that x really does carry that garde — and only
+   * its placement carries the scan's resolution. What a scrub *sees* is larger and is not this: the
+   * line can jump 2,53 m of `x` between consecutive steps, with 0,1 m of garde between them, because
+   * the governing point steps from the rider's own kink to a fixed feature of the line. The
+   * passenger's own dimension at `x_D` carries none of it: `x_D` is exact.
    */
   function dimension(atX: number, hClear: number) {
     const base = groundAt(ground, atX);
@@ -304,12 +314,13 @@ export function Profile({
                 **Never red on its own account**, and § 5's four coordinated signals gain no fifth
                 member here: `underRider` is one candidate in `worst.hClear`'s own minimum, so a
                 negative garde under the rider means a negative `worst.hClear`, and signal 4 has
-                already turned the cable and the rider red. That holds *in exact arithmetic*; the
-                shipped scan can report `worst.hClear` up to 99 mm above `underRider` (the kink its
-                grid never lands on — voir `SceneRider.underRider`), so there is a sub-decimetre window
-                where this line dips below the ground while the cable is still black. It is **≤1,2 px
-                of line** at § 5's reference column, it is ticket 37's residual and not a state of its
-                own, and colouring it here would mint a signal § 5 did not.
+                already turned the cable and the rider red. That used to hold *in exact arithmetic
+                only* — the shipped scan could report `worst.hClear` up to 99 mm above `underRider`,
+                the kink its grid never landed on, leaving a sub-decimetre window where this line
+                dipped below the ground while the cable was still black. Ticket 37 closed it: the
+                excess is **exactly 0** over all 260 steps of six scenarios (ticket 39 item 5), so the
+                window is gone and the rule is the arithmetic again. Colouring this line would still
+                mint a signal § 5 did not.
 
                 **No leader between the two, and that is measured rather than a taste** (browser
                 evidence, this ticket): both dimensions' tops sit on *one* curve — the cable offset

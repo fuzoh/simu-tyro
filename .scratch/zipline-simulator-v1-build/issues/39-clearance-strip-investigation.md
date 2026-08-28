@@ -5,12 +5,12 @@
 vertical scale looks wrong**. This ticket does the first half of the work — it separates what is
 already measured from what is still open — and leaves the remedy to be decided on the evidence.
 
-**Blocked by:** — *(item 5 below overlaps [ticket 37](./37-engine-correctness-fixes.md) item 1; if 37
-lands first, re-take the figures here before deciding anything)*
+**Blocked by:** — *(item 5 below overlapped [ticket 37](./37-engine-correctness-fixes.md) item 1;
+37 landed 2026-08-28 and the figures were re-taken here before anything was decided)*
 
-**Status:** open — items 1, 2, 3, 4 and 6 **landed 2026-08-17** on the user's decisions of the same
-day (voir ## Comments); **item 5 is the only thing left**, and it is blocked on
-[37](./37-engine-correctness-fixes.md). Do not re-measure it here until 37 lands.
+**Status:** closed — items 1, 2, 3, 4 and 6 **landed 2026-08-17** on the user's decisions of the same
+day, and **item 5 closed 2026-08-28** once [37](./37-engine-correctness-fixes.md) landed: re-measured,
+and the evidence says the curve needs nothing. Voir ## Comments.
 
 Spec: [v1 build spec](../../zipline-simulator-v1/spec.md) § 5 (*The spine*, *The rider moves three
 ways*, *Clearance failure — four coordinated signals*) · touches tickets
@@ -140,10 +140,12 @@ between the two *solved* neighbours' `x_D`, or to state that a hole's x is nomin
 - [x] The strip's vertical scale, whatever it becomes, is **stated somewhere the user can read** —
       badge, unit on the ticks, or a fixed domain — and the choice names what it costs. — **the
       topmost tick carries « m » on a quantised grid**; no badge. Cost named in « Item 2 ».
-- [ ] Item 5 is re-measured after [37](./37-engine-correctness-fixes.md) and the dimension line's
-      quantisation is either removed or documented in ticket 09's terms. — **blocked on 37**, and
-      deliberately not written up early: documenting a magnitude 37 is about to change is how stale
-      docs are made. The chart-side evidence that it is *visible* is now recorded — voir « Item 5 ».
+- [x] Item 5 is re-measured after [37](./37-engine-correctness-fixes.md) and the dimension line's
+      quantisation is either removed or documented in ticket 09's terms. — **re-measured 2026-08-28
+      and the noise is gone**: the curve draws 3 reversals against a 600-sample scan's own 3, and
+      `h_min` agrees with it *exactly*. **Nothing was drawn differently.** The quantisation is
+      **documented, not removed** — `clearance.ts`'s docblock now says `atX` is a scanned vertex,
+      with the measured position error beside ticket 09's magnitude trade. Voir « Item 5, re-taken ».
 - [x] Browser evidence follows [ticket 30](./30-chart-fidelity-and-drag-evidence.md)'s method: the
       strip at 390 and at the reference column, healthy and violating, with the zero line's position
       called out in each. — **five captures**, voir « The browser evidence ».
@@ -264,3 +266,141 @@ of keeping the numbers in the ticket.
 
 **Not touched:** `spec.md`, `AMENDMENTS.md`, `src/lib/sim/**`, the sweep grid, `sweep.ts`'s refined
 end steps, and no `Status:` line on any other ticket.
+
+### Item 5, re-taken on the tree ticket 37 landed on — 2026-08-28
+
+Measured through `buildScene` on five scenarios, each traverse re-reduced by `evaluateClearance` at
+**600** samples per step against the shipped 60. That fine scan is the reference throughout: the
+question is not « is the curve smooth » but « does ten times the resolution draw a different
+picture ».
+
+**The noise the ticket opened on is gone, and the third of the strip's three reversals is the
+shape's own.**
+
+| | before (this ticket, 2026-08-15) | now | fine scan (600) |
+| --- | --- | --- | --- |
+| reversals, acier | **55** | **3** | **3** |
+| reversals, textile | **79** | **3** | **3** |
+| worst adjacent step, acier | 43,1 mm | **5,6 mm** | 1,8 mm |
+| worst adjacent step, textile | 63,7 mm | **29,2 mm** | 28,8 mm |
+| max per-step difference 60 ↔ 600, acier | **87 mm** @ `x_D` 65,01 | **1,546 mm** @ `x_D` 149,43 | — |
+| max per-step difference 60 ↔ 600, textile | — | **0,883 mm** @ `x_D` 149,92 | — |
+| `h_min` error 60 ↔ 600, acier | **+18,5 mm**, non-conservative | **0** — bit for bit | — |
+| `h_min` error 60 ↔ 600, textile | — | **0** — bit for bit | — |
+
+Reversal counting is over consecutive sweep steps, ties skipped. The **counts are equal at 60 and at
+600 on both lines**, which is the claim that matters: three is what the shape draws, not what the
+scan adds. Three is also the W's *own* count and this ticket said two — a W is maximum, minimum,
+maximum, so it reverses three times. Measured turning points, steel: max @ `x_D` 9,78 (5,1861) ·
+min @ 74,43 (2,4169) · max @ 140,75 (5,2858); textile: max @ 3,46 (6,9023) · min @ 74,30 (1,2669) ·
+max @ 147,29 (7,0724). No flat run on either line. `h_min` is now *exactly* the fine scan's on
+both manual lines, because § 4's straight ground puts the traverse minimum on the rider's own node
+and both scans sample it. The textile line's 29,2 mm worst adjacent step is likewise physical: the
+fine scan reads 28,8 mm at the same place.
+
+The three imported profiles were re-measured too and never carried the defect: reversals 8 / 11 / 4,
+identical at 600, `h_min` error 0,257 / 0,000 / 0,080 mm. Their larger reversal counts are relief,
+not sampling — the terrain's own vertices are evaluated exactly (§ 4).
+
+**Decision: the strip is not changed.** A curve whose worst departure from a ten-times-finer scan is
+1,5 mm — a fifth of the read-out's last printed digit, and **0,02 px** of the profile's 13,0 px/m at
+§ 5's reference column, against the **1,29 px** the old 99 mm was worth — has no drawing remedy left
+to justify. The first-run `h_min` moved 23,06 mm **down** under 37, which is the
+conservative direction, and the strip drew that move without any help from here. That is item 5's
+whole first half, closed with numbers rather than with a change.
+
+**What remains is the *position*, and it is documented rather than removed.**
+
+| | acier | textile | trace1 / 2 / 3 |
+| --- | --- | --- | --- |
+| `perStepX` **is the rider's own node** | **142 / 260** | **209 / 260** | 1 / 9 / 0 |
+| `perStepX` vs the 600-sample scan | ≤ **1,256 m** | ≤ **1,257 m** | **0,000 m** |
+| worst hop between consecutive steps | 2,534 m | 5,062 m | 6,5 / 224,0 / 179,8 m |
+| the same hop **at 600 samples** | 1,028 m | 4,531 m | 6,5 / 224,0 / 179,8 m |
+
+Ticket 37 dissolved most of it: on § 4's straight ground the inner minimum is now the trolley's own
+kink on more than half the steps, and while it is, `profile.tsx`'s dimension line **follows the
+rider smoothly** at the sweep's own 0,63 m spacing — the measured hop sequence
+74,29 → 71,78 → 69,27 → 61,72 recorded when this ticket opened does not reproduce. What is left is
+that where the minimum is *not* the kink, it is a cable vertex `L₀ / 60` ≈ 2,53 m apart, so the line
+stands within **1,26 m** — half a sample spacing, exactly what a vertex-quantised argmin gives —
+of the true point, while the *value* it draws is right to 1,5 mm. Both of those are against the fine
+scan, and they are **not** what a scrub sees: between two consecutive steps the line can jump 2,53 m
+of `x` with 0,1 m of garde between them, because the governing point steps off the rider's own kink
+onto a fixed feature of the line. That movement is the curve's, not the scan's. On an imported profile the
+placement is **exact**: the governing point is a terrain vertex the scan evaluates directly, and the
+big hops there (224 m on `trace2`, whose two ends tie to 1,2 mm) reproduce identically at 600
+samples, so they are argmin degeneracy on flat relief, not scan error.
+
+Removing it means the inner-loop root-find `clearance.ts` already refuses for millimetres, and it
+would move every `[MEASURED]` `atX` record for 1,5 mm of value. So it is **written down** instead,
+which is what the gate box allows: `clearance.ts`'s docblock now states that `atX` and `perStepX` are
+scanned vertices carrying the scan's *position* resolution — beside ticket 09's magnitude trade,
+which is where the ticket asked for it — and `SceneRider.worst` and `profile.tsx`'s `dimension()`
+carry the chart-side half. `docs/conventions/testing.md`'s « positions of scanned extrema » tier
+(absolute, 2× the sample spacing) already **was** the bar for it; the gap was that nothing said so.
+
+**Three stale claims found while re-measuring, and corrected.** Ticket 37 changed the engine's
+numbers and updated `scene.test.ts`, but not the prose in three files that 37's own diff never
+opened:
+
+- `scene.ts`'s `SceneRider.underRider` and `profile.tsx`'s second dimension line both still said the
+  shipped scan reports `worst.hClear` up to **99 mm** above `underRider` on roughly half the sweep's
+  steps, and that there is a « sub-decimetre window where this line dips below the ground while the
+  cable is still black ». Re-measured: the excess is **exactly 0** — not a tolerance — over all 260
+  steps of **six** scenarios (first-run, ancrages 12 / 20, the textile line, the three imported
+  profiles). `scene.test.ts` had already been rewritten to the closure, so the docblocks were
+  contradicting their own test file.
+- « `x_D` = `L/2` … 0,9 m from the traverse minimum » in `first-run.ts`, `scene.ts` and
+  `scene.test.ts`: the rider's **own** inner minimum is its node now, **0,000 m** away, and it is the
+  *traverse's* minimum that sits **0,57 m** off, at x 74,43. The `relabel` bit is holding its whole
+  1,5 m of margin, not 0,6 m of it.
+
+**Four cases added** to `scene.test.ts` — the curve is `strip.tsx`'s data and the position is
+`profile.tsx`'s, so the claim is about the drawing and belongs there rather than in
+`clearance.test.ts`. Each judges the shipped scan against `10 × CLEARANCE.samplesPerStep` of the same
+traverse: the reversal count on both materials as an **equality with the fine scan** (a threshold
+would pass a curve that reversed five times in both), per-step agreement < 2 mm, `h_min` equal, and
+`perStepX` inside the « positions of scanned extrema » tier with more than half the steps on the
+rider's node.
+
+**No browser evidence is owed.** `git diff 560f890..HEAD` changes **no executable line** — every
+`.ts`/`.tsx` hunk is a docblock or a JSX comment, plus the new cases. Nothing rendered moved, so
+amendment B has nothing to capture; the five captures of 2026-08-17 remain the strip's evidence of
+record.
+
+### The independent review, and what it changed — 2026-08-28
+
+A second pass re-derived every figure above rather than reading it back. **All of them reproduce**,
+including the exact zero on all six scenarios and the 0,000 m on the three profiles. Six things moved,
+and three of them are the same defect class this ticket set out to fix:
+
+1. **« the two-reversal W » was wrong**, in the tests and in this ticket's own first draft. A W
+   reverses **three** times. The count is right and the closure stands; the sentence explaining it
+   invented a « flat top » that the measurement says does not exist (zero flat adjacencies on either
+   line). Corrected with the turning points printed.
+2. **`clearance.ts:28`'s « optimistic by 19–27 mm » is a figure ticket 37's own review retracted** —
+   its re-take reads **20,18 to 29,30 mm** on the nine 150 m rows, and `theory-15.ts` says so 66
+   lines from the paragraph this ticket added to the same docblock. Corrected.
+3. **`contract.test.ts:939` still stood on the pre-37 traverse** — `[3.9025, 5.1773, 2.4399, 5.2746,
+   3.9032]`, three of five superseded, `h_min` by the 23 mm ticket 37 moved. The domain it asserts is
+   unchanged (that is item 2's point), so the suite was green over a superseded garde: the failure
+   mode ticket 37 closed twice, in a file 37's own list named. Re-recorded to **5,1861 / 2,4169 /
+   5,2858**.
+4. **« hops 2,53 m … while the value it carries moves ≤ 1,5 mm » mixed two scales in one clause.**
+   1,5 mm is the 60 ↔ 600 *scan* error; the value really does move up to **99,5 mm** across those
+   hops, and up to 177,5 mm somewhere on the traverse — the curve's own slope. Re-anchored in both
+   chart-side copies; `clearance.ts` already phrased it correctly.
+5. **« ≈0,005 px » does not reconcile.** The profile's z scale at the reference column is
+   `1152 / 165 × VE 1,8629` = **13,0 px/m**, which reproduces this repo's own « 99 mm ≈ 1,2 px » and
+   makes 1,546 mm **0,020 px**. And 2 mm is a *fifth* of the read-out's last digit, not a quarter.
+6. **The six-scenario zero was pinned by nothing.** The textile line now joins ticket 37's own
+   ordering loop, at 37's bound rather than tightened onto the zero; the three imported profiles stay
+   a measurement here, because reading `docs/references/` to re-assert a bound that case already
+   carries buys coverage of the loop and not of the claim.
+
+**Gates:** `bun run typecheck` and `bun run lint-type-aware` clean, **40 files / 1364 cases** green
+(1360 at 37's close; the four are this ticket's).
+
+**Not touched:** `spec.md`, `AMENDMENTS.md`, `strip.tsx`, `contract.ts`, the sweep grid, and no
+`Status:` line on any other ticket. `src/lib/sim/**` carries **one docblock paragraph** and no code.
