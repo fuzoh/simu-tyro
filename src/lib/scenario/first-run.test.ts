@@ -311,8 +311,9 @@ describe("the opening state — § 9's measured table, from FIRST_RUN_SCENARIO",
   });
 
   test("« 2,42 m » — garde min, at x 74,4 m with the rider at x 74,4 m", () => {
-    // Re-recorded under ticket 37 defect 1: 2,44 m at x 74,1 m with the rider at x 73,8 m before
-    // §11's scan evaluated the rider's own kink. The garde moved **21 mm down** — conservative —
+    // Re-recorded under ticket 37 defect 1: 2,442178 m at x 74,1170 m with the rider at x 73,8 m
+    // before §11's scan evaluated the rider's own kink. The garde moved **23,06 mm down** — the
+    // conservative direction —
     // and the worst point moved onto the rider's own position, which is where § 4's straight
     // two-point ground puts it once the kink is sampled.
     expect(formatQuantity("clearance", opening.clearance.hMin)).toBe("2,42 m");

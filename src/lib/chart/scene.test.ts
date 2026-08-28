@@ -59,8 +59,9 @@ describe("the first-run scene — § 9's opening screen, drawn", () => {
   });
 
   it("reproduces the locked garde: 2,42 m at x 74,4 m, contact « none »", () => {
-    // Re-recorded under ticket 37 defect 1 — 2,44 m at x 74,1 m before §11's scan evaluated the
-    // rider's own kink, so the shipped read-out moved **21 mm down**, the conservative direction.
+    // Re-recorded under ticket 37 defect 1 — 2,442178 m at x 74,1170 m before §11's scan evaluated
+    // the rider's own kink, so the shipped read-out moved **23,06 mm down**, the conservative
+    // direction, and the worst point moved 0,314 m along the line.
     expect(formatQuantity("clearance", first.clearance.hMin)).toBe("2,42 m");
     expect(formatQuantity("extremumX", first.clearance.atX)).toBe("74,4 m");
     expect(first.clearance.contact).toBe("none");
@@ -261,7 +262,10 @@ describe("ticket 41 — the line's minimum against the garde under the passenger
     const here = at(base, 75);
     expect(formatQuantity("clearance", here.worst.hClear)).toBe("2,42 m");
     expect(formatQuantity("clearance", here.underRider)).toBe("2,42 m");
-    expect(here.worst.hClear).toBe(here.underRider);
+    // `toBeCloseTo`, not `toBe`: the two are computed by different paths — this one from
+    // `clearance.ts`'s `zAt(shape, s_D)`, `underRider` from `scene.ts`'s `step.zD` — and the claim
+    // is that they agree, not that two float expressions happen to reassociate identically.
+    expect(here.worst.hClear).toBeCloseTo(here.underRider, 12);
     expect(Math.abs(here.worst.atX - here.step.xD)).toBeLessThan(1e-5);
   });
 

@@ -26,8 +26,8 @@ import { zGroundAt } from "./terrain.ts";
  *
  * - **The opening screen's garde, all four outputs at once**: 2,42 m at `x` 74,4 with
  *   `contact: "none"` and **0** steps in violation. A garde that drifts is the app's central
- *   read-out drifting. (2,44 m at `x` 74,1 before ticket 37 put §11's scan on the rider's own
- *   node — the re-take is 21 mm *lower*, the conservative direction.)
+ *   read-out drifting. (2,442178 m at `x` 74,1170 before ticket 37 put §11's scan on the rider's
+ *   own node — the re-take is 23,06 mm *lower*, the conservative direction.)
  * - **The two sensitivities that forced the first-run geometry**: dénivelé buys no clearance
  *   (21 cm across 60 m of it) and flèche spends it metre-for-metre. They are one measurement
  *   about the *shape* of the output, and asserting only the shipped point would let both slopes
