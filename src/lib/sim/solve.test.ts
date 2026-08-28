@@ -459,6 +459,36 @@ describe("§5.2's seeds", () => {
     }
   });
 
+  test("§6.1's identity, one reading: a load shifts Peyrot–Goulois' V₀ by exactly −ΣP", () => {
+    // § 6.1 fixes `V_B = V₀ + w·L₀ + ΣP`, so inverting it gives `V₀ = V_B − w·L₀ − ΣP`. § 5.2's
+    // `V₀,B` is stated for the **unloaded** line and carries no `P`, so the whole of ΣP lands on
+    // `V₀` — half of it is the § 6.1 identity read twice over. Asserted as the *shift* rather than
+    // by restating § 5.2 here, which would make the case a copy of the code it guards.
+    const bare = spanOf(Z1.in);
+    const P = 1177.2;
+    const loaded: SpanInput = { ...bare, loads: [{ P, s: bare.L0 / 2 }] };
+    const [bareSeed] = seedIterates(bare);
+    const [loadedSeed] = seedIterates(loaded);
+    expect(loadedSeed.V0).toBeCloseTo(bareSeed.V0 - P, 9);
+    // § 5.2's `H₀ = |w·L/(2λ₀)|` has no `P` in it at all, so the load moves one component only.
+    expect(loadedSeed.H).toBe(bareSeed.H);
+  });
+
+  test("and §4.3's bar seed shifts by −ΣP/2 — its own derivation, not the same reading", () => {
+    // The other family, and the reason § 6.1's identity does not settle every seed by analogy:
+    // `straightBarIterate` splits the self-weight **evenly** between the ends (`V₀ = T·h/d −
+    // w·L₀/2`, which returns § 4.1's exact `−w·L₀/2` on a level span), so the consistent form
+    // there is `−(w·L₀ + ΣP)/2` — the bar's `V₀` less `ΣP/2`. § 5.2's parabolic seed is in the
+    // same family. Two forms, two derivations, both right; what was wrong was one function
+    // carrying § 6.1's inversion with the symmetric split's factor.
+    const stretched = spanOf({ L: 200, h: -30, L0: 199, w: 5.36, EA: 6.9e6 });
+    const P = 1177.2;
+    const bar = straightBarIterate(stretched);
+    expect(bar).not.toBeNull();
+    const [seed] = seedIterates({ ...stretched, loads: [{ P, s: 100 }] });
+    expect(seed.V0).toBeCloseTo((bar?.V0 ?? 0) - P / 2, 9);
+  });
+
   test("a warm start at the answer costs no iterations at all", () => {
     const first = solved(spanOf(Z1.in)).state;
     const again = solved(spanOf(Z1.in), { H: first.H, V0: first.V0 }).state;
