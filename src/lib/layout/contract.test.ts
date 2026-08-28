@@ -936,9 +936,13 @@ describe("§ 5 — the anchor targets in the Handle Lane", () => {
  */
 describe("ticket 39 — the clearance strip's quantised y domain", () => {
   it("the first-run traverse gets step 2, top 6 and a reserved floor at −2", () => {
-    // `h_min` 2,4399 and the two local maxima 5,1773 / 5,2746 — the ticket's own measured table.
+    // The first-run traverse's own five landmarks: both ends, the two flank maxima and `h_min`.
+    // Re-taken 2026-08-28 on ticket 39 item 5 — `h_min` 2,4399 → **2,4169** under ticket 37 defect 1
+    // (23 mm down, the conservative direction) and the two maxima 5,1773 / 5,2746 → 5,1861 / 5,2858.
+    // The ladder does not move, which is item 2's whole point; the values are re-recorded anyway,
+    // because a green suite over a superseded garde is exactly the failure ticket 37 closed twice.
     const domain = clearanceDomain({
-      values: [3.9025, 5.1773, 2.4399, 5.2746, 3.9032],
+      values: [3.9025, 5.1861, 2.4169, 5.2858, 3.9032],
       wide: true,
     });
     expect(domain).toStrictEqual({

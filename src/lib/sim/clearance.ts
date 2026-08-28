@@ -25,7 +25,9 @@
  * - **The rider's own node is always evaluated.** § 11 fixes the worst point per load position
  *   **at `x = x_P`**, and the loaded low point is the trolley's **kink** — a corner in `z_cable`,
  *   not a sag. No grid uniform in `s` lands on it, and reading its two neighbours across a convex
- *   cable is optimistic by 19–27 mm on a 150 m span and by 0,57 m on 200 m of slack. So `s_D` is
+ *   cable is optimistic by 20–29 mm on a 150 m span and by 0,57 m on 200 m of slack (the nine
+ *   150 m rows' own re-take, `__fixtures__/theory-15.ts`; « 19–27 » was the pre-re-take estimate
+ *   ticket 37's review retracted). So `s_D` is
  *   merged into every step's sample set: **one extra sample per step**, not a denser grid, so the
  *   frame budget is untouched — the scan runs `samplesPerStep + 2` evaluations per step, and the
  *   tripwire below is the *grid*, which is unchanged at 60. Ticket 37 defect 1; ticket 09's own
