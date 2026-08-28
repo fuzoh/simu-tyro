@@ -48,6 +48,15 @@ export type UseClass = "PERMANENTE" | "TEMPORAIRE";
  * retained alternate », so an imported line has `tr`/`sa`/`sb` and **no** `L`/`h`, and a manual
  * line has `L`/`h` and **no** `tr`. In imported mode `L` and `h` are *derived read-outs*, which
  * is why they are absent from that arm rather than optional in one flat shape.
+ *
+ * **`source` is branched on in four modules** — `rail/gates.ts`, `rail/deduced.ts`,
+ * `rail/values.ts` and `chart/scene.ts` — and ticket 38 item 4 named that rather than removing it.
+ * Each branch answers its own module's question (which mode a row is in · where the span comes
+ * from · which field holds a value · what the chart draws), and routing them through a shared
+ * `geometryMode(scenario)` would cost the **narrowing** three of the four depend on: it is the
+ * discriminant of this union, so `source === "manual"` is what makes `geometry.L` exist. A helper
+ * returning a string cannot do that, and a fifth branch that reads neither arm's fields is the
+ * signal that the discriminant wants a derivation of its own.
  */
 export type Geometry =
   /** Manual geometry: the ground is the straight line between the two anchor bases. */
