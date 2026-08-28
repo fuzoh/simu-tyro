@@ -102,7 +102,21 @@ export type SceneRider = {
   readonly step: SweepStep;
   /** The loaded line at this position — regenerated, never stored on a result. */
   readonly cable: Polyline;
-  /** §11's **inner** minimum at this rider position: the worst clearance, and where it sits. */
+  /**
+   * §11's **inner** minimum at this rider position: the worst clearance, and where it sits.
+   *
+   * `hClear` is a value; **`atX` is a position of a scanned extremum**, and the two do not carry the
+   * same resolution. The scan reads the cable's own vertices plus the rider's node plus the terrain's
+   * points, so `atX` is always one of those — never an interpolated argmin. On § 4's straight
+   * two-point ground that is usually the rider's node (142 of 260 steps on the shipped line, 209 of
+   * 260 on the textile one), and where it is not, it is a cable vertex `L₀ / 60` ≈ 2,53 m apart:
+   * re-measured on ticket 39 item 5, `atX` sits within **1,26 m** of a 600-sample scan's answer and
+   * the drawn dimension line hops by at most **2,53 m** between consecutive steps while the value it
+   * carries moves ≤ **1,5 mm**. On an imported profile the difference against 600 samples is
+   * **0,000 m**, because the governing point is a terrain vertex the scan evaluates exactly. Assert
+   * it at `testing.md`'s « positions of scanned extrema » tier — absolute, 2× the sample spacing —
+   * and voir `clearance.ts` for why refining it costs a root-find in the inner loop.
+   */
   readonly worst: { readonly hClear: number; readonly atX: number };
   /**
    * « Garde sous le passager », m — `z_D − z_ground(x_D) − h_rider`, the clearance under the rider's
@@ -115,13 +129,15 @@ export type SceneRider = {
    * strip and the read-out cell stay {@link worst}'s, which is what §11 reduces and §10 judges.
    *
    * `underRider ≥ worst.hClear` **by construction** — it is `h_clear` evaluated at `x = x_D`, one
-   * candidate in the inner minimum. The shipped scan violates that by up to **99 mm**, on roughly half
-   * the sweep's steps (142 / 260 on the first-run line, 123 / 260 at ancrages 12 / 20), because its 60
-   * uniform samples in `s` never land on the trolley kink, which is the loaded catenary's own low
-   * point. That is
-   * [ticket 37](../../../.scratch/zipline-simulator-v1-build/issues/37-engine-correctness-fixes.md)
-   * item 1 measured from the chart, worth ≈0,5 px at § 5's reference column, and **not** ticket 41's
-   * to fix.
+   * candidate in the inner minimum. The shipped scan used to violate that by up to **99 mm**, on
+   * roughly half the sweep's steps, because its 60 uniform samples in `s` never landed on the trolley
+   * kink — the loaded catenary's own low point.
+   * [Ticket 37](../../../.scratch/zipline-simulator-v1-build/issues/37-engine-correctness-fixes.md)
+   * item 1 merged `s_D` into every step's sample set, so the ordering now holds **as written**:
+   * re-measured on ticket 39 item 5 at `worst.hClear − underRider ≤ 0` over all 260 steps of six
+   * scenarios — first-run, ancrages 12 / 20, the textile line and the three imported profiles — with
+   * a worst excess of **exactly 0**, not a tolerance. Consumers may rely on the ordering; what they
+   * may **not** rely on is `worst.atX`'s resolution, voir {@link SceneRider.worst}.
    */
   readonly underRider: number;
   /**
@@ -514,9 +530,10 @@ export function placeRider(base: SceneBase, requestedXD: number): SceneRider | n
     // over the line — voir {@link SceneRider.underRider}. `z_D` is exact here (the trolley sits on
     // the kink), so this is the one clearance in the app that carries no scan error at all.
     underRider: step.zD - zGroundAt(terrain, step.xD) - hRider,
-    // « Only when the worst point is further than max(1 m, 1 % of span) from the rider », which is
-    // why the first-run rider ships 0,9 m from the traverse minimum: the cell must not relabel
-    // itself on first paint.
+    // « Only when the worst point is further than max(1 m, 1 % of span) from the rider ». On the
+    // shipped line the two now **coincide** — since ticket 37 the inner minimum at `x_D` 75 is the
+    // rider's own node, 0,000 m away, against 0,9 m before — so the cell reads plainly on first
+    // paint. The traverse's own minimum still sits elsewhere, 0,57 m off at x 74,43.
     relabel: Math.abs(worst.atX - step.xD) > Math.max(1, 0.01 * L),
     inViolation: worst.hClear < 0,
     envelope: hRider,
