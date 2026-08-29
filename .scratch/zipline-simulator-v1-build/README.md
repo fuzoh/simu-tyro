@@ -24,6 +24,31 @@ the first step goes negative. **Only item 5 remains open**, blocked on
 55 direction reversals where the shape has two — and re-measuring it before 37 lands would date the
 figure.
 
+**42–46 are the second algorithmic review's tickets, opened 2026-08-29** (point fixe = racine, revue
+de correction algorithmique sur `src/lib/sim/**` et ses consommateurs). Le solveur lui-même est
+re-vérifié et **toutes les valeurs de § 15 reproduisent** (F1, Z1–Z7), le Jacobien § 4.2 différencie
+bien son résidu, `unloadedSag` est la solution exacte de `V(s) = H·h/L`, et le réducteur § 11 tombe à
+**0,7 mm** d'un balayage de référence à 4 000 points sur terrain droit et à **0,05 mm** sur un profil
+accidenté. Rien ici ne conteste la forme résolue. Ce que la revue a trouvé :
+
+- [42](./issues/42-eta-termination-efficiency-unbounded.md) — **`η_t` n'a pas de plafond.** Saisir
+  « 90 » au lieu de « 0,90 » — la faute de qui lit « ≥ 90 % MBF » dans § 10.2 — fait passer la ligne
+  livrée de « Hors limites » à « Dans les limites » avec un `T adm` **neuf fois** la charge de
+  rupture. Le seul défaut de la série qui retourne un verdict.
+- [43](./issues/43-headline-fs-reads-the-wrong-end.md) — la ligne de tête « FS effectif » lit
+  l'ancrage le plus **tendu**, qui n'est pas le moins **favorable** dès que `η_A ≠ η_B` : 9,78 en
+  tête contre 6,24 dans la cellule qui décide.
+- [44](./issues/44-governing-cell-ranks-fs-not-margin.md) — `governingCell` départage sur `FS` brut
+  et non sur la marge `FS / k`, donc sous WorkSafe QLD le bandeau nomme le critère qui n'est pas le
+  plus contraignant. **Le cas se produit sur la ligne livrée**, et un test le fixe comme attendu.
+- [45](./issues/45-near-taut-fallback-drops-point-loads.md) — le repli § 4.3 jette les charges
+  ponctuelles et rend `ok: true` sur un résidu de 76 mm, soit 76 000 × la tolérance § 5.3.
+- [46](./issues/46-steel-k-docblock-cites-refuted-triple.md) — le docblock de `STEEL.K` cite comme
+  `[STD-ATTESTED]` le triplet 6 mm que § 14 #21 réfute. Provenance seule ; aucun nombre ne bouge.
+
+42, 45 et 46 sont `ready-for-agent` ; 43 et 44 sont `ready-for-human`, parce que chacun remet en
+cause une phrase que § 6 fixe explicitement.
+
 **41 re-opened the strip's *quantity*, not 39's reading, and closed 2026-08-17.**
 [41](./issues/41-clearance-curve-plots-the-envelope.md) came from a second user report of the same
 day: the curve rises while the passenger descends at both ends, the dimension line is not under the
