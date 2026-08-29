@@ -570,10 +570,19 @@ export function ReadOutCells({
         // row is one cell: a scope label distinguishes five values from the Rail's traverse
         // aggregate, and there is only one value left to distinguish.
         <span className="text-muted-foreground/70 pinned:hidden absolute top-0 right-3 text-xs">
-          {/* Abbreviated below B1 for the same reason the View Strip's labels are: at 130 px of
-              cell the full string would run over the neighbouring cell's own label. */}
-          <span className="@max-[624px]:hidden">{scope.full}</span>
-          <span className="@min-[624px]:hidden">{scope.short}</span>
+          {/* The two forms switch on **what clears « Flèche »'s own label, measured**, not on B1:
+              the full string is 142 px right-anchored and the fifth cell's label ends at
+              `0,8 × col + 48`, so below a 1152 px column the two glyph runs collide (12 px deep at
+              a 1024 px viewport), and at 1152 exactly — a 1440 px desktop — the 26 px left reads
+              as one phrase, « Flèche à la position du passager ». 1280 px of column is where the
+              full form stands 44 px clear. The 68 px short form clears the same label from 680 px
+              up, and in the 3-column grid below B1 at any width; in the [624, 680) sliver neither
+              fits and the label yields — the scope is still on the section header and the row
+              label, and an overlapped parenthetical states nothing. */}
+          <span className="@max-[1280px]:hidden">{scope.full}</span>
+          <span className="@min-[624px]:@max-[680px]:hidden @min-[1280px]:hidden">
+            {scope.short}
+          </span>
         </span>
       )}
     </div>
