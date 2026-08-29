@@ -54,7 +54,14 @@ Injected refusals — `vi.mock` on the collaborator, never a widened signature �
   « ouvrir malgré tout » · no persisted strip dismissal · no second equivalent beside a quoted bound.
 - **« Saisie en cours » is focus-scoped**, so a blurred or never-filled required field is « Aucun
   résultat » with no stale picture: the chart **freezes rather than dims**, and scrubbing goes **inert**,
-  because a stale Sweep must not be used to *generate* new stale numbers. Amendment D gives it a home:
+  because a stale Sweep must not be used to *generate* new stale numbers. **Corrected 2026-08-28 by
+  [amendment J](../../zipline-simulator-v1-build/AMENDMENTS.md#j--two--7-readings-about-the-scrub-track-settled-together):**
+  the inertness in this bullet is « Saisie en cours »'s own, and it does **not** survive the blur.
+  « Aucun résultat » **keeps its scrub track**, pointer and typed `x` alike — the geometry is still
+  valid and the cable is still drawn, so `x` selects a view over a line the app can draw. The two
+  inert states are *L'exception géométrique* and « Saisie en cours ». This bullet's heading was one
+  of the two readings J weighed and rejected; it is left in place, annotated, because the *rule* it
+  gives « Saisie en cours » is right and only its reach was wrong. Amendment D gives it a home:
   TanStack Form's `field.state.meta.isTouched` / `isBlurred`, so the **rule** is a unit test here while
   the **screen behaviour** — freeze, inert scrubbing, suppressed URL write — is ticket 31's. It still
   has no representation in the URL or the Session, so it cannot be restored or shared.

@@ -959,3 +959,40 @@ subject » is the same instinct one level down.
 **No printed number for it, at any width.** § 5 fixes five read-out cells and killed in-plot read-outs
 for occlusion — « C's follow-the-rider tooltip covers the cable it describes » — so a sixth cell would
 re-open B1, the `pinned` row and the `compact` row for one number. The dimension line carries it.
+
+---
+
+## N · En `compact`, le bandeau **est** la ligne de cause
+
+**2026-08-28, by the repo owner**, on the evidence of
+[ticket 31](../archive/zipline-simulator-v1-build/31-shell-and-suppressed-output-browser-pass.md)'s
+« One consequence of D2's fix a reviewer should still rule on » — the last question
+**F1** left standing. **Amends nothing.** It *reads* § 5's `compact` row and § 6's « — » discipline
+together and records that what ships is right, so the question stops being open.
+
+**What was measured.** `compact` under « Aucun résultat » at 390 × 400 (`data-fit="tight"`,
+`data-collapse="compact"`): banner slot `x 0 y 0 310 × 44` carrying « ⛔ 1 erreur bloquante — aucun
+résultat  [ voir la première ] », read-out slot `x 310 y 0 80 × 44` whose only visible content is the
+chevron. The cause line is `compact:hidden`, and since **D2** the five cells are text-less rather
+than valueless labels.
+
+**The reading that made it look like a gap.** § 5's `compact` row promises « « Garde min » en ligne »
+and § 6's discipline gives a blocked state « une ligne de cause qui traverse la rangée ». Read as
+promises about *the read-out slot*, `compact` under « Aucun résultat » keeps neither.
+
+**The decision: read them as promises about the row, which in `compact` is shared.** `compact` is the
+one place the band stack stops being a stack — the banner slot and the read-out slot are two cells of
+**one** 44 px row (`shell.tsx:349-354`, `shell.tsx:430-438`). The banner is spending that row on the
+blocking cause, in the row § 5 gives the cause. So « une ligne de cause qui traverse la rangée » is
+**satisfied by the banner**, and « « Garde min » en ligne » is a promise about the state where there
+*is* a Garde min. The chevron is the correct residual: it is the way back to the read-out, and it is
+the only thing in that slot that still means something under a blocking error.
+
+- **Rejected: a valueless « Garde min. ligne » in the chevron slot.** It reinstates exactly what
+  **D2** removed, and [amendment M](#m--the-strips-curve-names-the-lines-minimum-and-the-riders-garde-is-the-profiles)
+  moved that label in five places precisely so it names the **line's** minimum — printing that name
+  with no number under a blocking error invites the misread M was closing.
+- **Rejected: the read-out slot yields its width to the banner in this state.** It takes away the
+  chevron, i.e. the only route back to the read-out, to buy 80 px for a message that already fits.
+- **No code changed, and no string moved.** Unlike J, this amendment has no counterpart in the spec's
+  headings either: § 5 and § 6 are both correct as written under the row reading.
