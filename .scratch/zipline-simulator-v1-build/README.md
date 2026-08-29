@@ -49,7 +49,7 @@ their small variants**. It changes nothing in `src/lib/`, and it does **not** re
 load-bearing sizes it lists — amendment G's 16 px numeric field and § 5's 44 px touch budget
 foremost.
 
-## The seven amendments, in one line each
+## The fourteen amendments, in one line each
 
 | | Amendment | Lands on |
 | --- | --- | --- |
@@ -60,10 +60,24 @@ foremost.
 | **E** | The refusal is a **rendered state, not a thrown error** — C's re-probe found a thrown `validateSearch` now answers 500, so the throw goes and **200 survives** | 20, 22, 26, 29 |
 | **F** | § 5's plot height is **capped at the reference chart column** (`min(0,42 × W_inner , 463,68 px)`) — nothing at or below the reference desktop moves, the block is bounded, and the **peek control is re-enabled where the cap is what cuts the cable** | 28, 29, 30 |
 | **G** | § 5's keyboard piece 2 is **gated on `visualViewport.scale`** — a pinch is no longer read as a keyboard — and the Rail's numeric fields go to **16 px** so iOS no longer auto-zooms them | 28, 35, 27, 29 |
+| **H** | § 5's **`pinned + x`** row is read **literally**: it keeps its caret through the first press, and every control in the 44 px row is a legal touch target — **no sentence of § 5 changes**, the tree was failing claims § 5 already makes | 27, 35 |
+| **I** | The published first-run **VE is ×1,86**, not ≈ ×1,5 — the spec's figure was arithmetic from two superseded inputs; the app was right and the line was stale | 30, § 13, `testing.md` |
+| **J** | Two § 7 scrub-track readings, settled together: « Aucun résultat » **keeps its track** (inertness is scoped to *L'exception géométrique* and « Saisie en cours »), and **a scrub is a prefill** — `roundToDisplay("x_D", …)` | 31, 26 |
+| **K** | The keyboard's **focus-into-view belongs to the platform** — the focus-then-inset ordering is accepted, not fixed | 35 |
+| **L** | The app ships **no mono face**, and **B1 moves to 624 px** — the normative type, radius, colour and control rules move to [`docs/conventions/ui.md`](../../docs/conventions/ui.md) | 40, 23 |
+| **M** | The strip's curve names the **line's** minimum (« Garde min. ligne », captions and `aria` verbatim), and the **rider's** garde is a second, self-hiding dimension line on the **profile** at `x_D` | 41, 23, 25 |
+| **N** | In **`compact`** the banner slot and the read-out slot are two cells of **one** row, so **the banner is the cause line** — the chevron-only read-out under « Aucun résultat » is correct, and a valueless « Garde min. ligne » is rejected. **No code changed** | 31 |
 
-**A–D are 2026-08-12; E is 2026-08-13; F and G are 2026-08-14**, and F and G each carry more than one
-user decision, recorded beside the cost they close rather than as letters of their own. Amendment F's
-costs 2 and 3 and amendment G's decision 5 are **settled**, not open questions.
+**A–D are 2026-08-12; E is 2026-08-13; F and G are 2026-08-14; H–K are 2026-08-15; L is 2026-08-16;
+M is 2026-08-17; N is 2026-08-28**, and F and G each carry more than one user decision, recorded beside
+the cost they close rather than as letters of their own. Amendment F's costs 2 and 3 and amendment G's
+decision 5 are **settled**, not open questions.
+
+**H, K and N change no code and no string** — each is a *reading* of the contract recorded so the
+question stops being re-opened: H and K found the tree failing claims the spec already made, and N
+rules the `compact` read-out slot correct as shipped. **J changed one line of code and two headings**;
+the headings are the reason ticket 26's « Saisie en cours » bullet carries a correction note rather
+than the rule it was written with.
 
 **The spec is the contract.** These tickets carry the stage's deliverable, its gate and the
 non-obvious constraints that stage would otherwise get wrong — they never restate the spec's
