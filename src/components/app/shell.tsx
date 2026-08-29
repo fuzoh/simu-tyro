@@ -272,7 +272,12 @@ export function Shell({
       }
     >
       {strip}
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+      {/* Capped and centred past 1728 px — the 288 px Rail plus a 1440 px chart column, already
+          288 px more chart than `REFERENCE_COLUMN_PX` buys a 1500 m span. Uncapped, a 2560 px
+          desktop stretched the x scale edge-to-edge and scattered the five read-out cells 460 px
+          apart, with the banner's sentence a screen away from its own action. The hairline borders
+          paint only once the cap engages, so no viewport below it gains an edge it never had. */}
+      <div className="border-border mx-auto flex min-h-0 w-full max-w-[1728px] flex-1 flex-col min-[1730px]:border-x md:flex-row">
         {/* The Rail is not becoming interactive: `focusin`, `focusout` and `scroll` are **observed**
             here, on the one element that is both the collapse's scroller and the ancestor of every
             field it watches. None of the three adds an affordance, a role or a keyboard contract —
