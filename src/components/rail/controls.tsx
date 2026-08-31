@@ -90,6 +90,13 @@ export function Row({
 }) {
   return (
     <div className="flex flex-col gap-1 py-1">
+      {/* The chip gets a right-aligned line of its own, **never a slot inside the Field row** —
+          the same shape `DerivedRow` gives it. Inline it sat between a `flex-1` label (basis 0)
+          and a `shrink-0` control, so at the 288 px Rail a 108 px « ⚠ non confirmé » left the
+          label ~16 px of box and « Masse » painted straight under the chip. */}
+      {chip !== undefined && chip !== null && (
+        <div className="flex items-start justify-end gap-1">{chip}</div>
+      )}
       <Field orientation={stacked ? "vertical" : "horizontal"}>
         {/* The label **wraps**, never truncates: at 288 px « Hauteur d'ancrage A » and its B twin
             would clip to the same string, and a control the user cannot tell apart is worse than
@@ -101,7 +108,6 @@ export function Row({
         >
           {label}
         </FieldLabel>
-        {chip}
         <div
           className={cn("flex shrink-0 items-center gap-1", outlined && "ring-destructive ring-1")}
         >
