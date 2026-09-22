@@ -1,0 +1,81 @@
+# Build the simulator as static files and publish them to GitHub Pages.
+#
+# The app is a SPA by construction, not by concession: the one route sets `ssr: false`, there
+# is no server function and no server route, and no terrain ever crosses a network boundary.
+# `vite.config.ts` turns on Start's SPA mode, so the build prerenders the shell — the Skeleton,
+# the same frame the dev server returns — into `dist/client/index.html`. Only `dist/client/` is
+# published; `dist/server/` is emitted by Start and deliberately not deployed.
+#
+# See `docs/conventions/routing.md` § Static hosting.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  # So a Pages settings change can be republished without an empty commit.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race for the same site. `cancel-in-progress: false` and not `true`: a
+# half-uploaded artifact that gets cancelled leaves the live site on the previous build, which is
+# fine, but cancelling the *deploy* step is how a site ends up serving a partial upload.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - run: bun install --frozen-lockfile
+
+      # The same three gates `CLAUDE.md` asks for before declaring work done. They run before the
+      # build because a green deploy of red code is worse than no deploy.
+      - run: bun run typecheck
+      - run: bun run lint-type-aware
+      - run: bun run test
+
+      # `enablement: true` turns Pages on for the repo on the first run, so nobody has to find
+      # Settings › Pages first. If the token is refused the step fails loudly — flip
+      # *Source: GitHub Actions* by hand and re-run.
+      - uses: actions/configure-pages@v5
+        id: pages
+        with:
+          enablement: true
+
+      # `base_path` is `/scoutech` for a project site and empty once a custom domain is attached.
+      # Vite wants a trailing slash either way, and the router reads the same value back out of
+      # `import.meta.env.BASE_URL` — see the comment in `src/router.tsx`.
+      - name: Resolve the base path
+        env:
+          PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+        run: |
+          base="${PAGES_BASE_PATH:-/}"
+          case "$base" in */) ;; *) base="$base/" ;; esac
+          echo "BASE_PATH=$base" >> "$GITHUB_ENV"
+
+      - run: bun run build:pages
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/client
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
