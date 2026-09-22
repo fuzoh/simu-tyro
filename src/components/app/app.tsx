@@ -24,6 +24,7 @@ import { RailHeaderControls, RailInputs } from "@/components/rail/inputs.tsx";
 import { RailOutputs } from "@/components/rail/outputs.tsx";
 import { buildDiagnostic } from "@/lib/app/diagnostic.ts";
 import { linkStrip } from "@/lib/app/link-strip.ts";
+import { siteOrigin } from "@/lib/app/site.ts";
 import { compactRequired, fitsWholeBlock } from "@/lib/layout/collapse.ts";
 
 import { Banner } from "./banner.tsx";
@@ -138,7 +139,7 @@ function Live() {
       deduced,
       at: new Date().toISOString(),
       build: import.meta.env.MODE,
-      origin: window.location.origin,
+      origin: siteOrigin(),
     });
     if (payload !== null) void navigator.clipboard.writeText(payload).catch(() => undefined);
   }

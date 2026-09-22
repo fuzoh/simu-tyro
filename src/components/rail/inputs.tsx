@@ -58,6 +58,7 @@ import { Button, buttonVariants } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.tsx";
 import { COPY_INCOMPLETE, copyLink } from "@/lib/app/persist.ts";
+import { siteOrigin } from "@/lib/app/site.ts";
 import { formatQuantity, formatValue } from "@/lib/format/quantity.ts";
 import {
   checkField,
@@ -945,7 +946,7 @@ export function RailHeaderControls({
     const result = copyLink({
       scenario: state.scenario,
       trace: state.trace,
-      origin: window.location.origin,
+      origin: siteOrigin(),
     });
     if (!result.ok) {
       // **Refuse rather than degrade**: a terrain-less link of an imported scenario is not a weaker

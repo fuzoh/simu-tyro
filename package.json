@@ -5,6 +5,7 @@
   "scripts": {
     "bench": "vitest bench",
     "build": "vite build",
+    "build:pages": "vite build && cp dist/client/index.html dist/client/404.html",
     "dev": "vite dev --port 3000",
     "format": "oxfmt --write",
     "lint": "oxlint",
@@ -54,5 +55,6 @@
     "typescript": "^6",
     "vite": "^8",
     "vitest": "^4"
-  }
+  },
+  "packageManager": "bun@1.4.2"
 }

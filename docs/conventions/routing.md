@@ -2,7 +2,9 @@
 
 TanStack Start with the file-based router (`@tanstack/router-plugin` in `vite.config.ts`).
 **SSR is on for the document and off for the app**: `__root.tsx`'s `shellComponent` is
-server-rendered, and `src/routes/index.tsx` — the only real route — sets `ssr: false`.
+server-rendered, and `src/routes/index.tsx` — the only real route — sets `ssr: false`. In
+production that render happens **once at build time** and ships as a static file (*Static hosting*
+below); under `bun run dev` it happens per request. Same output either way — which is the point.
 
 - Routes are files under `src/routes/`. Each exports a route created with `createFileRoute`.
   There is exactly one route in v1; a second route would re-declare the same ~30-key
@@ -16,10 +18,13 @@ server-rendered, and `src/routes/index.tsx` — the only real route — sets `ss
 - **`ssr: false` goes on the route, never on the router.** `defaultSsr` in `createRouter` is
   silently ignored in this scaffold: `createStartHandler` calls
   `router.update({ defaultSsr: <undefined> })` from a `src/start.ts` that does not exist, so the
-  option is spread away with no error and SSR stays on. `spa: {}` stays off.
-- Under `ssr: false` the server renders the route's `pendingComponent` — the **Skeleton** — and
-  returns **200**; `beforeLoad` and `loader` are skipped on the server. `validateSearch` still
-  runs there, **three times per request**, so it must stay pure, cheap and side-effect-free.
+  option is spread away with no error and SSR stays on. **`spa: { enabled: true }` is now on** —
+  see *Static hosting* below — and it changes none of the above: it adds a build step, not a
+  routing rule.
+- Under `ssr: false` the server — the dev server, or the build's prerender pass — renders the
+  route's `pendingComponent`, the **Skeleton**, and returns **200**; `beforeLoad` and `loader` are
+  skipped on the server. `validateSearch` still runs there, **three times per request**, so it must
+  stay pure, cheap and side-effect-free.
 - A `validateSearch` must **omit** keys it rejects, and must never return `{ key: undefined }` or
   a coerced value: either makes the server emit a **307** to the canonical URL before any client
   code runs, which destroys the evidence the ignored-keys banner needs.
@@ -27,8 +32,40 @@ server-rendered, and `src/routes/index.tsx` — the only real route — sets `ss
   treat it as the schema; the app reads one derived Scenario object built from the validated keys.
 - No service worker and no PWA manifest. "Fully offline" means no runtime network dependency
   after load, not an installable app.
+- **The router's `basepath` is read, never written.** `src/router.tsx` sets
+  `basepath: import.meta.env.BASE_URL`, which Vite fills from `base` in `vite.config.ts` — `/` in
+  dev, `/scoutech/` on the GitHub Pages project site. Route code stays written against `/`; the
+  router strips the prefix before matching and re-adds it when it builds an href. Hardcoding the
+  subpath in either place is how the app 404s on a custom domain, silently.
 
 `bun run dev` serves on port 3000.
+
+## Static hosting
+
+The app ships as static files — the v1 spec recorded `spa: {}` as the migration path and said it
+must not be enabled speculatively; a GitHub Pages deploy is the ask that spends it.
+
+- `vite.config.ts` sets `spa: { enabled: true, prerender: { outputPath: "/index" } }`. The build
+  gains a prerender pass that renders the root route with the index route's `pendingComponent`, so
+  the shipped HTML **is the Skeleton** — the same frame the dev server returns, not an empty
+  `<body>`. `maskPath` stays at its default `/`, which is why.
+- `outputPath: "/index"` and not the default `/_shell`: a static host serves `index.html` at a
+  directory URL, and GitHub Pages runs Jekyll, which drops `_`-prefixed paths outright.
+  `public/.nojekyll` covers `assets/` — **do not delete it**, the whole site goes unstyled.
+- `bun run build:pages` is `vite build` plus one copy: `index.html` → `404.html`. Pages has no
+  rewrite rules, and `404.html` is the only fallback it offers. This keeps the root route's policy
+  intact rather than defeating it — an unknown path still returns a genuine **404** status, and the
+  router renders `notFoundComponent` into it. No redirect to `/`.
+- `BASE_PATH` is a build-time env var, not a constant: unset (`/`) in dev and on a custom domain,
+  `/scoutech/` on the project site. `.github/workflows/deploy.yml` reads it off
+  `actions/configure-pages`, so attaching a domain needs no code change.
+- **Every URL the app writes goes through the router** — `navigate({ to: "/" })` in `store.tsx`,
+  `use-persist.ts` and `inputs.tsx` — so `basepath` is applied for free. « Copier le lien » is the
+  one exception, because `copyLink` builds an *absolute* href by hand against § 7's whole-URL
+  budget: its `origin` argument comes from `siteOrigin()` in `src/lib/app/site.ts`, which is origin
+  + `BASE_URL`. A new absolute-URL writer must use it too, or it ships links that 404.
+- Only `dist/client/` is published. `dist/server/` is still emitted by Start — SPA mode does not
+  suppress it — and is deliberately not deployed.
 
 ## The shell, as built — where each rule lives
 
