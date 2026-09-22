@@ -31,7 +31,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -53,7 +53,7 @@ jobs:
       # `enablement: true` turns Pages on for the repo on the first run, so nobody has to find
       # Settings › Pages first. If the token is refused the step fails loudly — flip
       # *Source: GitHub Actions* by hand and re-run.
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
         id: pages
         with:
           enablement: true
@@ -71,7 +71,7 @@ jobs:
 
       - run: bun run build:pages
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist/client
 
@@ -82,5 +82,5 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@v5
         id: deployment
