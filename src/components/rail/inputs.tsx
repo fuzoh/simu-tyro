@@ -1294,13 +1294,15 @@ type ClampEvent = { readonly L: number; readonly nonce: number };
  * raises {@link ClampEvent}; this component only decides how long it stays up.
  */
 function ClampNote({ event }: { event: ClampEvent }) {
-  const [shown, setShown] = useState<ClampEvent | null>(null);
+  // The note is derived: the latest event shows until its nonce is marked expired. The effect
+  // only owns the timer — it never sets state synchronously, so no cascading render.
+  const [expiredNonce, setExpiredNonce] = useState(0);
+  const shown = event.nonce !== 0 && event.nonce !== expiredNonce ? event : null;
 
   useEffect(() => {
     if (event.nonce === 0) return;
-    setShown(event);
     // Transient — it is a note about a move that just happened, not a state of the field.
-    const timer = setTimeout(() => setShown(null), CLAMP_NOTE_MS);
+    const timer = setTimeout(() => setExpiredNonce(event.nonce), CLAMP_NOTE_MS);
     return () => clearTimeout(timer);
   }, [event]);
 
