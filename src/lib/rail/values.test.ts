@@ -293,13 +293,25 @@ describe("the Tightness Spec — one editable field, prefilled from its own read
     expect(Math.abs(back.tightness.D_target - 6)).toBeLessThan(0.02);
   });
 
-  test("a mode switch with no solve to read from changes nothing", () => {
-    // A switch may not invent a tightness the line never had.
+  test("under « Tension impossible » the switch still switches, from the last good read-out", () => {
+    // The state a user most needs another driver in: a flèche the cable cannot reach is fixed by
+    // typing a tension, so the selector must not go dead there.
+    const impossible = scenario((draft) => {
+      draft.tightness = { mode: "sag", D_target: 0.01 };
+    });
+    const refused = deduceValues(impossible, null);
+    expect(refused.solve).toBeNull();
+    const tension = switchTightness(impossible, "tension", refused, deduced.solve);
+    expect(tension.tightness).toEqual({ mode: "tension", H_target: 2535 });
+  });
+
+  test("with no read-out ever seen, the prefill is the first-run line's", () => {
     const blank = scenario((draft) => {
       draft.usage = "TEMPORAIRE";
       draft.material = { family: "textile", ropeClass: "hmpe", MBL: null, mu: null, k: 22 };
     });
-    expect(switchTightness(blank, "length", deduceValues(blank, null))).toBe(blank);
+    const length = switchTightness(blank, "length", deduceValues(blank, null));
+    expect(length.tightness).toEqual({ mode: "length", L0: 151.64 });
   });
 
   test("switching to the mode already active is a no-op", () => {

@@ -41,7 +41,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { createContext, use, useEffect, useRef, useState } from "react";
 
 import type { RailFormApi, RailFormState } from "@/components/app/use-rail-form.ts";
-import type { Deduced } from "@/lib/rail/deduced.ts";
+import type { Deduced, DeducedSolve } from "@/lib/rail/deduced.ts";
 import type { FieldContext, FieldId } from "@/lib/rail/fields.ts";
 import type { BlockingError, FixActionId } from "@/lib/rail/gates.ts";
 import type { LadderRow } from "@/lib/rail/provenance.ts";
@@ -190,6 +190,11 @@ export function RailInputs({
   const [importFailure, setImportFailure] = useState<ParseFailure | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const regimePicker = useRef<HTMLSelectElement | null>(null);
+  // What a tightness switch prefills from under « Aucun résultat », where there is no read-out.
+  const lastGoodSolve = useRef<DeducedSolve | null>(null);
+  useEffect(() => {
+    if (deduced.solve !== null) lastGoodSolve.current = deduced.solve;
+  }, [deduced.solve]);
 
   // § 6's warning ladder, on the rows it qualifies. The terrain rung renders inside the terrain
   // disclosure block and the verdict rung is a banner state — neither is here, so nothing is said
@@ -633,7 +638,9 @@ export function RailInputs({
             {/* Exactly one field is editable; the other two appear under `Valeurs déduites`.
                 Switching mode **pre-fills the new field from its read-out**. */}
             <Segmented
-              onChange={(mode) => patch(switchTightness(scenario, mode, deduced))}
+              onChange={(mode) =>
+                patch(switchTightness(scenario, mode, deduced, lastGoodSolve.current))
+              }
               options={[
                 { value: "sag", label: "Flèche" },
                 { value: "tension", label: "Tension" },

@@ -34,12 +34,14 @@ import type { TightnessSpec } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { roundToDisplay } from "@/lib/format/quantity.ts";
+import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { clampX } from "@/lib/scenario/from-search.ts";
 import { spanOfGeometry } from "@/lib/scenario/geometry.ts";
 
-import type { Deduced } from "./deduced.ts";
+import type { Deduced, DeducedSolve } from "./deduced.ts";
 import type { FieldContext, FieldId } from "./fields.ts";
 
+import { deduceValues } from "./deduced.ts";
 import { displayField } from "./fields.ts";
 import { isFieldActive } from "./gates.ts";
 
@@ -323,16 +325,21 @@ export function clearOverride(scenario: ScenarioDraft, key: "MBF" | "EA" | "mu")
  * The Tightness Spec's segmented control: switching mode **pre-fills the new field from its
  * read-out**, at the read-out's own display precision.
  *
- * @returns the Scenario on the new driver, or unchanged when the read-out the new field would be
- *   filled from does not exist — a mode switch may not invent a tightness the line never had.
+ * **Under « Aucun résultat » the switch still switches.** That is the state a user most needs
+ * another driver in — « Tension impossible » on a flèche is fixed by typing a tension — so with no
+ * read-out the prefill falls back to `lastGood`, the last read-out the Rail saw solve, and failing
+ * that to the first-run line's. A dead control there reads as a broken app.
+ *
+ * @returns the Scenario on the new driver, or unchanged when it is already on it.
  */
 export function switchTightness(
   scenario: ScenarioDraft,
   mode: TightnessSpec["mode"],
   deduced: Deduced,
+  lastGood: DeducedSolve | null = null,
 ): ScenarioDraft {
   if (scenario.tightness.mode === mode) return scenario;
-  const solve = deduced.solve;
+  const solve = deduced.solve ?? lastGood ?? firstRunSolve();
   if (solve === null) return scenario;
   switch (mode) {
     case "sag":
@@ -350,6 +357,14 @@ export function switchTightness(
     case "length":
       return { ...scenario, tightness: { mode, L0: roundToDisplay("L0", solve.L0) } };
   }
+}
+
+let firstRun: DeducedSolve | null | undefined;
+
+/** The first-run line's read-out — computed, never stored, and only once. */
+function firstRunSolve(): DeducedSolve | null {
+  firstRun ??= deduceValues(firstRunDefaults() as ScenarioDraft, null).solve;
+  return firstRun;
 }
 
 /** Which field the segmented control is currently pointing at. */
