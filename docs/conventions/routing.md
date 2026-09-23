@@ -113,7 +113,6 @@ re-probe below attached**.
 | `@tanstack/react-router-devtools` | 1.167.1 | no — dev only |
 | `@tanstack/react-router-ssr-query` | 1.167.1 | no — unused by v1 |
 | `@tanstack/devtools-vite` | 0.8.3 | no — dev only |
-| `@tanstack/eslint-config` | 0.4.0 | no — lint only |
 | `@tanstack/react-form` | 1.33.5 | no — form state, no router surface |
 | `valibot` | 1.4.2 | no — boundary validation only |
 
