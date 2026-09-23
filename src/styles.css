@@ -1,4 +1,10 @@
-@import "tailwindcss";
+/**
+ * `source("../src")` — Tailwind's automatic detection scans every non-gitignored file in the repo,
+ * and `docs/` plus `.scratch/` hold ~90 markdown files that *name* classes this app bans
+ * (`text-sm`, `rounded-md`, …). Each one was generated into the shipped stylesheet. Only `src/`
+ * holds class names that render.
+ */
+@import "tailwindcss" source("../src");
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
