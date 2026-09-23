@@ -215,6 +215,8 @@ export const QUANTITIES = {
   loadedSag: { unit: "m", decimals: 2 },
   /** `Garde min`, m — the app's central output. */
   clearance: { unit: "m", decimals: 2 },
+  /** `Écart à vide`, m — the load's drop below the unloaded line at `x_D`, a flèche's grain. */
+  unloadedGap: { unit: "m", decimals: 2 },
   /** The position of an extremum, `x` in m. */
   extremumX: { unit: "m", decimals: 1 },
   /** `FS effectif` — a safety factor, never a percentage. */

@@ -53,8 +53,28 @@ export const STRIP = { factor: 0.16, min: 96, max: 200 } as const;
 /** One touch-height row: the layer toggles, « ×1 vraie échelle » and the typed `x`. */
 export const VIEW_STRIP = 44;
 
-/** One read-out cell row. Two rows below {@link CELL_WRAP_PX}, one above. */
+/** One read-out cell row. How many the row wraps to is {@link cellRows}'s. */
 export const CELL_ROW = 52;
+
+/**
+ * **One read-out cell's flex basis, px** — the narrowest box a value fits in: a nine-character value
+ * (« 12345 daN ») at `font-mono text-lg` plus its `px-3`, i.e. one fifth of {@link CELL_WRAP_PX}'s
+ * own five-cell arithmetic, `9 × 18 × 0,62 + 24 ≈ 124,4`. The cells **grow** from it to fill their
+ * line and wrap to a new one when the next would not fit: a flex row, not a fixed column count
+ * (2026-09-23).
+ *
+ * **124 and not 125**: eight units are then **992 px**, the chart column of a 1280 px laptop, so the
+ * row stays single there and the block keeps the height it had. The 0,4 px is inside the 0,62 em
+ * guard itself — the faces a bare `monospace` resolves to measure 0,60, which is 121,2.
+ */
+export const CELL_BASIS_PX = 124;
+
+/**
+ * Each read-out cell's width in {@link CELL_BASIS_PX} units, in the row's own order — `shell.tsx`'s
+ * `READ_OUT_CELLS` — so {@link cellRows} can lay the row out without a DOM. « Garde min. ligne » is
+ * **two**: its relabelled form « Garde min. ligne (à x 74,3 m) » needs ≈ 200 px of label.
+ */
+export const READ_OUT_SPANS = [2, 1, 1, 1, 1, 1, 1] as const;
 
 /**
  * The **live** « Garde min » cell of the Pinned Safety Header — § 5's `76 + 44 = 120`. It is one
@@ -83,6 +103,11 @@ export const PINNED_CELL = 44;
  * it spends two rows of header on laptop widths that fit today, for a face the keyword does not
  * resolve to. Changing the header cells' type, or the mono stack, changes this constant **and**
  * `contract.test.ts`, in the same commit.
+ *
+ * **The read-out row no longer wraps on it.** Since 2026-09-23 there are seven cells, and they wrap
+ * by {@link cellRows}'s flex rule instead. B1 still carries everything else it named: the View
+ * Strip's abbreviations, the banner's budget and the five-cell arithmetic above, which is what
+ * {@link CELL_BASIS_PX} is one fifth of.
  */
 export const CELL_WRAP_PX = 624;
 
@@ -215,9 +240,28 @@ export function stripOuterHeight(wInner: number): number {
   return raw < STRIP.min ? STRIP.min : raw > STRIP.max ? STRIP.max : raw;
 }
 
-/** How many rows the five read-out cells take at this chart-column width — B1. */
-export function cellRows(columnWidth: number): 1 | 2 {
-  return columnWidth >= CELL_WRAP_PX ? 1 : 2;
+/**
+ * How many lines the read-out cells wrap to at this chart-column width — the **flex line-breaking
+ * rule**, run in arithmetic: a cell joins the current line while the line's bases still fit the
+ * column, and starts the next one otherwise. The row spans the whole column, so the column *is* the
+ * flex container's width.
+ *
+ * With {@link READ_OUT_SPANS} at {@link CELL_BASIS_PX}: **one line from 992 px, two from 496,
+ * three from 372** (four below it) — a 1280 px laptop and § 5's reference column (1152) keep their
+ * single row; budgets A and B gain a third line.
+ */
+export function cellRows(columnWidth: number): number {
+  let rows = 1;
+  let used = 0;
+  for (const span of READ_OUT_SPANS) {
+    const basis = span * CELL_BASIS_PX;
+    if (used > 0 && used + basis > columnWidth) {
+      rows += 1;
+      used = 0;
+    }
+    used += basis;
+  }
+  return rows;
 }
 
 /**

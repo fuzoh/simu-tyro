@@ -63,7 +63,7 @@ export function Skeleton() {
           <ViewStripSlot />
           <ReadOutCells>
             {READ_OUT_CELLS.map((cell) => (
-              <ReadOutCell className={cell.narrow} key={cell.label} label={cell.label} />
+              <ReadOutCell className={cell.basis} key={cell.label} label={cell.label} />
             ))}
           </ReadOutCells>
         </>

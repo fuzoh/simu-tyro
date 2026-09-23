@@ -38,7 +38,7 @@ function storedSession(): Session {
     retainedMaterial: FIRST_RUN_RETAINED_TEXTILE,
     retainedManual: { L: 150, h: -18 },
     trace: null,
-    layers: { unloadedLine: true, chordAB: false },
+    layers: { unloadedLine: true, chordAB: false, riderTip: false, trajectory: true },
   };
 }
 
@@ -293,8 +293,8 @@ describe("appReducer — one reducer over one object", () => {
     expect(state.scenario.regime).toBeNull();
   });
 
-  it("sets § 5's two toggles without touching the scenario", () => {
-    const layers = { unloadedLine: true, chordAB: false };
+  it("sets the layer toggles without touching the scenario", () => {
+    const layers = { unloadedLine: true, chordAB: false, riderTip: false, trajectory: true };
     const next = appReducer(state, { type: "calques/basculés", layers });
     expect(next.layers).toEqual(layers);
     expect(next.scenario).toBe(state.scenario);

@@ -108,7 +108,7 @@ function fullSession(): Session {
     retainedMaterial: FIRST_RUN_RETAINED_TEXTILE,
     retainedManual: { L: 150, h: -18 },
     trace: TRACE,
-    layers: { unloadedLine: true, chordAB: false },
+    layers: { unloadedLine: true, chordAB: false, riderTip: false, trajectory: true },
   };
 }
 
@@ -154,7 +154,12 @@ describe("the round-trip", () => {
     // The retained manual span behind an import — what « Retirer le tracé » restores.
     expect(restored?.retainedManual).toEqual({ L: 150, h: -18 });
     // The layer toggles, which are Session-only and never in the URL.
-    expect(restored?.layers).toEqual({ unloadedLine: true, chordAB: false });
+    expect(restored?.layers).toEqual({
+      unloadedLine: true,
+      chordAB: false,
+      riderTip: false,
+      trajectory: true,
+    });
   });
 
   test("the cached Trace comes back as `Float64Array`s, sample for sample, with no quantisation", () => {
@@ -224,8 +229,32 @@ describe("the round-trip", () => {
     expect(readSession(storage)?.scenario.regime).toBeNull();
   });
 
-  test("§ 5's shipped toggles: « ligne à vide » off, « corde A–B » on", () => {
-    expect(DEFAULT_LAYERS).toEqual({ unloadedLine: false, chordAB: true });
+  test("§ 5's shipped toggles: « ligne à vide » off, « corde A–B » on — distances on, trajectory off", () => {
+    expect(DEFAULT_LAYERS).toEqual({
+      unloadedLine: false,
+      chordAB: true,
+      riderTip: true,
+      trajectory: false,
+    });
+  });
+
+  test("a Session stored before the two later layers is kept, and they take their defaults", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    storage.setItem(
+      SESSION_KEY,
+      JSON.stringify({ ...blob, layers: { unloadedLine: true, chordAB: false } }),
+    );
+
+    const restored = readSession(storage);
+    // Not discarded: the cached Trace is the whole reason it matters.
+    expect(restored?.trace).not.toBeNull();
+    expect(restored?.layers).toEqual({
+      unloadedLine: true,
+      chordAB: false,
+      riderTip: DEFAULT_LAYERS.riderTip,
+      trajectory: DEFAULT_LAYERS.trajectory,
+    });
   });
 });
 

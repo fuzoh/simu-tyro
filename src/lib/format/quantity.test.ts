@@ -43,10 +43,11 @@ const ALL_IDS = Object.keys(QUANTITIES) as QuantityId[];
 
 /**
  * One case per row of {@link QUANTITIES}, in its order, valued from the spec's own « Premier
- * lancement » column wherever it has one. That is **§ 3's table plus one row**: `regimeK` is the
+ * lancement » column wherever it has one. That is **§ 3's table plus two rows**: `regimeK` is the
  * régime's safety divisor, which § 3 has no row for because it spends `k` on textile relative
  * stiffness — voir its own comment in the table, and ticket 37 defect 4 for why it is a
- * `QuantityId` rather than a second rounding site. The four rows the column leaves empty or dashed
+ * `QuantityId` rather than a second rounding site — and `unloadedGap`, the « Écart à vide » cell
+ * added after § 3 was written. The four rows the column leaves empty or dashed
  * (`Station`, `MBL`, `T adm`, `Réserve de tension`) take § 3's or § 6's quoted figures instead.
  *
  * `value` is always the row's **canonical** unit — § 3's SI storage: metres, mm, kg, kg/m,
@@ -92,6 +93,8 @@ const ROWS: ReadonlyArray<{ id: QuantityId; value: number; expected: string }> =
   { id: "Tdaf", value: 9278.8, expected: "927,9 daN" },
   { id: "loadedSag", value: 7.4831, expected: "7,48 m" },
   { id: "clearance", value: 2.4399, expected: "2,44 m" },
+  // Not a § 3 row: the read-out cell of 2026-09-23, valued at the first-run line's own `x_D` 75.
+  { id: "unloadedGap", value: 1.4829, expected: "1,48 m" },
   { id: "extremumX", value: 74.117, expected: "74,1 m" },
   { id: "FS", value: 8.8011, expected: "8,80" },
   // The régime's own divisor — « k = 3,0 » / « exigé 3,0 » — distinct from the textile `k` above.

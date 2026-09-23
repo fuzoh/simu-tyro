@@ -91,7 +91,7 @@ describe("the Session is strictly larger than the link", () => {
     const state: AppState = {
       ...appState(firstRunDefaults(), trace),
       retainedManual: { L: 150, h: -18 },
-      layers: { unloadedLine: true, chordAB: false },
+      layers: { unloadedLine: true, chordAB: false, riderTip: false, trajectory: true },
     };
     const session = sessionOf(state);
     expect(session).not.toBeNull();
@@ -101,7 +101,12 @@ describe("the Session is strictly larger than the link", () => {
     expect(session?.retainedMaterial).toBe(FIRST_RUN_RETAINED_TEXTILE);
     expect(session?.retainedManual).toEqual({ L: 150, h: -18 });
     expect(session?.trace).toBe(trace);
-    expect(session?.layers).toEqual({ unloadedLine: true, chordAB: false });
+    expect(session?.layers).toEqual({
+      unloadedLine: true,
+      chordAB: false,
+      riderTip: false,
+      trajectory: true,
+    });
   });
 });
 

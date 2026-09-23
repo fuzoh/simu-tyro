@@ -19,6 +19,7 @@ import {
   anchorTarget,
   BANNER,
   bannerBudget,
+  CELL_BASIS_PX,
   CELL_ROW,
   CELL_WRAP_PX,
   cellRows,
@@ -44,6 +45,7 @@ import {
   PROFILE_PLOT_MAX,
   RAIL_REFLOW_PX,
   RAIL_WIDTH,
+  READ_OUT_SPANS,
   REFERENCE_COLUMN_PX,
   REFERENCE_DESKTOP_PX,
   STRIP,
@@ -65,9 +67,10 @@ const BUDGETS = [
     plot: 144,
     profile: 220,
     strip: 96,
-    rows: 2,
+    // Three cell lines since the row became seven cells (2026-09-23): 540 + 52.
+    rows: 3,
     banner: BANNER.threeLines,
-    block: 540,
+    block: 592,
   },
   {
     name: "B · 768×1024",
@@ -76,9 +79,9 @@ const BUDGETS = [
     plot: 181,
     profile: 257,
     strip: 96,
-    rows: 2,
+    rows: 3,
     banner: BANNER.twoLines,
-    block: 561,
+    block: 613,
   },
   {
     name: "C · 1440×900",
@@ -123,7 +126,7 @@ describe("§ 5 — the layout contract", () => {
         expect(aspect).toBeLessThanOrEqual(PLOT_ASPECT_BAND.max);
       });
 
-      it("the read-out cells wrap as B1 says", () => {
+      it("the read-out cells wrap as the flex row lays them out", () => {
         expect(cellRows(budget.column)).toBe(budget.rows);
       });
 
@@ -180,13 +183,15 @@ describe("§ 5 — the layout contract", () => {
     expect(chartBlockHeight(1152, BANNER.threeLines) - chartBlockHeight(1152)).toBe(32);
   });
 
-  it("budget A clears MIN_RAIL by the 4 px that refuse `__root.tsx` an app bar", () => {
-    // « Those 124 px of resting rail clear `MIN_RAIL = 120` by 4 px » — the measurement the whole
-    // no-app-bar decision rests on, and the one place (c) is decided by single pixels.
+  it("budget A no longer clears MIN_RAIL: the third cell line spends the 4 px and 48 more", () => {
+    // « Those 124 px of resting rail clear `MIN_RAIL = 120` by 4 px » was the measurement the
+    // no-app-bar decision rested on. Seven read-out cells wrap to three lines at 390 px, and the
+    // third line's 52 px is the whole difference: the resting rail is 72 px, so (c) pins the block
+    // at 390 × 664 — the user's call of 2026-09-23, made knowing it.
     const rail = 664 - chartBlockHeight(390);
-    expect(Math.round(rail)).toBe(124);
-    expect(rail - MIN_RAIL).toBeGreaterThan(0);
-    expect(rail - MIN_RAIL).toBeLessThan(5);
+    expect(Math.round(rail)).toBe(72);
+    expect(rail).toBeLessThan(MIN_RAIL);
+    expect(Math.round(rail + CELL_ROW)).toBe(124);
   });
 
   it("the strip floor is 96 px, not the 72 px policy floor", () => {
@@ -200,14 +205,33 @@ describe("§ 5 — the layout contract", () => {
   it("B1 is exactly 624 px of chart column, not 625", () => {
     // Amendment L: the threshold is `≥`, and it is 624 because the mono face is unbound and
     // `(9 × 18 × 0,62 + 24) × 5 ≈ 622` is what five nine-character cells then need. § 5's 600 was
-    // five pixels *under* its own 605 px estimate — this one sits above its own 622.
-    expect(cellRows(624)).toBe(1);
-    expect(cellRows(623)).toBe(2);
-    // And the retired threshold is now firmly on the two-row side, which is the regression a
-    // re-introduced 600 would show up as here first.
-    expect(cellRows(600)).toBe(2);
+    // five pixels *under* its own 605 px estimate — this one sits above its own 622. The read-out
+    // row no longer wraps on it; the View Strip and the banner still do.
     expect(CELL_WRAP_PX).toBe(624);
     expect(CELL_WRAP_PX).toBeGreaterThan((9 * 18 * 0.62 + 24) * 5);
+    expect(bannerBudget(CELL_WRAP_PX)).toBe(BANNER.oneLine);
+    expect(bannerBudget(CELL_WRAP_PX - 1)).toBe(BANNER.twoLines);
+  });
+
+  it("the seven read-out cells wrap to one line from 992 px, two from 496, three from 372", () => {
+    // One basis is one fifth of B1's five-cell arithmetic, and « Garde min. ligne » is two of them.
+    expect(CELL_BASIS_PX * 5).toBeLessThanOrEqual(CELL_WRAP_PX);
+    expect(READ_OUT_SPANS).toHaveLength(7);
+    expect(READ_OUT_SPANS.reduce((sum, span) => sum + span, 0)).toBe(8);
+    // Eight units are a 1280 px laptop's chart column, to the pixel: that laptop keeps one line.
+    expect(CELL_BASIS_PX * 8).toBe(1280 - RAIL_WIDTH);
+    expect(cellRows(1280 - RAIL_WIDTH)).toBe(1);
+    expect(cellRows(1280 - RAIL_WIDTH - 1)).toBe(2);
+    expect(cellRows(REFERENCE_COLUMN_PX)).toBe(1);
+    // « Garde min. ligne » and the two tensions fill the first line from 496 px.
+    expect(cellRows(4 * CELL_BASIS_PX)).toBe(2);
+    expect(cellRows(4 * CELL_BASIS_PX - 1)).toBe(3);
+    // Three units a line from 372 px, which is every phone § 5 budgets for; a 320 px one takes four.
+    expect(cellRows(3 * CELL_BASIS_PX)).toBe(3);
+    expect(cellRows(390)).toBe(3);
+    expect(cellRows(3 * CELL_BASIS_PX - 1)).toBe(4);
+    // A column narrower than « Garde min. ligne »'s own basis still puts one cell per line at least.
+    expect(cellRows(100)).toBe(READ_OUT_SPANS.length);
   });
 
   it("the aspect is the same at every width up to the reference column — the invariant, stated as a test", () => {
@@ -379,10 +403,12 @@ describe("amendment F — the plot's ceiling at wide widths", () => {
       expect(chartBlockHeight(column)).toBeLessThanOrEqual(plateau);
     }
     expect(chartBlockHeight(624)).toBeLessThan(chartBlockHeight(623));
-    // Above B1 there is no step left, so the block is monotone non-decreasing there — which is the
+    // The read-out row's last wrap is the other step: at 992 px the seven cells fit one line.
+    expect(chartBlockHeight(992)).toBeLessThan(chartBlockHeight(991));
+    // Past it there is no step left, so the block is monotone non-decreasing there — which is the
     // arm (c) bisects on a desktop, and what makes the comparison meaningful at all.
     let previous = 0;
-    for (let column = CELL_WRAP_PX; column <= 4000; column += 7) {
+    for (let column = 8 * CELL_BASIS_PX; column <= 4000; column += 7) {
       const block = chartBlockHeight(column);
       expect(block).toBeGreaterThanOrEqual(previous);
       previous = block;
@@ -1132,11 +1158,12 @@ describe("§ 5 — the two mechanisms the layout may not use", () => {
     }
   });
 
-  it("`matchMedia` is read at the event, in the one place that has one", () => {
-    // § 5's peek control reads `(pointer: coarse)` inside a pointer handler — a render-time media
-    // read is the branch the rule above forbids, and a handler only ever runs on the client.
+  it("`matchMedia` is read nowhere", () => {
+    // § 5's peek control used to read `(pointer: coarse)` inside a pointer handler, the one legal
+    // media read. It is a plain toggle since 2026-09-23, so the call is gone — and a render-time
+    // media read is still the branch the rule above forbids.
     const callers = FILES.filter((path) => /matchMedia\s*\(/.test(read(path)));
-    expect(callers).toStrictEqual(["src/components/chart/view-strip.tsx"]);
+    expect(callers).toStrictEqual([]);
   });
 
   it("one file reads a window height, and it is the viewport hook", () => {

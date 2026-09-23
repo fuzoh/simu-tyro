@@ -17,7 +17,10 @@
  *   while `relabel` says the two are further apart than `max(1 m, 1 % de la portée)`** (ticket 41).
  *   This plot is where that second quantity belongs: it has a z scale, the ground and the passenger,
  *   and the strip's y axis measurably cannot hold both — voir `scene.ts`.
- * - **Exactly two toggles**: « ligne à vide » (off) and « corde A–B » (on), both from the Session.
+ * - **Four toggles**, all from the Session: « ligne à vide » (off) and « corde A–B » (on) are § 5's;
+ *   « trajectoire » (off) — the load's path over the whole traverse, dotted — and « distances » (on)
+ *   — the passenger's garde and the gap to the unloaded line, printed beside the handle and moving
+ *   with it — were added on 2026-09-23.
  * - **The rider envelope stays metric** — never drawn at a minimum pixel size. At 1500 m it is
  *   ~5 px tall, and a non-metric glyph would misrepresent the one measurement the tool exists to
  *   produce. Legibility is the printed read-out's job.
@@ -29,10 +32,12 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 
 import { area, line } from "d3-shape";
 
-import type { ChartScene, Polyline, SceneFrame } from "@/lib/chart/scene.ts";
+import type { ChartScene, Polyline, SceneFrame, SceneRider } from "@/lib/chart/scene.ts";
 import type { SharedX, ZScale } from "@/lib/layout/contract.ts";
 import type { LayerToggles } from "@/lib/session/session.ts";
 
+import { polylineAt } from "@/lib/chart/scene.ts";
+import { formatQuantity } from "@/lib/format/quantity.ts";
 import { anchorTarget } from "@/lib/layout/contract.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -144,7 +149,7 @@ export function Profile({
    * **below** the ground, never clamped, in both of them.
    *
    * The drawn ground and the engine's `Terrain` are the same data inside `[0, L]` (`scene.ts` holds
-   * the ends exactly as `zGroundAt` does), so reading `groundAt` here does not make the drawn length
+   * the ends exactly as `zGroundAt` does), so reading `polylineAt` here does not make the drawn length
    * disagree with the number `scene.ts` computed.
    *
    * **The length is exact; the `x` it stands at is not.** `worst.atX` is a scanned extremum's
@@ -158,7 +163,7 @@ export function Profile({
    * passenger's own dimension at `x_D` carries none of it: `x_D` is exact.
    */
   function dimension(atX: number, hClear: number) {
-    const base = groundAt(ground, atX);
+    const base = polylineAt(ground, atX);
     const at = x.x(atX);
     return { x1: at, x2: at, y1: z.y(base), y2: z.y(base + hClear) };
   }
@@ -273,6 +278,22 @@ export function Profile({
               />
             )}
 
+            {/* « Trajectoire » — the load's own path over the whole traverse, **dotted** so it can
+                never be read as a cable: the loaded line touches it at exactly one point, the
+                rider's node. Under the cable, which is the subject. One path per run, because an
+                `Indéterminé` gap is a position nobody computed. */}
+            {layers.trajectory &&
+              scene.trajectory.map((run) => (
+                <path
+                  className="stroke-foreground/60 fill-none"
+                  d={pathOf(run, x, z) ?? undefined}
+                  key={run.xs[0]}
+                  strokeDasharray="0 4"
+                  strokeLinecap="round"
+                  strokeWidth={1.5}
+                />
+              ))}
+
             <path
               className={cn(
                 "fill-none stroke-2",
@@ -357,6 +378,19 @@ export function Profile({
           </>
         )}
       </g>
+
+      {/* « distances » — outside the clip, so a rider near the frame's top keeps its numbers. */}
+      {layers.riderTip && rider !== null && (
+        <RiderTip
+          clearance={clearance}
+          plot={plot}
+          rider={rider}
+          wide={wide}
+          width={x.width}
+          x={x.x(rider.step.xD)}
+          y={z.y(rider.step.zD)}
+        />
+      )}
 
       {/* Both anchors: the tower from its base to its top, at the domain edges of the span. */}
       {[
@@ -461,18 +495,70 @@ export function Profile({
   );
 }
 
-/** The drawn ground's altitude at `x`, by the same linear interpolation `zGroundAt` uses. */
-function groundAt(ground: Polyline, at: number): number {
-  const { xs, zs } = ground;
-  if (at <= xs[0]) return zs[0];
-  const last = xs.length - 1;
-  if (at >= xs[last]) return zs[last];
-  let lo = 0;
-  let hi = last;
-  while (hi - lo > 1) {
-    const mid = (lo + hi) >> 1;
-    if (xs[mid] <= at) lo = mid;
-    else hi = mid;
-  }
-  return zs[lo] + ((at - xs[lo]) / (xs[hi] - xs[lo])) * (zs[hi] - zs[lo]);
+/** The tip's rough width, SVG user units — enough to decide which side of the handle it goes. */
+const TIP_WIDTH = { wide: 150, narrow: 96 } as const;
+
+/**
+ * « distances » — the two numbers **beside the handle**, moving with it: the passenger's garde (the
+ * « Garde passager » cell) and the load's gap to the unloaded line (« Écart à vide »). Labels in the
+ * app's sans and values in mono, the call-site rule the read-out cells keep.
+ *
+ * Right of the handle and above it, flipped left near the right edge and below near the frame's
+ * top, so the tip never covers the handle it annotates. The garde line goes with the Clearance
+ * Gate, exactly as the cell does: it is computed from the anchor heights and envelope the gate
+ * refused. `pointer-events-none`, so the tip is never a hole in the scrub surface.
+ */
+function RiderTip({
+  rider,
+  clearance,
+  x,
+  y,
+  width,
+  plot,
+  wide,
+}: {
+  rider: SceneRider;
+  clearance: boolean;
+  /** The handle's centre, SVG user units. */
+  x: number;
+  y: number;
+  /** The SVG's width. */
+  width: number;
+  plot: { top: number; height: number };
+  wide: boolean;
+}) {
+  const left = x + 14 + (wide ? TIP_WIDTH.wide : TIP_WIDTH.narrow) > width;
+  const below = y - 30 < plot.top;
+  const tx = left ? x - 14 : x + 14;
+  const lines = [
+    ...(clearance
+      ? [
+          {
+            label: wide ? "garde passager" : "garde",
+            value: formatQuantity("clearance", rider.underRider),
+          },
+        ]
+      : []),
+    {
+      label: wide ? "écart à vide" : "à vide",
+      value: formatQuantity("unloadedGap", rider.belowUnloaded),
+    },
+  ];
+  const first = below ? y + 20 : y - 8 - 13 * (lines.length - 1);
+  return (
+    <text
+      className="fill-foreground stroke-background pointer-events-none text-[11px]"
+      paintOrder="stroke"
+      strokeLinejoin="round"
+      strokeWidth={3}
+      textAnchor={left ? "end" : "start"}
+    >
+      {lines.map((line, index) => (
+        <tspan key={line.label} x={tx} y={first + 13 * index}>
+          <tspan className="fill-muted-foreground">{line.label} </tspan>
+          <tspan className="font-mono">{line.value}</tspan>
+        </tspan>
+      ))}
+    </text>
+  );
 }

@@ -148,6 +148,16 @@ export type SceneRider = {
    */
   readonly underRider: number;
   /**
+   * « Écart à vide », m — how far the load hangs **below the unloaded line** at its own `x`:
+   * `z_à vide(x_D) − z_D`. Positive whenever the load pulls the line down, which is always.
+   *
+   * Read off {@link SceneBase.unloadedCable} by linear interpolation, so it is the gap to the line
+   * **as drawn** — the number beside the handle and the dashed curve cannot disagree. The chord error
+   * of 240 samples is `Δ²·w / (8·H)`: well under a millimetre on § 9's line and a few millimetres at
+   * 1500 m, both below the two decimals it prints at.
+   */
+  readonly belowUnloaded: number;
+  /**
    * Is the worst point further than `max(1 m, 1 % de la portée)` from the rider? The cell relabels
    * itself « Garde min. ligne (à x 101 m) » only then, so the ordinary case reads plainly — **and
    * the same bit gates the profile's second dimension line**, so the drawing and the label say « the
@@ -224,6 +234,12 @@ export type SceneBase = SceneFrame & {
   readonly unloadedCable: Polyline;
   /** The precomputed traverse. `coverage < 1` is `Indéterminé` and the scrub track gains gaps. */
   readonly traverse: SweepResult;
+  /**
+   * « Trajectoire » — the load's own path, `(x_D, z_D)` over every solved step, **split at
+   * `Indéterminé`'s gaps** rather than bridged across them: a line through a step that did not solve
+   * would draw a position nobody computed. Usually one run.
+   */
+  readonly trajectory: readonly Polyline[];
   /** §11 over the traverse: the aggregate `h_min`, its `x`, and the per-step arrays. */
   readonly clearance: ClearanceResult;
   /** §6.3's passenger envelope, m — §11's third term, so it is the scenario's, not the view's. */
@@ -361,6 +377,7 @@ export function buildSceneBase(
     unloaded: unloaded.state,
     unloadedCable,
     traverse,
+    trajectory: trajectoryRuns(traverse),
     clearance,
     hRider,
     violating: violatingBands(traverse, clearance),
@@ -510,7 +527,7 @@ function drawnTrace(
  *   returns, and A11's to name.
  */
 export function placeRider(base: SceneBase, requestedXD: number): SceneRider | null {
-  const { span, P, terrain, hRider, L, h } = base;
+  const { span, P, terrain, hRider, L, h, unloadedCable } = base;
   const xD = clampToSpan(requestedXD, L);
   // §6.1 case 2 — outer bisection on `s_P`, inner 2×2 Newton, measured ≈40 µs. Snapping 99,7 to
   // 101,2 and rewriting the field would discard user input silently for the sake of one code path.
@@ -537,6 +554,7 @@ export function placeRider(base: SceneBase, requestedXD: number): SceneRider | n
     // over the line — voir {@link SceneRider.underRider}. `z_D` is exact here (the trolley sits on
     // the kink), so this is the one clearance in the app that carries no scan error at all.
     underRider: step.zD - zGroundAt(terrain, step.xD) - hRider,
+    belowUnloaded: polylineAt(unloadedCable, step.xD) - step.zD,
     // « Only when the worst point is further than max(1 m, 1 % of span) from the rider ». On the
     // shipped line the two now **coincide** — since ticket 37 the inner minimum at `x_D` 75 is the
     // rider's own node, 0,000 m away, against 0,9 m before — so the cell reads plainly on first
@@ -546,6 +564,57 @@ export function placeRider(base: SceneBase, requestedXD: number): SceneRider | n
     envelope: hRider,
     sagAtRider: (h * step.xD) / L - step.zD,
   };
+}
+
+/**
+ * A polyline's height at `at`, by linear interpolation between its vertices — the drawn ground's rule
+ * and `zGroundAt`'s: **outside the vertices the ends are held, never extrapolated**.
+ */
+export function polylineAt(points: Polyline, at: number): number {
+  const { xs, zs } = points;
+  if (at <= xs[0]) return zs[0];
+  const last = xs.length - 1;
+  if (at >= xs[last]) return zs[last];
+  let lo = 0;
+  let hi = last;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (xs[mid] <= at) lo = mid;
+    else hi = mid;
+  }
+  return zs[lo] + ((at - xs[lo]) / (xs[hi] - xs[lo])) * (zs[hi] - zs[lo]);
+}
+
+/**
+ * The load's path over the traverse, one polyline per run of consecutive solved steps. A failed
+ * step ends a run; a run of one step has no line to draw and is dropped.
+ *
+ * Exported for its test: a failed step is **injected, never hunted** (`testing.md`), and a
+ * hand-built traverse is the injection that needs no mock.
+ */
+export function trajectoryRuns(traverse: SweepResult): Polyline[] {
+  const failed = new Set(traverse.failures.map((failure) => failure.index));
+  const runs: Polyline[] = [];
+  let xs: number[] = [];
+  let zs: number[] = [];
+  const close = () => {
+    if (xs.length > 1) runs.push({ xs: Float64Array.from(xs), zs: Float64Array.from(zs) });
+    xs = [];
+    zs = [];
+  };
+  // `steps` is the grid minus `failures`, in grid order, so walking the grid re-aligns the two.
+  let next = 0;
+  for (let index = 0; index < traverse.grid.length; index++) {
+    if (failed.has(index)) {
+      close();
+      continue;
+    }
+    const step = traverse.steps[next++];
+    xs.push(step.xD);
+    zs.push(step.zD);
+  }
+  close();
+  return runs;
 }
 
 /**

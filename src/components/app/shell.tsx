@@ -40,6 +40,7 @@ import {
 } from "@/lib/layout/collapse.ts";
 import {
   BANNER,
+  CELL_BASIS_PX,
   CELL_ROW,
   GUTTER,
   PINNED_CELL,
@@ -65,25 +66,18 @@ export const RAIL_SECTIONS = [
 ] as const;
 
 /**
- * § 5's five read-out cells. **All five at every width, no subset and no horizontal scroll** — a
- * subset would delete the printed number that justified drawing a sub-pixel rider envelope at
- * 1500 m in the first place, and horizontal scroll would hide « Garde min » behind a gesture that
- * competes with the scrub.
+ * The read-out cells — § 5's five, plus « Garde passager » and « Écart à vide » (2026-09-23). **All
+ * of them at every width, no subset and no horizontal scroll** — a subset would delete the printed
+ * number that justified drawing a sub-pixel rider envelope at 1500 m in the first place, and
+ * horizontal scroll would hide « Garde min » behind a gesture that competes with the scrub.
  *
- * Below B1 they wrap to three columns in § 5's order — `T anc. A · T anc. B · Pente` over
- * `Garde min` (two columns) `· Flèche` — which is why each row carries its own narrow-width
- * placement rather than falling out of source order. **Wrapping a label is benign; clipping a value
- * is not**, and the value is what binds: `font-mono text-lg` needs ≈622 px for five cells.
- *
- * **`624` is `CELL_WRAP_PX`, and it is written out because a Tailwind arbitrary container query
- * cannot read a TypeScript constant.** `@/lib/layout/contract.ts` is the source of truth; every
- * `@max-[624px]` / `@min-[624px]` in this file and in `view-strip.tsx` is that constant spelled by
- * hand, and `contract.test.ts` builds its expected class strings from it so the two cannot drift.
- * It moved 600 → 624 with [amendment
- * L](../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md): the app ships **no mono face**,
- * so the five cells are budgeted at the 0,62 em advance a bare `monospace` keyword realistically
- * resolves to — `(9 × 18 × 0,62 + 24) × 5 ≈ 622` — instead of the 0,60 em § 5 assumed, and 600 was
- * already five pixels under its own derivation.
+ * **They wrap as a flex row**, not a fixed grid: each cell starts from `--cell-basis` (two of them
+ * for « Garde min. ligne »), grows to fill its line, and moves to the next line when it would not
+ * fit — one line from a 992 px column, two from 496, three from 372. The order is the same at every
+ * width. **Wrapping a label is benign; clipping a value is not**, and the value is what the basis is
+ * sized for — voir `CELL_BASIS_PX`. `basis` is spelled by hand because a Tailwind arbitrary value
+ * cannot read a TypeScript constant; `READ_OUT_SPANS` in `@/lib/layout/contract.ts` is its
+ * arithmetic twin, and `cellRows()` lays the same row out without a DOM.
  */
 export const READ_OUT_CELLS = [
   {
@@ -105,7 +99,7 @@ export const READ_OUT_CELLS = [
      * that discusses « the Garde min cell » as a layout occupant means this one.
      */
     label: "Garde min. ligne",
-    narrow: "@max-[624px]:order-4 @max-[624px]:col-span-2",
+    basis: "basis-[calc(2*var(--cell-basis))]",
     /**
      * The Pinned Safety Header's **one live cell**: it *is* the row there, at one touch height
      * rather than {@link CELL_ROW}. It is the garde and not one of the other four because
@@ -114,10 +108,14 @@ export const READ_OUT_CELLS = [
      */
     pinned: "pinned:h-[var(--pinned-cell)] pinned:flex-1",
   },
-  { label: "T anc. A", narrow: "@max-[624px]:order-1", pinned: "pinned:hidden" },
-  { label: "T anc. B", narrow: "@max-[624px]:order-2", pinned: "pinned:hidden" },
-  { label: "Pente", narrow: "@max-[624px]:order-3", pinned: "pinned:hidden" },
-  { label: "Flèche", narrow: "@max-[624px]:order-5", pinned: "pinned:hidden" },
+  { label: "T anc. A", basis: "basis-[var(--cell-basis)]", pinned: "pinned:hidden" },
+  { label: "T anc. B", basis: "basis-[var(--cell-basis)]", pinned: "pinned:hidden" },
+  { label: "Pente", basis: "basis-[var(--cell-basis)]", pinned: "pinned:hidden" },
+  { label: "Flèche", basis: "basis-[var(--cell-basis)]", pinned: "pinned:hidden" },
+  /** The garde **under the passenger's feet** at `x_D` — `SceneRider.underRider`, ticket 41's. */
+  { label: "Garde passager", basis: "basis-[var(--cell-basis)]", pinned: "pinned:hidden" },
+  /** The load's drop below the unloaded line at `x_D` — `SceneRider.belowUnloaded`. */
+  { label: "Écart à vide", basis: "basis-[var(--cell-basis)]", pinned: "pinned:hidden" },
 ] as const;
 
 /** § 7's one `<noscript>` line: under `ssr: false` the app is a Skeleton forever without JS. */
@@ -148,6 +146,7 @@ const LAYOUT_VARS = {
   "--strip": `clamp(${STRIP.min}px, calc(${STRIP.factor} * var(--w-inner)), ${STRIP.max}px)`,
   "--view-strip": `${VIEW_STRIP}px`,
   "--cell-row": `${CELL_ROW}px`,
+  "--cell-basis": `${CELL_BASIS_PX}px`,
   "--pinned-cell": `${PINNED_CELL}px`,
   // § 5's banner row, **all three of it**, because the créneau is a band like every other one: a
   // function of the chart column's width and not of its own text. `--banner` carries the ≥ 624 px
@@ -539,12 +538,12 @@ export function ViewStripSlot({ children }: { children?: ReactNode }) {
 }
 
 /**
- * The read-out row. Five cells in one row above B1, three columns in two rows below it —
- * `@max-[624px]` is the container query on the chart column, not on the viewport, because the
- * 288 px rail means the chart column is never the viewport.
+ * The read-out row — a **wrapping flex row**, laid out by `--cell-basis` and each cell's own basis
+ * class: one line from a 992 px chart column, two from 496, three from 372. The column is the
+ * container, not the viewport, because the 288 px rail means the chart column is never the viewport.
  *
- * **In the Pinned Safety Header it stops being a grid**: four cells go, « Garde min » takes the row
- * at one touch height, and {@link RevealProfile} sits at its end. The five-cells-at-every-width rule
+ * **In the Pinned Safety Header it stops wrapping**: the other cells go, « Garde min » takes the row
+ * at one touch height, and {@link RevealProfile} sits at its end. The all-cells-at-every-width rule
  * is a rule about *widths* — the collapse is a rule about height, and it keeps the one cell whose
  * absence § 5 calls non-negotiable.
  *
@@ -556,41 +555,25 @@ export function ReadOutCells({
   scope,
 }: {
   children: ReactNode;
-  /** § 5's scope label for the row, in its two widths. */
-  scope?: { full: string; short: string };
+  /** § 5's scope label for the row — « à la position du passager ». */
+  scope?: string;
 }) {
   return (
-    <div className="pinned:flex pinned:items-center compact:w-auto compact:h-full relative grid shrink-0 grid-cols-5 @max-[624px]:grid-cols-3">
+    <div className="pinned:flex-nowrap pinned:items-center compact:w-auto compact:h-full relative flex shrink-0 flex-wrap">
       {children}
       {/*
-       * § 5's own scope label, « à la position du passager ». It is **inside** the row and costs it
-       * no height, because at narrow the row ends up directly against the Rail's `Résultats` (« sur
-       * toute la traversée ») and the two are **different reductions**, `ligne` over `x` at one
-       * `x_P` against `traversée` over `x_P`. They read the same 2,42 m on first paint since ticket
-       * 37 put §11's scan on the rider's own node (2,49 against 2,44 before), and metres apart as
-       * soon as the passenger leaves mid-span — which is what the label is for. A row of its own
-       * would have broken the desktop budget, which sums to the viewport exactly.
+       * § 5's own scope label, « à la position du passager »: at narrow the row ends up directly
+       * against the Rail's `Résultats` (« sur toute la traversée »), and the two are **different
+       * reductions**, `ligne` over `x` at one `x_P` against `traversée` over `x_P`.
+       *
+       * **Screen-reader only since the row wraps** (2026-09-23). It used to sit over the row's
+       * top-right corner, clear of the fifth cell's label by measurement; a flex row fills every
+       * line to its end, so there is no corner left to clear at any width, and a row of its own
+       * would cost the block another line. The scope still reads on screen in three places: the
+       * View Strip's `x` directly above the row, the section header's « sur toute la traversée »
+       * opposite it, and every cell's help text.
        */}
-      {scope !== undefined && (
-        // Gone in the pinned header, where it would land on {@link RevealProfile} and where the
-        // row is one cell: a scope label distinguishes five values from the Rail's traverse
-        // aggregate, and there is only one value left to distinguish.
-        <span className="text-muted-foreground/70 pinned:hidden absolute top-0 right-3 text-xs">
-          {/* The two forms switch on **what clears « Flèche »'s own label, measured**, not on B1:
-              the full string is 142 px right-anchored and the fifth cell's label ends at
-              `0,8 × col + 48`, so below a 1152 px column the two glyph runs collide (12 px deep at
-              a 1024 px viewport), and at 1152 exactly — a 1440 px desktop — the 26 px left reads
-              as one phrase, « Flèche à la position du passager ». 1280 px of column is where the
-              full form stands 44 px clear. The 68 px short form clears the same label from 680 px
-              up, and in the 3-column grid below B1 at any width; in the [624, 680) sliver neither
-              fits and the label yields — the scope is still on the section header and the row
-              label, and an overlapped parenthetical states nothing. */}
-          <span className="@max-[1280px]:hidden">{scope.full}</span>
-          <span className="@min-[624px]:@max-[680px]:hidden @min-[1280px]:hidden">
-            {scope.short}
-          </span>
-        </span>
-      )}
+      {scope !== undefined && <span className="sr-only">{scope}</span>}
     </div>
   );
 }
@@ -705,12 +688,12 @@ export function ReadOutCell({
    * « keeping the row's height, so nothing jumps » is the other half of the same sentence.
    */
   label?: string;
-  /** The cell's narrow-width and pinned placements — {@link READ_OUT_CELLS} carries both. */
+  /** The cell's flex basis and pinned placement — {@link READ_OUT_CELLS} carries both. */
   className?: string;
   children?: ReactNode;
 }) {
   return (
-    <div className={cn("flex h-[var(--cell-row)] flex-col justify-center px-3", className)}>
+    <div className={cn("flex h-[var(--cell-row)] grow flex-col justify-center px-3", className)}>
       {label !== undefined && (
         <span className="flex items-center gap-1">
           <span className="text-muted-foreground text-xs">{label}</span>

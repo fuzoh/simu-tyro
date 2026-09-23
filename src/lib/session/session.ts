@@ -78,18 +78,31 @@ export type SessionStorage = {
 };
 
 /**
- * § 5's two layer toggles, which are **Session-only and never in the URL**: they change what is
- * drawn, never how a number reads — which is the line `u` sits on the other side of.
+ * The View Strip's layer toggles, which are **Session-only and never in the URL**: they change what
+ * is drawn, never how a number reads — which is the line `u` sits on the other side of. § 5 shipped
+ * the first two; the last two were added on the user's request of 2026-09-23.
  */
 export type LayerToggles = {
   /** « ligne à vide ». */
   readonly unloadedLine: boolean;
   /** « corde A–B ». */
   readonly chordAB: boolean;
+  /** « distances » — the two distances printed beside the rider's handle, moving with it. */
+  readonly riderTip: boolean;
+  /** « trajectoire » — the load's path over the whole traverse, dotted. */
+  readonly trajectory: boolean;
 };
 
-/** § 5's shipped states: « ligne à vide » **off**, « corde A–B » **on**. */
-export const DEFAULT_LAYERS: LayerToggles = { unloadedLine: false, chordAB: true };
+/**
+ * § 5's shipped states — « ligne à vide » **off**, « corde A–B » **on** — plus the two later layers:
+ * the distances **on**, since they were asked for in order to be read, and the trajectory **off**.
+ */
+export const DEFAULT_LAYERS: LayerToggles = {
+  unloadedLine: false,
+  chordAB: true,
+  riderTip: true,
+  trajectory: false,
+};
 
 /**
  * The **retained inactive** Material Spec — § 7's « both Material Specs », of which the URL carries
@@ -315,7 +328,15 @@ const STORED_SESSION: v.GenericSchema<unknown, StoredSession> = v.object({
   retainedMaterial: v.nullable(RETAINED_MATERIAL),
   retainedManual: v.nullable(v.object({ L: FINITE, h: FINITE })),
   trace: v.nullable(TRACE),
-  layers: v.object({ unloadedLine: v.boolean(), chordAB: v.boolean() }),
+  // The two later layers are **optional with their defaults**: a Session stored before they existed
+  // is otherwise whole, and « valid or discarded » would throw away its cached Trace over two
+  // display preferences it could not have held.
+  layers: v.object({
+    unloadedLine: v.boolean(),
+    chordAB: v.boolean(),
+    riderTip: v.optional(v.boolean(), DEFAULT_LAYERS.riderTip),
+    trajectory: v.optional(v.boolean(), DEFAULT_LAYERS.trajectory),
+  }),
 });
 
 /**

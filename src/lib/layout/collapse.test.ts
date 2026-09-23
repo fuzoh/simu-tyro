@@ -355,11 +355,12 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
     readonly fits: boolean;
   }[] = [
     {
-      // Budget A: the block is 540 and the rail's 124 px clear `MIN_RAIL` by 4 px. This is the
-      // measurement that refuses `__root.tsx` an app bar.
+      // Budget A: the block was 540 and the rail's 124 px cleared `MIN_RAIL` by 4 px. Seven read-out
+      // cells wrap to three lines at 390 px (2026-09-23), the block is 592 and the rail 72: (c)
+      // pins it at rest, and 390 × 844 below is the phone that still opens whole.
       name: "A · 390×664 au repos",
       fit: { viewportWidth: 390, viewportHeight: 664, keyboardInset: 0, columnWidth: 390 },
-      fits: true,
+      fits: false,
     },
     {
       name: "390×844 — un téléphone courant, le bloc entier",
@@ -484,16 +485,16 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
     // **The cap is a width rule; `MIN_RAIL` is about who the Rail sits under.** Below B2 the widest
     // column that arm can reach is 767 px, so the ceiling never applies there at all — every narrow
     // viewport is decided by exactly the term it was before, and dropping it would claim a fit with
-    // a 20 px Rail: at 390 × 560 the block is 539,64 and the residual 20,36 against a floor of 120.
+    // a 48 px Rail: at 390 × 640 the block is 591,64 and the residual 48,36 against a floor of 120.
     const narrow: ViewportFit = {
       viewportWidth: 390,
-      viewportHeight: 560,
+      viewportHeight: 640,
       keyboardInset: 0,
       columnWidth: 390,
     };
-    expect(chartBlockHeight(390)).toBeLessThan(560);
+    expect(chartBlockHeight(390)).toBeLessThan(640);
     expect(fitsWholeBlock(narrow)).toBe(false);
-    expect(560 - chartBlockHeight(390)).toBeLessThan(MIN_RAIL);
+    expect(640 - chartBlockHeight(390)).toBeLessThan(MIN_RAIL);
     // And the *other* arm may not gain the term either — that is the rejected option (ii). With
     // `MIN_RAIL` spent above B2 as well, budget C's 856,32 against `900 − 120 = 780` collapses the
     // spec's **own reference desktop**, and 1600 × 900 — the row the cap just rescued — goes straight
@@ -586,16 +587,18 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
     // § 5's spine: « avec le bandeau des clés ignorées le rail descend à 64 px — tolérable seulement
     // parce que ce bandeau est rejetable et que le bloc se replie au premier défilement ». The Rail
     // is the residual scroller there, so nothing is clipped and (c) must not pin the budget the
-    // spine prints. `MIN_RAIL` is the term that arm already spends.
-    const budgetA: ViewportFit = {
+    // spine prints. `MIN_RAIL` is the term that arm already spends. Asserted on 390 × 844, because
+    // budget A itself no longer fits with seven read-out cells (2026-09-23) — the claim is about the
+    // chrome term, and it needs a viewport the block fits in to be about anything.
+    const phone: ViewportFit = {
       viewportWidth: 390,
-      viewportHeight: 664,
+      viewportHeight: 844,
       keyboardInset: 0,
       columnWidth: 390,
     };
-    expect(fitsWholeBlock(budgetA)).toBe(true);
-    expect(fitsWholeBlock({ ...budgetA, chromeHeight: 60 })).toBe(true);
-    expect(fitsWholeBlock({ ...budgetA, chromeHeight: 200 })).toBe(true);
+    expect(fitsWholeBlock(phone)).toBe(true);
+    expect(fitsWholeBlock({ ...phone, chromeHeight: 60 })).toBe(true);
+    expect(fitsWholeBlock({ ...phone, chromeHeight: 200 })).toBe(true);
   });
 });
 

@@ -1,6 +1,6 @@
 /**
  * The Chart Block — « v1 build spec » § 5, assembled: the banner slot, the profile, the clearance
- * strip, the View Strip and the five read-out cells, over **one** `SharedX` and **one** measured
+ * strip, the View Strip and the read-out cells, over **one** `SharedX` and **one** measured
  * width.
  *
  * What this file owns, and why each one is here rather than in a chart:
@@ -118,7 +118,7 @@ export function ChartBlock({
    */
   banner?: ReactNode;
   /**
-   * § 7's cause sentence, echoed here into the five read-out cells as **one line spanning the
+   * § 7's cause sentence, echoed here into the read-out cells as **one line spanning the
    * row** — never « — » per cell, which is `Indéterminé`'s glyph, and never empty frames, which
    * read as a rendering fault.
    */
@@ -218,9 +218,9 @@ export function ChartBlock({
     xSpan: x.domain[1] - x.domain[0],
     zDataSpan: zExtent.max - zExtent.min,
   });
-  // The peek is **never persisted** — no Session key, no URL key, gone on reload — but it is *not*
-  // only a hold: § 5 gives the control **toggle** semantics from the keyboard in **both** pointer
-  // modes and under `(pointer: coarse)`, so on those paths the drawing stands until the next press.
+  // The peek is **never persisted** — no Session key, no URL key, gone on reload — and since
+  // 2026-09-23 it is a **toggle** on every path, pointer and keyboard alike (§ 5 had a hold on fine
+  // pointers), so the drawing stands until the next press.
   // What it shows is `ve.peek`: ×1 out of an auto-fit — § 5's own peek, and why the control is
   // disabled when the clamp already holds the drawing at ×1 — or, where amendment F's cap is what cut
   // the cable out of a ×1 frame, the auto-fit that fits the whole cable back into it (the user's
@@ -233,13 +233,12 @@ export function ChartBlock({
   //
   // 1. **The badge must not lie during the off window.** `held` is derived rather than read, so a
   //    standing flag cannot print « sous la vraie échelle » over a ×1 drawing.
-  // 2. **The flag must not survive the off window.** Masking alone left the toggle paths — the
-  //    keyboard, in *both* pointer modes, and a coarse-pointer tap — latched *through* `"off"` and
-  //    re-arming on the way back: measured at 2560 × 1440 on `?L=200&h=-40&za=12&zb=12&fl=6`, `Space`
-  //    then a width excursion to 2000 and back restored « ×0,7 — sous la vraie échelle » with nothing
-  //    focused and nobody pressing. An unbidden *compression* in a clearance tool is the direction
-  //    § 5 calls worse than exaggeration, « because it reads safe ». `onLostPointerCapture` covers
-  //    the fine-pointer hold and only it, so the release the toggle paths never send is this one.
+  // 2. **The flag must not survive the off window.** Masking alone left a toggled peek latched
+  //    *through* `"off"` and re-arming on the way back: measured at 2560 × 1440 on
+  //    `?L=200&h=-40&za=12&zb=12&fl=6`, `Space` then a width excursion to 2000 and back restored
+  //    « ×0,7 — sous la vraie échelle » with nothing focused and nobody pressing. An unbidden
+  //    *compression* in a clearance tool is the direction § 5 calls worse than exaggeration,
+  //    « because it reads safe ». A toggle sends no release, so this reset is the one it gets.
   //
   // Adjusted during render — React's own « state derived from new props » path — rather than in an
   // effect: no extra commit, and the re-render lands before anything is painted. **This reset is one
@@ -366,6 +365,23 @@ export function ChartBlock({
             value: formatQuantity("loadedSag", rider.sagAtRider),
             note: false,
           },
+          // The garde **under the passenger's feet** — ticket 41's second quantity, which the profile
+          // dimensions at `x_D` and which this row now prints too. Judged by nothing, so never red:
+          // « Garde min. ligne » is the criterion. Refused with it under a Clearance Gate breach,
+          // because it is computed from the same anchor heights and envelope.
+          "Garde passager": clearance
+            ? {
+                label: "Garde passager",
+                value: formatQuantity("clearance", rider.underRider),
+                note: false,
+              }
+            : { label: "Garde passager", value: GATE_CONSEQUENCE.clearance, note: true },
+          // The cable alone — no ground, no envelope — so no gate touches it.
+          "Écart à vide": {
+            label: "Écart à vide",
+            value: formatQuantity("unloadedGap", rider.belowUnloaded),
+            note: false,
+          },
         };
 
   return (
@@ -424,10 +440,10 @@ export function ChartBlock({
           xD={rider === null ? clampToSpan(riderInput.xD, frame.L) : rider.step.xD}
         />
       </ViewStripSlot>
-      <ReadOutCells scope={{ full: "à la position du passager", short: "à la position" }}>
+      <ReadOutCells scope="à la position du passager">
         {READ_OUT_CELLS.map((cell) => (
           <ReadOutCell
-            className={cn(cell.narrow, cell.pinned)}
+            className={cn(cell.basis, cell.pinned)}
             help={CELL_HELP[cell.label]}
             key={cell.label}
             // No label under the cause line: the row is **replaced** by it, and the box stays only
@@ -522,7 +538,7 @@ function EmptyBands({
       <ReadOutCells>
         {READ_OUT_CELLS.map((cell) => (
           <ReadOutCell
-            className={cn(cell.narrow, cell.pinned)}
+            className={cn(cell.basis, cell.pinned)}
             key={cell.label}
             // The pre-measurement frame keeps its five labels — nothing was attempted, and that *is*
             // the Skeleton's own content. Under the geometric exception the cause line occupies the

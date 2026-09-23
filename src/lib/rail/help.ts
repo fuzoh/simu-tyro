@@ -163,4 +163,8 @@ export const CELL_HELP: Record<string, string> = {
     "Pente locale de la ligne au niveau du passager, en % : tan θ · 100, où θ est l'angle du câble au nœud du passager. Elle commande la composante motrice du poids et donc l'accélération du passager à cette position.",
   Flèche:
     "Flèche chargée à la position affichée : écart vertical entre la corde A–B et le nœud du passager, en mètres. C'est la flèche qui consomme la garde au sol à cet endroit ; son maximum sur la traversée est « Flèche chargée max » dans la barre latérale.",
+  "Garde passager":
+    "Garde au sol sous les pieds du passager, à sa position : z_D − z_sol(x_D) − h_rider, en mètres. Informative : le critère reste « Garde min. ligne », le minimum sur toute la ligne, qui peut se trouver ailleurs qu'à l'aplomb du passager.",
+  "Écart à vide":
+    "Distance verticale entre la charge et la ligne à vide, à la position du passager : z_à vide(x_D) − z_D, en mètres. C'est de combien le poids du passager tire le câble vers le bas à cet endroit ; nul aux deux ancrages.",
 };

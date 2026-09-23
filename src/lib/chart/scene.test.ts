@@ -13,6 +13,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Scenario, ScenarioDraft } from "@/lib/scenario/types.ts";
+import type { SweepResult, SweepStep } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
@@ -26,8 +27,10 @@ import {
   buildSceneFrame,
   clampToSpan,
   placeRider,
+  polylineAt,
   sceneInputs,
   snapToStep,
+  trajectoryRuns,
 } from "./scene.ts";
 
 /** A scene that must exist — the `null` arm is « Aucun résultat », and these cases are not it. */
@@ -659,6 +662,79 @@ describe("the split at x_D — § 7's « memo on the solve inputs »", () => {
     if (base === null) throw new Error("expected a drawable base");
     expect(base.hRider).toBe(scenario.rider.hRider);
     expect(placeRider(base, 75)?.envelope).toBe(scenario.rider.hRider);
+  });
+});
+
+describe("the load against the unloaded line, and its trajectory — the 2026-09-23 layers", () => {
+  const built = buildSceneBase(sceneInputs(firstRunDefaults(), null));
+  if (built === null) throw new Error("expected a drawable base");
+  const base = built;
+
+  function at(xD: number) {
+    const placed = placeRider(base, xD);
+    if (placed === null) throw new Error(`expected a rider at x_D ${xD}`);
+    return placed;
+  }
+
+  it("the gap to the unloaded line closes at both anchors, where the two lines share a point", () => {
+    // Both lines end on the two anchor tops, `(0, 0)` and `(L, h)`, whatever the load does: the
+    // frame check that makes the mid-span figure readable, and a sign slip's first casualty.
+    expect(at(0).belowUnloaded).toBeCloseTo(0, 5);
+    expect(at(150).belowUnloaded).toBeCloseTo(0, 5);
+  });
+
+  it("the load hangs below the unloaded line everywhere between them", () => {
+    for (const xD of [15, 37.5, 75, 112.5, 135]) {
+      expect(at(xD).belowUnloaded).toBeGreaterThan(0);
+    }
+    // The load cannot pull the line down by more than it sags below the chord: the unloaded line
+    // is itself under the chord on a line hanging from its own weight.
+    expect(at(75).belowUnloaded).toBeLessThan(at(75).sagAtRider);
+  });
+
+  it("the trajectory is the traverse's own (x_D, z_D), one run when every step solved", () => {
+    expect(base.traverse.coverage).toBe(1);
+    expect(base.trajectory).toHaveLength(1);
+    const [run] = base.trajectory;
+    expect(Array.from(run.xs)).toEqual(base.traverse.steps.map((step) => step.xD));
+    expect(Array.from(run.zs)).toEqual(base.traverse.steps.map((step) => step.zD));
+  });
+
+  it("the trajectory breaks at an Indéterminé gap instead of bridging it", () => {
+    const step = (xD: number): SweepStep => ({
+      sD: xD,
+      xD,
+      zD: -xD / 10,
+      H: 1,
+      V0: 0,
+      TA: 1,
+      TB: 1,
+      theta: 0,
+    });
+    const failure = (index: number) => ({
+      index,
+      sD: index,
+      error: { kind: "no-convergence" as const, attempts: 3, residual: 1 },
+    });
+    // Six grid steps, 2 and 4 failed: a run of two, then two lone steps with no line to draw.
+    const traverse: SweepResult = {
+      grid: Float64Array.from([0, 1, 2, 3, 4, 5]),
+      steps: [step(0), step(1), step(3), step(5)],
+      failures: [failure(2), failure(4)],
+      coverage: 4 / 6,
+    };
+    const runs = trajectoryRuns(traverse);
+    expect(runs).toHaveLength(1);
+    expect(Array.from(runs[0].xs)).toEqual([0, 1]);
+  });
+
+  it("polylineAt interpolates between vertices and holds the ends", () => {
+    const line = { xs: Float64Array.from([0, 10, 20]), zs: Float64Array.from([0, -2, 4]) };
+    expect(polylineAt(line, 5)).toBe(-1);
+    expect(polylineAt(line, 15)).toBe(1);
+    expect(polylineAt(line, 10)).toBe(-2);
+    expect(polylineAt(line, -5)).toBe(0);
+    expect(polylineAt(line, 99)).toBe(4);
   });
 });
 

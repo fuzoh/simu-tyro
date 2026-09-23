@@ -1,31 +1,33 @@
 /**
  * The View Strip — « v1 build spec » § 5 (*The View Strip, and its one abbreviation rule*, *The
  * peek control, not a selector*, *Position reads as `x_D` in metres*). One 44 px touch-height row:
- * two layer toggles, « ×1 vraie échelle », and the typed `x` with its `%` secondary.
+ * four layer toggles, « ×1 vraie échelle », and the typed `x` with its `%` secondary.
  *
  * ```
- * [✓ ligne à vide]  [✓ corde A–B]          [ ×1 vraie échelle ]     x [ 74,8 ] m · 50 %
+ * [╌ ligne à vide] [⁄ corde A–B] [⋯ trajectoire] [↕ distances]   [ ×1 vraie échelle ]   x [ 74,8 ] m · 50 %
  * ```
  *
- * Why these four controls are *here* and not in the Rail: **at 390 px the Rail is not co-visible
- * with the chart** — the block collapses precisely when the Rail comes into view — so a rail-only
- * `x` puts the app's only precision input path out of sight of the thing it moves.
+ * Why these controls are *here* and not in the Rail: **at 390 px the Rail is not co-visible with the
+ * chart** — the block collapses precisely when the Rail comes into view — so a rail-only `x` puts
+ * the app's only precision input path out of sight of the thing it moves.
  *
+ * - **Every control is a toggle, and says so** (2026-09-23). A pressed toggle is **filled**, a
+ *   released one is an outline in muted ink: the registry's pressed state is `bg-muted`, which is
+ *   also its *hover*, so « what is drawn right now » could not be read off the row. Each layer
+ *   toggle carries a **swatch of its own stroke** — dash, chord, dots, dimension — so the row doubles
+ *   as the profile's legend.
  * - **The user-facing VE selector is dead.** Forcing ×20 at 1500 m throws the cable out of the top
  *   of the frame and collapses the terrain into a triangle: a manual selector is a loaded gun
- *   pointed at the chart's legibility. What ships is a **hold-to-peek** « ×1 vraie échelle », and
- *   it is **disabled whenever the ×1 clamp is already in force** — *except* where amendment F's
- *   plot cap is what cut the cable out of that ×1 frame, where it reads « voir tout le câble » and
- *   shows the whole cable instead (the user's **decision 4**; voir `peekMode` in
- *   `@/lib/layout/contract.ts`).
- * - **Toggle under `@media (pointer: coarse)`, hold-to-peek on fine pointers**: press-and-hold on a
- *   coarse pointer collides with text selection, the context menu and scroll initiation. The query
- *   is § 5's own, the same one that widens the rider's hit radius, and it is read **at the event**
- *   rather than at render — a render-time media read is the `useMediaQuery` branch § 5 forbids.
- *   **Keyboard gets toggle semantics in both modes**, since a held gesture has no keyboard
- *   equivalent.
- * - **Below B1 the labels abbreviate rather than wrap** — 44 px out of `MIN_RAIL` is the tightest
- *   budget in the app — and each keeps its full string as `aria-label` and `title`.
+ *   pointed at the chart's legibility. What ships is a **toggle** « ×1 vraie échelle » — a press
+ *   switches the drawing to true scale, the next press switches it back — and it is **disabled
+ *   whenever the ×1 clamp is already in force** — *except* where amendment F's plot cap is what cut
+ *   the cable out of that ×1 frame, where it reads « voir tout le câble » and shows the whole cable
+ *   instead (the user's **decision 4**; voir `peekMode` in `@/lib/layout/contract.ts`). § 5 had it
+ *   as a hold-to-peek on fine pointers; the user asked for a plain toggle on 2026-09-23, so the
+ *   drawing now stays at ×1 until it is switched back, on every pointer and from the keyboard alike.
+ * - **The labels shorten as the chart column narrows, rather than wrap**: full from 768 px, short
+ *   from B1, and the swatch alone below it — 44 px out of `MIN_RAIL` is the tightest budget in the
+ *   app. Each control keeps its full string as `aria-label` and `title`.
  * - **The row's controls are 28 px of visual inside a 44 px hit target**, and a press here never
  *   moves the caret. Both are § 5 read literally rather than widened; voir `.touch-44` in
  *   `src/styles.css`, `keepCaret` below, and amendment H.
@@ -36,48 +38,61 @@ import { useEffect, useState } from "react";
 import type { PeekMode } from "@/lib/layout/contract.ts";
 import type { LayerToggles } from "@/lib/session/session.ts";
 
-import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
+import { Toggle } from "@/components/ui/toggle.tsx";
 import { formatValue } from "@/lib/format/quantity.ts";
 import { keepCaret } from "@/lib/layout/collapse.ts";
 import { cn } from "@/lib/utils.ts";
 
 /**
- * One control's two labels: the full string, and what it reads below B1 of chart column.
+ * One control's label at the three widths of chart column: **full** from 768 px, **short** from B1,
+ * and — for a layer toggle, whose swatch already names it — **nothing** below B1.
  *
  * **624 is `CELL_WRAP_PX`**, and it is B1 by *intent*, not by coincidence of literals: the strip
  * abbreviates « at the same B1 threshold — no new breakpoint » (§ 5), which is the same constant the
- * read-out cells wrap at. It moved 600 → 624 with [amendment
- * L](../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md) — the app ships no mono face, so
- * the five header cells are budgeted at a 0,62 em advance instead of 0,60. A Tailwind arbitrary
- * container query cannot read the TypeScript constant, so the literal is duplicated here and in
- * `shell.tsx`; `contract.ts`'s `CELL_WRAP_PX` is the source of truth and both move with it.
+ * banner's budget steps at. A Tailwind arbitrary container query cannot read the TypeScript
+ * constant, so the literal is duplicated here and in `shell.tsx`; `contract.ts`'s `CELL_WRAP_PX` is
+ * the source of truth and both move with it. **768 is this row's own**, the width its full labels
+ * need — voir the budget on {@link ViewStrip}.
  */
-function Abbr({ full, short }: { full: string; short: string }) {
+function Abbr({
+  full,
+  short,
+  narrow,
+}: {
+  full: string;
+  short: string;
+  /** What shows below B1: the short form, or nothing when a swatch carries the name. */
+  narrow: "short" | "none";
+}) {
   return (
     <>
-      <span className="@max-[624px]:hidden">{full}</span>
-      <span className="@min-[624px]:hidden">{short}</span>
+      <span className="@max-[768px]:hidden">{full}</span>
+      <span className={cn("@min-[768px]:hidden", narrow === "none" && "@max-[624px]:hidden")}>
+        {short}
+      </span>
     </>
   );
 }
 
 /**
- * § 5's peek query, read at the event and never at render. A pointer handler only ever runs on the
- * client, so there is no `defaultMatches` frame to paint and nothing for the layout to branch on.
+ * The pressed state, **filled**: a toggle that is on is the one dark box in the row. The registry's
+ * `aria-pressed:bg-muted` is the same tint as its `hover:bg-muted`, so on and hovered-off read alike,
+ * and the user's ask was precisely to see what is displayed. Kept at these call sites rather than
+ * re-tuned in `ui/toggle.tsx`, because the Rail's segmented `ToggleGroup` is a radio choice, not a
+ * layer switch, and keeps the registry's look.
  */
-function coarsePointer(): boolean {
-  return window.matchMedia("(pointer: coarse)").matches;
-}
+const PRESSED =
+  "text-muted-foreground aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:text-background aria-pressed:hover:bg-foreground/85";
 
 /** How long § 3's clamp note stays up, ms. Long enough to read one line, short enough to be a note. */
 const CLAMP_NOTE_MS = 4000;
 
 /**
- * The peek control's two labels, per mode — § 5's « ×1 vraie échelle », and the **decision 4** hold
- * that puts a box-clipped cable back inside the frame. The label names *what pressing it does*, so
+ * The peek control's two labels, per mode — § 5's « ×1 vraie échelle », and the **decision 4**
+ * toggle that puts a box-clipped cable back inside the frame. The label names *what pressing it does*, so
  * the mode that no longer shows ×1 no longer says ×1; the disabled control keeps § 5's own words,
  * because that is the row the spec's table describes.
  */
@@ -87,8 +102,46 @@ const PEEK_LABEL: Record<PeekMode, { full: string; short: string }> = {
   fit: { full: "voir tout le câble", short: "tout" },
 };
 
-/** The two layer toggles' values, in § 5's order. A `LayerToggles` key, so the map below is total. */
-const LAYERS = ["unloadedLine", "chordAB"] as const satisfies readonly (keyof LayerToggles)[];
+/** The layer toggles, in the row's order: § 5's two, then the two of 2026-09-23. */
+const LAYERS = [
+  "unloadedLine",
+  "chordAB",
+  "trajectory",
+  "riderTip",
+] as const satisfies readonly (keyof LayerToggles)[];
+
+/** Each layer toggle's two labels. `full` is also its `aria-label` and `title`. */
+const LAYER_LABEL: Record<keyof LayerToggles, { full: string; short: string }> = {
+  unloadedLine: { full: "ligne à vide", short: "à vide" },
+  chordAB: { full: "corde A–B", short: "corde" },
+  trajectory: { full: "trajectoire", short: "trajet" },
+  riderTip: { full: "distances", short: "dist." },
+};
+
+/**
+ * A layer's swatch — **its own stroke, drawn small**: the dash of « ligne à vide », the straight dash
+ * of « corde A–B », the dots of « trajectoire », and a dimension line for « distances ». `currentColor`,
+ * so it inverts with the pressed fill.
+ */
+function Swatch({ layer }: { layer: keyof LayerToggles }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="size-4 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.25}
+      viewBox="0 0 16 16"
+    >
+      {layer === "unloadedLine" && <path d="M1 4 Q8 16 15 4" strokeDasharray="3 2" />}
+      {layer === "chordAB" && <path d="M1 3 L15 13" strokeDasharray="2.5 2" />}
+      {layer === "trajectory" && (
+        <path d="M1 3 Q8 17 15 5" strokeDasharray="0 3" strokeLinecap="round" strokeWidth={1.75} />
+      )}
+      {layer === "riderTip" && <path d="M8 3 V13 M5 3 H11 M5 13 H11" />}
+    </svg>
+  );
+}
 
 /**
  * § 5 states « the row is 44 px tall, **so** every control in it is a legal touch target ». That is
@@ -103,32 +156,32 @@ const LAYERS = ["unloadedLine", "chordAB"] as const satisfies readonly (keyof La
  * overlay bleeds 8 px past each edge rather than 6. The **row is unchanged**: `VIEW_STRIP` is still
  * 44 and `.touch-44` still lands inside it exactly.
  *
- * **The width budget, re-derived.** § 5 abbreviates below B1 and sums the abbreviated row against
- * the 342 px of inner width a 390 px viewport leaves:
+ * **The width budget, re-derived for four layers** (2026-09-23). § 5 abbreviates below B1 and
+ * sums the abbreviated row against the 342 px of inner width a 390 px viewport leaves:
  *
  * ```
- * 59 + 48 + 44 + 128 + 24 = 303   32 px box ·  8 px inline · 11 px label · 64 px field  (shipped)
- * 67 + 55 + 44 + 153 + 20 = 339   28 px box · 10 px inline · 12 px label · 84 px field  (migrated)
+ * 59 + 48 + 44 + 128 + 24       = 303   2 labelled toggles, 32 px box, 11 px label   (shipped)
+ * 67 + 55 + 44 + 153 + 20       = 339   2 labelled toggles, 28 px box, 12 px label   (migrated)
+ * 4 × 28 + 12 + 44 + 153 + 16   = 337   4 swatch-only toggles, 28 × 28              (below B1)
  * ```
  *
- * Three of the five terms moved, and none of them silently:
+ * Four labelled toggles cannot fit there — « à vide · corde · trajet · dist. » alone is ≈ 300 px —
+ * so **below B1 a layer toggle is its swatch**, a 28 px square (`px-0 w-7`), named by its
+ * `aria-label` and `title`. From B1 the short labels come back beside the swatch — ≈ 300 + 44 + 153
+ * + 16 ≈ 513 against 576 — and from **768 px of column** the full ones, ≈ 400 + 110 + 153 + 16 ≈ 680
+ * against 720. That 768 is this row's own threshold and nothing else's. **Measured** (Chromium,
+ * 2026-09-23), the space left between the toggle group and « ×1 » beyond the row's `gap-2`: 9 px
+ * at a 390 px column, 65 at 624, 26 at 768.
  *
- * - **the two toggles, 59 → 67 and 48 → 55.** The registry's inline padding is 2 px wider a side,
- *   and 11 px → 12 px of label is +9 % on the glyphs — the two arbitrary sizes leave the DOM, and
- *   12 px is the one body size.
- * - **the `x` field, 128 → 153.** Its input is **locked at 16 px** (§ 7.1 / amendment G decision 5:
- *   iOS Safari auto-zooms below it), and a 64 px box sized for 11 px cannot hold « 1500,0 » at 16.
- *   At the 0,62 em advance amendment L budgets for an unbound `monospace`,
- *   `6 × 16 × 0,62 + 20 + 2 ≈ 82`, so the box is `w-21` (84). The rest of the group scales with the
- *   type, its three `gap-1`s do not.
- * - **the gaps, 24 → 20.** The toggle pair is one `ToggleGroup` at § 6's in-row `gap-1` (4 px, was
- *   12), and the row itself steps down to `gap-2`; the field's old `ml-3` goes — one spacing
- *   mechanism between two controls, not two.
+ * - **the `x` field, 153.** Its input is **locked at 16 px** (§ 7.1 / amendment G decision 5: iOS
+ *   Safari auto-zooms below it), and « 1500,0 » at 16 px against amendment L's 0,62 em advance is
+ *   `6 × 16 × 0,62 + 20 + 2 ≈ 82`, so the box is `w-21` (84).
+ * - **the gaps.** The layer toggles are one `ToggleGroup` at § 6's in-row `gap-1`, and the row itself
+ *   is `gap-2`.
  *
  * « ×1 » keeps its `min-w-11`: that 44 is § 5's own figure for the abbreviated peek control, and its
- * content (≈ 35 px at 12 px) does not reach it. 339 is inside 342 on § 5's own character-count
- * arithmetic, which over-states — the shipped row computed 327 that way and **measured 288,33**
- * (ticket 29) — so the real slack is wider than the 3 px printed here.
+ * content (≈ 35 px at 12 px) does not reach it. § 5's character-count arithmetic over-states — the
+ * shipped row computed 327 that way and **measured 288,33** (ticket 29).
  */
 export function ViewStrip({
   layers,
@@ -144,7 +197,7 @@ export function ViewStrip({
   layers: LayerToggles;
   onLayers: (layers: LayerToggles) => void;
   /**
-   * What a hold shows. `"off"` where the ×1 clamp is already in force and there is nothing to reveal
+   * What the toggle shows. `"off"` where the ×1 clamp is already in force and there is nothing to reveal
    * — the control is then **disabled, not hidden** — and `"fit"` where amendment F's cap is what cut
    * the cable out of a ×1 frame, which is the one case the user's **decision 4** hands back to it.
    */
@@ -165,9 +218,9 @@ export function ViewStrip({
 }) {
   return (
     <>
-      {/* The two layer toggles are a genuine multi-select segmented control, so they are one
-          `ToggleGroup` rather than two `aria-pressed` buttons that happen to sit side by side —
-          `multiple`, because the two layers are independent. `gap-1` is § 6's in-row gap over the
+      {/* The layer toggles are a genuine multi-select segmented control, so they are one
+          `ToggleGroup` rather than separate `aria-pressed` buttons that happen to sit side by side —
+          `multiple`, because the layers are independent. `gap-1` is § 6's in-row gap over the
           registry's `spacing={2}`, decided at the call site as ticket 40 asks rather than re-tuned a
           third time in `ui/`. */}
       <ToggleGroup
@@ -177,80 +230,50 @@ export function ViewStrip({
           onLayers({
             unloadedLine: pressed.includes("unloadedLine"),
             chordAB: pressed.includes("chordAB"),
+            trajectory: pressed.includes("trajectory"),
+            riderTip: pressed.includes("riderTip"),
           })
         }
         value={LAYERS.filter((layer) => layers[layer])}
       >
-        <ToggleGroupItem
-          className="touch-44"
-          onMouseDown={keepCaret}
-          size="sm"
-          title="ligne à vide"
-          value="unloadedLine"
-          variant="outline"
-        >
-          <Abbr full="ligne à vide" short="à vide" />
-        </ToggleGroupItem>
-
-        <ToggleGroupItem
-          className="touch-44"
-          onMouseDown={keepCaret}
-          size="sm"
-          title="corde A–B"
-          value="chordAB"
-          variant="outline"
-        >
-          <Abbr full="corde A–B" short="corde" />
-        </ToggleGroupItem>
+        {LAYERS.map((layer) => (
+          <ToggleGroupItem
+            aria-label={LAYER_LABEL[layer].full}
+            // Below B1 the swatch *is* the control: a 28 px square, the row's one height both ways.
+            className={cn("touch-44 @max-[624px]:w-7 @max-[624px]:px-0", PRESSED)}
+            key={layer}
+            onMouseDown={keepCaret}
+            size="sm"
+            title={LAYER_LABEL[layer].full}
+            value={layer}
+            variant="outline"
+          >
+            <Swatch layer={layer} />
+            <Abbr full={LAYER_LABEL[layer].full} narrow="none" short={LAYER_LABEL[layer].short} />
+          </ToggleGroupItem>
+        ))}
       </ToggleGroup>
 
-      <Button
+      <Toggle
         aria-label={PEEK_LABEL[peek].full}
-        aria-pressed={peeking}
-        // **A `Button` and not a `Toggle`**: a `Toggle` owns `click` → `onPressedChange`, and this
-        // control's whole point is that a fine pointer *holds* it — `pointerdown` / `pointerup`
-        // with capture — while a coarse one toggles it. `aria-pressed` says what it is; the press
-        // semantics stay § 5's.
-        //
         // `min-w-11` is § 5's own abbreviation arithmetic: the **44** in the row's width budget is
         // this control abbreviated to « ×1 ». It shipped at 29,8 px, so the width was a spec figure
         // missed while the height was a spec inference unmet. `size="sm"` does not reach it either
         // (≈ 35 px at 12 px of « ×1 » plus `px-2.5`), so the floor stays.
-        className={cn("touch-44 ml-auto min-w-11", peeking && "bg-muted")}
+        className={cn("touch-44 ml-auto min-w-11", PRESSED)}
         disabled={peek === "off"}
-        // Hold on a fine pointer; a plain toggle under `(pointer: coarse)`, where a held gesture
-        // has no room — and the same toggle from the keyboard, in both modes.
-        onKeyDown={(event) => {
-          if (event.key === " " || event.key === "Enter") {
-            event.preventDefault();
-            onPeek(!peeking);
-          }
-        }}
-        // Guarded like `onPointerUp` beside it, and for the same reason. This exists to end a
-        // **hold** whose pointer was taken away mid-gesture, which is a fine-pointer story: the
-        // coarse branch takes no capture. But a touch pointer gets *implicit* capture, so this fired
-        // on every tap — `pointerdown` toggled the peek on and `lostpointercapture` forced it back
-        // off before the frame, and § 5's « toggle under `(pointer: coarse)` » could never stick.
-        onLostPointerCapture={() => {
-          if (!coarsePointer()) onPeek(false);
-        }}
         onMouseDown={keepCaret}
-        onPointerDown={(event) => {
-          if (coarsePointer()) onPeek(!peeking);
-          else {
-            event.currentTarget.setPointerCapture(event.pointerId);
-            onPeek(true);
-          }
-        }}
-        onPointerUp={() => {
-          if (!coarsePointer()) onPeek(false);
-        }}
+        // A plain toggle on every pointer and from the keyboard — the user's call of 2026-09-23,
+        // replacing § 5's hold-to-peek. The flag lives in the Chart Block, which also ends it
+        // whenever the mode goes `"off"` under it.
+        onPressedChange={(pressed) => onPeek(pressed)}
+        pressed={peeking}
         size="sm"
         title={PEEK_LABEL[peek].full}
         variant="outline"
       >
-        <Abbr full={PEEK_LABEL[peek].full} short={PEEK_LABEL[peek].short} />
-      </Button>
+        <Abbr full={PEEK_LABEL[peek].full} narrow="short" short={PEEK_LABEL[peek].short} />
+      </Toggle>
 
       <PositionField L={L} onFocusChange={onPositionFocus} onX={onX} xD={xD} />
     </>
