@@ -80,6 +80,7 @@ export type FieldId =
   | "D_target"
   | "H_target"
   | "L0"
+  | "vRatio"
   | "mp"
   | "hRider"
   | "DAF"
@@ -398,6 +399,15 @@ export const FIELDS = {
     errorLabel: "Longueur non tendue",
     quantity: "L0",
     rule: { kind: "positive", sentence: POSITIVE_LENGTH },
+    warning: null,
+    gate: "solve",
+  },
+  vRatio: {
+    id: "vRatio",
+    label: "Rapport V cible",
+    errorLabel: "Rapport V cible",
+    quantity: "vRatio",
+    rule: { kind: "positive", sentence: "un rapport P / H strictement positif est requis" },
     warning: null,
     gate: "solve",
   },

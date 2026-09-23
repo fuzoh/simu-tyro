@@ -100,6 +100,7 @@ export const CANONICAL_KEYS = [
   "fl",
   "te",
   "lo",
+  "vr",
   "fam",
   "d",
   "r0",
@@ -235,8 +236,11 @@ export function terminationIdFromToken(
 /** § 7's `r0` — the two grades § 3 publishes. A third is unrepresentable, not out of range. */
 export const GRADES = [1770, 1960] as const;
 
-/** § 7's three tightness drivers. **Exactly one** may be present; two is a refusal. */
-export const TIGHTNESS_KEYS = ["fl", "te", "lo"] as const;
+/**
+ * § 7's tightness drivers — three, plus `vr` (« Rapport V », `P / H`, added 2026-09-23). **Exactly
+ * one** may be present; two is a refusal.
+ */
+export const TIGHTNESS_KEYS = ["fl", "te", "lo", "vr"] as const;
 
 /**
  * A validated bag: § 7's key table with every key optional, because **absence is meaning** and
@@ -280,6 +284,8 @@ export type ValidatedSearch = {
   readonly te?: number;
   /** Longueur non tendue, m. */
   readonly lo?: number;
+  /** « Rapport V » `P / H`, dimensionless. Presence selects the driver, like the three above. */
+  readonly vr?: number;
   readonly fam?: FamilyToken;
   /** Diamètre nominal, mm — acier. */
   readonly d?: number;
@@ -338,6 +344,7 @@ const KEY_SCHEMAS: Record<SearchKey, v.GenericSchema> = {
   fl: FINITE,
   te: FINITE,
   lo: FINITE,
+  vr: FINITE,
   fam: v.picklist(FAMILY_TOKENS),
   d: FINITE,
   r0: v.picklist(GRADES),
@@ -815,6 +822,7 @@ export function scenarioToSearch(scenario: Scenario): ValidatedSearch {
 
   if (tightness.mode === "sag") out.fl = tightness.D_target;
   else if (tightness.mode === "tension") out.te = daN(tightness.H_target);
+  else if (tightness.mode === "ratio") out.vr = tightness.ratio;
   else out.lo = tightness.L0;
 
   if (material.family === "steel") {

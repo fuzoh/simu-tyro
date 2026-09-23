@@ -81,6 +81,7 @@ describe("the key table and canonical order", () => {
       "fl",
       "te",
       "lo",
+      "vr",
       "fam",
       "d",
       "r0",
@@ -134,6 +135,7 @@ describe("the three refusal classes come back as a marker, never as a throw", ()
     },
     { name: "two tightness drivers — fl + lo", query: "?fl=6&lo=151.64", kind: "deux-directeurs" },
     { name: "two tightness drivers — fl + te", query: "?fl=6&te=253.5", kind: "deux-directeurs" },
+    { name: "two tightness drivers — vr + te", query: "?vr=0.8&te=253.5", kind: "deux-directeurs" },
     {
       name: "two tightness drivers — te + lo",
       query: "?te=253.5&lo=151.64",

@@ -39,6 +39,7 @@ describe("scenarioFromSearch — the read side of § 7's key table", () => {
   it("reads the tightness driver from **which** key is present", () => {
     expect(scenarioFromSearch({ fl: 6 }).tightness).toEqual({ mode: "sag", D_target: 6 });
     expect(scenarioFromSearch({ lo: 151.64 }).tightness).toEqual({ mode: "length", L0: 151.64 });
+    expect(scenarioFromSearch({ vr: 0.82 }).tightness).toEqual({ mode: "ratio", ratio: 0.82 });
   });
 
   it("leaves § 9's two textile blanks blank — a rope nobody typed has no numbers", () => {

@@ -574,7 +574,6 @@ export function RailInputs({
                 <NumericRow hint={unit} id="MBL" />
                 <NumericRow hint="kg/m" id="muTextile" />
                 <NumericRow
-                  chip={<Chip detail={PROVENANCE.k} label="non confirmé" />}
                   id="k"
                   // The **ambient** tier: plain status text, **no ⚠**. It fires on every textile
                   // line — a tyrolienne never enters §13.2's 10–30 % MBL band — so an alarm here
@@ -599,15 +598,7 @@ export function RailInputs({
               ropeClass={textileSpec?.ropeClass}
               selected={scenario.terminations.A.id}
             />
-            <NumericRow
-              chip={
-                TERMINATIONS[scenario.terminations.A.id].tag === "[STD-ATTESTED]" ? undefined : (
-                  <Chip detail={PROVENANCE.termination} label="non confirmé" />
-                )
-              }
-              id="etaA"
-              label="Rendement η_A"
-            />
+            <NumericRow id="etaA" label="Rendement η_A" />
             <TerminationRow
               end="B"
               family={scenario.material.family}
@@ -623,15 +614,7 @@ export function RailInputs({
               ropeClass={textileSpec?.ropeClass}
               selected={scenario.terminations.B.id}
             />
-            <NumericRow
-              chip={
-                TERMINATIONS[scenario.terminations.B.id].tag === "[STD-ATTESTED]" ? undefined : (
-                  <Chip detail={PROVENANCE.termination} label="non confirmé" />
-                )
-              }
-              id="etaB"
-              label="Rendement η_B"
-            />
+            <NumericRow id="etaB" label="Rendement η_B" />
           </Group>
 
           <Group title="Tension de la ligne">
@@ -645,25 +628,30 @@ export function RailInputs({
                 { value: "sag", label: "Flèche" },
                 { value: "tension", label: "Tension" },
                 { value: "length", label: "Longueur" },
+                { value: "ratio", label: "Rapport V" },
               ]}
               value={scenario.tightness.mode}
             />
             {driver === "D_target" && <NumericRow hint="m" id="D_target" />}
             {driver === "H_target" && <NumericRow hint={unit} id="H_target" />}
             {driver === "L0" && <NumericRow hint="m" id="L0" />}
+            {/* `P / H` — the passenger's design load over the horizontal pretension. It resolves to
+                a `H_target` from `m_p`, so the resulting `Prétension` shows under `Valeurs
+                déduites` like any other mode's. */}
+            {driver === "vRatio" && (
+              <NumericRow
+                hint="P/H"
+                id="vRatio"
+                note={
+                  <AmbientNote text="P / H : poids du passager sur la prétension horizontale — plus il est grand, plus la ligne forme un V sous le passager." />
+                }
+              />
+            )}
           </Group>
 
           <Group title="Passager">
-            <NumericRow
-              chip={<Chip detail={PROVENANCE.mp} label="non confirmé" />}
-              hint="kg"
-              id="mp"
-            />
-            <NumericRow
-              chip={<Chip detail={PROVENANCE.hRider} label="non confirmé" />}
-              hint="m"
-              id="hRider"
-            />
+            <NumericRow hint="kg" id="mp" />
+            <NumericRow hint="m" id="hRider" />
             <NumericRow
               chip={<Chip detail={PROVENANCE.DAF} label="§8.2" tone="neutral" />}
               id="DAF"
@@ -728,7 +716,6 @@ export function RailInputs({
                 <NumericRow hint={unit} id="mbfOverride" label="Charge de rupture" />
               </DerivedRow>
               <DerivedRow
-                chip={<Chip detail={PROVENANCE.EA} label="non confirmé" />}
                 formula={deduced.material.formula?.EA ?? null}
                 id="eaOverride"
                 label="Raideur axiale"
@@ -740,7 +727,6 @@ export function RailInputs({
                 <NumericRow hint="MN" id="eaOverride" label="Raideur axiale" />
               </DerivedRow>
               <DerivedRow
-                chip={<Chip detail={PROVENANCE.mu} label="non confirmé" />}
                 formula={deduced.material.formula?.mu ?? null}
                 id="muOverride"
                 label="Masse linéique"
@@ -761,7 +747,6 @@ export function RailInputs({
                 />
                 {deduced.material.EA !== null && (
                   <ReadOut
-                    chip={<Chip detail={PROVENANCE.k} label="non confirmé" />}
                     label="Raideur axiale"
                     value={formatQuantity("EA", deduced.material.EA)}
                   />
@@ -1225,13 +1210,14 @@ function DerivedRow({
   formula: number | null;
   quantity: "MBF" | "EA" | "mu";
   unit: ForceUnit;
-  chip: ReactNode;
+  /** A neutral provenance chip. The « non confirmé » ones live in `Provenance` alone. */
+  chip?: ReactNode;
   onRecalculate: () => void;
   children: ReactNode;
 }) {
   return (
     <div data-field={id}>
-      <div className="flex items-start justify-end gap-1">{chip}</div>
+      {chip !== undefined && <div className="flex items-start justify-end gap-1">{chip}</div>}
       {children}
       {stale && formula !== null && (
         <div className="flex flex-wrap items-center gap-1">

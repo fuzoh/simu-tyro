@@ -66,6 +66,7 @@ const ROWS: ReadonlyArray<{ id: QuantityId; value: number; expected: string }> =
   { id: "D_target", value: 6, expected: "6,00 m" },
   { id: "H_target", value: 2535.2, expected: "253,5 daN" },
   { id: "L0", value: 151.644, expected: "151,64 m" },
+  { id: "vRatio", value: 0.8175, expected: "0,82" },
   { id: "d", value: 12, expected: "12,0 mm" },
   { id: "k", value: 22, expected: "22,0" },
   // « vide, requis » on first run — a datasheet figure, always whole in daN.

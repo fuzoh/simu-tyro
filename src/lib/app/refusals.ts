@@ -36,8 +36,8 @@
  *   verdict state. Neither reaches this module.
  */
 
-import type { ForceUnit, ScenarioDraft } from "@/lib/scenario/types.ts";
-import type { SolveError, SolveNote, TightnessSpec } from "@/lib/sim";
+import type { ForceUnit, ScenarioDraft, TightnessDraft } from "@/lib/scenario/types.ts";
+import type { SolveError, SolveNote } from "@/lib/sim";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { SOLVER } from "@/lib/sim";
@@ -101,7 +101,7 @@ export const REFUSAL_CAUSE: Record<RefusalId, string> = {
  */
 export function engineRefusal(
   { stage, error }: EngineFailure,
-  { tightness, unit = "daN" }: { tightness: TightnessSpec; unit?: ForceUnit },
+  { tightness, unit = "daN" }: { tightness: TightnessDraft; unit?: ForceUnit },
 ): EngineRefusal | null {
   if (error.kind === "invalid-input") {
     // §5.4's floor, in whichever quantity `resolveL0` re-emitted it. Every other field is tier
@@ -122,11 +122,13 @@ export function engineRefusal(
       case "H_target":
         return {
           id: "tension-impossible",
+          // In « Rapport V » the engine still speaks of `H_target` — the ratio resolved to one —
+          // so the bound is named in the quantity the user can act on.
           message: `${TENSION_LEAD} Prétension maximale atteignable : ${formatQuantity(
             "H_target",
             error.bound,
             unit,
-          )}.`,
+          )}${tightness.mode === "ratio" ? " — augmenter le rapport V" : ""}.`,
           diagnostic: false,
         };
       case "D_target":
@@ -161,12 +163,15 @@ export function engineRefusal(
 }
 
 /** « cette flèche à vide (6,00 m) » / « cette prétension (9074,0 daN) » — the target, named. */
-function target(tightness: TightnessSpec, unit: ForceUnit): string {
+function target(tightness: TightnessDraft, unit: ForceUnit): string {
   if (tightness.mode === "sag") {
     return `cette flèche à vide (${formatQuantity("D_target", tightness.D_target)})`;
   }
   if (tightness.mode === "tension") {
     return `cette prétension (${formatQuantity("H_target", tightness.H_target, unit)})`;
+  }
+  if (tightness.mode === "ratio") {
+    return `ce rapport V (${formatQuantity("vRatio", tightness.ratio)})`;
   }
   return `cette longueur non tendue (${formatQuantity("L0", tightness.L0)})`;
 }
@@ -219,7 +224,9 @@ export function diagnosticPayload(input: DiagnosticInput): string {
       ? tightness.D_target
       : tightness.mode === "tension"
         ? tightness.H_target
-        : tightness.L0;
+        : tightness.mode === "ratio"
+          ? tightness.ratio
+          : tightness.L0;
   lines.push(tag("resolveL0", `mode=${tightness.mode}  target=${num(targetValue)}`));
 
   if (span !== null && derived !== null) {

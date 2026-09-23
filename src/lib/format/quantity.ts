@@ -155,6 +155,11 @@ export const QUANTITIES = {
    * 8 % of the shipped margin. The sharp row, and the reason this table is not derivable.
    */
   L0: { unit: "m", decimals: 2 },
+  /**
+   * `Rapport V` `P / H` — dimensionless, prefilled from `m_p·g / H`; 2 decimals keep a 0,82
+   * round trip through the mode switch inside 0,6 % of `H`.
+   */
+  vRatio: { unit: "", decimals: 2 },
   /** `Diamètre nominal` `d`, mm — `MBF ∝ d²`, so rounding 12,7 → 13 inflates `MBF` by 4,8 %. */
   d: { unit: "mm", decimals: 1 },
   /** `Raideur relative` `k` — the two published defaults (22 and 1,5) must show as they are. */

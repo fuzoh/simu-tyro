@@ -64,6 +64,7 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { G } from "@/lib/format/quantity.ts";
 import { xDomain } from "@/lib/layout/contract.ts";
+import { engineTightness } from "@/lib/scenario/tightness.ts";
 import {
   deriveSteel,
   deriveTextile,
@@ -327,7 +328,7 @@ export function buildSceneBase(
   if (placed === null) return null;
   const { L, h, terrain } = placed;
 
-  const L0 = resolveL0(tightness, { L, h, ...material });
+  const L0 = resolveL0(engineTightness(tightness, mp), { L, h, ...material });
   if (!L0.ok) return null;
 
   const span: SpanInput = {

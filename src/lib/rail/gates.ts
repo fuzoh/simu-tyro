@@ -168,6 +168,7 @@ export type CulpritMode =
   | "mode Longueur"
   | "mode Flèche"
   | "mode Tension"
+  | "mode Rapport V"
   | "acier"
   | "acier surchargé"
   | "textile";
@@ -180,6 +181,7 @@ const CULPRITS: Partial<Record<`${Grandeur}/${CulpritMode}`, readonly FieldId[]>
   "L0/mode Longueur": ["L0"],
   "L0/mode Flèche": ["D_target"],
   "L0/mode Tension": ["H_target"],
+  "L0/mode Rapport V": ["vRatio"],
   "MBF/acier": ["d", "R0", "cst"],
   "MBF/acier surchargé": ["mbfOverride"],
   "EA/acier": ["d"],
@@ -260,6 +262,8 @@ export function isFieldActive(id: FieldId, scenario: ScenarioDraft): boolean {
       return scenario.tightness.mode === "tension";
     case "L0":
       return scenario.tightness.mode === "length";
+    case "vRatio":
+      return scenario.tightness.mode === "ratio";
     default:
       return true;
   }
@@ -474,6 +478,7 @@ function tightnessScalar(scenario: ScenarioDraft): readonly (readonly [FieldId, 
   const { tightness } = scenario;
   if (tightness.mode === "sag") return [["D_target", tightness.D_target]];
   if (tightness.mode === "tension") return [["H_target", tightness.H_target]];
+  if (tightness.mode === "ratio") return [["vRatio", tightness.ratio]];
   return [["L0", tightness.L0]];
 }
 

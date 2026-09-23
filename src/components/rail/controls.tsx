@@ -352,6 +352,12 @@ export function Segmented<T extends string>({
  * A provenance chip. **Editing an Unconfirmed Default flips the chip to « valeur utilisateur » but
  * never removes it from the aggregate list**: « no normative value exists » stays true whatever the
  * user types, and a user-supplied 100 kg is no more standards-backed than the shipped 120 kg.
+ *
+ * **The popover opens on hover, not on click** — decision of 2026-09-23, replacing the `<details>`
+ * disclosure. Keyboard users get the same on focus: the badge is in the tab order and the popover
+ * is shown under `group-focus-within`, so nothing is hover-only. Since ticket 41's simplification
+ * the « non confirmé » chips live in the `Provenance` section alone, so the field rows carry no
+ * warning chips at all.
  */
 export function Chip({
   label,
@@ -365,28 +371,27 @@ export function Chip({
 }) {
   const id = useId();
   return (
-    <details className="relative shrink-0">
-      {/* `Badge` renders **as the `<summary>`**, which is the one composition that keeps the
-          disclosure working: `Badge` is a `useRender` span with no semantics of its own, where
-          `Button` *enforces* button semantics and would put `role="button"` on the summary. */}
+    <span className="group relative inline-block shrink-0">
       <Badge
+        aria-describedby={id}
         className={cn(
-          "cursor-pointer list-none",
+          "cursor-help",
           tone === "warning" ? "bg-warning/15 text-warning" : "bg-muted text-muted-foreground",
         )}
-        id={id}
-        render={
-          <summary>
-            {tone === "warning" ? "⚠ " : ""}
-            {label}
-          </summary>
-        }
+        tabIndex={0}
         variant="secondary"
-      />
-      <p className="bg-popover border-border absolute right-0 z-10 mt-1 w-64 border px-3 py-2 text-xs whitespace-pre-line shadow-md">
+      >
+        {tone === "warning" ? "⚠ " : ""}
+        {label}
+      </Badge>
+      <p
+        className="bg-popover border-border absolute right-0 z-10 mt-1 hidden w-64 border px-3 py-2 text-xs whitespace-pre-line shadow-md group-focus-within:block group-hover:block"
+        id={id}
+        role="tooltip"
+      >
         {detail}
       </p>
-    </details>
+    </span>
   );
 }
 

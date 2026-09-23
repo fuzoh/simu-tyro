@@ -996,3 +996,30 @@ the only thing in that slot that still means something under a blocking error.
   chevron, i.e. the only route back to the read-out, to buy 80 px for a message that already fits.
 - **No code changed, and no string moved.** Unlike J, this amendment has no counterpart in the spec's
   headings either: § 5 and § 6 are both correct as written under the row reading.
+
+## O · « Rapport V » is a fourth tightness driver, the field chips move to `Provenance`, and chips open on hover
+
+**Decided 2026-09-23**, on three user requests of the same day, after the 423,5 m textile report that
+prompted [ticket 41](./issues/41-clearance-curve-plots-the-envelope.md)'s strip reversal.
+
+**1 · A fourth driver, `vr`.** « Rapport V » is `P / H` — the passenger's design load `m_p·g` over the
+horizontal pretension. It is what decides how deep the loaded line folds under the rider, and it is
+the quantity the user reasons in on a light rope, where `H` alone says nothing until it is compared to
+`P`. It is **the app's, not the engine's**: `TightnessDraft` (`scenario/types.ts`) adds
+`{ mode: "ratio", ratio }` beside the engine's three, and `engineTightness` (`scenario/tightness.ts`)
+resolves it to `{ mode: "tension", H_target: m_p·g / ratio }` before `resolveL0` sees it, in both
+`deduced.ts` and `scene.ts`. `src/lib/sim/**` is untouched and `TightnessSpec` still has three modes.
+§ 7's key table gains `vr` after `lo`; the **exactly-one-present** rule and the `deux-directeurs`
+refusal extend to it unchanged. The field is `vRatio`, « Rapport V cible », `> 0`, 2 decimals, gate
+`solve`; culprit row `L0/mode Rapport V`. A prefill on mode switch writes `m_p·g / H` from the
+read-out at the field's grain. Changing `m_p` in this mode changes `H` — that is the point of the
+mode, and the deduced `Prétension` row shows the result.
+
+**2 · No « ⚠ non confirmé » chip beside a field.** The eight inline warning chips (`k`, `η_A`, `η_B`,
+`m_p`, `h_rider`, `EA`, `μ`, textile `EA`) are removed from the input and deduced rows. The
+`Provenance` aggregate is unchanged and remains the one place those chips live; the neutral chips
+(« §8.2 », « [STD-ATTESTED] », « valeur saisie », « la formule ») stay where they were.
+
+**3 · Chip popovers open on hover, and on focus.** `Chip` is no longer a `<details>` disclosure. The
+badge is in the tab order and the detail is shown under `group-hover` / `group-focus-within`, with
+`aria-describedby` binding the two, so a keyboard user loses nothing.

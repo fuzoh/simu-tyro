@@ -29,11 +29,10 @@
  *   from the one that was asked for.
  */
 
-import type { Geometry, ScenarioDraft } from "@/lib/scenario/types.ts";
-import type { TightnessSpec } from "@/lib/sim";
+import type { Geometry, ScenarioDraft, TightnessDraft } from "@/lib/scenario/types.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
-import { roundToDisplay } from "@/lib/format/quantity.ts";
+import { G, roundToDisplay } from "@/lib/format/quantity.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { clampX } from "@/lib/scenario/from-search.ts";
 import { spanOfGeometry } from "@/lib/scenario/geometry.ts";
@@ -69,6 +68,7 @@ export const NUMERIC_FIELDS = [
   "D_target",
   "H_target",
   "L0",
+  "vRatio",
   "mp",
   "hRider",
   "DAF",
@@ -143,6 +143,8 @@ function heldValue(
       return tightness.mode === "tension" ? tightness.H_target : null;
     case "L0":
       return tightness.mode === "length" ? tightness.L0 : null;
+    case "vRatio":
+      return tightness.mode === "ratio" ? tightness.ratio : null;
     case "d":
       return material.family === "steel" ? material.d : null;
     case "MBL":
@@ -230,6 +232,8 @@ export function applyField(
       return { ...scenario, tightness: { mode: "tension", H_target: value } };
     case "L0":
       return { ...scenario, tightness: { mode: "length", L0: value } };
+    case "vRatio":
+      return { ...scenario, tightness: { mode: "ratio", ratio: value } };
     case "d":
       return material.family === "steel"
         ? { ...scenario, material: { ...material, d: value } }
@@ -334,7 +338,7 @@ export function clearOverride(scenario: ScenarioDraft, key: "MBF" | "EA" | "mu")
  */
 export function switchTightness(
   scenario: ScenarioDraft,
-  mode: TightnessSpec["mode"],
+  mode: TightnessDraft["mode"],
   deduced: Deduced,
   lastGood: DeducedSolve | null = null,
 ): ScenarioDraft {
@@ -356,6 +360,12 @@ export function switchTightness(
       };
     case "length":
       return { ...scenario, tightness: { mode, L0: roundToDisplay("L0", solve.L0) } };
+    case "ratio":
+      // `P / H` from the read-out `H`, at the field's grain — voir `scenario/tightness.ts`.
+      return {
+        ...scenario,
+        tightness: { mode, ratio: roundToDisplay("vRatio", (scenario.rider.mp * G) / solve.H) },
+      };
   }
 }
 
@@ -369,6 +379,14 @@ function firstRunSolve(): DeducedSolve | null {
 
 /** Which field the segmented control is currently pointing at. */
 export function drivingField(scenario: ScenarioDraft): FieldId {
-  if (scenario.tightness.mode === "sag") return "D_target";
-  return scenario.tightness.mode === "tension" ? "H_target" : "L0";
+  switch (scenario.tightness.mode) {
+    case "sag":
+      return "D_target";
+    case "tension":
+      return "H_target";
+    case "length":
+      return "L0";
+    case "ratio":
+      return "vRatio";
+  }
 }

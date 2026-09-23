@@ -101,6 +101,16 @@ export type Rider = {
   xD: number;
 };
 
+/**
+ * The Tightness Driver **as the app holds it**: the engine's three modes plus « Rapport V », the
+ * ratio `P / H` of the passenger's design load to the horizontal pretension (decision of
+ * 2026-09-23). A higher ratio is a deeper V under the rider. It is a parameterisation of the
+ * tension mode, not a fourth inversion: `engineTightness` in `./tightness.ts` maps it to
+ * `{ mode: "tension", H_target: m_p·g / ratio }` before anything reaches `resolveL0`, which is why
+ * `src/lib/sim/**` does not know it exists.
+ */
+export type TightnessDraft = TightnessSpec | { mode: "ratio"; ratio: number };
+
 /** § 7's Scenario: everything a link transports, and nothing the Session keeps on the side. */
 export type Scenario = {
   unit: ForceUnit;
@@ -109,8 +119,11 @@ export type Scenario = {
   regime: RegimeId | null;
   geometry: Geometry;
   anchors: AnchorHeights;
-  /** §7's presence-encoded Tightness Driver — exactly one of flèche / prétension / `L₀`. */
-  tightness: TightnessSpec;
+  /**
+   * §7's presence-encoded Tightness Driver — exactly one of flèche / prétension / `L₀` / rapport V.
+   * The fourth is the app's, not the engine's: {@link TightnessDraft}.
+   */
+  tightness: TightnessDraft;
   /** The **active** family's spec. The retained one is the Session's — see {@link TextileDraft}. */
   material: MaterialSpec;
   terminations: { A: EndTermination; B: EndTermination };

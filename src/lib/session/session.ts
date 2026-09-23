@@ -205,6 +205,7 @@ const TIGHTNESS: v.GenericSchema<unknown, Scenario["tightness"]> = v.variant("mo
   v.object({ mode: v.literal("sag"), D_target: FINITE }),
   v.object({ mode: v.literal("tension"), H_target: FINITE }),
   v.object({ mode: v.literal("length"), L0: FINITE }),
+  v.object({ mode: v.literal("ratio"), ratio: FINITE }),
 ]);
 
 /**

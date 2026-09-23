@@ -275,6 +275,19 @@ describe("the Tightness Spec — one editable field, prefilled from its own read
     expect(railValues(tension).H_target).toBe("253,5");
   });
 
+  test("« Flèche » → « Rapport V » lands on `m_p·g / H` at 2 decimals, and solves to the same line", () => {
+    // 120 kg × 9,81 / 2535 N = 0,4644 → 0,46. The ratio is the app's; the engine only ever sees
+    // the `H_target` it resolves to, so the deduced `L₀` must land within the field's own grain.
+    const ratio = switchTightness(first, "ratio", deduced);
+    expect(ratio.tightness).toEqual({ mode: "ratio", ratio: 0.46 });
+    expect(drivingField(ratio)).toBe("vRatio");
+    expect(railValues(ratio).vRatio).toBe("0,46");
+    const solve = deduceValues(ratio, null).solve;
+    if (solve === null) throw new Error("expected a solve");
+    expect(solve.H).toBeCloseTo((120 * 9.81) / 0.46, 0);
+    expect(Math.abs(solve.L0 - 151.64)).toBeLessThan(0.05);
+  });
+
   test("the prefill writes the **displayed** value, never the float behind it", () => {
     // 151,64 enters state; 151,6440231 never does. That is what makes the URL exact and short by
     // construction — and it is 8 % of the shipped clearance margin if the row were 1 decimal.

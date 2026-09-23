@@ -21,8 +21,8 @@
  *   boundary — and lights up the form's own validation.
  */
 
-import type { EndTermination, TextileDraft } from "@/lib/scenario/types.ts";
-import type { SteelSpec, TerminationId, TightnessSpec } from "@/lib/sim";
+import type { EndTermination, TextileDraft, TightnessDraft } from "@/lib/scenario/types.ts";
+import type { SteelSpec, TerminationId } from "@/lib/sim";
 import type { TerminationToken, ValidatedSearch } from "@/lib/url/schema.ts";
 
 import { terminationIdFromToken } from "@/lib/url/schema.ts";
@@ -76,10 +76,11 @@ function endTermination(
 
 /** § 7's presence-encoded driver, back into the engine's union. Exactly one key can be present:
  * two is a refusal that never reaches this function. */
-function tightness(search: ValidatedSearch): TightnessSpec {
+function tightness(search: ValidatedSearch): TightnessDraft {
   if (search.fl !== undefined) return { mode: "sag", D_target: search.fl };
   if (search.te !== undefined) return { mode: "tension", H_target: newtons(search.te) };
   if (search.lo !== undefined) return { mode: "length", L0: search.lo };
+  if (search.vr !== undefined) return { mode: "ratio", ratio: search.vr };
   return { ...FIRST_RUN_SCENARIO.tightness };
 }
 

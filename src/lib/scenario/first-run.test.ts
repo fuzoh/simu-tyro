@@ -17,6 +17,7 @@ import {
 import type { Scenario } from "./types.ts";
 
 import { FIRST_RUN_RETAINED_TEXTILE, FIRST_RUN_SCENARIO, firstRunDefaults } from "./first-run.ts";
+import { engineTightness } from "./tightness.ts";
 
 /**
  * The first-run lock — « v1 build spec » § 9 (*The opening screen is frozen as a Vitest fixture*)
@@ -79,7 +80,7 @@ function openingState(scenario: Scenario) {
   // `g` is § 2's fixed, unexposed constant; A2 owns the app-side copy the Rail will read.
   const P = rider.mp * STEEL.g;
 
-  const L0 = resolveL0(scenario.tightness, { L, h, ...derived });
+  const L0 = resolveL0(engineTightness(scenario.tightness, rider.mp), { L, h, ...derived });
   if (!L0.ok) throw new Error(`expected an L₀, got ${JSON.stringify(L0.error)}`);
 
   const span: SpanInput = {

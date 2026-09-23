@@ -38,6 +38,7 @@ import type { DerivedMaterial, SpanInput, SpanState, SteelValues } from "@/lib/s
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { equalAtDisplayPrecision } from "@/lib/format/quantity.ts";
+import { engineTightness } from "@/lib/scenario/tightness.ts";
 import {
   deriveSteel,
   deriveTextile,
@@ -140,7 +141,11 @@ export function deduceValues(scenario: ScenarioDraft, trace: Trace | null): Dedu
   }
 
   const { L, h } = span;
-  const L0 = resolveL0(scenario.tightness, { L, h, ...derived });
+  const L0 = resolveL0(engineTightness(scenario.tightness, scenario.rider.mp), {
+    L,
+    h,
+    ...derived,
+  });
   if (!L0.ok) return { material, span, solve: null, failure: { stage: "L0", error: L0.error } };
 
   const input: SpanInput = {
