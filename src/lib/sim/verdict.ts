@@ -166,7 +166,8 @@ export type TerminationId =
   | "oeil-cousu-epissure"
   | "epissure-longue-hmpe"
   | "noeud-de-huit"
-  | "noeud-de-chaise";
+  | "noeud-de-chaise"
+  | "attelage-sans-tension";
 
 /**
  * One termination. `eta` is the **default** the picker prefills — every §10.2/§10.3 value is a
@@ -176,7 +177,8 @@ export type TerminationId =
  */
 export type Termination = {
   readonly id: TerminationId;
-  readonly family: "steel" | "textile";
+  /** Which picker lists it. `"both"` is the one hardware-free end every family can rig. */
+  readonly family: "steel" | "textile" | "both";
   readonly label: string;
   /** §10.2/§10.3's default efficiency — the picker's prefill, not the verdict's input. */
   readonly eta: number;
@@ -195,7 +197,10 @@ export type Termination = {
   readonly knot: boolean;
 };
 
-/** §10.2's five steel terminations and § 3's four textile ones, with §10.3's efficiencies. */
+/**
+ * §10.2's five steel terminations and § 3's four textile ones, with §10.3's efficiencies — plus
+ * « Attelage sans tension », the one end offered to both families (decision of 2026-09-23).
+ */
 export const TERMINATIONS = {
   "manchon-metal-resine": {
     id: "manchon-metal-resine",
@@ -277,6 +282,21 @@ export const TERMINATIONS = {
     tag: "[CONVENTION]",
     personProhibited: false,
     knot: true,
+  },
+  /**
+   * An end **attached without being put under tension** — the line is hitched to its anchor and the
+   * attachment itself carries no share of the working load, so nothing reduces the line's breaking
+   * strength there: `η = 1`. Decision of 2026-09-23 (repo owner), not a §10.2/§10.3 value, hence
+   * `[CONVENTION]`. Offered under both families, and editable like every other `η`.
+   */
+  "attelage-sans-tension": {
+    id: "attelage-sans-tension",
+    family: "both",
+    label: "Attelage sans tension",
+    eta: 1,
+    tag: "[CONVENTION]",
+    personProhibited: false,
+    knot: false,
   },
 } as const satisfies Record<TerminationId, Termination>;
 

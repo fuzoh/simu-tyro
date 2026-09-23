@@ -98,6 +98,7 @@ describe("the key table and canonical order", () => {
       "nb",
       "mp",
       "hr",
+      "gm",
       "daf",
       "x",
       "tr",
@@ -499,6 +500,7 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
       nb: 0.9,
       mp: 120,
       hr: 2.1,
+      gm: 1,
       daf: 1.2,
       x: 125,
     });
@@ -519,6 +521,7 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
       "nb",
       "mp",
       "hr",
+      "gm",
       "daf",
       "x",
     ]);
@@ -598,19 +601,20 @@ describe("the first-run link", () => {
   test("is § 9's shipped scenario, in canonical order", () => {
     expect(FIRST_RUN_LINK).toBe(
       "/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&fam=ac&d=12&r0=1770" +
-        "&cst=iwrc&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&daf=1.2&x=75",
+        "&cst=iwrc&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=75",
     );
   });
 
-  test("is 137 characters — `reg` absent, `mbf`/`ea`/`mu` absent", () => {
+  test("is 142 characters — `reg` absent, `mbf`/`ea`/`mu` absent", () => {
     // § 7/§ 9/§ 11 quote **141**, counted off § 9's *printed* sketch, which spells `fl=6.0` and
     // `x=75.0`. That sketch is not emittable: the spec keeps the router's default codecs, and
     // `stringifySearchWith(JSON.stringify, JSON.parse)` renders the number 6 as `6` and the
     // string `"6.0"` as `%226.0%22`. § 3 says the same thing from the other side — « padding is
     // display-only: state holds a number whose value equals the displayed value, so the URL
     // serialises `6` ». So 141 − 4 = **137**, measured against the installed router; the two
-    // absence meanings the count exists to lock are asserted below, unchanged.
-    expect(FIRST_RUN_LINK).toHaveLength(137);
+    // absence meanings the count exists to lock are asserted below, unchanged. **142 since
+    // 2026-09-23**: `&gm=1` — « Garde min. admise » — is five more characters.
+    expect(FIRST_RUN_LINK).toHaveLength(142);
     expect(FIRST_RUN_LINK).not.toContain("reg=");
     expect(FIRST_RUN_LINK).not.toContain("mbf=");
     expect(FIRST_RUN_LINK).not.toContain("ea=");

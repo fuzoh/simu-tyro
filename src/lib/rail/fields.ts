@@ -83,6 +83,7 @@ export type FieldId =
   | "vRatio"
   | "mp"
   | "hRider"
+  | "hClearMin"
   | "DAF"
   | "xD";
 
@@ -429,6 +430,17 @@ export const FIELDS = {
     rule: { kind: "positive", sentence: POSITIVE_HEIGHT },
     warning: null,
     // It enters only `evaluateClearance`'s envelope.
+    gate: "clearance",
+  },
+  hClearMin: {
+    id: "hClearMin",
+    label: "Garde min. admise",
+    errorLabel: "Garde min. admise",
+    quantity: "h_clear_min",
+    // `0` is « aucun seuil », a legitimate value; only a negative garde is nonsense.
+    rule: { kind: "non-negative", sentence: "une garde négative n'existe pas" },
+    warning: null,
+    // It qualifies the clearance read-out and nothing else — never the solve, never the verdict.
     gate: "clearance",
   },
   DAF: {

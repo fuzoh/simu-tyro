@@ -174,6 +174,8 @@ export const QUANTITIES = {
   m_p: { unit: "kg", decimals: 0 },
   /** `Enveloppe passager` `h_rider`, m — subtracted straight from garde; 0,1 m is 4 % of it. */
   h_rider: { unit: "m", decimals: 1 },
+  /** `Garde min. admise` `h_clear,min`, m — a threshold compared to a 2-decimal garde; 0,1 m suffices. */
+  h_clear_min: { unit: "m", decimals: 1 },
   /** `Coefficient dynamique` `DAF` — multiplies a tension gap: 0,05 on 664 daN is 33 daN. */
   DAF: { unit: "", decimals: 1 },
   /** `Position du passager` `x_D`, m — 1 px ≈ 1,2 m at 1500 m, so 0,1 m is under the pointer. */

@@ -87,9 +87,11 @@ export const FIRST_RUN_SCENARIO = {
    * own node, 0,000 m away and so well inside the `max(1 m, 1 % de la portée)` rule (0,9 m before),
    * so the clearance cell reads plainly « Garde min. ligne » on first paint instead of relabelling
    * itself — **and** the profile draws one clearance dimension
-   * rather than two, since ticket 41 gates its second one on the same bit.
+   * rather than two, since ticket 41 gates its second one on the same bit. `h_clear,min` 1,0 m is a
+   * `[CONVENTION]` of 2026-09-23 — no reference publishes a minimum garde — and the shipped line's
+   * 2,42 m clears it, so the first screen carries no clearance breach.
    */
-  rider: { mp: 120, hRider: 2.1, DAF: 1.2, xD: 75 },
+  rider: { mp: 120, hRider: 2.1, hClearMin: 1, DAF: 1.2, xD: 75 },
 } as const satisfies Scenario;
 
 /**

@@ -39,6 +39,7 @@ import { jumpToField } from "@/components/app/banner.tsx";
 import { RailSection } from "@/components/app/shell.tsx";
 import { useAppState } from "@/components/app/store.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import { GRID_HELP, RESULT_HELP } from "@/lib/rail/help.ts";
 import {
   LOAD_COMBINATION_FORMULA,
   NOT_COMPUTED_LINES,
@@ -47,7 +48,7 @@ import {
 import { terrainDisclosure } from "@/lib/terrain/provenance.ts";
 import { cn } from "@/lib/utils.ts";
 
-import { Chip } from "./controls.tsx";
+import { Chip, InfoTip } from "./controls.tsx";
 
 /**
  * The Rail's three output sections. `deduced` is the shared rider-free chain and `results` the
@@ -166,9 +167,18 @@ function ResultsSection({ cause, results }: { cause: string | null; results: Res
 function HeadlineRow({ row }: { row: ResultRow }) {
   return (
     <div>
-      <span className="text-muted-foreground text-xs">{row.label}</span>
+      <span className="flex items-center gap-1">
+        <span className="text-muted-foreground text-xs">{row.label}</span>
+        <InfoTip label={row.label} text={RESULT_HELP[row.id]} />
+      </span>
       <div className="flex flex-wrap items-baseline gap-1">
-        <span className="font-mono text-base">{row.value}</span>
+        {/* « Garde min (traversée) » under « Garde min. admise » is the one headline that judges
+            itself; the colour is the verdict grid's own « hors limites » tint. */}
+        <span
+          className={cn("font-mono text-base", row.state === "hors-limites" && "text-destructive")}
+        >
+          {row.value}
+        </span>
         {row.qualifier !== null && (
           <span className="text-muted-foreground text-xs">{row.qualifier}</span>
         )}
@@ -181,8 +191,11 @@ function HeadlineRow({ row }: { row: ResultRow }) {
 function DetailRow({ row }: { row: ResultRow }) {
   return (
     <div className={cn("flex items-baseline gap-1 py-0.5", row.indent && "pl-3")}>
-      <span className="text-muted-foreground min-w-0 flex-1 text-xs" title={row.label}>
-        {row.label}
+      <span className="flex min-w-0 flex-1 items-center gap-1">
+        <span className="text-muted-foreground min-w-0 text-xs" title={row.label}>
+          {row.label}
+        </span>
+        <InfoTip label={row.label} text={RESULT_HELP[row.id]} />
       </span>
       {/* The label takes the slack, so the value sits flush right — that *is* amendment L's
           right-aligned column, and it is reached without a `min-w` reservation. */}
@@ -202,8 +215,9 @@ function DetailRow({ row }: { row: ResultRow }) {
 function GridRow({ row }: { row: ResultGridRow }) {
   return (
     <div className="mt-2">
-      <div className="flex flex-wrap items-baseline gap-1">
+      <div className="flex flex-wrap items-center gap-1">
         <span className="text-xs">{row.label}</span>
+        <InfoTip label={row.label} text={GRID_HELP[row.id]} />
         {row.note !== null && <span className="text-muted-foreground text-xs">{row.note}</span>}
       </div>
       {row.formula !== "" && <p className="text-muted-foreground text-xs">{row.formula}</p>}

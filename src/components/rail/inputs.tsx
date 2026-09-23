@@ -68,6 +68,7 @@ import {
   fieldSchema,
   warningFor,
 } from "@/lib/rail/fields.ts";
+import { DEDUCED_HELP, FIELD_HELP, TIGHTNESS_HELP } from "@/lib/rail/help.ts";
 import { PROVENANCE_COPY, warningLadder } from "@/lib/rail/provenance.ts";
 import {
   applyField,
@@ -95,6 +96,7 @@ import {
   Choice,
   DisabledReason,
   FixButton,
+  InfoTip,
   NumericInput,
   Picker,
   ReadOut,
@@ -348,6 +350,7 @@ export function RailInputs({
                   value={scenario.usage}
                 />
               }
+              help={FIELD_HELP.usage}
               label={FIELDS.usage.label}
               stacked
             />
@@ -384,6 +387,7 @@ export function RailInputs({
                   })}
                 </NativeSelect>
               }
+              help={FIELD_HELP.regime}
               htmlFor="rail-regime"
               label={FIELDS.regime.label}
               message={
@@ -481,6 +485,7 @@ export function RailInputs({
                   value={scenario.material.family}
                 />
               }
+              help={FIELD_HELP.family}
               label={FIELDS.family.label}
               message={
                 familyBreach === undefined
@@ -519,6 +524,7 @@ export function RailInputs({
                       value={String(steelSpec.R0)}
                     />
                   }
+                  help={FIELD_HELP.R0}
                   hint="N/mm²"
                   htmlFor="rail-r0"
                   label={FIELDS.R0.label}
@@ -540,6 +546,7 @@ export function RailInputs({
                       value={steelSpec.construction}
                     />
                   }
+                  help={FIELD_HELP.cst}
                   htmlFor="rail-cst"
                   label={FIELDS.cst.label}
                 />
@@ -568,6 +575,7 @@ export function RailInputs({
                       value={textileSpec?.ropeClass ?? "hmpe"}
                     />
                   }
+                  help={FIELD_HELP.cls}
                   htmlFor="rail-cls"
                   label={FIELDS.cls.label}
                 />
@@ -620,6 +628,10 @@ export function RailInputs({
           <Group title="Tension de la ligne">
             {/* Exactly one field is editable; the other two appear under `Valeurs déduites`.
                 Switching mode **pre-fills the new field from its read-out**. */}
+            <div className="flex items-center gap-1 py-1">
+              <span className="text-muted-foreground text-xs">Pilote</span>
+              <InfoTip label="Pilote de tension" text={TIGHTNESS_HELP} />
+            </div>
             <Segmented
               onChange={(mode) =>
                 patch(switchTightness(scenario, mode, deduced, lastGoodSolve.current))
@@ -652,6 +664,9 @@ export function RailInputs({
           <Group title="Passager">
             <NumericRow hint="kg" id="mp" />
             <NumericRow hint="m" id="hRider" />
+            {/* The threshold the clearance read-outs are judged against (2026-09-23). Beside the
+                envelope because both are clearance inputs; a Clearance Gate field like it. */}
+            <NumericRow hint="m" id="hClearMin" />
             <NumericRow
               chip={<Chip detail={PROVENANCE.DAF} label="§8.2" tone="neutral" />}
               id="DAF"
@@ -669,8 +684,16 @@ export function RailInputs({
         <div className="mt-2">
           {deduced.span !== null && scenario.geometry.source === "trace" && (
             <>
-              <ReadOut label="Portée" value={formatQuantity("L", deduced.span.L)} />
-              <ReadOut label="Dénivelé" value={formatQuantity("h", deduced.span.h)} />
+              <ReadOut
+                help={DEDUCED_HELP.L}
+                label="Portée"
+                value={formatQuantity("L", deduced.span.L)}
+              />
+              <ReadOut
+                help={DEDUCED_HELP.h}
+                label="Dénivelé"
+                value={formatQuantity("h", deduced.span.h)}
+              />
               {/* § 4's anchor-placement block prints the two base altitudes **beside** `Portée` and
                   `Dénivelé`: they are what says *where on the hill* the placement sits, and without
                   them a station read-out is a number with no altitude behind it. One row each rather
@@ -679,10 +702,12 @@ export function RailInputs({
               {deduced.span.bases !== null && (
                 <>
                   <ReadOut
+                    help={DEDUCED_HELP.zBaseA}
                     label="Alt. base A"
                     value={formatQuantity("zBase", deduced.span.bases.zBaseA)}
                   />
                   <ReadOut
+                    help={DEDUCED_HELP.zBaseB}
                     label="Alt. base B"
                     value={formatQuantity("zBase", deduced.span.bases.zBaseB)}
                   />
@@ -742,11 +767,13 @@ export function RailInputs({
             deduced.material.strength !== null && (
               <>
                 <ReadOut
+                  help={DEDUCED_HELP.MBL}
                   label="Charge de rupture"
                   value={formatQuantity("MBL", deduced.material.strength, unit)}
                 />
                 {deduced.material.EA !== null && (
                   <ReadOut
+                    help={DEDUCED_HELP.EAtextile}
                     label="Raideur axiale"
                     value={formatQuantity("EA", deduced.material.EA)}
                   />
@@ -757,10 +784,18 @@ export function RailInputs({
 
           {/* `corde` and `w` are the only two rows independent of a solve. */}
           {deduced.material.w !== null && (
-            <ReadOut label="Poids linéique" value={formatQuantity("w", deduced.material.w, unit)} />
+            <ReadOut
+              help={DEDUCED_HELP.w}
+              label="Poids linéique"
+              value={formatQuantity("w", deduced.material.w, unit)}
+            />
           )}
           {deduced.span !== null && (
-            <ReadOut label="Corde" value={formatQuantity("chord", deduced.span.chord)} />
+            <ReadOut
+              help={DEDUCED_HELP.chord}
+              label="Corde"
+              value={formatQuantity("chord", deduced.span.chord)}
+            />
           )}
 
           {/* **The cause governs, not `deduced.solve`.** The rider-free chain is derived from the
@@ -772,18 +807,21 @@ export function RailInputs({
             <>
               {driver !== "L0" && (
                 <ReadOut
+                  help={DEDUCED_HELP.L0}
                   label="Longueur non tendue"
                   value={formatQuantity("L0", deduced.solve.L0)}
                 />
               )}
               {driver !== "H_target" && (
                 <ReadOut
+                  help={DEDUCED_HELP.H}
                   label="Prétension"
                   value={formatQuantity("H_target", deduced.solve.H, unit)}
                 />
               )}
               {driver !== "D_target" && (
                 <ReadOut
+                  help={DEDUCED_HELP.sag}
                   label="Flèche à vide"
                   value={`${formatQuantity("sag", deduced.solve.sag)} (à x ${formatValue(
                     "extremumX",
@@ -792,11 +830,13 @@ export function RailInputs({
                 />
               )}
               <ReadOut
+                help={DEDUCED_HELP.sagRatio}
                 label="Flèche / portée"
                 value={formatQuantity("sagRatio", deduced.solve.sagRatio)}
                 warning={rung("sagRatio")}
               />
               <ReadOut
+                help={DEDUCED_HELP.standingTension}
                 label="Tension permanente"
                 value={`${formatQuantity("standingTension", deduced.solve.standingTension)} ${
                   scenario.material.family === "steel" ? "MBF" : "MBL"
@@ -853,6 +893,7 @@ function NumericRow({
       {(field) => (
         <Row
           chip={chip}
+          help={FIELD_HELP[id]}
           control={
             <NumericInput
               id={`rail-${id}`}
@@ -1158,7 +1199,7 @@ function TerminationRow({
   onPick: (id: TerminationId) => void;
 }) {
   const options = Object.values(TERMINATIONS)
-    .filter((termination) => termination.family === family)
+    .filter((termination) => termination.family === family || termination.family === "both")
     .map((termination) => ({
       value: termination.id,
       label: termination.label,
@@ -1180,6 +1221,7 @@ function TerminationRow({
           value={selected}
         />
       }
+      help={end === "A" ? FIELD_HELP.ta : FIELD_HELP.tb}
       htmlFor={`rail-t${end.toLowerCase()}`}
       label={`Terminaison ${end}`}
       note={knotsDisabled ? <DisabledReason reason={KNOT_ON_HMPE_REASON} /> : null}

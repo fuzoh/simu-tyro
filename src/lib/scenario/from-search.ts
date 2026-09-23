@@ -156,6 +156,7 @@ export function scenarioFromSearch(search: ValidatedSearch): ScenarioDraft {
     rider: {
       mp: search.mp ?? shipped.rider.mp,
       hRider: search.hr ?? shipped.rider.hRider,
+      hClearMin: search.gm ?? shipped.rider.hClearMin,
       DAF: search.daf ?? shipped.rider.DAF,
       xD: span === undefined ? xD : clampX(xD, span),
     },

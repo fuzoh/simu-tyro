@@ -94,6 +94,12 @@ export type ResultRow = {
   readonly rank: "headline" | "detail";
   /** « ↳ majoration dynamique » hangs under « T max statique ». */
   readonly indent: boolean;
+  /**
+   * « hors-limites » on the one row that carries its own threshold — « Garde min (traversée) »
+   * under « Garde min. admise » (2026-09-23). `null` everywhere else: the tension rows are judged
+   * by the verdict, not row by row.
+   */
+  readonly state: CellState | null;
 };
 
 /** One cell of the criteria × ends grid. `end: null` **is** the suspended-load cell. */
@@ -276,15 +282,22 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
   // A Clearance Gate breach removes the garde **and its curve alone** — the cable still draws and
   // every tension row stands. That is the whole reason the three gates are three.
   if (gates.passed.clearance) {
-    rows.push(
-      row(
+    const breach = clearanceBreached(base.clearance.hMin, scenario.rider.hClearMin);
+    rows.push({
+      ...row(
         "clearance",
         "Garde min (traversée)",
         formatQuantity("clearance", base.clearance.hMin),
-        qualify(null, riderAt(base, base.clearance.atStepIndex)),
+        qualify(
+          breach
+            ? `sous la garde admise ${formatQuantity("h_clear_min", scenario.rider.hClearMin)}`
+            : null,
+          riderAt(base, base.clearance.atStepIndex),
+        ),
         "headline",
       ),
-    );
+      state: breach ? "hors-limites" : null,
+    });
   }
 
   // ── The nine detail rows ──────────────────────────────────────────────────────────────────
@@ -356,6 +369,7 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
       // The one indented row in the block: it is a decomposition of the row above it, not a
       // fourteenth quantity.
       indent: true,
+      state: null,
     });
   }
 
@@ -606,6 +620,15 @@ function envelopes(base: SceneBase, DAF: number): Envelope {
 }
 
 /**
+ * « Garde min. admise » — does the traverse minimum fall under the user's threshold? A threshold of
+ * `0` (or less, which a link can carry) disables the check: nothing is judged against no bound.
+ * Shared by the Rail's headline row and the read-out cell so the two cannot disagree.
+ */
+export function clearanceBreached(hMin: number, hClearMin: number): boolean {
+  return hClearMin > 0 && Number.isFinite(hMin) && hMin < hClearMin;
+}
+
+/**
  * « Flèche chargée max » — the deepest the loaded line hangs below the A–B chord over the
  * traverse, which is the rider's own node: the kink is the low point of a loaded catenary.
  */
@@ -675,5 +698,5 @@ function row(
   qualifier: string | null,
   rank: "headline" | "detail",
 ): ResultRow {
-  return { id, label, value, qualifier, rank, indent: false };
+  return { id, label, value, qualifier, rank, indent: false, state: null };
 }

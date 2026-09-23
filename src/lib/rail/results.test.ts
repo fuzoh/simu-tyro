@@ -12,6 +12,7 @@ import { evaluateVerdict } from "@/lib/sim";
 import type { ResultRowId, Results } from "./results.ts";
 
 import {
+  clearanceBreached,
   deriveResults,
   NO_REGIME_ASIDE,
   REGIME_PROMPT,
@@ -505,5 +506,16 @@ describe("what suppresses what — three gates, three different consequences", (
       expect(results.aside).toBeNull();
       expect(results.prompt).toBeNull();
     }
+  });
+});
+
+describe("« Garde min. admise » — the clearance row judges itself (2026-09-23)", () => {
+  test("clearanceBreached: under the threshold only, and a threshold of 0 disables the check", () => {
+    expect(clearanceBreached(2.42, 1)).toBe(false);
+    expect(clearanceBreached(0.8, 1)).toBe(true);
+    expect(clearanceBreached(-0.5, 1)).toBe(true);
+    expect(clearanceBreached(0.8, 0)).toBe(false);
+    expect(clearanceBreached(0.8, -1)).toBe(false);
+    expect(clearanceBreached(Number.POSITIVE_INFINITY, 1)).toBe(false);
   });
 });

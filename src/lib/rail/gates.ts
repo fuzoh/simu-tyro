@@ -437,6 +437,7 @@ export function evaluateGates({ scenario, trace, issues = [] }: GateInput): Gate
     ["zB", scenario.anchors.zB],
     ["mp", scenario.rider.mp],
     ["hRider", scenario.rider.hRider],
+    ["hClearMin", scenario.rider.hClearMin],
     ["DAF", scenario.rider.DAF],
     ["etaA", scenario.terminations.A.eta],
     ["etaB", scenario.terminations.B.eta],
@@ -589,6 +590,8 @@ function scalarOf(scenario: ScenarioDraft, field: FieldId): number | null {
       return rider.mp;
     case "hRider":
       return rider.hRider;
+    case "hClearMin":
+      return rider.hClearMin;
     case "DAF":
       return rider.DAF;
     case "xD":

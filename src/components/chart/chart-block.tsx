@@ -61,6 +61,8 @@ import {
   veBadgeLabel,
 } from "@/lib/layout/contract.ts";
 import { GATE_CONSEQUENCE } from "@/lib/rail/gates.ts";
+import { CELL_HELP } from "@/lib/rail/help.ts";
+import { clearanceBreached } from "@/lib/rail/results.ts";
 import { applyField } from "@/lib/rail/values.ts";
 import { snapStation } from "@/lib/terrain/trace.ts";
 import { cn } from "@/lib/utils.ts";
@@ -88,7 +90,13 @@ const UNAVAILABLE = "—";
  * clause instead of a number — set apart typographically, because a sentence in `text-lg` mono
  * would read as a value.
  */
-type ReadOutValue = { readonly label: string; readonly value: string; readonly note: boolean };
+type ReadOutValue = {
+  readonly label: string;
+  readonly value: string;
+  readonly note: boolean;
+  /** Under « Garde min. admise » — the one cell that carries its own threshold (2026-09-23). */
+  readonly breach?: boolean;
+};
 
 export function ChartBlock({
   banner,
@@ -332,6 +340,7 @@ export function ChartBlock({
                   : "Garde min. ligne",
                 value: formatQuantity("clearance", rider.worst.hClear),
                 note: false,
+                breach: clearanceBreached(rider.worst.hClear, riderInput.hClearMin),
               }
             : // The one cell a Clearance Gate breach takes: it says **why** rather than printing a
               // number computed from the refused anchor height, and rather than « — », which is
@@ -419,6 +428,7 @@ export function ChartBlock({
         {READ_OUT_CELLS.map((cell) => (
           <ReadOutCell
             className={cn(cell.narrow, cell.pinned)}
+            help={CELL_HELP[cell.label]}
             key={cell.label}
             // No label under the cause line: the row is **replaced** by it, and the box stays only
             // to hold the row's height — voir `ReadOutCell`'s own `label`.
@@ -428,7 +438,14 @@ export function ChartBlock({
               (values[cell.label].note ? (
                 <span className="text-muted-foreground text-xs">{values[cell.label].value}</span>
               ) : (
-                <span className="font-mono text-lg">{values[cell.label].value}</span>
+                <span
+                  className={cn(
+                    "font-mono text-lg",
+                    values[cell.label].breach === true && "text-destructive",
+                  )}
+                >
+                  {values[cell.label].value}
+                </span>
               ))}
             {/* **The one place « — » is legal**: the traverse solved, the rider sits in one of
                 `Indéterminé`'s gaps, and the exact §6.1-case-2 solve a typed `x` gets — which may

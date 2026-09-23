@@ -56,6 +56,7 @@ import type { EndTermination, ForceUnit, Scenario, TextileDraft } from "@/lib/sc
 import type { MaterialSpec, RegimeId, SteelSpec, TerminationId } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
+import { FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 import { REGIMES, TERMINATIONS } from "@/lib/sim";
 import { P1Error, validateP1Structure } from "@/lib/url/p1.ts";
 
@@ -274,7 +275,15 @@ const SCENARIO: v.GenericSchema<unknown, Scenario> = v.object({
   tightness: TIGHTNESS,
   material: MATERIAL_SPEC,
   terminations: v.object({ A: END_TERMINATION, B: END_TERMINATION }),
-  rider: v.object({ mp: FINITE, hRider: FINITE, DAF: FINITE, xD: FINITE }),
+  rider: v.object({
+    mp: FINITE,
+    hRider: FINITE,
+    // Added 2026-09-23. **Optional with the shipped default**, so a Session written before it is
+    // not discarded for lacking a key nobody could have set.
+    hClearMin: v.optional(FINITE, FIRST_RUN_SCENARIO.rider.hClearMin),
+    DAF: FINITE,
+    xD: FINITE,
+  }),
 });
 
 /**

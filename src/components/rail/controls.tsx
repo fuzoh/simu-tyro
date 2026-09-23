@@ -27,6 +27,7 @@
 
 import type { ChangeEvent, ReactNode } from "react";
 
+import { Info } from "lucide-react";
 import { useId } from "react";
 
 import { Badge } from "@/components/ui/badge.tsx";
@@ -37,6 +38,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.tsx";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip.tsx";
 import { cn } from "@/lib/utils.ts";
 
 /**
@@ -54,6 +56,7 @@ export function Row({
   label,
   htmlFor,
   hint,
+  help,
   chip,
   control,
   message,
@@ -66,6 +69,8 @@ export function Row({
   htmlFor?: string;
   /** The unit, or a short qualifier — never a sentence. */
   hint?: string;
+  /** What the value is and how it is computed — `@/lib/rail/help.ts`'s copy, as an {@link InfoTip}. */
+  help?: string;
   chip?: ReactNode;
   control: ReactNode;
   /** § 7's field message: neutral when `kind` is empty, ⛔ otherwise. */
@@ -101,13 +106,16 @@ export function Row({
         {/* The label **wraps**, never truncates: at 288 px « Hauteur d'ancrage A » and its B twin
             would clip to the same string, and a control the user cannot tell apart is worse than
             a row two lines tall. */}
-        <FieldLabel
-          className="text-muted-foreground min-w-0 flex-1 leading-tight"
-          htmlFor={htmlFor}
-          title={label}
-        >
-          {label}
-        </FieldLabel>
+        <span className="flex min-w-0 flex-1 items-center gap-1">
+          <FieldLabel
+            className="text-muted-foreground min-w-0 leading-tight"
+            htmlFor={htmlFor}
+            title={label}
+          >
+            {label}
+          </FieldLabel>
+          {help !== undefined && <InfoTip label={label} text={help} />}
+        </span>
         <div
           className={cn("flex shrink-0 items-center gap-1", outlined && "ring-destructive ring-1")}
         >
@@ -395,15 +403,42 @@ export function Chip({
   );
 }
 
+/**
+ * The explanation beside a label — an `ⓘ` that opens a tooltip with `@/lib/rail/help.ts`'s copy
+ * (decision of 2026-09-23): what the value is and how it is computed, in French, as long as it needs
+ * to be. A **button** in the tab order, so keyboard and touch users reach it — hover is not the only
+ * path. The content is `text-xs` like every other annotation; it is wider than the registry's
+ * `max-w-xs` because a formula and its § reference do not fit three lines.
+ */
+export function InfoTip({ label, text }: { label: string; text: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        aria-label={`Explication : ${label}`}
+        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex shrink-0 cursor-help items-center rounded-none focus-visible:ring-[3px] focus-visible:outline-none"
+        type="button"
+      >
+        <Info aria-hidden="true" className="size-3" />
+      </TooltipTrigger>
+      <TooltipContent className="max-w-sm text-left leading-snug whitespace-pre-line" side="bottom">
+        {text}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 /** One `Valeurs déduites` row: read-only, and never editable — except a steel override. */
 export function ReadOut({
   label,
   value,
+  help,
   chip,
   warning,
   children,
 }: {
   label: string;
+  /** `@/lib/rail/help.ts`'s copy for this row, as an {@link InfoTip}. */
+  help?: string;
   /** `null` renders nothing at all: « — » is spent on `Indéterminé` and may not be reused. */
   value: string | null;
   chip?: ReactNode;
@@ -418,8 +453,11 @@ export function ReadOut({
   return (
     <div className="flex flex-col gap-1 py-1">
       <div className="flex items-center gap-1">
-        <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs" title={label}>
-          {label}
+        <span className="flex min-w-0 flex-1 items-center gap-1">
+          <span className="text-muted-foreground min-w-0 truncate text-xs" title={label}>
+            {label}
+          </span>
+          {help !== undefined && <InfoTip label={label} text={help} />}
         </span>
         {chip}
         {/* A computed quantity: mono, and right-aligned because the label beside it is `flex-1`. */}

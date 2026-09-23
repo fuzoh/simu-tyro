@@ -22,6 +22,7 @@ import { ChartBlock } from "@/components/chart/chart-block.tsx";
 import { useChartWidth } from "@/components/chart/use-chart-width.ts";
 import { RailHeaderControls, RailInputs } from "@/components/rail/inputs.tsx";
 import { RailOutputs } from "@/components/rail/outputs.tsx";
+import { TooltipProvider } from "@/components/ui/tooltip.tsx";
 import { buildDiagnostic } from "@/lib/app/diagnostic.ts";
 import { linkStrip } from "@/lib/app/link-strip.ts";
 import { siteOrigin } from "@/lib/app/site.ts";
@@ -42,7 +43,11 @@ import { useBandHeight, useViewport } from "./use-viewport.ts";
 export function App() {
   return (
     <AppStoreProvider>
-      <Live />
+      {/* One provider for every `InfoTip`: Base UI shares the open delay across the group, so
+          moving from one ⓘ to the next does not restart it. */}
+      <TooltipProvider delay={200}>
+        <Live />
+      </TooltipProvider>
     </AppStoreProvider>
   );
 }

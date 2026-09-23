@@ -117,6 +117,7 @@ export const CANONICAL_KEYS = [
   "nb",
   "mp",
   "hr",
+  "gm",
   "daf",
   "x",
   "tr",
@@ -162,8 +163,8 @@ export const ROPE_CLASS_TOKENS = ["hmpe", "pa", "pes"] as const;
 export type RopeClassToken = (typeof ROPE_CLASS_TOKENS)[number];
 
 /**
- * § 7's `ta` / `tb` tokens — five steel, four textile, `epissure` shared. The schema accepts all
- * eight regardless of `fam`, because a textile termination under steel is an **invalid
+ * § 7's `ta` / `tb` tokens — five steel, four textile, `epissure` shared, plus `attelage`, which
+ * both families publish (2026-09-23). The schema accepts all nine regardless of `fam`, because a textile termination under steel is an **invalid
  * combination**, not an unrepresentable value: it arrives and raises its blocking error, exactly
  * as `reg=secours10&fam=ac` does.
  */
@@ -176,6 +177,7 @@ export const TERMINATION_TOKENS = [
   "oeil",
   "huit",
   "chaise",
+  "attelage",
 ] as const;
 
 /** § 7's `ta` / `tb` token. */
@@ -195,6 +197,7 @@ const TERMINATION_ID_BY_TOKEN: Record<
     oeil: null,
     huit: null,
     chaise: null,
+    attelage: "attelage-sans-tension",
   },
   textile: {
     manchon: null,
@@ -205,6 +208,7 @@ const TERMINATION_ID_BY_TOKEN: Record<
     oeil: "oeil-cousu-epissure",
     huit: "noeud-de-huit",
     chaise: "noeud-de-chaise",
+    attelage: "attelage-sans-tension",
   },
 };
 
@@ -219,6 +223,7 @@ export const TERMINATION_TOKEN_BY_ID = {
   "epissure-longue-hmpe": "epissure",
   "noeud-de-huit": "huit",
   "noeud-de-chaise": "chaise",
+  "attelage-sans-tension": "attelage",
 } as const satisfies Record<TerminationId, TerminationToken>;
 
 /**
@@ -312,6 +317,8 @@ export type ValidatedSearch = {
   readonly mp?: number;
   /** Enveloppe passager, m. */
   readonly hr?: number;
+  /** Garde min. admise, m (2026-09-23). */
+  readonly gm?: number;
   /** Coefficient dynamique. */
   readonly daf?: number;
   /** Position du passager, m — clamped to `[0, L]` by the store, **never here**. */
@@ -361,6 +368,7 @@ const KEY_SCHEMAS: Record<SearchKey, v.GenericSchema> = {
   nb: FINITE,
   mp: FINITE,
   hr: FINITE,
+  gm: FINITE,
   daf: FINITE,
   x: FINITE,
   // `tr` is validated **structurally** by the codec, not by valibot: sentinel, base64url alphabet,
@@ -861,6 +869,7 @@ export function scenarioToSearch(scenario: Scenario): ValidatedSearch {
 
   out.mp = rider.mp;
   out.hr = rider.hRider;
+  out.gm = rider.hClearMin;
   out.daf = rider.DAF;
   out.x = rider.xD;
 
@@ -904,7 +913,7 @@ const FIRST_RUN_SEARCH: ValidatedSearch = scenarioToSearch(FIRST_RUN_SCENARIO);
  * bar itself stays **bare** on first run: `/` *means* « restore the Session », so it is never
  * rewritten on load.
  *
- * **137 characters, measured against the installed router.** § 7, § 9 and § 11 all quote **141**,
+ * **142 characters, measured against the installed router** — 137 before `gm` (2026-09-23). § 7, § 9 and § 11 all quote **141**,
  * counted off § 9's *printed* sketch, which spells `fl=6.0` and `x=75.0` — and that sketch is not
  * emittable. The spec keeps the router's default codecs (« no global codec override »), and
  * `stringifySearchWith(JSON.stringify, JSON.parse)` renders the number `6` as `6`, while the string

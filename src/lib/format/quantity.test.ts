@@ -75,6 +75,7 @@ const ROWS: ReadonlyArray<{ id: QuantityId; value: number; expected: string }> =
   { id: "eta", value: 0.9, expected: "0,90" },
   { id: "m_p", value: 120, expected: "120 kg" },
   { id: "h_rider", value: 2.1, expected: "2,1 m" },
+  { id: "h_clear_min", value: 1, expected: "1,0 m" },
   { id: "DAF", value: 1.2, expected: "1,2" },
   { id: "x_D", value: 75, expected: "75,0 m" },
   // The badge's own row: the formula value, not the override, so the padding is what rounds it.

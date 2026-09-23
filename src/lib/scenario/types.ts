@@ -95,6 +95,13 @@ export type Rider = {
   mp: number;
   /** §11's passenger envelope, m — subtracted straight from the clearance. */
   hRider: number;
+  /**
+   * « Garde min. admise », m — the least ground clearance the user accepts over the traverse
+   * (decision of 2026-09-23). A **threshold on the read-out**, never an engine input: §11's
+   * clearance is computed exactly as before, and the Rail marks it « hors limites » when the
+   * traverse minimum falls under this value. `0` disables the check.
+   */
+  hClearMin: number;
   /** §8.2's dynamic amplification factor. */
   DAF: number;
   /** Rider position, m in the span frame `[0, L]`. */

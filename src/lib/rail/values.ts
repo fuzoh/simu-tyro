@@ -71,6 +71,7 @@ export const NUMERIC_FIELDS = [
   "vRatio",
   "mp",
   "hRider",
+  "hClearMin",
   "DAF",
   "xD",
 ] as const;
@@ -129,6 +130,8 @@ function heldValue(
       return rider.mp;
     case "hRider":
       return rider.hRider;
+    case "hClearMin":
+      return rider.hClearMin;
     case "DAF":
       return rider.DAF;
     case "xD":
@@ -207,6 +210,8 @@ export function applyField(
       return { ...scenario, rider: { ...scenario.rider, mp: value } };
     case "hRider":
       return { ...scenario, rider: { ...scenario.rider, hRider: value } };
+    case "hClearMin":
+      return { ...scenario, rider: { ...scenario.rider, hClearMin: value } };
     case "DAF":
       return { ...scenario, rider: { ...scenario.rider, DAF: value } };
     case "xD":

@@ -26,6 +26,7 @@ import { flushSync } from "react-dom";
 
 import type { CollapseState } from "@/lib/layout/collapse.ts";
 
+import { InfoTip } from "@/components/rail/controls.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
   CENTRE_IN_RAIL,
@@ -686,9 +687,12 @@ export function RevealProfile({
 /** One read-out cell. The Skeleton passes a label and no value — never a « — ». */
 export function ReadOutCell({
   label,
+  help,
   className,
   children,
 }: {
+  /** `@/lib/rail/help.ts`'s copy for this cell — what the value is and how it is computed. */
+  help?: string;
   /**
    * The cell's own label, or **nothing at all** while § 7's cause line occupies the row: « les cinq
    * cellules sont **remplacées par une seule ligne** qui occupe la rangée », and a label left
@@ -707,7 +711,12 @@ export function ReadOutCell({
 }) {
   return (
     <div className={cn("flex h-[var(--cell-row)] flex-col justify-center px-3", className)}>
-      {label !== undefined && <span className="text-muted-foreground text-xs">{label}</span>}
+      {label !== undefined && (
+        <span className="flex items-center gap-1">
+          <span className="text-muted-foreground text-xs">{label}</span>
+          {help !== undefined && <InfoTip label={label} text={help} />}
+        </span>
+      )}
       {children}
     </div>
   );

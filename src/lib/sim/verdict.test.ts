@@ -718,16 +718,26 @@ describe("§10.2 and §10.3's termination table", () => {
     expect(TERMINATIONS["epissure-longue-hmpe"].knot).toBe(false);
   });
 
-  test("§ 6's tags govern: only the wedge socket, the grips and textile carry « non confirmé »", () => {
+  test("§ 6's tags govern: only the wedge socket, the grips, textile and the attelage carry « non confirmé »", () => {
     const unconfirmed = new Set(["[CONVENTION]", "[UNVERIFIED:R1]", "[PAYWALLED]"]);
     for (const termination of Object.values(TERMINATIONS)) {
       const chip = unconfirmed.has(termination.tag) || termination.family === "textile";
       const expected =
         termination.family === "textile" ||
         termination.id === "manchon-a-coin" ||
-        termination.id === "serre-cables-etrier";
+        termination.id === "serre-cables-etrier" ||
+        // Decision of 2026-09-23, not a §10.2/§10.3 value — hence `[CONVENTION]`.
+        termination.id === "attelage-sans-tension";
       expect(chip).toBe(expected);
     }
+  });
+
+  test("« Attelage sans tension » — η 1, offered to both families, never refused (2026-09-23)", () => {
+    const attelage = TERMINATIONS["attelage-sans-tension"];
+    expect(attelage.eta).toBe(1);
+    expect(attelage.family).toBe("both");
+    expect(attelage.personProhibited).toBe(false);
+    expect(attelage.knot).toBe(false);
   });
 });
 
