@@ -37,7 +37,7 @@
 
 import type { ReactNode } from "react";
 
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { createContext, use, useEffect, useRef, useState } from "react";
 
 import type { RailFormApi, RailFormState } from "@/components/app/use-rail-form.ts";
@@ -57,8 +57,10 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Button, buttonVariants } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.tsx";
+import { Separator } from "@/components/ui/separator.tsx";
 import { COPY_INCOMPLETE, copyLink } from "@/lib/app/persist.ts";
 import { siteOrigin } from "@/lib/app/site.ts";
+import { DOC_PAGES } from "@/lib/docs/pages.ts";
 import { formatQuantity, formatValue } from "@/lib/format/quantity.ts";
 import {
   checkField,
@@ -1085,6 +1087,24 @@ export function RailHeaderControls({
               Supprime le tracé en mémoire, la spec conservée et les préférences d'affichage.
             </span>
           </Button>
+          <Separator className="my-1" />
+          {/* The documentation — the theory the engine is built against and the reports behind
+              it, rendered at `/docs`. Links wearing `buttonVariants`, never `<Button render>`:
+              they navigate, and Base UI's button would take the anchor's semantics away. */}
+          <p className="text-muted-foreground px-2.5 text-xs">Documentation</p>
+          {DOC_PAGES.map((page) => (
+            <Link
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "sm" }),
+                "h-auto w-full justify-start py-1 text-left font-normal whitespace-normal",
+              )}
+              key={page.slug}
+              params={{ slug: page.slug }}
+              to="/docs/$slug"
+            >
+              {page.title}
+            </Link>
+          ))}
         </div>
       </details>
       {copied !== null && (

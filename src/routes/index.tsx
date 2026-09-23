@@ -3,10 +3,11 @@
  * amended and binding, as [amendment E](../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md)
  * leaves the refusal.
  *
- * **Exactly one route, and that is a drift decision.** The router validates search params *per
+ * **Exactly one app route, and that is a drift decision.** The router validates search params *per
  * route*, so a second route re-declares the same ~30-key `validateSearch` — and a link that types
  * cleanly on one route and refuses on the other is precisely the failure the typing-boundary rule
- * exists to make impossible. Every state change is a search-param change, so there is no navigation
+ * exists to make impossible. The `/docs` routes (`docs.tsx`, 2026-09-23) are not app routes: they
+ * carry no search, read no Session and render markdown. Every state change is a search-param change, so there is no navigation
  * to model; « Ouvrir l'application sans ce lien » is a `<Link to="/" search={{}} replace>` onto this
  * same route, and SVG export is a client-side `XMLSerializer` on the SVG already in the page.
  */

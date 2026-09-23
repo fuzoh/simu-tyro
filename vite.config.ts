@@ -38,6 +38,22 @@ const config = defineConfig({
        * why the Skeleton lands in the HTML rather than an empty `<body>`.
        */
       spa: { enabled: true, prerender: { outputPath: "/index" } },
+      /**
+       * **The documentation pages are prerendered as full HTML**, unlike the app. `/docs/*`
+       * renders markdown from the repository with no client state and no `ResizeObserver`, so the
+       * provenance argument that puts `ssr: false` on `/` does not apply, and a shared
+       * `/docs/modele#s-10-4` should land on the text with a **200** rather than on `404.html`.
+       * `autoStaticPathsDiscovery` stays off: `/` must remain the SPA shell, and `$slug` is not a
+       * static path — the five pages are listed here, from the same registry the router uses.
+       */
+      prerender: { enabled: true, autoStaticPathsDiscovery: false, crawlLinks: false },
+      pages: [
+        { path: "/docs", prerender: { enabled: true, outputPath: "/docs/index.html" } },
+        ...["modele", "algorithme", "simulation", "cable", "corde"].map((slug) => ({
+          path: `/docs/${slug}`,
+          prerender: { enabled: true, outputPath: `/docs/${slug}/index.html` },
+        })),
+      ],
     }),
     viteReact(),
   ],

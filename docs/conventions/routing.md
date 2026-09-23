@@ -7,8 +7,9 @@ production that render happens **once at build time** and ships as a static file
 below); under `bun run dev` it happens per request. Same output either way — which is the point.
 
 - Routes are files under `src/routes/`. Each exports a route created with `createFileRoute`.
-  There is exactly one route in v1; a second route would re-declare the same ~30-key
-  `validateSearch`.
+  **The simulator is exactly one route**, `/`; a second *app* route would re-declare the same
+  ~30-key `validateSearch`. The `/docs` routes (below) are not app routes: they declare no
+  `validateSearch`, read no Session and write no URL state.
 - `src/routes/__root.tsx` is the **document**, not chrome: `<html lang="fr">`, head, stylesheet,
   `HeadContent`/`Scripts`, `notFoundComponent`. No header, no app bar, no root `component`, no
   print stylesheet. `src/router.tsx` builds the router.
@@ -39,6 +40,30 @@ below); under `bun run dev` it happens per request. Same output either way — w
   subpath in either place is how the app 404s on a custom domain, silently.
 
 `bun run dev` serves on port 3000.
+
+## The documentation pages — `/docs`
+
+Added 2026-09-23. `src/routes/docs.tsx` (layout), `docs.index.tsx` and `docs.$slug.tsx` render the
+repository's own markdown — `docs/simulation-theory.md` and four reports under `docs/references/` —
+through `react-markdown` (+ `remark-gfm`, `remark-math`, `rehype-katex`). The registry is
+`src/lib/docs/pages.ts`; the bytes are `src/lib/docs/sources.ts`, raw `?raw` imports.
+
+- **They are SSR and prerendered, unlike `/`.** `vite.config.ts` lists the six paths under
+  `pages` with `prerender.enabled`, so the build emits `dist/client/docs/<slug>/index.html` as full
+  HTML and a shared `/docs/modele#s-10-4` lands with a **200**. `autoStaticPathsDiscovery` is
+  **off** so `/` stays the SPA shell. Under `bun run dev`, SPA mode serves the shell for every path
+  and the page renders client-side — same output, different status line.
+- **Heading ids come from the section number, not the title**: `### 10.4 Use-class gate` renders as
+  `id="s-10-4"` (`src/components/docs/markdown.tsx`, `@/lib/docs/refs.ts`). That number is the
+  contract every `§` in `src/lib/rail/help.ts` and `provenance.ts` links to, through `HelpText`
+  (`src/components/docs/help-text.tsx`). `src/lib/docs/refs.test.ts` fails on a `§` that names no
+  heading of the theory file — so a renumbering of `docs/simulation-theory.md` is a test failure,
+  not a dead link.
+- **The markdown is read in the route's `component`, never in its `loader`.** The router plugin
+  code-splits the component and leaves the loader in the critical chunk; a `docSource` call in the
+  loader ships ~150 kB of prose with the simulator. Measured: `index-*.js` 517 kB → 668 kB.
+- Add a page by adding an entry to `DOC_PAGES`, its raw import to `sources.ts`, and its path to
+  `pages` in `vite.config.ts`. Nothing else knows the list.
 
 ## Static hosting
 

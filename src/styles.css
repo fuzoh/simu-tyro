@@ -254,6 +254,137 @@
  * everywhere, so the whole rule is one media query.
  */
 @layer components {
+
+  /*
+   * The documentation pages' prose — `src/routes/docs.$slug.tsx` renders markdown into `.doc`.
+   * Three sizes, as everywhere: `text-xs` for meta, `text-base` for the body, `text-lg` for every
+   * heading — levels rank by weight and colour, never by a fourth size. Computed quantities in the
+   * reports are in code spans, so they come out mono like the app's own numbers.
+   */
+  .doc {
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    max-width: 72ch;
+    overflow-wrap: anywhere;
+  }
+  .doc > * + * {
+    margin-top: calc(var(--spacing) * 3);
+  }
+  .doc h1,
+  .doc h2,
+  .doc h3,
+  .doc h4,
+  .doc h5,
+  .doc h6 {
+    font-family: var(--font-heading);
+    font-size: var(--text-lg);
+    line-height: var(--text-lg--line-height);
+    letter-spacing: var(--tracking-tight);
+    scroll-margin-top: calc(var(--spacing) * 14);
+  }
+  .doc h1 {
+    font-weight: 700;
+  }
+  .doc h2 {
+    font-weight: 600;
+    margin-top: calc(var(--spacing) * 8);
+    padding-top: calc(var(--spacing) * 3);
+    border-top: 1px solid var(--border);
+  }
+  .doc h3 {
+    font-weight: 600;
+    margin-top: calc(var(--spacing) * 6);
+  }
+  .doc h4,
+  .doc h5,
+  .doc h6 {
+    font-weight: 500;
+    color: var(--muted-foreground);
+  }
+  .doc .doc-anchor {
+    color: inherit;
+    text-decoration: none;
+  }
+  .doc .doc-anchor:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+  .doc p > a,
+  .doc li > a,
+  .doc td > a {
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+  }
+  .doc p > a:hover,
+  .doc li > a:hover,
+  .doc td > a:hover {
+    text-decoration-style: solid;
+  }
+  .doc ul,
+  .doc ol {
+    padding-inline-start: calc(var(--spacing) * 5);
+  }
+  .doc ul {
+    list-style: disc;
+  }
+  .doc ol {
+    list-style: decimal;
+  }
+  .doc li + li {
+    margin-top: calc(var(--spacing) * 1);
+  }
+  .doc blockquote {
+    border-inline-start: 2px solid var(--border);
+    padding-inline-start: calc(var(--spacing) * 3);
+    color: var(--muted-foreground);
+  }
+  .doc code,
+  .doc .doc-path {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+    background: var(--muted);
+    padding: 0 calc(var(--spacing) * 1);
+  }
+  .doc pre {
+    background: var(--muted);
+    padding: calc(var(--spacing) * 3);
+    overflow-x: auto;
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+  }
+  .doc pre code {
+    background: none;
+    padding: 0;
+    font-size: inherit;
+  }
+  .doc table {
+    display: block;
+    overflow-x: auto;
+    border-collapse: collapse;
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+  }
+  .doc th,
+  .doc td {
+    border: 1px solid var(--border);
+    padding: calc(var(--spacing) * 1) calc(var(--spacing) * 2);
+    vertical-align: top;
+    text-align: start;
+  }
+  .doc th {
+    font-weight: 600;
+    background: var(--muted);
+  }
+  .doc hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+  }
+  .doc .katex-display {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-block: calc(var(--spacing) * 1);
+  }
   .chart-grab {
     fill: transparent;
     pointer-events: all;

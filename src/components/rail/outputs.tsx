@@ -38,6 +38,7 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 import { jumpToField } from "@/components/app/banner.tsx";
 import { RailSection } from "@/components/app/shell.tsx";
 import { useAppState } from "@/components/app/store.tsx";
+import { HelpText } from "@/components/docs/help-text.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { GRID_HELP, RESULT_HELP } from "@/lib/rail/help.ts";
 import {
@@ -348,7 +349,9 @@ function NotComputedSection() {
         {NOT_COMPUTED_LINES.map((line, index) => (
           <li className="flex items-start gap-1" key={line}>
             <span>·</span>
-            <span>{line}</span>
+            <span>
+              <HelpText text={line} />
+            </span>
             {/* §8.3 asks that the load combination be exposed and labelled — prose on the
                 surface, formula in the popover. Printed in the open, someone applies those γ
                 factors by hand and believes the result. */}

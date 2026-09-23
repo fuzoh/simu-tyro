@@ -30,15 +30,16 @@ import type { ChangeEvent, ReactNode } from "react";
 import { Info } from "lucide-react";
 import { useId } from "react";
 
+import { HelpText } from "@/components/docs/help-text.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.tsx";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover.tsx";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip.tsx";
 import { cn } from "@/lib/utils.ts";
 
 /**
@@ -135,7 +136,9 @@ export function Row({
           <p className="text-muted-foreground text-xs">{message.text}</p>
         ))}
       {warning !== undefined && warning !== null && (
-        <p className="text-warning text-xs">⚠ {warning}</p>
+        <p className="text-warning text-xs">
+          ⚠ <HelpText text={warning} />
+        </p>
       )}
       {note}
     </div>
@@ -397,33 +400,47 @@ export function Chip({
         id={id}
         role="tooltip"
       >
-        {detail}
+        {/* The popover stays open while hovered — it is inside the `group` — so the § links are
+            reachable by pointer, and by keyboard under `group-focus-within`. */}
+        <HelpText text={detail} />
       </p>
     </span>
   );
 }
 
 /**
- * The explanation beside a label — an `ⓘ` that opens a tooltip with `@/lib/rail/help.ts`'s copy
- * (decision of 2026-09-23): what the value is and how it is computed, in French, as long as it needs
- * to be. A **button** in the tab order, so keyboard and touch users reach it — hover is not the only
- * path. The content is `text-xs` like every other annotation; it is wider than the registry's
- * `max-w-xs` because a formula and its § reference do not fit three lines.
+ * The explanation beside a label — an `ⓘ` that opens `@/lib/rail/help.ts`'s copy (decision of
+ * 2026-09-23): what the value is and how it is computed, in French, as long as it needs to be, with
+ * every `§` a link into the documentation (`HelpText`).
+ *
+ * **A popover, not a tooltip** — the change of 2026-09-23 that came with the `/docs` pages. A
+ * tooltip is non-interactive by contract: it closes as the pointer leaves the trigger, so a link
+ * inside it can be seen but never reached. Base UI's popover opens on hover *and* on click
+ * (`openOnHover`), stays open while the pointer is over it, and is a **button** in the tab order,
+ * so keyboard and touch users reach the same text and the same links. The content is `text-xs` like
+ * every other annotation; it is wider than the registry's `w-72` because a formula and its §
+ * reference do not fit three lines.
  */
 export function InfoTip({ label, text }: { label: string; text: string }) {
   return (
-    <Tooltip>
-      <TooltipTrigger
+    <Popover>
+      <PopoverTrigger
         aria-label={`Explication : ${label}`}
         className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex shrink-0 cursor-help items-center rounded-none focus-visible:ring-[3px] focus-visible:outline-none"
+        closeDelay={150}
+        delay={200}
+        openOnHover
         type="button"
       >
         <Info aria-hidden="true" className="size-3" />
-      </TooltipTrigger>
-      <TooltipContent className="max-w-sm text-left leading-snug whitespace-pre-line" side="bottom">
-        {text}
-      </TooltipContent>
-    </Tooltip>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-auto max-w-sm text-left leading-snug whitespace-pre-line"
+        side="bottom"
+      >
+        <HelpText text={text} />
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -465,7 +482,9 @@ export function ReadOut({
         {children}
       </div>
       {warning !== undefined && warning !== null && (
-        <p className="text-warning text-xs">⚠ {warning}</p>
+        <p className="text-warning text-xs">
+          ⚠ <HelpText text={warning} />
+        </p>
       )}
     </div>
   );

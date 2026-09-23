@@ -10,9 +10,11 @@
  * - **Every entry says two things: what the value is, and where it comes from.** An input names its
  *   role in the computation; a read-out names the formula or the reduction that produced it. A
  *   sentence that only restates the label is not help.
- * - **Formulas are quoted as the engine computes them**, with the § reference of the report they
- *   trace back to (`docs/conventions/simulation.md`). Nothing here invents a coefficient: where a
- *   value is a `[CONVENTION]`, the copy says so.
+ * - **Formulas are quoted as the engine computes them**, with the § of `docs/simulation-theory.md`
+ *   they trace back to — **that file and no other**: `@/components/docs/help-text.tsx` renders every
+ *   `§n.m` as a link to `/docs/modele#s-n-m`, and `@/lib/docs/refs.test.ts` fails on a § that names
+ *   no heading there. Nothing here invents a coefficient: where a value is a `[CONVENTION]`, the
+ *   copy says so.
  * - **Total over the ids it keys.** `FIELD_HELP` is a `Record<FieldId, string>`, so a new field
  *   without help is a type error, not a silent hole.
  */
@@ -53,7 +55,7 @@ export const FIELD_HELP: Record<FieldId, string> = {
   etaA: "Rendement de la terminaison A, η_A ∈ ]0, 1] : fraction de la charge de rupture que la ligne conserve à cette extrémité. Il multiplie directement la tension admissible T adm,A = η_A · MBF / k et le facteur de sécurité FS_A = η_A · MBF / T max,A majoré. Prérempli depuis le type choisi ; une valeur modifiée passe en « valeur utilisateur » dans la provenance.",
   etaB: "Rendement de la terminaison B, η_B ∈ ]0, 1] : fraction de la charge de rupture conservée à cette extrémité. T adm,B = η_B · MBF / k et FS_B = η_B · MBF / T max,B majoré. Le critère « charge suspendue » utilise min(η_A, η_B), car une ligne cède à sa terminaison la plus faible.",
   D_target:
-    "Flèche à vide cible, en mètres : creux maximal de la ligne sans passager sous la corde A–B. Le solveur cherche la longueur non tendue L₀ (et donc la prétension H) qui donne exactement cette flèche à la chaînette élastique (§1, §5). C'est le pilote de tension par défaut, car sa valeur est exacte à la précision affichée.",
+    "Flèche à vide cible, en mètres : creux maximal de la ligne sans passager sous la corde A–B. Le solveur cherche la longueur non tendue L₀ (et donc la prétension H) qui donne exactement cette flèche à la chaînette élastique (§4, §5). C'est le pilote de tension par défaut, car sa valeur est exacte à la précision affichée.",
   H_target:
     "Prétension cible, composante horizontale H de la tension à vide, constante sur toute la ligne. Le solveur cherche la longueur non tendue L₀ qui, sous le poids propre w = μ · g, donne cette H. Une H trop faible pour la corde A–B est refusée par le moteur (« Tension impossible », §5.4).",
   L0: "Longueur non tendue L₀ de la ligne, en mètres : longueur du câble hors charge, avant allongement élastique. C'est la vraie grandeur d'état du modèle — les deux autres pilotes s'y ramènent. La ligne installée s'allonge de T · L₀ / EA ; L₀ doit dépasser la corde A–B moins cet allongement.",
@@ -61,7 +63,7 @@ export const FIELD_HELP: Record<FieldId, string> = {
     "Rapport V = P / H : poids du passager P = m_p · g sur la prétension horizontale H. C'est un paramétrage du mode « Tension » : H cible = m_p · g / rapport. Plus le rapport est grand, plus H est faible et plus la ligne forme un V profond sous le passager.",
   mp: "Masse du passager m_p, en kg. La charge ponctuelle appliquée à la ligne vaut P = m_p · g ; elle crée le point anguleux de la chaînette chargée, augmente les tensions aux ancrages et la flèche chargée. Les 120 kg par défaut sont attribués à EN 15567-1 mais non vérifiés dans le texte primaire.",
   hRider:
-    "Enveloppe passager h_rider, en mètres : hauteur occupée sous le câble par le passager, son harnais et sa poulie. Elle est soustraite directement de la hauteur du câble pour obtenir la garde au sol : h_clear(x) = z_câble(x) − z_sol(x) − h_rider (§11, §4.3). 2,1 m est une [CONVENTION] : aucune valeur normative n'est publiée.",
+    "Enveloppe passager h_rider, en mètres : hauteur occupée sous le câble par le passager, son harnais et sa poulie. Elle est soustraite directement de la hauteur du câble pour obtenir la garde au sol : h_clear(x) = z_câble(x) − z_sol(x) − h_rider (§11). 2,1 m est une [CONVENTION] : aucune valeur normative n'est publiée.",
   hClearMin:
     "Garde au sol minimale admise, en mètres : le seuil en dessous duquel la garde calculée est jugée insuffisante. L'outil compare la garde minimale (traversée) — le minimum de h_clear sur toutes les positions du passager — à cette valeur ; sous le seuil, la ligne « Garde min (traversée) » et la cellule « Garde min. ligne » passent en rouge. 1,0 m est une [CONVENTION] ; 0 désactive la vérification. Ce seuil ne modifie aucun calcul.",
   DAF: "Coefficient d'amplification dynamique DAF (§8.2). Il majore l'écart de tension dû au passager : T max majoré = T à vide + DAF · (T chargé − T à vide). C'est ce T majoré que divise le facteur de sécurité. 1,2 est le plafond mesuré pour un départ contrôlé sur ligne tendue [FIELD:SSF] ; sous 3 % de flèche / portée, la ligne sort du régime où il a été mesuré. Il ne touche pas la garde au sol.",
@@ -99,12 +101,12 @@ export const DEDUCED_HELP: Record<DeducedHelpId, string> = {
   MBL: "Charge de rupture minimale MBL de la corde, telle que saisie, affichée dans l'unité de force choisie. Numérateur de T adm = η · MBL / k et de FS = η · MBL / T max majoré.",
   EAtextile:
     "Raideur axiale de la corde EA = k · MBL, en MN (§13.2). Elle règle l'allongement élastique sous charge : plus EA est grand, moins la flèche chargée augmente.",
-  w: "Poids linéique de la ligne w = μ · g, en force par mètre. C'est la charge répartie qui donne la forme de chaînette à vide : constante C = H / w, y(x) = C · cosh((x − x₀) / C) + y₀ (§1.1).",
+  w: "Poids linéique de la ligne w = μ · g, en force par mètre. C'est la charge répartie qui donne la forme de chaînette à vide : constante C = H / w, y(x) = C · cosh((x − x₀) / C) + y₀ (§3, §4).",
   chord:
     "Longueur de la corde A–B, ligne droite entre les deux ancrages : √(L² + h²), en mètres. Toute longueur non tendue L₀ doit dépasser cette corde diminuée de l'allongement élastique ; la borne §5.4 refuse une tension qui ne la respecte pas.",
   L0: "Longueur non tendue L₀ résolue par le solveur pour le pilote choisi (flèche, prétension ou rapport V), en mètres. C'est la longueur de câble à mesurer hors charge lors du montage. Elle est préremplie dans le champ si vous passez au pilote « Longueur ».",
   H: "Prétension horizontale H de la ligne à vide, résolue par le solveur pour le pilote choisi. Constante sur toute la ligne ; la tension totale en un point vaut T = H / cos θ, et T aux ancrages est la plus grande là où la pente est la plus forte. Préremplie dans le champ si vous passez au pilote « Tension ».",
-  sag: "Flèche à vide : creux maximal de la ligne sans passager sous la corde A–B, en mètres, et la position x où il se produit. Résolue depuis la chaînette élastique pour la L₀ courante (§1). Préremplie dans le champ si vous passez au pilote « Flèche ».",
+  sag: "Flèche à vide : creux maximal de la ligne sans passager sous la corde A–B, en mètres, et la position x où il se produit. Résolue depuis la chaînette élastique pour la L₀ courante (§4). Préremplie dans le champ si vous passez au pilote « Flèche ».",
   sagRatio:
     "Rapport flèche à vide / portée, en %. C'est un indicateur de validité du modèle : sous 3 % (§8.2) la ligne se raidit, la réponse dynamique est mal décrite et le DAF 1,2 sort de son régime de mesure — un avertissement s'affiche alors ici et sur le coefficient dynamique.",
   standingTension:
@@ -118,7 +120,7 @@ export const RESULT_HELP: Record<ResultRowId, string> = {
   FS: "Facteur de sécurité effectif de l'extrémité la plus chargée : FS = η · MBF / T max majoré, où T max majoré = T à vide + DAF · (T chargé − T à vide) pris au pire pas de la traversée. Affiché contre le k exigé par le régime pour le critère tension totale. Ce n'est pas un pourcentage d'utilisation : c'est le rapport que vous pouvez recalculer vous-même.",
   Tmax: "Tension maximale majorée sur toute la traversée : T à vide + DAF · (T chargé − T à vide), à l'ancrage et pour la position du passager qui la produisent. C'est la grandeur que divise le FS effectif. Elle diffère de « T anc. » des cellules de lecture, qui est la tension statique pour la seule position affichée.",
   clearance:
-    "Garde au sol minimale sur toute la traversée : minimum, pour toutes les positions du passager x_P ∈ [0, L], de h_clear(x, x_P) = z_câble(x, x_P) − z_sol(x) − h_rider (§4.3, §11). La position du passager qui la produit est nommée. Elle est comparée à « Garde min. admise » et passe en rouge sous ce seuil. Elle diffère de la cellule « Garde min. ligne », qui vaut pour la seule position affichée.",
+    "Garde au sol minimale sur toute la traversée : minimum, pour toutes les positions du passager x_P ∈ [0, L], de h_clear(x, x_P) = z_câble(x, x_P) − z_sol(x) − h_rider (§11). La position du passager qui la produit est nommée. Elle est comparée à « Garde min. admise » et passe en rouge sous ce seuil. Elle diffère de la cellule « Garde min. ligne », qui vaut pour la seule position affichée.",
   reserve:
     "Réserve de tension avant T admissible à l'ancrage gouvernant : T adm − T max majoré, en force. Positive, c'est de combien la tension peut encore croître avant que FS ne tombe à k ; négative, c'est l'excès à retirer. C'est la forme qui répond à « combien puis-je encore tendre » sans arithmétique.",
   TadmA:
@@ -154,9 +156,9 @@ export const CELL_HELP: Record<string, string> = {
   "Garde min. ligne":
     "Garde au sol minimale sur toute la ligne pour la position affichée du passager : min sur x de z_câble(x, x_D) − z_sol(x) − h_rider (§11). Quand ce minimum n'est pas sous le passager, la cellule indique à quel x il se trouve. Passe en rouge sous « Garde min. admise ». Diffère de « Garde min (traversée) » de la barre latérale, qui prend aussi le minimum sur toutes les positions du passager.",
   "T anc. A":
-    "Tension statique à l'ancrage A pour la position affichée du passager, sans majoration dynamique : résolue par l'équilibre de la chaînette chargée (§5). Le T max majoré de la barre latérale en est le pire cas sur la traversée, multiplié par le DAF.",
+    "Tension statique à l'ancrage A pour la position affichée du passager, sans majoration dynamique : résolue par l'équilibre de la chaînette chargée (§6.1). Le T max majoré de la barre latérale en est le pire cas sur la traversée, multiplié par le DAF.",
   "T anc. B":
-    "Tension statique à l'ancrage B pour la position affichée du passager, sans majoration dynamique : résolue par l'équilibre de la chaînette chargée (§5).",
+    "Tension statique à l'ancrage B pour la position affichée du passager, sans majoration dynamique : résolue par l'équilibre de la chaînette chargée (§6.1).",
   Pente:
     "Pente locale de la ligne au niveau du passager, en % : tan θ · 100, où θ est l'angle du câble au nœud du passager. Elle commande la composante motrice du poids et donc l'accélération du passager à cette position.",
   Flèche:
