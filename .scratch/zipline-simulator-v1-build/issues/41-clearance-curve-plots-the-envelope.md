@@ -10,7 +10,7 @@ engine's arithmetic.
 by ~18 mm, and nothing in this ticket is smaller than 0,44 m. Overlaps
 [39](./39-clearance-strip-investigation.md), whose item 5 stays 37's.)*
 
-**Status:** closed — **shape B+ landed 2026-08-17** on the user's four decisions of the same day
+**Status:** closed — **shape B+ landed 2026-08-17**, strip half reversed 2026-09-23 (voir ## Comments); on the user's four decisions of the same day
 (voir ## Comments). Shape A is **refuted on measured grounds**, not merely costed: on an imported
 profile one shared linear axis leaves the crossing 0,2 px tall. `src/lib/sim/**` untouched.
 
@@ -375,3 +375,22 @@ figures land 3 mm under the identity the parenthesis claims. Read through `place
 `x_D` 0 and `x_D` `L`, which is what the app draws when the field says « 0,0 », the identity is exact:
 **9,900 m** on both ends of **A** and **17,900 m** at **B**'s arrival anchor. `scene.test.ts` pins the
 exact form; the 9,897 / 17,896 figures above stand as what the *sweep* records.
+
+### Shape B+ reversed for the strip — user decision 2026-09-23
+
+Reported on a 423,5 m imported textile line (`te=120`, PA 73 g/m, `k` 0,9): « the information I want
+on this graph is the number of meters between the load and the floor. If negative this indicates we
+are *in the floor*, which is impossible. Draw in red only the negative parts. »
+
+**Decision:** the strip's curve is now « garde sous le passager », `z_D − z_ground(x_D) − h_rider`,
+per solved step — the same arithmetic as `SceneRider.underRider`. Caption and `aria` renamed to
+match. The stroke is `foreground` where positive and `destructive` where negative, split at an
+interpolated zero crossing; the deficit fill stays.
+
+**What B+ measured still holds, and is kept:** the envelope's *positive* side is not drawn — one
+shared linear axis flattens it to 0,2 px (comment above). Its **negative** side alone is filled in
+`destructive/10` beneath the curve, so a cable-ground contact away from the passenger — the case
+where `underRider > 0` while the verdict fails — remains visible on the strip. The read-out cell,
+`violatingBands` and §10's verdict are unchanged and still judge the envelope.
+
+`src/lib/sim/**` untouched. Only `strip.tsx` changed.

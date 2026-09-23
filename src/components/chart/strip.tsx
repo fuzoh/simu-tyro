@@ -8,24 +8,21 @@
  * also why **no `<input type="range">` exists anywhere in the app** — a rail slider maps to nothing
  * spatially, and this axis *already is* rider position.
  *
- * **What the curve is, stated because it was read wrong** — ticket 41. `y` is §11's inner minimum
- * **over the whole line** at that rider position, `min over x of h_clear(x; x_P)`; `x` is the rider
- * position that parameterises it. So the curve is a function *of* the passenger's position and its
- * value is **not** the passenger's own garde, which is `profile.tsx`'s dimension line at `x_D`. The
- * caption, the axis and that cell all name the line's minimum for that reason. Three consequences
- * are honest and are **not** defects: the curve rises at both ends while the passenger descends (a
- * rider near an anchor raises `H`, which lifts mid-span, so the worst point on the line gains
- * clearance exactly while the rider loses it — ticket 39 measured this and closed it as physical);
- * the y axis tops out at the *envelope's* ceiling, which is below the passenger's garde near an
- * anchor; and the curve can go flat over metres of traverse where the passenger is climbing.
+ * **What the curve is** — ticket 41, reversed on the user's decision of 2026-09-23. `y` is « garde
+ * sous le passager », `z_D − z_ground(x_D) − h_rider`, the metres between the passenger's feet and
+ * the ground **at the passenger's own position**; `x` is that position. This is the quantity the
+ * reader computes by eye off the profile, and it is the same arithmetic as
+ * {@link SceneRider.underRider}, evaluated at every solved step instead of at the current one.
+ * Negative means the passenger is *in* the ground, which is impossible, so **only the negative parts
+ * are drawn red** — stroke and fill — and the curve is `foreground` everywhere else.
  *
- * **Why the passenger's garde may not simply be a second stroke in here**, measured on ticket 41's
- * scenarios: the two quantities are not the same order of magnitude. On an imported profile the
- * passenger flies a valley at **+62,6 m** while the envelope minimum sits at **−0,36 m** against a
- * ridge, so one shared linear domain leaves the envelope curve **0,2 px** tall at § 5's reference
- * column — 100 % of the crossing gone — and 67 % gone on a violating manual line at 390 px. The
- * deficit fill, the zero crossing and {@link clearanceDomain}'s input therefore stay this one
- * quantity, which is the one that fails and the one §10's verdict judges.
+ * **What it is not, and what still shows.** §11's criterion is the inner minimum **over the whole
+ * line**, `min over x of h_clear(x; x_P)`, and `underRider ≥ worst.hClear` by construction. So the
+ * cable can touch a ridge away from the passenger while this curve stays positive. That case is not
+ * hidden: the envelope's **negative** parts alone are still filled in a fainter red beneath the
+ * curve — its positive parts are not drawn, because ticket 41 measured that sharing one linear axis
+ * with the envelope flattens the crossing to 0,2 px on an imported profile. The read-out cell and
+ * §10's verdict keep judging the envelope, as before.
  *
  * Two rules that outlive any redesign of it:
  *
@@ -49,12 +46,13 @@ import type { ChartScene, SceneFrame } from "@/lib/chart/scene.ts";
 import type { SharedX } from "@/lib/layout/contract.ts";
 
 import { clearanceDomain, clearanceTickLabel } from "@/lib/layout/contract.ts";
+import { zGroundAt } from "@/lib/sim";
 
 /**
- * One point of the curve: a rider position and **the line's** worst clearance at it, or a hole where
- * a step failed. Not the garde under the rider — voir the module docblock.
+ * One point of the curve: a rider position, the garde **under the rider** there (`y`), and the
+ * line's envelope minimum at that same step (`envelope`) — or a hole where a step failed.
  */
-type Sample = { x: number; y: number | null };
+type Sample = { x: number; y: number | null; envelope: number | null };
 
 /**
  * The curve, over the **grid** rather than over the solved steps. `sweep` copies each grid value
@@ -68,19 +66,26 @@ type Sample = { x: number; y: number | null };
  * since `x_D` increases with `s` — and falls back to the arc fraction only at a run of holes that
  * reaches an end of the grid, where there is no neighbour on one side. Ticket 39, item 6.
  */
-function samples(scene: ChartScene): Sample[] {
+function samples(frame: SceneFrame, scene: ChartScene): Sample[] {
   const { grid, steps } = scene.traverse;
   const solved: { s: number; x: number }[] = [];
-  const out: { s: number; x: number | null; y: number | null }[] = [];
+  const out: { s: number; x: number | null; y: number | null; envelope: number | null }[] = [];
   let next = 0;
   for (let i = 0; i < grid.length; i++) {
     const step = steps[next];
     if (step !== undefined && step.sD === grid[i]) {
-      out.push({ s: grid[i], x: step.xD, y: scene.clearance.perStep[next] });
+      out.push({
+        s: grid[i],
+        x: step.xD,
+        // `scene.ts`'s `underRider`, at every step: `z_D` is exact (the trolley sits on the kink), so
+        // this curve carries no scan error at all.
+        y: step.zD - zGroundAt(frame.terrain, step.xD) - scene.hRider,
+        envelope: scene.clearance.perStep[next],
+      });
       solved.push({ s: grid[i], x: step.xD });
       next++;
     } else {
-      out.push({ s: grid[i], x: null, y: null });
+      out.push({ s: grid[i], x: null, y: null, envelope: null });
     }
   }
 
@@ -88,16 +93,42 @@ function samples(scene: ChartScene): Sample[] {
   // at or before it. Both present ⇒ interpolate; one missing ⇒ the grid runs off an end.
   let at = 0;
   return out.map((point) => {
-    if (point.x !== null) return { x: point.x, y: point.y };
+    if (point.x !== null) return { x: point.x, y: point.y, envelope: point.envelope };
     while (at < solved.length && solved[at].s < point.s) at++;
     const after = solved[at];
     const before = at > 0 ? solved[at - 1] : undefined;
     if (before !== undefined && after !== undefined) {
       const t = (point.s - before.s) / (after.s - before.s);
-      return { x: before.x + t * (after.x - before.x), y: null };
+      return { x: before.x + t * (after.x - before.x), y: null, envelope: null };
     }
-    return { x: (point.s / scene.span.L0) * scene.L, y: null };
+    return { x: (point.s / scene.span.L0) * scene.L, y: null, envelope: null };
   });
+}
+
+/**
+ * The curve with a point inserted at every zero crossing of `y`, so the red and the `foreground`
+ * strokes meet exactly on the zero line instead of stopping one sample short of it. A hole on
+ * either side is not a crossing.
+ */
+function withZeroCrossings(points: Sample[]): Sample[] {
+  const out: Sample[] = [];
+  for (let i = 0; i < points.length; i++) {
+    const point = points[i];
+    const previous = points[i - 1];
+    if (
+      previous !== undefined &&
+      previous.y !== null &&
+      point.y !== null &&
+      previous.y < 0 !== point.y < 0 &&
+      previous.y !== 0 &&
+      point.y !== 0
+    ) {
+      const t = previous.y / (previous.y - point.y);
+      out.push({ x: previous.x + t * (point.x - previous.x), y: 0, envelope: null });
+    }
+    out.push(point);
+  }
+  return out;
 }
 
 export function ClearanceStrip({
@@ -130,8 +161,13 @@ export function ClearanceStrip({
   wide: boolean;
   onScrub: (metres: number) => void;
 }) {
-  const points = scene === null || !clearance ? [] : samples(scene);
-  const values = points.filter((point) => point.y !== null).map((point) => point.y as number);
+  const points = scene === null || !clearance ? [] : withZeroCrossings(samples(frame, scene));
+  // The y domain is sized on the curve, plus the envelope's **negative** side only — that fill must
+  // fit, and its positive side is exactly what ticket 41 measured must not share this axis.
+  const values = points.flatMap((point) => [
+    ...(point.y !== null ? [point.y] : []),
+    ...(point.envelope !== null && point.envelope < 0 ? [point.envelope] : []),
+  ]);
 
   const top = 20;
   const bottom = height - 10;
@@ -140,17 +176,32 @@ export function ClearanceStrip({
     bottom - ((metres - domain.floor) / (domain.top - domain.floor)) * (bottom - top);
   const zero = y(0);
 
-  const curve = line<Sample>()
-    .defined((point) => point.y !== null)
+  // Two strokes over one point set, split at zero: `foreground` where the passenger is above the
+  // ground, `destructive` where they are in it. The inserted crossings belong to both, so the two
+  // meet on the zero line.
+  const above = line<Sample>()
+    .defined((point) => point.y !== null && point.y >= 0)
+    .x((point) => x.x(point.x))
+    .y((point) => y(point.y ?? 0))(points);
+  const below = line<Sample>()
+    .defined((point) => point.y !== null && point.y <= 0)
     .x((point) => x.x(point.x))
     .y((point) => y(point.y ?? 0))(points);
 
   // Signal 2 — red fill below zero: « de combien, et où sur la traversée ? ».
   const deficit = area<Sample>()
-    .defined((point) => point.y !== null && point.y < 0)
+    .defined((point) => point.y !== null && point.y <= 0)
     .x((point) => x.x(point.x))
     .y0(zero)
     .y1((point) => y(point.y ?? 0))(points);
+
+  // The envelope's own negative parts — a cable-ground contact away from the passenger — in a
+  // fainter red, so the verdict's failure never disappears from this chart. Voir the docblock.
+  const envelopeDeficit = area<Sample>()
+    .defined((point) => point.envelope !== null && point.envelope < 0)
+    .x((point) => x.x(point.x))
+    .y0(zero)
+    .y1((point) => y(point.envelope ?? 0))(points);
 
   function scrub(event: ReactPointerEvent<SVGSVGElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -159,7 +210,7 @@ export function ClearanceStrip({
 
   return (
     <svg
-      aria-label="Garde au sol minimale de la ligne selon la position du passager"
+      aria-label="Garde au sol sous le passager selon sa position"
       className="block h-full w-full touch-pan-y select-none"
       height={height}
       onPointerDown={(event) => {
@@ -173,14 +224,11 @@ export function ClearanceStrip({
       width={x.width}
     >
       <text className="fill-muted-foreground text-[10px]" x={x.gutter} y={12}>
-        {/* The caption names **both** scopes, because naming one is how the curve came to be read as
-            the other: « de la ligne » is what `y` reduces over, « selon la position du passager » is
-            what `x` is. The narrow variant keeps the first and drops the second — the axis itself is
-            rider position and the marker is on it, while the y quantity has nothing else on screen
-            saying what it minimises over. Ticket 41. */}
+        {/* The caption names the quantity's scope — « sous le passager » — because the previous
+            curve was the line's envelope and was read as this one (ticket 41). */}
         {wide
-          ? "Garde min. de la ligne (m) selon la position du passager — glisser pour déplacer"
-          : "Garde min. de la ligne (m) — glisser"}
+          ? "Garde sous le passager (m) selon sa position — glisser pour déplacer"
+          : "Garde sous le passager (m) — glisser"}
       </text>
 
       {/* Zero is the threshold this whole chart exists to show a crossing of, so it is drawn in
@@ -214,8 +262,10 @@ export function ClearanceStrip({
           </text>
         ))}
 
+      {envelopeDeficit !== null && <path className="fill-destructive/10" d={envelopeDeficit} />}
       {deficit !== null && <path className="fill-destructive/25" d={deficit} />}
-      {curve !== null && <path className="stroke-foreground fill-none stroke-2" d={curve} />}
+      {above !== null && <path className="stroke-foreground fill-none stroke-2" d={above} />}
+      {below !== null && <path className="stroke-destructive fill-none stroke-2" d={below} />}
 
       {/* The rider's own position on its own axis — the one marker this chart needs. Absent with
           the rest of the solved half, while the track it sits on stays live. */}
