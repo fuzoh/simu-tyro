@@ -7,7 +7,7 @@ import viteReact from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 /**
- * Where the built app will be *served* from — `/` in dev and on any root-domain host, `/scoutech/`
+ * Where the built app will be *served* from — `/` in dev and on any root-domain host, `/simu-tyro/`
  * on a GitHub Pages **project** site. It is an env var and not a constant because it is a property
  * of the host, not of the app: `.github/workflows/deploy.yml` sets it, a custom domain unsets it,
  * and `bun run dev` never sees it. Vite hands the same value to client code as
