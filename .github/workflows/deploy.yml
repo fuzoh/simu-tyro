@@ -55,7 +55,7 @@ jobs:
 
       # The same gates as `ci.yml`, run again on the released commit: a green deploy of red code
       # is worse than no deploy. `test:ci` leaves out the wall-clock p95 tripwire — see
-      # `CONTRIBUTING.md` § Checks.
+      # `docs/conventions/testing.md` § Benches.
       - run: bun run typecheck
       - run: bun run lint-type-aware
       - run: bun run test:ci
