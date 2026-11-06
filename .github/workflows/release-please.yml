@@ -1,0 +1,47 @@
+# Keep a release PR open against `main`; merging it tags the release and publishes GitHub Pages.
+#
+# release-please reads Conventional Commits since the last tag, bumps `package.json`, writes
+# `CHANGELOG.md` and keeps one PR up to date. Merging that PR makes the next run create the
+# `vX.Y.Z` tag and GitHub release, and `release_created` then calls `deploy.yml`.
+#
+# Token: the `RELEASE_PLEASE_SIMU_TYRO` secret, a PAT with contents + pull-requests write. Not the
+# default `GITHUB_TOKEN`: GitHub starts no workflow for a PR opened with it, so `ci.yml` would never
+# run on the release PR. Deploy is chained via `release_created` below, not via the tag event.
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # create release commits, tags and GitHub releases
+      pull-requests: write # open and update the release PR
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_SIMU_TYRO }}
+
+  deploy:
+    name: Deploy GitHub Pages
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    permissions:
+      contents: read # checkout
+      pages: write # publish the site
+      id-token: write # authenticate the Pages deployment
+    uses: ./.github/workflows/deploy.yml

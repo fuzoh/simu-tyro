@@ -35,7 +35,7 @@ below); under `bun run dev` it happens per request. Same output either way — w
   after load, not an installable app.
 - **The router's `basepath` is read, never written.** `src/router.tsx` sets
   `basepath: import.meta.env.BASE_URL`, which Vite fills from `base` in `vite.config.ts` — `/` in
-  dev, `/scoutech/` on the GitHub Pages project site. Route code stays written against `/`; the
+  dev, `/simu-tyro/` on the GitHub Pages project site. Route code stays written against `/`; the
   router strips the prefix before matching and re-adds it when it builds an href. Hardcoding the
   subpath in either place is how the app 404s on a custom domain, silently.
 
@@ -82,7 +82,7 @@ must not be enabled speculatively; a GitHub Pages deploy is the ask that spends 
   intact rather than defeating it — an unknown path still returns a genuine **404** status, and the
   router renders `notFoundComponent` into it. No redirect to `/`.
 - `BASE_PATH` is a build-time env var, not a constant: unset (`/`) in dev and on a custom domain,
-  `/scoutech/` on the project site. `.github/workflows/deploy.yml` reads it off
+  `/simu-tyro/` on the project site. `.github/workflows/deploy.yml` reads it off
   `actions/configure-pages`, so attaching a domain needs no code change.
 - **Every URL the app writes goes through the router** — `navigate({ to: "/" })` in `store.tsx`,
   `use-persist.ts` and `inputs.tsx` — so `basepath` is applied for free. « Copier le lien » is the
@@ -91,6 +91,8 @@ must not be enabled speculatively; a GitHub Pages deploy is the ask that spends 
   + `BASE_URL`. A new absolute-URL writer must use it too, or it ships links that 404.
 - Only `dist/client/` is published. `dist/server/` is still emitted by Start — SPA mode does not
   suppress it — and is deliberately not deployed.
+- The site is published **per release**, not per push: merging the release-please PR tags `main`,
+  and `release-please.yml` calls `deploy.yml`. What is live is always a tagged version.
 
 ## The shell, as built — where each rule lives
 

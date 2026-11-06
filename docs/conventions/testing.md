@@ -130,6 +130,10 @@ input the app's own ranges refuse.
   `sweep.bench.ts` (`bun run bench`, human-read, asserts nothing) and `bench-harness.test.ts` (the
   p95 tripwire, in `bun run test`). One definition, because a bench cell and a gate cell that could
   drift apart would make CI guard something the bench does not measure.
+- **CI runs `bun run test:ci`, which excludes `bench-harness.test.ts`.** It is a wall-clock gate,
+  and a shared runner measures the box, not the code (the same commit measured 8,7 ms then 13,6 ms
+  there). The budget is not relaxed to fit a runner: run the full `bun run test` on a real machine
+  before merging anything that touches `src/lib/sim/`.
 - Microsecond figures (e.g. `p1` decode at 2,3–2,5 µs) belong in a bench a human reads, never in a
   CI assertion.
 
