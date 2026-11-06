@@ -39,12 +39,12 @@ rewrite.
 
 ### Issue tracker
 
-Local markdown: issues and specs live under `.scratch/<feature-slug>/`. See [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
+GitHub Issues on `fuzoh/simu-tyro`, via the `gh` CLI. See [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
 
 ### Triage labels
 
-The five canonical roles, unrenamed, written as a `Status:` line in each issue file. See [docs/agents/triage-labels.md](docs/agents/triage-labels.md).
+The five canonical roles, unrenamed, as GitHub labels. See [docs/agents/triage-labels.md](docs/agents/triage-labels.md).
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See [docs/agents/domain.md](docs/agents/domain.md).
+Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See [docs/agents/domain.md](docs/agents/domain.md).

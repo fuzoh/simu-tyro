@@ -17,6 +17,18 @@ One zip line, anchor to anchor. Always exactly one span — there are no interme
 supports and no multi-span lines.
 _Avoid_: line, cable run, section
 
+**Brins porteurs**:
+How many load-bearing members one Span carries: one or two. Two means both carry the
+rider and the trolley splits the load; on textile that is the usual redundant rig, both
+tensioned similarly. Not a second Span, and not an unloaded spare.
+_Avoid_: montage, double tyrolienne, redondance (when that means a slack backup), twin span
+
+**Mise en tension**:
+The device that tensions the line and holds it. A Maestro is a progress-capture pulley
+used in place of a mouflage. Distinct from a termination: it does not set termination
+efficiency.
+_Avoid_: montage, terminaison, ancrage
+
 **Tightness Spec**:
 The user's chosen way of saying how tight the line is: unstretched length directly, a
 target installed tension, or a target unloaded sag. Whichever is chosen, it resolves to an
@@ -178,6 +190,11 @@ The cable itself reaches the ground. Strictly worse than Rider Contact, and an e
 _Avoid_: touchdown, grounding
 
 ### The screen
+
+**Page**:
+A routed screen with its own layout and its own information set. The app is several
+Pages. The Rail is a layout a Page may use, not the navigation model.
+_Avoid_: espace, mode, panel, view
 
 **Rail**:
 The app's one scrolling column: Rail Header, then `Paramètres → Valeurs déduites →
