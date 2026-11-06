@@ -11,8 +11,8 @@
  * [`bench-harness.ts`](./bench-harness.ts), shared with the p95 tripwire so the two cannot measure
  * different lines.
  *
- * **This file asserts nothing.** A bench is never part of `bun run test` (`vitest bench` replaces
- * `test.include` while it runs, and `benchmark.enabled` is left unset on purpose), and tinybench
+ * **This file asserts nothing.** A bench is never part of `bun run test` (bench files match only
+ * `benchmark.include`, and `benchmark.enabled` is left unset on purpose), and tinybench
  * reports `p75` / `p99` / `p995` / `p999` and **no `p95`** — the criterion's own statistic. The
  * ≤ 8 ms gate therefore lives in `bench-harness.test.ts` as a plain timed `test`; this file exists
  * to show *where* the time goes when that gate moves.
@@ -27,7 +27,7 @@
  * against the 8 ms criterion, never against a Chromium figure.
  */
 
-import { bench, describe } from "vitest";
+import { describe, test } from "vitest";
 
 import { BENCH_CELLS, BENCH_RUNS, BENCH_STEP_COUNTS, timePair } from "./bench-harness.ts";
 import { CLEARANCE, evaluateClearance } from "./clearance.ts";
@@ -41,22 +41,23 @@ const CELL = { iterations: BENCH_RUNS, time: 0, warmupIterations: 5, warmupTime:
 
 for (const cell of BENCH_CELLS) {
   describe(`${cell.key} · ${cell.label}`, () => {
-    for (const n of BENCH_STEP_COUNTS) {
-      bench(`pair · ${n} steps`, () => void timePair(cell, n), CELL);
-    }
+    test("pair", async ({ bench }) => {
+      await bench.compare(
+        ...BENCH_STEP_COUNTS.map((n) => bench(`pair · ${n} steps`, () => void timePair(cell, n))),
+        CELL,
+      );
+    });
 
-    describe("the two halves", () => {
-      for (const n of BENCH_STEP_COUNTS) {
-        bench(`sweep · ${n} steps`, () => void sweep(cell.input, cell.riderP, n), CELL);
-      }
-
-      for (const n of BENCH_STEP_COUNTS) {
-        // Solved once, outside the timed body: the reducer's cost is what this cell isolates, and
-        // re-sweeping inside it would measure the pair again under a narrower name.
-        const steps = sweep(cell.input, cell.riderP, n).steps;
-        bench(
-          `clearance · ${n} steps`,
-          () =>
+    test("the two halves", async ({ bench }) => {
+      await bench.compare(
+        ...BENCH_STEP_COUNTS.map((n) =>
+          bench(`sweep · ${n} steps`, () => void sweep(cell.input, cell.riderP, n)),
+        ),
+        ...BENCH_STEP_COUNTS.map((n) => {
+          // Solved once, outside the timed body: the reducer's cost is what this cell isolates, and
+          // re-sweeping inside it would measure the pair again under a narrower name.
+          const steps = sweep(cell.input, cell.riderP, n).steps;
+          return bench(`clearance · ${n} steps`, () =>
             void evaluateClearance(
               cell.input,
               cell.riderP,
@@ -64,10 +65,10 @@ for (const cell of BENCH_CELLS) {
               cell.terrain,
               cell.hRider,
               CLEARANCE.samplesPerStep,
-            ),
-          CELL,
-        );
-      }
+            ));
+        }),
+        CELL,
+      );
     });
   });
 }

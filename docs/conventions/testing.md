@@ -114,9 +114,13 @@ input the app's own ranges refuse.
 
 ## Benches
 
-- `*.bench.ts`, colocated like tests. `bun run bench` → `vitest bench`.
-- **A bench is never part of `bun run test`.** `vitest bench` globs `*.bench.ts` and replaces
-  `test.include` while it runs, and `benchmark.enabled` is left **unset** on purpose.
+- `*.bench.ts`, colocated like tests. `bun run bench` → `vitest bench --reporter=verbose` (the
+  default reporter hides the result tables off a TTY).
+- **A bench is never part of `bun run test`.** Bench files match only `benchmark.include`, and
+  `benchmark.enabled` is left **unset** on purpose: only `vitest bench` turns it on.
+- Vitest 5 API: `bench` is a **test-context fixture**, not an import — one `test()` per comparison,
+  `await bench.compare(bench(…), bench(…), runOptions)`. Run options (`iterations`, `time`, warmup)
+  go in the trailing argument, not per `bench()`.
 - What it measures: p95 of `sweep()` **plus** `evaluateClearance` (the pair — both run on a parameter
   change), 40 runs per cell, `SWEEP_STEPS` at 100 / 240 / 500, over the three worst-conditioned spans.
   Tripwire: **re-run the bench if anything raises `260 × 60`**.
