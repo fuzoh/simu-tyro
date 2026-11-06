@@ -5,22 +5,14 @@ dynamics and equipment sizing for spans >50 m.
 
 Package manager is **bun**. TanStack Start in SPA mode (file-based router, static build on
 GitHub Pages) · React 19 · Tailwind v4 · shadcn/ui on Base UI · Vitest. Setup and scripts:
-[README.md](README.md). Workflow, commits and releases: [CONTRIBUTING.md](CONTRIBUTING.md).
+[README.md](README.md). Workflow — issues, commits, checks, tests, releases:
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Before declaring work done
 
-CI gates every PR on these; run them all:
-
-```
-bun run format:check     # oxfmt --check
-bun run typecheck        # tsc --noEmit
-bun run lint-type-aware  # oxlint --type-aware --type-check
-bun run test             # full suite, incl. the p95 tripwire CI skips (`test:ci`)
-jactionlint              # only when .github/ changed
-```
-
-Commit messages are Conventional Commits (`type(scope): summary`): release-please derives the
-version and `CHANGELOG.md` from them, so the type is what users see in the release notes.
+Run every command in [CONTRIBUTING.md § Checks](CONTRIBUTING.md#checks) — CI gates the PR on them —
+plus the full `bun run test`. Commits follow [§ Commit messages](CONTRIBUTING.md#commit-messages):
+release-please builds the version and changelog from them.
 
 ## Never edit
 
@@ -42,7 +34,7 @@ rewrite.
 | --- | --- |
 | Simulation math, safety factors | [docs/conventions/simulation.md](docs/conventions/simulation.md) |
 | Routing, data loading, SSR, static hosting | [docs/conventions/routing.md](docs/conventions/routing.md) |
-| CI, release, Pages deploy | [CONTRIBUTING.md](CONTRIBUTING.md), `.github/workflows/` |
+| CI, release, Pages deploy | `.github/workflows/` (each file's header comment) |
 | Styling, Tailwind v4, shadcn | [docs/conventions/ui.md](docs/conventions/ui.md) |
 | TypeScript, imports, formatting | [docs/conventions/typescript.md](docs/conventions/typescript.md) |
 | Tests | [docs/conventions/testing.md](docs/conventions/testing.md) |

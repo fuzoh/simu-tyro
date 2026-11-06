@@ -64,7 +64,7 @@ jobs:
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
-      # `test:ci` leaves out the wall-clock p95 tripwire — see `CONTRIBUTING.md` § Checks.
+      # `test:ci` leaves out the wall-clock p95 tripwire — see `docs/conventions/testing.md` § Benches.
       - run: bun run test:ci
 
   workflows:
