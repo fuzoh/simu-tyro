@@ -72,8 +72,6 @@
 * **tickets:** open 42–46 from the second algorithmic review ([41dec5b](https://github.com/fuzoh/simu-tyro/commit/41dec5b3b6e56b38321363c6d8e8e0731acf4c91))
 * **tickets:** record the review on 37, and untick the toFixed box ([560f890](https://github.com/fuzoh/simu-tyro/commit/560f890767d3532b38d03a403bd8c49231cca94d))
 * wayfinder grill ([696df0b](https://github.com/fuzoh/simu-tyro/commit/696df0b93e8bd24ab634a98e962e2e46e836d331))
-* wayfinder grill ([e4bff60](https://github.com/fuzoh/simu-tyro/commit/e4bff60b74f37bd85cd2e0dbc951a2624f2344c2))
-* wayfinder grill ([b6232ea](https://github.com/fuzoh/simu-tyro/commit/b6232ea542d88c63753b08ccecb88462406eed38))
 
 
 ### Refactors
@@ -94,7 +92,6 @@
 * **build:** update project dependencies and tooling ([939b2eb](https://github.com/fuzoh/simu-tyro/commit/939b2ebb14cd47a988745edcb84c69c6303ae1ce))
 * finalize spec ([9434f86](https://github.com/fuzoh/simu-tyro/commit/9434f8643f3c4829cc66c1012eae92c20fe3bc6c))
 * oxlint and oxfmt ([728d76a](https://github.com/fuzoh/simu-tyro/commit/728d76af990c1549107725dd407eaeed98298d88))
-* release 1.0.0 ([d340e28](https://github.com/fuzoh/simu-tyro/commit/d340e2832b736281f42c9e87129b7bce40c1973c))
 * research references for zipline simulation ([f0004f2](https://github.com/fuzoh/simu-tyro/commit/f0004f2fa9285e086aab0df40a8e60fa23ee868e))
 * resources for simulator ([56439cd](https://github.com/fuzoh/simu-tyro/commit/56439cd8d7971db14093063f27b004ac65cdfc9b))
 * retire profile prototype and settle v1 amendments ([385ff02](https://github.com/fuzoh/simu-tyro/commit/385ff027207735af7a091ddcb50ba55e3356e97d))
@@ -103,14 +100,11 @@
 ### Build System
 
 * **deps:** apply dependabot updates [#18](https://github.com/fuzoh/simu-tyro/issues/18)–[#21](https://github.com/fuzoh/simu-tyro/issues/21) and pin bun 1.4.4 ([59803f7](https://github.com/fuzoh/simu-tyro/commit/59803f7d46c048cd6859d45999eb6644a05a7969))
-* **deps:** apply dependabot updates [#18](https://github.com/fuzoh/simu-tyro/issues/18)–[#21](https://github.com/fuzoh/simu-tyro/issues/21), port benches to vitest 5 ([d94a037](https://github.com/fuzoh/simu-tyro/commit/d94a0371cdbd36f868bce1eee5990e520f6c9965))
 
 
 ### Continuous Integration
 
 * add CI checks, release-please and deploy Pages on release ([c30e1db](https://github.com/fuzoh/simu-tyro/commit/c30e1dbdb36585f68203baace73644337146c708))
-* add CI, release-please and release-gated Pages deploy ([d8822d5](https://github.com/fuzoh/simu-tyro/commit/d8822d5382f34a5f3478e14c038f34f664b95119))
-* fix release PR formatting; docs: drop CLAUDE.md and dedupe contributor docs ([23cecab](https://github.com/fuzoh/simu-tyro/commit/23cecabe0b9f111a099f0321a227af82ef598d70))
 * keep the p95 tripwire out of the deploy gate ([d0da74d](https://github.com/fuzoh/simu-tyro/commit/d0da74dcffcbad989c89e3d798e262c3d0625826))
 * leave the release-please manifest out of oxfmt ([a17631d](https://github.com/fuzoh/simu-tyro/commit/a17631db4cf36f6336efd2bdf49921d80b02ecdd))
 * publish to GitHub Pages on every push to main ([316f325](https://github.com/fuzoh/simu-tyro/commit/316f325f4e79eca31b1f8b0ec2d95b740490163b))
