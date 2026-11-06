@@ -36,6 +36,7 @@
     "apps/web/src/routeTree.gen.ts",
     ".agents/**",
     "**/*.md",
-    "src/routeTree.gen.ts"
+    "src/routeTree.gen.ts",
+    ".release-please-manifest.json"
   ]
 }
