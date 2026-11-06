@@ -20,7 +20,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { bench, describe } from "vitest";
+import { test } from "vitest";
 
 import type { Trace } from "@/lib/terrain/trace.ts";
 
@@ -39,15 +39,17 @@ const TRACES: readonly { readonly label: string; readonly trace: Trace }[] = [1,
 
 for (const { label, trace } of TRACES) {
   const payload = encodeP1(trace);
-  describe(`${label} · ${payload.length} characters`, () => {
-    bench("validateP1 — the structural walk `validateSearch` pays 3× per request", () => {
-      validateP1(payload);
-    });
-    bench("decodeP1 — the memoised client-side derivation", () => {
-      decodeP1(payload);
-    });
-    bench("encodeP1 — the write side, once per « Copier le lien »", () => {
-      encodeP1(trace);
-    });
+  test(`${label} · ${payload.length} characters`, async ({ bench }) => {
+    await bench.compare(
+      bench("validateP1 — the structural walk `validateSearch` pays 3× per request", () => {
+        validateP1(payload);
+      }),
+      bench("decodeP1 — the memoised client-side derivation", () => {
+        decodeP1(payload);
+      }),
+      bench("encodeP1 — the write side, once per « Copier le lien »", () => {
+        encodeP1(trace);
+      }),
+    );
   });
 }

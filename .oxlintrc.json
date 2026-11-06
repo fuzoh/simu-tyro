@@ -17,7 +17,12 @@
     "correctness": "error"
   },
   "rules": {
-    "import/no-cycle": ["error", { "maxDepth": 3 }],
+    "import/no-cycle": [
+      "error",
+      {
+        "maxDepth": 3
+      }
+    ],
     "jsx-a11y/prefer-tag-over-role": "off"
   },
   "settings": {
@@ -70,5 +75,13 @@
     ".agents/**",
     ".turbo/**",
     ".junie/**"
+  ],
+  "overrides": [
+    {
+      "files": ["**/*.bench.ts"],
+      "rules": {
+        "vitest/expect-expect": "off"
+      }
+    }
   ]
 }

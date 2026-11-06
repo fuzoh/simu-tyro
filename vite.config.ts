@@ -64,11 +64,9 @@ const config = defineConfig({
     // Colocated, one test file per source file, `.ts` only (a `.tsx` test would be
     // a component test, which this project does not have). No `tests/` directory.
     include: ["src/**/*.test.ts"],
-    // The suite is empty until the §15 fixtures land; an empty run is a pass, not a failure.
-    passWithNoTests: true,
     benchmark: {
-      // `benchmark.enabled` stays unset: `vitest bench` replaces `test.include` while it
-      // runs, so a bench never executes inside `bun run test`.
+      // `benchmark.enabled` stays unset: only `vitest bench` turns it on, so a bench never
+      // executes inside `bun run test`.
       include: ["src/**/*.bench.ts"],
     },
   },
