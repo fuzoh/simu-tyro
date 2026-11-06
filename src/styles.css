@@ -254,7 +254,6 @@
  * everywhere, so the whole rule is one media query.
  */
 @layer components {
-
   /*
    * The documentation pages' prose — `src/routes/docs.$slug.tsx` renders markdown into `.doc`.
    * Three sizes, as everywhere: `text-xs` for meta, `text-base` for the body, `text-lg` for every

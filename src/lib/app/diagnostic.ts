@@ -66,8 +66,7 @@ export function buildDiagnostic({
     span: span === null ? null : { L: span.L, h: span.h, L0: solve?.L0 ?? null },
     // The three the solver consumes, or `null` while the Material Spec is still incomplete — which
     // is a state a diagnostic has to be able to report rather than fabricate a zero for.
-    derived:
-      strength === null || EA === null || w === null ? null : { w, EA, strength },
+    derived: strength === null || EA === null || w === null ? null : { w, EA, strength },
     // The **unloaded** solve carries no rider, so the loads line is empty and printed anyway: a
     // reader has to be able to tell « none » from « not recorded ».
     loads: [],
