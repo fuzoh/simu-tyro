@@ -1,5 +1,11 @@
 # Build the simulator as static files and publish them to GitHub Pages.
 #
+# Runs on a **release**, not on every push: `release-please.yml` calls this workflow when merging
+# its release PR creates a tag on `main`. It is called from that run, not triggered by the tag,
+# because a tag pushed with the default `GITHUB_TOKEN` starts no workflow, and because the
+# `github-pages` environment only accepts deployments from `main`. `workflow_dispatch` stays so a
+# Pages settings change can be republished without cutting a release.
+#
 # The app is a SPA by construction, not by concession: the one route sets `ssr: false`, there
 # is no server function and no server route, and no terrain ever crosses a network boundary.
 # `vite.config.ts` turns on Start's SPA mode, so the build prerenders the shell — the Skeleton,
@@ -10,55 +16,59 @@
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    branches: [main]
-  # So a Pages settings change can be republished without an empty commit.
+  workflow_call:
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+permissions: {}
 
 # Never let two deploys race for the same site. `cancel-in-progress: false` and not `true`: a
-# half-uploaded artifact that gets cancelled leaves the live site on the previous build, which is
-# fine, but cancelling the *deploy* step is how a site ends up serving a partial upload.
+# cancelled build leaves the live site on the previous one, which is fine, but cancelling the
+# *deploy* step is how a site ends up serving a partial upload. A fixed group name, never
+# `${{ github.workflow }}`: called from `release-please.yml` that would resolve to the caller's
+# group and deadlock.
 concurrency:
   group: pages
   cancel-in-progress: false
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: Build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read # checkout
+      pages: write # configure-pages enablement
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: package.json
 
       - run: bun install --frozen-lockfile
 
-      # The same three gates `CLAUDE.md` asks for before declaring work done. They run before the
-      # build because a green deploy of red code is worse than no deploy.
+      # The same gates as `ci.yml`, run again on the released commit: a green deploy of red code
+      # is worse than no deploy. `test:ci` leaves out the wall-clock p95 tripwire — see
+      # `CONTRIBUTING.md` § Checks.
       - run: bun run typecheck
       - run: bun run lint-type-aware
-      # Everything but the p95 tripwire. § 10 E7b is a **wall-clock** gate — p95 of
-      # `sweep()` + `evaluateClearance` ≤ 8 ms — and a shared two-core runner measures the box,
-      # not the code: the same commit that passes locally measured 8,7 ms and then 13,6 ms here.
-      # The budget is a contract and is not relaxed to fit a runner; it stays enforced by
-      # `bun run test` on a real machine.
-      - run: bun run test --exclude 'src/lib/sim/bench-harness.test.ts'
+      - run: bun run test:ci
 
       # `enablement: true` turns Pages on for the repo on the first run, so nobody has to find
       # Settings › Pages first. If the token is refused the step fails loudly — flip
       # *Source: GitHub Actions* by hand and re-run.
-      - uses: actions/configure-pages@v6
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
         id: pages
         with:
           enablement: true
 
-      # `base_path` is `/scoutech` for a project site and empty once a custom domain is attached.
+      # `base_path` is `/simu-tyro` for a project site and empty once a custom domain is attached.
       # Vite wants a trailing slash either way, and the router reads the same value back out of
       # `import.meta.env.BASE_URL` — see the comment in `src/router.tsx`.
       - name: Resolve the base path
@@ -71,16 +81,21 @@ jobs:
 
       - run: bun run build:pages
 
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist/client
 
   deploy:
+    name: Deploy
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write # publish the artifact
+      id-token: write # authenticate the deployment
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/deploy-pages@v5
+      - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
         id: deployment

@@ -4,7 +4,7 @@
  *
  * Everything else in the app writes URLs through the router, which applies `basepath` for us:
  * `navigate({ to: "/" })` in `store.tsx`, `use-persist.ts` and `inputs.tsx` all land on
- * `/scoutech/…` under a GitHub Pages project site without knowing it. **« Copier le lien » is the
+ * `/simu-tyro/…` under a GitHub Pages project site without knowing it. **« Copier le lien » is the
  * exception**, and it has to be: `copyLink` builds an absolute href by hand, because § 7's link
  * budget is measured on the *whole* URL and the router will not hand one over pre-measured.
  *
@@ -13,7 +13,7 @@
  */
 
 /**
- * `https://fuzoh.github.io/scoutech` on the project site, `https://example.org` on a custom domain
+ * `https://fuzoh.github.io/simu-tyro` on the project site, `https://example.org` on a custom domain
  * or in dev. No trailing slash: `canonicalLink` already opens with one, and a doubled `//`
  * is a different path to every static host that has an opinion.
  *
