@@ -29,11 +29,14 @@ Thanks for helping. This file is the workflow; the code conventions live in
 [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): summary`, imperative,
 lower case. They drive the version and the changelog, so pick the type for what the *user* sees:
 
-| Type                                     | Release effect (while < 1.0.0) |
-| ---------------------------------------- | ------------------------------ |
-| `feat!` or a `BREAKING CHANGE:` footer   | minor bump                     |
-| `feat`, `fix`, `perf`, `docs`, `test`, `refactor`, `chore`, `build`, `ci`, `revert` | patch bump, own changelog section |
-| `style`                                  | no release, hidden             |
+| Type                                     | Release effect                    |
+| ---------------------------------------- | --------------------------------- |
+| `feat!` or a `BREAKING CHANGE:` footer   | major bump                        |
+| `feat`                                   | minor bump                        |
+| `fix`, `perf`, `docs`, `test`, `refactor`, `chore`, `build`, `ci`, `revert` | patch bump, own changelog section |
+| `style`                                  | no release, hidden                |
+
+To force a version, push a commit whose body carries a `Release-As: x.y.z` footer.
 
 Scopes follow the code area: `sim`, `chart`, `rail`, `docs`, `ui`, `terrain`, `url`, `agents`…
 
