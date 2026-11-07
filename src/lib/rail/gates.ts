@@ -53,9 +53,19 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { isFamilyAllowed, REGIMES, regimeMismatch } from "@/lib/sim";
 
+import type { Deduced } from "./deduced.ts";
 import type { FieldId, FieldIssue, FieldIssueKind, GateId } from "./fields.ts";
 
 import { checkField, displayField, emptyMessage, FIELD_ORDER, FIELDS, gateOf } from "./fields.ts";
+import {
+  FIELD_ACCESS,
+  fieldContext,
+  GATED_FIELDS,
+  heldValue,
+  isGatedField,
+  isNumericField,
+  isOverrideField,
+} from "./values.ts";
 
 export type { GateId } from "./fields.ts";
 
@@ -263,44 +273,16 @@ function geometryMode(scenario: TraverseScenario): "manual" | "trace" {
  * Is this control on screen for this Scenario? A field the current mode, family or tightness
  * driver does not render cannot be a culprit — a stale issue on `MBL` under `fam=ac` would block a
  * steel line on a rope nobody can see.
+ *
+ * A gated numeric field is on screen where its lens reads anything at all. The pickers have no
+ * lens, so the two steel pickers and the rope class keep their family rule here.
  */
 export function isFieldActive(id: FieldId, scenario: TraverseScenario): boolean {
-  const manual = scenario.geometry.source === "manual";
+  if (isGatedField(id)) return FIELD_ACCESS[id].read(scenario) !== undefined;
   const steel = scenario.material.family === "steel";
-  switch (id) {
-    case "L":
-    case "h":
-      return manual;
-    case "sa":
-    case "sb":
-      return !manual;
-    case "d":
-    case "R0":
-    case "cst":
-      return steel;
-    // The three derived rows are editable at all times on a steel line — typing into one is what
-    // creates the override. A *scenario-level* check still only runs on an override that exists,
-    // because `materialScalars` only lists the keys the spec actually holds.
-    case "mbfOverride":
-    case "eaOverride":
-    case "muOverride":
-      return steel;
-    case "cls":
-    case "MBL":
-    case "muTextile":
-    case "k":
-      return !steel;
-    case "D_target":
-      return scenario.tightness.mode === "sag";
-    case "H_target":
-      return scenario.tightness.mode === "tension";
-    case "L0":
-      return scenario.tightness.mode === "length";
-    case "vRatio":
-      return scenario.tightness.mode === "ratio";
-    default:
-      return true;
-  }
+  if (id === "R0" || id === "cst") return steel;
+  if (id === "cls") return !steel;
+  return true;
 }
 
 /**
@@ -377,117 +359,55 @@ export function evaluateGates({ scenario, trace, issues = [] }: GateInput): Gate
     });
   }
 
-  // ── The textile blanks the *state* can hold ────────────────────────────────────────────────
-  // **No rope ships**: one invented `MBL` decides the verdict (100 kN ⇒ FS 11,94 « dans les
-  // limites »; 60 kN ⇒ 7,63 « hors limites » on the same line). Flipping to `Corde textile` under
-  // `TEMPORAIRE` therefore lands on two blank required fields — which is **not** « Saisie en
-  // cours »: a field the user never filled is not mid-edit, so it blocks and keeps no stale
-  // picture. Polyester adds a third, and its message carries the reason rather than the hole.
-  if (scenario.material.family === "textile") {
-    const spec = scenario.material;
-    const blanks: readonly [FieldId, number | null][] = [
-      ["MBL", spec.MBL],
-      ["muTextile", spec.mu],
-      ["k", spec.k],
-    ];
-    for (const [field, value] of blanks) {
-      if (value !== null) continue;
-      push({
-        gate: "solve",
-        kind: "empty",
-        field,
-        alsoOutlined: [],
-        message: emptyMessage(field, { ropeClass: spec.ropeClass }),
-        fixes: [],
-      });
-    }
-  }
-
-  // ── Imported placement — the hard checks that must run on **derived** values ────────────────
-  if (scenario.geometry.source === "trace") {
-    const { sa, sb } = scenario.geometry;
-    const extent =
-      trace === null ? undefined : { min: trace.d[0], max: trace.d[trace.d.length - 1] };
-
-    for (const [field, station] of [
-      ["sa", sa],
-      ["sb", sb],
-    ] as const) {
-      const issue = checkField(field, displayField(field, station, scenario.unit), { extent });
-      if (issue !== null) {
+  // ── Every number the Scenario holds, as a link can carry it ────────────────────────────────
+  // `?L=-5` restores state faithfully, including invalid state, and must light up here on the first
+  // frame even though nobody has typed into the field yet.
+  const context = fieldContext(scenario, trace);
+  for (const field of GATED_FIELDS) {
+    const value = FIELD_ACCESS[field].read(scenario);
+    if (value === undefined) continue;
+    if (value === null) {
+      // An unset Override is « non surchargée »: it shows the formula and judges nothing. The other
+      // blanks are the textile ones the *state* can hold. **No rope ships**: one invented `MBL`
+      // decides the verdict (100 kN ⇒ FS 11,94 « dans les limites »; 60 kN ⇒ 7,63 « hors limites »
+      // on the same line). Flipping to `Corde textile` under `TEMPORAIRE` therefore lands on two
+      // blank required fields — which is **not** « Saisie en cours »: a field the user never
+      // filled is not mid-edit, so it blocks and keeps no stale picture. Polyester adds a third,
+      // and its message carries the reason rather than the hole.
+      if (!isOverrideField(field)) {
         push({
           gate: "solve",
-          kind: issue.kind,
+          kind: "empty",
           field,
           alsoOutlined: [],
-          message: issue.message,
+          message: emptyMessage(field, context),
           fixes: [],
         });
       }
+      continue;
     }
-
-    // `L = d_B − d_A` is a **read-out** here, so `L > 0` is attributed back to the stations. Not
-    // a silent auto-swap: normalising to `A = min(station)` would **flip the sign of `h`**, the
-    // silent model reinterpretation the §10.4 family gate already ruled out.
-    if (!(sb > sa)) {
-      const [first, ...rest] = culprits("L", "importé");
-      push({
-        gate: "solve",
-        kind: "invalid",
-        field: first,
-        alsoOutlined: rest,
-        message: "⛔ Portée nulle ou négative — l'ancrage B est avant l'ancrage A.",
-        fixes: [FIX["inverser-a-b"]],
-      });
-    }
-  } else {
-    // Manual mode types `L` and `h` directly, so § 3's hard ranges are field rules and tier one has
-    // already run them on the text. What is left is the value a **link** can carry: `?L=-5`
-    // restores state faithfully, including invalid state, and must light up here on the first frame
-    // even though nobody has typed into the field yet.
-    const { L, h } = scenario.geometry;
-    for (const [field, value] of [
-      ["L", L],
-      ["h", h],
-    ] as const) {
-      const issue = checkField(field, displayField(field, value, scenario.unit), {});
-      if (issue !== null) {
-        push({
-          gate: "solve",
-          kind: issue.kind,
-          field,
-          alsoOutlined: [],
-          message: issue.message,
-          fixes: [],
-        });
-      }
-    }
-  }
-
-  // ── The remaining scenario-borne numbers a link can carry out of range ─────────────────────
-  const scalars: readonly (readonly [FieldId, number])[] = [
-    ["zA", scenario.anchors.zA],
-    ["zB", scenario.anchors.zB],
-    ["mp", scenario.rider.mp],
-    ["hRider", scenario.rider.hRider],
-    ["hClearMin", scenario.rider.hClearMin],
-    ["DAF", scenario.rider.DAF],
-    ["etaA", scenario.terminations.A.eta],
-    ["etaB", scenario.terminations.B.eta],
-    ...tightnessScalar(scenario),
-    ...materialScalars(scenario),
-  ];
-  for (const [field, value] of scalars) {
-    if (!isFieldActive(field, scenario)) continue;
     // Canonical → the text the field shows, so a message echoes « −10,0 daN » and not the raw
     // newtons: § 7's template quotes the value **in the field's own quantity and unit**.
-    const issue = checkField(field, displayField(field, value, scenario.unit), {
-      unit: scenario.unit,
-    });
+    const issue = checkField(field, displayField(field, value, scenario.unit), context);
     if (issue === null) continue;
     const gate = gateOf(field, mode);
     if (gate === null) continue;
     push({ gate, kind: issue.kind, field, alsoOutlined: [], message: issue.message, fixes: [] });
+  }
+
+  // `L = d_B − d_A` is a **read-out** in imported mode, so `L > 0` is attributed back to the
+  // stations. Not a silent auto-swap: normalising to `A = min(station)` would **flip the sign of
+  // `h`**, the silent model reinterpretation the §10.4 family gate already ruled out.
+  if (scenario.geometry.source === "trace" && !(scenario.geometry.sb > scenario.geometry.sa)) {
+    const [first, ...rest] = culprits("L", "importé");
+    push({
+      gate: "solve",
+      kind: "invalid",
+      field: first,
+      alsoOutlined: rest,
+      message: "⛔ Portée nulle ou négative — l'ancrage B est avant l'ancrage A.",
+      fixes: [FIX["inverser-a-b"]],
+    });
   }
 
   errors.sort(
@@ -505,33 +425,6 @@ export function evaluateGates({ scenario, trace, issues = [] }: GateInput): Gate
   const worst = errors.length === 0 ? null : errors[0].gate;
 
   return { errors, passed, worst, noRegime };
-}
-
-/** The driving tightness field and its value — exactly one is state per mode, by construction. */
-function tightnessScalar(scenario: TraverseScenario): readonly (readonly [FieldId, number])[] {
-  const { tightness } = scenario;
-  if (tightness.mode === "sag") return [["D_target", tightness.D_target]];
-  if (tightness.mode === "tension") return [["H_target", tightness.H_target]];
-  if (tightness.mode === "ratio") return [["vRatio", tightness.ratio]];
-  return [["L0", tightness.L0]];
-}
-
-/** The active Material Spec's own numbers, overrides included — they are their own culprits. */
-function materialScalars(scenario: TraverseScenario): readonly (readonly [FieldId, number])[] {
-  const spec = scenario.material;
-  if (spec.family === "steel") {
-    const out: (readonly [FieldId, number])[] = [["d", spec.d]];
-    const { MBF, EA, mu } = spec.overrides ?? {};
-    if (MBF !== undefined) out.push(["mbfOverride", MBF]);
-    if (EA !== undefined) out.push(["eaOverride", EA]);
-    if (mu !== undefined) out.push(["muOverride", mu]);
-    return out;
-  }
-  const out: (readonly [FieldId, number])[] = [];
-  if (spec.MBL !== null) out.push(["MBL", spec.MBL]);
-  if (spec.mu !== null) out.push(["muTextile", spec.mu]);
-  if (spec.k !== null) out.push(["k", spec.k]);
-  return out;
 }
 
 /**
@@ -595,65 +488,17 @@ export function saisieEnCours(
   };
 }
 
-/** The last committed value of a field, formatted for {@link saisieEnCours}'s sentence. */
-export function committedValue(scenario: ScenarioDraft, field: FieldId): string | null {
-  const { quantity } = FIELDS[field];
-  if (quantity === null) return null;
-  const value = scalarOf(scenario, field);
-  return value === null ? null : formatQuantity(quantity, value, scenario.unit);
-}
-
-/** Every scalar the Scenario holds, by field. `null` where the field is not a number in state. */
-function scalarOf(scenario: ScenarioDraft, field: FieldId): number | null {
-  const { geometry, anchors, rider, tightness, terminations, material } = scenario;
-  switch (field) {
-    case "L":
-      return geometry.source === "manual" ? geometry.L : null;
-    case "h":
-      return geometry.source === "manual" ? geometry.h : null;
-    case "sa":
-      return geometry.source === "trace" ? geometry.sa : null;
-    case "sb":
-      return geometry.source === "trace" ? geometry.sb : null;
-    case "zA":
-      return anchors.zA;
-    case "zB":
-      return anchors.zB;
-    case "mp":
-      return rider.mp;
-    case "hRider":
-      return rider.hRider;
-    case "hClearMin":
-      return rider.hClearMin;
-    case "DAF":
-      return rider.DAF;
-    case "xD":
-      return rider.xD;
-    case "etaA":
-      return terminations.A.eta;
-    case "etaB":
-      return terminations.B.eta;
-    case "D_target":
-      return tightness.mode === "sag" ? tightness.D_target : null;
-    case "H_target":
-      return tightness.mode === "tension" ? tightness.H_target : null;
-    case "L0":
-      return tightness.mode === "length" ? tightness.L0 : null;
-    case "d":
-      return material.family === "steel" ? material.d : null;
-    case "MBL":
-      return material.family === "textile" ? material.MBL : null;
-    case "muTextile":
-      return material.family === "textile" ? material.mu : null;
-    case "k":
-      return material.family === "textile" ? material.k : null;
-    case "mbfOverride":
-      return material.family === "steel" ? (material.overrides?.MBF ?? null) : null;
-    case "eaOverride":
-      return material.family === "steel" ? (material.overrides?.EA ?? null) : null;
-    case "muOverride":
-      return material.family === "steel" ? (material.overrides?.mu ?? null) : null;
-    default:
-      return null;
-  }
+/**
+ * The last committed value of a field, formatted for {@link saisieEnCours}'s sentence — what the
+ * Rail shows for it, so an unset Override names its formula value.
+ */
+export function committedValue(
+  scenario: ScenarioDraft,
+  field: FieldId,
+  deduced: Deduced,
+): string | null {
+  if (!isNumericField(field)) return null;
+  const value = heldValue(scenario, field, deduced);
+  if (value === null || value === undefined) return null;
+  return formatQuantity(FIELDS[field].quantity, value, scenario.unit);
 }

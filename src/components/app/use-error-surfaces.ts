@@ -90,7 +90,7 @@ export function useErrorSurfaces({
     [failure, tightness, unit],
   );
 
-  const committed = focused === null ? null : committedValue(scenario, focused);
+  const committed = focused === null ? null : committedValue(scenario, focused, deduced);
   const saisie = useMemo(
     () => saisieEnCours(report, focused, committed),
     [report, focused, committed],

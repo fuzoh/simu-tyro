@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, expectTypeOf, test } from "vitest";
 
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 
@@ -10,6 +10,7 @@ import {
   applyField,
   clearOverride,
   drivingField,
+  FIELD_ACCESS,
   NUMERIC_FIELDS,
   railValues,
   sameGatedText,
@@ -237,6 +238,54 @@ describe("applyField — one committed field, written back", () => {
       const before = railValues(host, deduceValues(host, null))[id];
       expect(railValues(after, deduceValues(after, null))[id]).not.toBe(before);
     }
+  });
+});
+
+describe("FIELD_ACCESS — one lens per numeric field", () => {
+  test("the numeric fields are the rows of `FIELDS` with a precision row, in rail order", () => {
+    expect(NUMERIC_FIELDS).toEqual([
+      "L",
+      "h",
+      "zA",
+      "zB",
+      "sa",
+      "sb",
+      "d",
+      "mbfOverride",
+      "eaOverride",
+      "muOverride",
+      "MBL",
+      "muTextile",
+      "k",
+      "etaA",
+      "etaB",
+      "D_target",
+      "H_target",
+      "L0",
+      "vRatio",
+      "mp",
+      "hRider",
+      "hClearMin",
+      "DAF",
+      "xD",
+    ]);
+  });
+
+  test("`null` clears a field whose blank is state, and a required field has no blank", () => {
+    const overridden = withOverride(scenario(), "MBF", 80000);
+    const cleared = FIELD_ACCESS.mbfOverride.write(overridden, null);
+    if (cleared.material.family !== "steel") throw new Error("expected steel");
+    expect(cleared.material.overrides).toBeUndefined();
+
+    const rope = scenario((draft) => {
+      draft.usage = "TEMPORAIRE";
+      draft.material = { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 };
+    });
+    expect(FIELD_ACCESS.MBL.read(FIELD_ACCESS.MBL.write(rope, null))).toBeNull();
+
+    expectTypeOf(FIELD_ACCESS.MBL.write).parameter(1).toEqualTypeOf<number | null>();
+    expectTypeOf(FIELD_ACCESS.L.write).parameter(1).toEqualTypeOf<number>();
+    expectTypeOf(FIELD_ACCESS.vRatio.write).parameter(1).toEqualTypeOf<number>();
   });
 });
 

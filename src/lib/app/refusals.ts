@@ -36,11 +36,14 @@
  *   verdict state. Neither reaches this module.
  */
 
+import type { TightnessFieldId } from "@/lib/rail/fields.ts";
 import type { ForceUnit, ScenarioDraft, TightnessDraft } from "@/lib/scenario/types.ts";
 import type { EngineFailure } from "@/lib/scenario/unloaded.ts";
 import type { SolveError, SolveNote } from "@/lib/sim";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
+import { FIELDS } from "@/lib/rail/fields.ts";
+import { tightnessDriver } from "@/lib/rail/values.ts";
 import { SOLVER } from "@/lib/sim";
 import { CONSTRUCTION_TOKEN_BY_ID } from "@/lib/url/scenario.ts";
 
@@ -159,18 +162,18 @@ export function engineRefusal(
   return CALCUL_IMPOSSIBLE;
 }
 
+/** How « Cible inatteignable » names each driver's target — the refusal's own wording. */
+const TARGET_NOUN: Record<TightnessFieldId, string> = {
+  D_target: "cette flèche à vide",
+  H_target: "cette prétension",
+  L0: "cette longueur non tendue",
+  vRatio: "ce rapport V",
+};
+
 /** « cette flèche à vide (6,00 m) » / « cette prétension (9074,0 daN) » — the target, named. */
 function target(tightness: TightnessDraft, unit: ForceUnit): string {
-  if (tightness.mode === "sag") {
-    return `cette flèche à vide (${formatQuantity("D_target", tightness.D_target)})`;
-  }
-  if (tightness.mode === "tension") {
-    return `cette prétension (${formatQuantity("H_target", tightness.H_target, unit)})`;
-  }
-  if (tightness.mode === "ratio") {
-    return `ce rapport V (${formatQuantity("vRatio", tightness.ratio)})`;
-  }
-  return `cette longueur non tendue (${formatQuantity("L0", tightness.L0)})`;
+  const { field, value } = tightnessDriver({ tightness });
+  return `${TARGET_NOUN[field]} (${formatQuantity(FIELDS[field].quantity, value, unit)})`;
 }
 
 /**
@@ -215,16 +218,8 @@ export function diagnosticPayload(input: DiagnosticInput): string {
   const counted = NOTE_ORDER.map((note) => `${note}×${notes.filter((n) => n === note).length}`);
   lines.push(key("notes", counted.join("  ")));
 
-  const { tightness } = scenario;
-  const targetValue =
-    tightness.mode === "sag"
-      ? tightness.D_target
-      : tightness.mode === "tension"
-        ? tightness.H_target
-        : tightness.mode === "ratio"
-          ? tightness.ratio
-          : tightness.L0;
-  lines.push(tag("resolveL0", `mode=${tightness.mode}  target=${num(targetValue)}`));
+  const target = num(tightnessDriver(scenario).value);
+  lines.push(tag("resolveL0", `mode=${scenario.tightness.mode}  target=${target}`));
 
   if (span !== null && derived !== null) {
     lines.push(

@@ -7,6 +7,7 @@ import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 
 import type { FieldId, GateId } from "./fields.ts";
 
+import { deduceValues } from "./deduced.ts";
 import {
   blockingSummary,
   committedValue,
@@ -495,9 +496,47 @@ describe("« Saisie en cours » — a required field empty **and holding focus**
 
   test("it names the field and its last committed value", () => {
     const state = scenario();
-    expect(saisieEnCours(report, "D_target", committedValue(state, "D_target"))).toEqual({
+    expect(
+      saisieEnCours(
+        report,
+        "D_target",
+        committedValue(state, "D_target", deduceValues(state, null)),
+      ),
+    ).toEqual({
       field: "D_target",
       message: "Saisie en cours — ces valeurs correspondent à Flèche à vide cible 6,00 m.",
+    });
+  });
+
+  test("on « Rapport V cible » it names the ratio the Scenario still holds", () => {
+    const state = scenario((draft) => {
+      draft.tightness = { mode: "ratio", ratio: 0.46 };
+    });
+    const midEdit = evaluateGates({
+      scenario: state,
+      trace: null,
+      issues: [{ field: "vRatio", kind: "empty", message: "valeur requise" }],
+    });
+    const committed = committedValue(state, "vRatio", deduceValues(state, null));
+    expect(saisieEnCours(midEdit, "vRatio", committed)).toEqual({
+      field: "vRatio",
+      message: "Saisie en cours — ces valeurs correspondent à Rapport V cible 0,46.",
+    });
+  });
+
+  test("on an unset Override it names the formula value the row shows", () => {
+    // No override ships on first run, so « Charge de rupture » shows §13.1's formula:
+    // K·d²·R₀ = 0,356 × 12² mm² × 1770 N/mm² = 90 737 N, which reads 9074 daN.
+    const state = scenario();
+    const midEdit = evaluateGates({
+      scenario: state,
+      trace: null,
+      issues: [{ field: "mbfOverride", kind: "empty", message: "valeur requise" }],
+    });
+    const committed = committedValue(state, "mbfOverride", deduceValues(state, null));
+    expect(saisieEnCours(midEdit, "mbfOverride", committed)).toEqual({
+      field: "mbfOverride",
+      message: "Saisie en cours — ces valeurs correspondent à Charge de rupture 9074 daN.",
     });
   });
 

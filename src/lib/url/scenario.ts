@@ -21,6 +21,7 @@
  *   its transports, and the dependency runs one way.
  */
 
+import type { TightnessFieldId } from "@/lib/rail/fields.ts";
 import type {
   Scenario,
   ScenarioDraft,
@@ -29,6 +30,7 @@ import type {
 } from "@/lib/scenario/types.ts";
 import type { SteelSpec, TerminationId, TextileSpec } from "@/lib/sim";
 
+import { tightnessDriver } from "@/lib/rail/values.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 import { clampX } from "@/lib/scenario/geometry.ts";
 
@@ -58,6 +60,14 @@ export const ROPE_CLASS_TOKEN_BY_ID = {
   polyester: "pes",
 } as const satisfies Record<TextileSpec["ropeClass"], RopeClassToken>;
 
+/** The key each Tightness Driver's field travels under. Total over the drivers and the keys. */
+const DRIVER_KEY = {
+  D_target: "fl",
+  H_target: "te",
+  L0: "lo",
+  vRatio: "vr",
+} as const satisfies Record<TightnessFieldId, TightnessKey>;
+
 type Values<T> = T[keyof T];
 
 /** Resolves to `true` only when the token tuple and its table name exactly the same tokens. */
@@ -70,7 +80,8 @@ type Covers<Token extends string, Table> = [Token] extends [Values<Table>]
 const TOKEN_TABLES_COVER_TUPLES: [
   Covers<ConstructionToken, typeof CONSTRUCTION_TOKEN_BY_ID>,
   Covers<RopeClassToken, typeof ROPE_CLASS_TOKEN_BY_ID>,
-] = [true, true];
+  Covers<TightnessKey, typeof DRIVER_KEY>,
+] = [true, true, true];
 void TOKEN_TABLES_COVER_TUPLES;
 
 /**
@@ -428,7 +439,7 @@ export function searchToScenario(search: CompletedSearch): ScenarioDraft {
  * there is no rounding decision left at the URL.
  */
 export function scenarioToSearch(scenario: Scenario): CompletedSearch {
-  const { geometry, tightness, material, terminations, rider, anchors } = scenario;
+  const { geometry, material, terminations, rider, anchors } = scenario;
   const out: Record<string, unknown> = {};
 
   out.v = 1;
@@ -447,10 +458,9 @@ export function scenarioToSearch(scenario: Scenario): CompletedSearch {
   out.za = anchors.zA;
   out.zb = anchors.zB;
 
-  if (tightness.mode === "sag") out.fl = tightness.D_target;
-  else if (tightness.mode === "tension") out.te = daNFromNewtons(tightness.H_target);
-  else if (tightness.mode === "ratio") out.vr = tightness.ratio;
-  else out.lo = tightness.L0;
+  const driver = tightnessDriver(scenario);
+  const driverKey = DRIVER_KEY[driver.field];
+  out[driverKey] = driverKey === "te" ? daNFromNewtons(driver.value) : driver.value;
 
   if (material.family === "steel") {
     out.fam = "ac";
