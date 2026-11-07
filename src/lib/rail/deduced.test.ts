@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import type { ScenarioDraft } from "@/lib/scenario/types.ts";
+import type { ForceUnit, ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { formatQuantity, roundToDisplay } from "@/lib/format/quantity.ts";
@@ -141,6 +141,48 @@ describe("the stale Override badge — derived on every load, at display precisi
     expect(material.stale.mu).toBe(false);
     // …while `MBF = K·d²·R₀/1000` depends on all three, so the grade change does badge it.
     expect(material.stale.MBF).toBe(true);
+  });
+});
+
+describe("rider and unit fields `deduceValues` reads, which `useDeduced` must key on", () => {
+  test("Rapport V resolves `L₀` against the passenger mass: mp 80 and 120 kg differ", () => {
+    const at = (mp: number) =>
+      deduceValues(
+        scenario((draft) => {
+          draft.tightness = { mode: "ratio", ratio: 0.2 };
+          draft.rider.mp = mp;
+        }),
+        null,
+      ).solve;
+    const light = at(80);
+    const heavy = at(120);
+    expect(light).not.toBeNull();
+    expect(heavy).not.toBeNull();
+    // [MEASURED] issue #30: H is 3924 N at 80 kg and 5886 N at 120 kg (proportional to mp).
+    expect(light?.H).toBeCloseTo(3924, 0);
+    expect(heavy?.H).toBeCloseTo(5886, 0);
+    expect(light?.L0).toBeCloseTo(151.25, 2);
+    expect(heavy?.L0).toBeCloseTo(151.06, 2);
+  });
+
+  test("the stale flag compares at the unit's precision: 90736 N is fresh in daN, stale in kgf", () => {
+    // Formula 90737,28 N reads 9074 daN and 9253 kgf; the override reads 9074 daN and 9252 kgf.
+    const at = (unit: ForceUnit) =>
+      deduceValues(
+        scenario((draft) => {
+          draft.unit = unit;
+          draft.material = {
+            family: "steel",
+            d: 12,
+            R0: 1770,
+            construction: "iwrc",
+            overrides: { MBF: 90736 },
+          };
+        }),
+        null,
+      ).material.stale.MBF;
+    expect(at("daN")).toBe(false);
+    expect(at("kgf")).toBe(true);
   });
 });
 

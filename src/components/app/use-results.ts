@@ -46,6 +46,7 @@ export function useResults(base: SceneBase | null, report: GateReport): Results 
       scenario.terminations,
       scenario.rider.mp,
       scenario.rider.hRider,
+      scenario.rider.hClearMin,
       scenario.rider.DAF,
       trace,
       base,
