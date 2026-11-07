@@ -17,13 +17,21 @@ import {
   FIRST_RUN_SCENARIO,
   firstRunDefaults,
 } from "@/lib/scenario/first-run.ts";
-import { DEFAULT_LAYERS } from "@/lib/session/session.ts";
+import { DEFAULT_LAYERS, readSession, writeSession } from "@/lib/session/session.ts";
 import { encodeP1, URL_BUDGET_CHARS } from "@/lib/url/p1.ts";
 import { FIRST_RUN_LINK, scenarioToSearch } from "@/lib/url/scenario.ts";
 
 import type { AppState } from "./state.ts";
 
-import { completeScenario, copyLink, publishedSearch, sessionOf } from "./persist.ts";
+import {
+  addressBarSearch,
+  completeScenario,
+  copyLink,
+  publishable,
+  publishedSearch,
+  sessionOf,
+} from "./persist.ts";
+import { initialAppState } from "./state.ts";
 
 const ORIGIN = "https://scoutech.example";
 
@@ -150,5 +158,91 @@ describe("oversize refuses at « Copier le lien » — it never degrades", () =>
     expect(result.ok).toBe(true);
     expect((result.ok ? result.href : "").length).toBeLessThanOrEqual(URL_BUDGET_CHARS);
     expect((result.ok ? result.href : "").length).toBeGreaterThan(0);
+  });
+});
+
+describe("one gate for both writers — an oversize import never reaches the address bar", () => {
+  /** 600 samples with a deterministic pseudo-random relief: the codec's worst shape. */
+  function ruggedTrace(points: number): Trace {
+    const d = new Float64Array(points);
+    const z = new Float64Array(points);
+    let seed = 12345;
+    for (let i = 0; i < points; i++) {
+      seed = (seed * 1103515245 + 12345) % 2 ** 31;
+      d[i] = i * 0.5;
+      z[i] = 500 + Math.round((seed / 2 ** 31) * 4000) / 100;
+    }
+    return { d, z, dev: 0, fileName: "releve.csv" };
+  }
+
+  function imported(points: number) {
+    const trace = ruggedTrace(points);
+    const scenario: ScenarioDraft = {
+      ...firstRunDefaults(),
+      geometry: { source: "trace", trace: encodeP1(trace), sa: 0, sb: trace.d[points - 1] },
+    };
+    return { trace, scenario };
+  }
+
+  function memoryStorage() {
+    const entries = new Map<string, string>();
+    return {
+      getItem: (key: string) => entries.get(key) ?? null,
+      setItem: (key: string, value: string) => void entries.set(key, value),
+      removeItem: (key: string) => void entries.delete(key),
+    };
+  }
+
+  it("calls a 600-point import oversize, and the Session restores it with no refusal", () => {
+    const { trace, scenario } = imported(600);
+    expect(publishable(scenario, ORIGIN)).toEqual({ ok: false, reason: "oversize" });
+
+    const session = sessionOf(appState(scenario, trace));
+    expect(session).not.toBeNull();
+    const restored = initialAppState({ query: "", session });
+    expect(restored.link.refused).toBeNull();
+    expect(restored.trace).toBe(trace);
+    expect(restored.scenario.geometry).toEqual(scenario.geometry);
+  });
+
+  it("writes a bare `/`, which load never rewrites, and the Session write is unaffected", () => {
+    const { trace, scenario } = imported(600);
+    const search = addressBarSearch(scenario, ORIGIN);
+    expect(search).toEqual({});
+
+    const storage = memoryStorage();
+    const session = sessionOf(appState(scenario, trace));
+    expect(session).not.toBeNull();
+    if (session !== null) writeSession(storage, session);
+    const reloaded = initialAppState({ query: "", session: readSession(storage) });
+    expect(reloaded.link.rewrite).toBeNull();
+    expect(reloaded.link.refused).toBeNull();
+    expect(reloaded.trace?.d.length).toBe(600);
+  });
+
+  it("leaves the address bar untouched while a textile draft has blanks", () => {
+    expect(publishable(blankTextile(), ORIGIN)).toEqual({ ok: false, reason: "incomplete" });
+    expect(addressBarSearch(blankTextile(), ORIGIN)).toBeNull();
+  });
+
+  it("publishes a fitting draft as the canonical bag and href copy uses", () => {
+    const { scenario } = imported(200);
+    const result = publishable(scenario, ORIGIN);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.search).toEqual(publishedSearch(scenario));
+    expect(addressBarSearch(scenario, ORIGIN)).toEqual(result.search);
+    expect(copyLink({ scenario, trace: null, origin: ORIGIN })).toEqual({
+      ok: true,
+      href: result.href,
+    });
+  });
+
+  it("measures the whole href, origin included", () => {
+    const { scenario } = imported(200);
+    const fits = publishable(scenario, ORIGIN);
+    expect(fits.ok).toBe(true);
+    const long = `https://${"a".repeat(URL_BUDGET_CHARS)}.example`;
+    expect(publishable(scenario, long)).toEqual({ ok: false, reason: "oversize" });
   });
 });

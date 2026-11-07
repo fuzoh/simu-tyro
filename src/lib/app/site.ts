@@ -4,12 +4,13 @@
  *
  * Everything else in the app writes URLs through the router, which applies `basepath` for us:
  * `navigate({ to: "/" })` in `store.tsx`, `use-persist.ts` and `inputs.tsx` all land on
- * `/simu-tyro/…` under a GitHub Pages project site without knowing it. **« Copier le lien » is the
- * exception**, and it has to be: `copyLink` builds an absolute href by hand, because § 7's link
- * budget is measured on the *whole* URL and the router will not hand one over pre-measured.
+ * `/simu-tyro/…` under a GitHub Pages project site without knowing it. **The link budget is the
+ * exception**, and it has to be: `publishable` builds an absolute href by hand for both link
+ * writers, because § 7's link budget is measured on the *whole* URL and the router will not hand
+ * one over pre-measured.
  *
- * So the mount prefix is a parameter of `copyLink`, never a `window` read inside it — see the
- * header of `persist.ts` — and this is what the two call sites pass.
+ * So the mount prefix is a parameter of `publishable`, never a `window` read inside it — see the
+ * header of `persist.ts` — and this is what its callers pass.
  */
 
 /**
