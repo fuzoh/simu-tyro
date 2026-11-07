@@ -527,7 +527,8 @@ const SHIPPED_BY_FAMILY: Readonly<Record<FamilyToken, AcceptedSearch>> = {
  * bar itself stays **bare** on first run: `/` *means* « restore the Session », so it is never
  * rewritten on load.
  *
- * **142 characters, measured against the installed router** — 137 before `gm` (2026-09-23). § 7, § 9 and § 11 all quote **141**,
+ * **142 characters, measured against the installed router** — 137 before `gm` (2026-09-23).
+ * § 7, § 9 and § 11 all quote **141**,
  * counted off § 9's *printed* sketch, which spells `fl=6.0` and `x=75.0` — and that sketch is not
  * emittable. The spec keeps the router's default codecs (« no global codec override »), and
  * `stringifySearchWith(JSON.stringify, JSON.parse)` renders the number `6` as `6`, while the string

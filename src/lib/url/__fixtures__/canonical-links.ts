@@ -1,5 +1,5 @@
 /**
- * Golden canonical links — one pinned string per encoding branch of `url/schema.ts`, so the codec
+ * Golden canonical links — one pinned string per encoding branch of `url/scenario.ts`, so the codec
  * refactors (total key tables, token tables, the decoder's move into `lib/url`) can prove they
  * changed no byte.
  *
