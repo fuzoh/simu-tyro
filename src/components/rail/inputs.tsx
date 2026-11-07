@@ -68,6 +68,7 @@ import {
   displayField,
   FIELDS,
   fieldSchema,
+  parseDecimal,
   warningFor,
 } from "@/lib/rail/fields.ts";
 import {
@@ -95,9 +96,12 @@ import { parseFailureMessage, parseProfileCsv, readFailure } from "@/lib/terrain
 import { encodeP1 } from "@/lib/url/p1.ts";
 import { cn } from "@/lib/utils.ts";
 
+import type { ClampEvent } from "./controls.tsx";
+
 import {
   Chip,
   Choice,
+  ClampNote,
   DisabledReason,
   FixButton,
   InfoTip,
@@ -670,7 +674,11 @@ export function RailInputs({
               // `Flèche / portée`, and deleting either half hides half the finding.
               warning={rung("DAF")}
             />
-            <NumericRow hint="m" id="xD" note={<ClampNote event={clamped} />} />
+            <NumericRow
+              hint="m"
+              id="xD"
+              note={<ClampNote className="text-muted-foreground block text-xs" event={clamped} />}
+            />
           </Group>
         </div>
       </RailSection>
@@ -879,7 +887,7 @@ function NumericRow({
     useRailRowContext();
   const breach = breaches.get(id);
   const value = text[id] ?? "";
-  const parsed = checkField(id, value, context) === null ? Number(value.replace(",", ".")) : NaN;
+  const parsed = checkField(id, value, context) === null ? (parseDecimal(value) ?? NaN) : NaN;
   return (
     <form.Field
       name={id}
@@ -1304,50 +1312,6 @@ function DerivedRow({
         </div>
       )}
     </div>
-  );
-}
-
-/** How long § 3's clamp note stays up, ms — the same budget the View Strip's note uses. */
-const CLAMP_NOTE_MS = 4000;
-
-/**
- * One clamp that **happened**: the span it landed on, and a nonce so a second clamp against the
- * same span restarts the timer rather than passing unnoticed. `nonce: 0` is « none yet ».
- */
-type ClampEvent = { readonly L: number; readonly nonce: number };
-
-/**
- * `x_D`'s clamp **is not silent**, and this is the one place a clamp speaks.
- *
- * It renders an **event**, never a state: `x_D` is clamped on the way into the Scenario, so a note
- * conditioned on « the Scenario holds a position outside the span » would be a note that can only
- * fire where no clamp happened. The caller compares what was asked for against what landed and
- * raises {@link ClampEvent}; this component only decides how long it stays up.
- */
-function ClampNote({ event }: { event: ClampEvent }) {
-  // The note is derived: the latest event shows until its nonce is marked expired. The effect
-  // only owns the timer — it never sets state synchronously, so no cascading render.
-  const [expiredNonce, setExpiredNonce] = useState(0);
-  const shown = event.nonce !== 0 && event.nonce !== expiredNonce ? event : null;
-
-  useEffect(() => {
-    if (event.nonce === 0) return;
-    // Transient — it is a note about a move that just happened, not a state of the field.
-    const timer = setTimeout(() => setExpiredNonce(event.nonce), CLAMP_NOTE_MS);
-    return () => clearTimeout(timer);
-  }, [event]);
-
-  return (
-    <span aria-live="polite" className="text-muted-foreground block text-xs" role="status">
-      {shown === null ? (
-        ""
-      ) : (
-        <>
-          position ramenée à la portée :{" "}
-          <span className="font-mono">0 – {formatValue("x_D", shown.L)}</span> m
-        </>
-      )}
-    </span>
   );
 }
 

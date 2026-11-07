@@ -28,7 +28,7 @@
 import type { ChangeEvent, ReactNode } from "react";
 
 import { Info } from "lucide-react";
-import { useId } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { HelpText } from "@/components/docs/help-text.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -40,6 +40,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover.tsx";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
+import { formatValue } from "@/lib/format/quantity.ts";
 import { cn } from "@/lib/utils.ts";
 
 /**
@@ -496,5 +497,50 @@ export function FixButton({ label, onClick }: { label: string; onClick: () => vo
     <Button onClick={onClick} size="sm" type="button" variant="outline">
       {label}
     </Button>
+  );
+}
+
+/** How long § 3's clamp note stays up, ms: one line's reading time, short enough to be a note. */
+const CLAMP_NOTE_MS = 4000;
+
+/**
+ * One clamp that **happened**: the span it landed on, and a nonce so a second clamp against the
+ * same span restarts the timer rather than passing unnoticed. `nonce: 0` is « none yet ».
+ */
+export type ClampEvent = { readonly L: number; readonly nonce: number };
+
+/**
+ * `x_D`'s clamp **is not silent**, and this is the one place a clamp speaks, for the Rail's field
+ * and the View Strip's alike.
+ *
+ * It renders an **event**, never a state: `x_D` is clamped on the way into the Scenario, so a note
+ * conditioned on « the Scenario holds a position outside the span » would be a note that can only
+ * fire where no clamp happened. The caller compares what was asked for against what landed and
+ * raises {@link ClampEvent}; this component only decides how long it stays up.
+ */
+export function ClampNote({ event, className }: { event: ClampEvent; className?: string }) {
+  // The note is derived: the latest event shows until its nonce is marked expired. The effect
+  // only owns the timer — it never sets state synchronously, so no cascading render.
+  const [expiredNonce, setExpiredNonce] = useState(0);
+  const shown = event.nonce !== 0 && event.nonce !== expiredNonce ? event : null;
+
+  useEffect(() => {
+    if (event.nonce === 0) return;
+    // Transient — it is a note about a move that just happened, not a state of the field.
+    const timer = setTimeout(() => setExpiredNonce(event.nonce), CLAMP_NOTE_MS);
+    return () => clearTimeout(timer);
+  }, [event]);
+
+  return (
+    <span aria-live="polite" className={className} role="status">
+      {shown === null ? (
+        ""
+      ) : (
+        <>
+          position ramenée à la portée :{" "}
+          <span className="font-mono">0 – {formatValue("x_D", shown.L)}</span> m
+        </>
+      )}
+    </span>
   );
 }
