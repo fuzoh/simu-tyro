@@ -46,7 +46,7 @@ import {
   newtonsFromDaN,
   ROPE_CLASS_TOKEN_BY_ID,
   terminationIdFromToken,
-} from "@/lib/url/schema.ts";
+} from "@/lib/url/scenario.ts";
 
 /** The three sentences, each `null` when this arrival has nothing to say with it. */
 export type LinkStrip = {
@@ -289,6 +289,5 @@ function render(
  */
 function terminationLabel(token: string, bag: ValidatedSearch): string {
   const family = bag.fam === "tx" ? "textile" : "steel";
-  const id = terminationIdFromToken(token as TerminationToken, family);
-  return id === null ? token : TERMINATIONS[id].label;
+  return TERMINATIONS[terminationIdFromToken(token as TerminationToken, family)].label;
 }

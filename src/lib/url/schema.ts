@@ -53,12 +53,12 @@
  *   keys « are not a bad value but two contradictory models of the same line », so presence is
  *   counted on the **raw** bag, before per-key validation, and the link refuses whole.
  * - **Forces are daN in the URL, always**, whatever `u` says. `u` is display-only, so hand-editing
- *   `u=daN` → `u=kN` must not make the line 100× tighter. The engine holds newtons; {@link
- *   scenarioToSearch} is the one place the ÷10 happens, on the **write** side.
+ *   `u=daN` → `u=kN` must not make the line 100× tighter. The engine holds newtons; `./scenario.ts`
+ *   is the one place the ÷10 happens, in both directions.
  * - **Absence carries exactly three meanings and never a fourth.** `reg` absent is « — choisir — »,
  *   `mbf`/`ea`/`mu` absent is « non surchargée », and a family- or terrain-scoped key absent means
  *   that configuration is not the active one. So `stripSearchParams` is rejected, every key with a
- *   value is stated even at its default, and {@link completeFromDefaults} exempts the first two.
+ *   value is stated even at its default, and `./scenario.ts`'s completion exempts the first two.
  * - **The dropped-keys reporter takes the raw query string as a parameter**
  *   ({@link reportDroppedKeys}), never reading `window.location` — amendment A removed the jsdom
  *   environment that would otherwise be needed, and as a pure function this is a plain unit test.
@@ -69,10 +69,7 @@ import type { SearchMiddleware } from "@tanstack/react-router";
 import { defaultParseSearch, defaultStringifySearch } from "@tanstack/react-router";
 import * as v from "valibot";
 
-import type { Scenario } from "@/lib/scenario/types.ts";
-import type { RegimeId, SteelSpec, TerminationId, TextileSpec } from "@/lib/sim";
-
-import { FIRST_RUN_RETAINED_TEXTILE, FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
+import type { RegimeId } from "@/lib/sim";
 
 import { P1Error, validateP1 } from "./p1.ts";
 
@@ -162,64 +159,6 @@ export const ROPE_CLASS_TOKENS = ["hmpe", "pa", "pes"] as const;
 /** § 7's `cls` token. */
 export type RopeClassToken = (typeof ROPE_CLASS_TOKENS)[number];
 
-/** The write-side direction of `cst`. Total over the engine's constructions. */
-export const CONSTRUCTION_TOKEN_BY_ID = {
-  "fibre-core": "tc",
-  iwrc: "iwrc",
-} as const satisfies Record<SteelSpec["construction"], ConstructionToken>;
-
-/** The write-side direction of `cls`. Total over the engine's rope classes. */
-export const ROPE_CLASS_TOKEN_BY_ID = {
-  hmpe: "hmpe",
-  "pa-en1891a": "pa",
-  polyester: "pes",
-} as const satisfies Record<TextileSpec["ropeClass"], RopeClassToken>;
-
-type Values<T> = T[keyof T];
-
-/** Resolves to `true` only when the token tuple and its table name exactly the same tokens. */
-type Covers<Token extends string, Table> = [Token] extends [Values<Table>]
-  ? [Values<Table>] extends [Token]
-    ? true
-    : never
-  : never;
-
-const TOKEN_TABLES_COVER_TUPLES: [
-  Covers<ConstructionToken, typeof CONSTRUCTION_TOKEN_BY_ID>,
-  Covers<RopeClassToken, typeof ROPE_CLASS_TOKEN_BY_ID>,
-] = [true, true];
-void TOKEN_TABLES_COVER_TUPLES;
-
-/**
- * The read side of a token table, derived so the two directions cannot disagree. The result is
- * keyed by token, and a token the schema does not know is `undefined`, never a neighbour's id.
- */
-function invert<Id extends string, Token extends string>(
-  byId: Readonly<Record<Id, Token>>,
-): Readonly<Record<Token, Id>> {
-  return Object.fromEntries(
-    (Object.keys(byId) as Id[]).map((id): [Token, Id] => [byId[id], id]),
-  ) as Record<Token, Id>;
-}
-
-export const CONSTRUCTION_ID_BY_TOKEN = invert<SteelSpec["construction"], ConstructionToken>(
-  CONSTRUCTION_TOKEN_BY_ID,
-);
-
-export const ROPE_CLASS_ID_BY_TOKEN = invert<TextileSpec["ropeClass"], RopeClassToken>(
-  ROPE_CLASS_TOKEN_BY_ID,
-);
-
-/** N → daN. § 7: forces serialise in daN, **fixed**, and ×10 exactly, so the step is lossless. */
-export function daNFromNewtons(newtons: number): number {
-  return newtons / 10;
-}
-
-/** daN → N, the exact inverse of {@link daNFromNewtons}. */
-export function newtonsFromDaN(daN: number): number {
-  return daN * 10;
-}
-
 /**
  * § 7's `ta` / `tb` tokens — five steel, four textile, `epissure` shared, plus `attelage`, which
  * both families publish (2026-09-23). The schema accepts all nine regardless of `fam`, because a textile termination under steel is an **invalid
@@ -241,61 +180,6 @@ export const TERMINATION_TOKENS = [
 /** § 7's `ta` / `tb` token. */
 export type TerminationToken = (typeof TERMINATION_TOKENS)[number];
 
-/** The id each token means, per family — `epissure` is the one token both families spell. */
-const TERMINATION_ID_BY_TOKEN: Record<
-  "steel" | "textile",
-  Record<TerminationToken, TerminationId | null>
-> = {
-  steel: {
-    manchon: "manchon-metal-resine",
-    cosse: "cosse-oeil-flamand",
-    epissure: "epissure",
-    coin: "manchon-a-coin",
-    serre: "serre-cables-etrier",
-    oeil: null,
-    huit: null,
-    chaise: null,
-    attelage: "attelage-sans-tension",
-  },
-  textile: {
-    manchon: null,
-    cosse: null,
-    epissure: "epissure-longue-hmpe",
-    coin: null,
-    serre: null,
-    oeil: "oeil-cousu-epissure",
-    huit: "noeud-de-huit",
-    chaise: "noeud-de-chaise",
-    attelage: "attelage-sans-tension",
-  },
-};
-
-/** The write-side direction. Total over {@link TerminationId}, so no end can fail to serialise. */
-export const TERMINATION_TOKEN_BY_ID = {
-  "manchon-metal-resine": "manchon",
-  "cosse-oeil-flamand": "cosse",
-  epissure: "epissure",
-  "manchon-a-coin": "coin",
-  "serre-cables-etrier": "serre",
-  "oeil-cousu-epissure": "oeil",
-  "epissure-longue-hmpe": "epissure",
-  "noeud-de-huit": "huit",
-  "noeud-de-chaise": "chaise",
-  "attelage-sans-tension": "attelage",
-} as const satisfies Record<TerminationId, TerminationToken>;
-
-/**
- * Which {@link TerminationId} a token names under a family, or `null` when that family does not
- * publish it. The app's tier, not the URL's: an out-of-family token is kept by the schema and
- * refused by the picker.
- */
-export function terminationIdFromToken(
-  token: TerminationToken,
-  family: "steel" | "textile",
-): TerminationId | null {
-  return TERMINATION_ID_BY_TOKEN[family][token];
-}
-
 /** § 7's `r0` — the two grades § 3 publishes. A third is unrepresentable, not out of range. */
 export const GRADES = [1770, 1960] as const;
 
@@ -305,24 +189,35 @@ export const GRADES = [1770, 1960] as const;
  */
 export const TIGHTNESS_KEYS = ["fl", "te", "lo", "vr"] as const;
 
+/** One of § 7's tightness-driver keys. */
+export type TightnessKey = (typeof TIGHTNESS_KEYS)[number];
+
+/** What each key's schema returns — the value that arrived, untouched. */
+export type SearchValues = { readonly [K in SearchKey]: v.InferOutput<(typeof KEY_SCHEMAS)[K]> };
+
 /**
- * A validated bag: § 7's key table with every key optional, because **absence is meaning** and
- * because a salvaged key is *omitted* rather than set to `undefined`.
- *
- * Every value is the value that arrived, untouched — a number stays a number and `tr` stays the
- * string the sender sent.
- *
- * {@link refused} is the one member that is **not** a URL key: it is amendment E's marker, set on
- * a link that refuses whole, and when it is set it is the **only** member — the refusal suppresses
- * the rest of the screen rather than merging with it.
+ * A link refused whole: amendment E's marker and **nothing else** — the refusal suppresses the rest
+ * of the screen rather than merging with it. `refused` is not a key of § 7's table: it never
+ * round-trips through the address bar, because {@link canonicalLink} emits {@link CANONICAL_KEYS}
+ * only.
  */
-export type ValidatedSearch = {
-  /**
-   * Amendment E's whole-link refusal, or absent. Not a key of § 7's table: it never round-trips
-   * through the address bar, because {@link canonicalLink} emits {@link CANONICAL_KEYS} only.
-   */
-  readonly refused?: LinkRefusal;
-} & Readonly<Partial<{ [K in SearchKey]: v.InferOutput<(typeof KEY_SCHEMAS)[K]> }>>;
+export type RefusedSearch = { readonly refused: LinkRefusal } & {
+  readonly [K in SearchKey]?: never;
+};
+
+/**
+ * A link that was not refused: § 7's key table with every key optional, because **absence is
+ * meaning** and because a salvaged key is *omitted* rather than set to `undefined`. Every value is
+ * the value that arrived, untouched — a number stays a number and `tr` stays the string the sender
+ * sent.
+ */
+export type AcceptedSearch = { readonly refused?: never } & Partial<SearchValues>;
+
+/**
+ * A validated bag. Testing `refused` tells the two apart, so code past the refusal check holds an
+ * {@link AcceptedSearch} and completion cannot be handed a refused link.
+ */
+export type ValidatedSearch = RefusedSearch | AcceptedSearch;
 
 /**
  * A finite number, and nothing else. `v.number()` already refuses `NaN`; `v.finite()` adds the two
@@ -371,7 +266,7 @@ const KEY_SCHEMAS = {
   hr: FINITE, // Enveloppe passager, m.
   gm: FINITE, // Garde min. admise, m (2026-09-23).
   daf: FINITE, // Coefficient dynamique.
-  x: FINITE, // Position du passager, m — clamped to `[0, L]` by the store, **never here**.
+  x: FINITE, // Position du passager, m — clamped to the span by `searchToScenario`, **never here**.
   // `tr` is validated **structurally** by the codec, not by valibot: sentinel, base64url alphabet,
   // varint walk, declared `n` against bytes consumed, character budget. A structural failure is a
   // refusal, not a salvage, so it is handled in {@link refuse} rather than here.
@@ -665,213 +560,6 @@ export function hasScenarioKey(search: ValidatedSearch): boolean {
 }
 
 /**
- * The keys whose **absence is meaning**, never completed. § 7's first two meanings: `reg` absent is
- * « — choisir — », and `mbf`/`ea`/`mu` absent is « non surchargée », which differs from « equal to
- * the formula value ».
- */
-const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>(["reg", "mbf", "ea", "mu"]);
-
-/** Membership, hoisted: the driver test runs once per key of every completed link. */
-const TIGHTNESS_KEY_SET: ReadonlySet<SearchKey> = new Set<SearchKey>(TIGHTNESS_KEYS);
-
-/**
- * The family a link with no `fam` is read under — § 9's shipped one, derived from the constant so
- * a defaults change cannot leave a stale token here. § 7 keeps `fam` explicit precisely because
- * « a URL with no line keys at all still needs a family ».
- */
-const DEFAULT_FAMILY: FamilyToken = FIRST_RUN_SCENARIO.material.family === "steel" ? "ac" : "tx";
-
-/** What {@link completeFromDefaults} returns — the canonical bag, and the strip's second sentence. */
-export type Completion = {
-  readonly search: ValidatedSearch;
-  /** The completed keys, in canonical order. The strip names the **values**, read from `search`. */
-  readonly completed: readonly SearchKey[];
-};
-
-/**
- * § 7's completion rule: **partial recognised links are completed literally** from
- * `FIRST_RUN_SCENARIO`, and the address bar is then rewritten to the completed Scenario.
- *
- * Literally, and that is measured, not stylistic: `?L=250&h=-40` completed with `fl=6.0` lands
- * clear at garde 1,25 m with an honest 2,40 % ⚠, while a "smart" 4 %-of-span completion lands at
- * **−2,39 m — on the ground**.
- *
- * Three groups are exempt, all of them § 7's three meanings of absence:
- *
- * 1. `reg` and `mbf`/`ea`/`mu` — {@link NEVER_COMPLETED}.
- * 2. The **inactive** terrain source. `tr` present ⇒ imported: `L`/`h` are derived read-outs and
- *    are dropped rather than completed; `tr` absent ⇒ manual, and `sa`/`sb` never appear.
- * 3. The **inactive** family, and a rope nobody typed. Under `fam=tx` no steel key is completed
- *    and **no rope is invented**: § 9 ships `MBL` and `μ` « vides et requis », because one made-up
- *    `MBL` decides the verdict. Those two blocking errors are the correct arrival state. The rope
- *    **class** is the exception: it is a choice among three, not a measurement, so it is completed
- *    from the shipped textile default and named.
- *
- * `x` is the one non-literal completion — `L/2` of the *completed* span, 125,0 m for `?L=250&h=-40`
- * rather than the constant 75,0 — because it selects a **view**, and a viewpoint off the end of the
- * span is worse than a moved viewpoint.
- *
- * A **refused** bag is returned untouched, completing nothing. Completion is the one operation
- * that would turn « refused whole » into a silent repair — a scenario neither party ever saw,
- * built entirely out of our defaults — so the marker short-circuits it.
- *
- * @param search a validated bag. Only meaningful when {@link hasScenarioKey} is true: a bare `/`
- *   restores the Session and is never rewritten.
- */
-export function completeFromDefaults(search: ValidatedSearch): Completion {
-  if (search.refused !== undefined) return { search, completed: [] };
-
-  const imported = search.tr !== undefined;
-  const family = search.fam ?? DEFAULT_FAMILY;
-  const hasDriver = TIGHTNESS_KEYS.some((key) => search[key] !== undefined);
-
-  const out: Record<string, unknown> = {};
-  const completed: SearchKey[] = [];
-
-  for (const key of CANONICAL_KEYS) {
-    if (!inActiveConfiguration(key, imported, family)) continue;
-
-    const present = search[key];
-    if (present !== undefined) {
-      out[key] = present;
-      continue;
-    }
-    if (NEVER_COMPLETED.has(key)) continue;
-    // A driver that arrived is never joined by a completed one; a link with none gets § 9's
-    // Flèche, because with no driver « the remainder does not describe a line at all ».
-    if (hasDriver && TIGHTNESS_KEY_SET.has(key)) continue;
-
-    const fallback = FIRST_RUN_SEARCH[key] ?? TEXTILE_COMPLETION[key];
-    if (fallback === undefined) continue;
-    out[key] = fallback;
-    completed.push(key);
-  }
-
-  if (out.x !== undefined && search.x === undefined) {
-    const span = spanOf(out);
-    if (span !== undefined) out.x = span / 2;
-  }
-
-  return { search: out as ValidatedSearch, completed };
-}
-
-/**
- * Is this key part of the **active** configuration? § 7's one governing rule: « the URL carries the
- * active configuration and never a retained alternate », so an imported link has `tr`/`sa`/`sb` and
- * no `L`/`h`, a steel link has no `cls`/`mbl`/`k`, and a textile link has no `d`/`r0`/`cst`.
- *
- * Out-of-scope keys leave the canonical bag **without** a strip line: the strip's two kinds are an
- * unknown key and an unrepresentable value, and a redundant `L` beside a `tr` is neither — with a
- * trace present `L` is derived, so nothing the line needs is removed.
- */
-function inActiveConfiguration(key: SearchKey, imported: boolean, family: FamilyToken): boolean {
-  switch (key) {
-    case "L":
-    case "h":
-      return !imported;
-    case "sa":
-    case "sb":
-    case "tr":
-      return imported;
-    case "d":
-    case "r0":
-    case "cst":
-    case "mbf":
-    case "ea":
-      return family === "ac";
-    case "cls":
-    case "mbl":
-    case "k":
-      return family === "tx";
-    default:
-      // `mu` is deliberately not scoped: it is the same physical quantity in both families.
-      return true;
-  }
-}
-
-/** The completed span, m — `L` in manual mode, `sb − sa` in imported mode, `undefined` if neither. */
-function spanOf(bag: Record<string, unknown>): number | undefined {
-  const { L, sa, sb } = bag;
-  if (typeof L === "number") return L;
-  if (typeof sa === "number" && typeof sb === "number") return sb - sa;
-  return undefined;
-}
-
-/**
- * A Scenario as § 7's canonical bag — the write side, and the only place the engine's newtons
- * become the URL's daN. Keys are inserted in {@link CANONICAL_KEYS} order, which *is* the emitted
- * query string's order.
- *
- * Nothing is rounded here: § 7 moved the precision decision upstream (« a prefill writes the
- * *displayed* value into state, never the underlying float »), so serialisation is **verbatim** and
- * there is no rounding decision left at the URL.
- */
-export function scenarioToSearch(scenario: Scenario): ValidatedSearch {
-  const { geometry, tightness, material, terminations, rider, anchors } = scenario;
-  const out: Record<string, unknown> = {};
-
-  out.v = 1;
-  out.u = scenario.unit;
-  out.use = scenario.usage === "PERMANENTE" ? "perm" : "tempo";
-  // `regime: null` **is** « — choisir — »: the key is omitted, never emitted empty.
-  if (scenario.regime !== null) out.reg = scenario.regime;
-
-  if (geometry.source === "manual") {
-    out.L = geometry.L;
-    out.h = geometry.h;
-  } else {
-    out.sa = geometry.sa;
-    out.sb = geometry.sb;
-  }
-  out.za = anchors.zA;
-  out.zb = anchors.zB;
-
-  if (tightness.mode === "sag") out.fl = tightness.D_target;
-  else if (tightness.mode === "tension") out.te = daNFromNewtons(tightness.H_target);
-  else if (tightness.mode === "ratio") out.vr = tightness.ratio;
-  else out.lo = tightness.L0;
-
-  if (material.family === "steel") {
-    out.fam = "ac";
-    out.d = material.d;
-    out.r0 = material.R0;
-    out.cst = CONSTRUCTION_TOKEN_BY_ID[material.construction];
-    const overrides = material.overrides;
-    // Absence **is** « non surchargée ». An override of `0` is still an override, so the test is
-    // `!== undefined` rather than truthiness.
-    if (overrides?.MBF !== undefined) out.mbf = daNFromNewtons(overrides.MBF);
-    if (overrides?.EA !== undefined) out.ea = daNFromNewtons(overrides.EA);
-    if (overrides?.mu !== undefined) out.mu = overrides.mu;
-  } else {
-    out.fam = "tx";
-    // `mu` is inserted **before** `cls`/`mbl`, which is its one slot in {@link CANONICAL_KEYS}: it
-    // is the same key in both families, so it cannot also sit in the textile group. Insertion order
-    // *is* the emitted query string, and {@link canonicalLink} re-inserts in `CANONICAL_KEYS`
-    // order — emitting `mu` last here made « Copier le lien » and the address bar disagree as
-    // strings for a textile line, which is exactly the diffability § 7 buys with a canonical order.
-    out.mu = material.mu;
-    out.cls = ROPE_CLASS_TOKEN_BY_ID[material.ropeClass];
-    out.mbl = daNFromNewtons(material.MBL);
-    out.k = material.k;
-  }
-
-  out.ta = TERMINATION_TOKEN_BY_ID[terminations.A.id];
-  out.tb = TERMINATION_TOKEN_BY_ID[terminations.B.id];
-  out.na = terminations.A.eta;
-  out.nb = terminations.B.eta;
-
-  out.mp = rider.mp;
-  out.hr = rider.hRider;
-  out.gm = rider.hClearMin;
-  out.daf = rider.DAF;
-  out.x = rider.xD;
-
-  if (geometry.source === "trace") out.tr = geometry.trace;
-
-  return out as ValidatedSearch;
-}
-
-/**
  * A canonical bag as the link the address bar holds — `/` plus the router's own
  * `defaultStringifySearch`, so the string asserted in a test is the string the router emits.
  *
@@ -883,8 +571,8 @@ export function scenarioToSearch(scenario: Scenario): ValidatedSearch {
  * it is not a key of § 7's table, so the rewrite cannot emit it. That is not the whole invariant,
  * though, and it was once mistaken for it: the router builds hrefs of its own from
  * `{ ...incoming, ...validated }` and would emit the marker there. {@link
- * keepRefusalOutOfTheAddressBar} covers that path, and a refused link is never rewritten anyway
- * ({@link completeFromDefaults} short-circuits).
+ * keepRefusalOutOfTheAddressBar} covers that path, and a refused link is never rewritten anyway:
+ * it never reaches completion.
  */
 export function canonicalLink(search: ValidatedSearch): string {
   const ordered: Record<string, unknown> = {};
@@ -894,35 +582,3 @@ export function canonicalLink(search: ValidatedSearch): string {
   }
   return `/${defaultStringifySearch(ordered)}`;
 }
-
-/**
- * § 9's shipped Scenario as a bag — the completion source, derived from the constant rather than
- * transcribed beside it, so a defaults change cannot leave a second copy behind.
- */
-const FIRST_RUN_SEARCH: ValidatedSearch = scenarioToSearch(FIRST_RUN_SCENARIO);
-
-/**
- * The one textile key a shipped default can complete: the rope class. `mbl`, `mu` and `k` stay
- * blank on purpose, and the first-run Scenario is steel, so its bag carries no `cls` to complete
- * from — the class is read from the retained textile default instead.
- */
-const TEXTILE_COMPLETION: ValidatedSearch = {
-  cls: ROPE_CLASS_TOKEN_BY_ID[FIRST_RUN_RETAINED_TEXTILE.spec.ropeClass],
-};
-
-/**
- * § 9's first-run link, which « Copier le lien » produces from the shipped defaults. The address
- * bar itself stays **bare** on first run: `/` *means* « restore the Session », so it is never
- * rewritten on load.
- *
- * **142 characters, measured against the installed router** — 137 before `gm` (2026-09-23). § 7, § 9 and § 11 all quote **141**,
- * counted off § 9's *printed* sketch, which spells `fl=6.0` and `x=75.0` — and that sketch is not
- * emittable. The spec keeps the router's default codecs (« no global codec override »), and
- * `stringifySearchWith(JSON.stringify, JSON.parse)` renders the number `6` as `6`, while the string
- * `"6.0"` comes back out as `%226.0%22`. § 3 states the same conclusion from the other side:
- * « padding is display-only: state holds a *number* whose value equals the displayed value, so the
- * URL serialises `6` ». 141 − the four characters of those two paddings = **137**. What the count
- * exists to lock is unchanged: the key table, the canonical order, and the two absence meanings
- * (`reg`, `mbf`/`ea`/`mu`).
- */
-export const FIRST_RUN_LINK: string = canonicalLink(FIRST_RUN_SEARCH);

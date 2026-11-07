@@ -12,7 +12,7 @@ import type { Session } from "@/lib/session/session.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { DEFAULT_LAYERS } from "@/lib/session/session.ts";
 import { encodeP1 } from "@/lib/url/p1.ts";
-import { FIRST_RUN_LINK } from "@/lib/url/schema.ts";
+import { FIRST_RUN_LINK } from "@/lib/url/scenario.ts";
 
 import { appReducer, initialAppState } from "./state.ts";
 
