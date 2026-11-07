@@ -39,9 +39,12 @@ import type { EngineFailure, Unloaded } from "@/lib/scenario/unloaded.ts";
 import type { SteelValues } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
-import { equalAtDisplayPrecision } from "@/lib/format/quantity.ts";
+import { equalAtDisplayPrecision, formatAtX, formatQuantity } from "@/lib/format/quantity.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { resolveSteelValues, STEEL, steelFormula, TEXTILE } from "@/lib/sim";
+
+import { strengthSymbol, TIGHTNESS_FIELD } from "./fields.ts";
+import { warningLadder } from "./provenance.ts";
 
 /** Which of the three steel read-outs the user has typed over, and which of those have gone stale. */
 export type OverrideFlags = { readonly MBF: boolean; readonly EA: boolean; readonly mu: boolean };
@@ -162,6 +165,100 @@ export function deducedFrom(
     },
     failure: null,
   };
+}
+
+/** The read-only rows of `Valeurs déduites`. The three steel derived rows are fields, not rows. */
+export type DeducedRowId =
+  | "L"
+  | "h"
+  | "zBaseA"
+  | "zBaseB"
+  | "MBL"
+  | "EAtextile"
+  | "w"
+  | "chord"
+  | "L0"
+  | "H"
+  | "sag"
+  | "sagRatio"
+  | "standingTension";
+
+/** One read-only row of `Valeurs déduites`. A row that has nothing to show is absent. */
+export type ReadOutRow = {
+  readonly id: DeducedRowId;
+  /**
+   * `placement` is § 4's anchor-placement rows, printed above the material; the steel Override
+   * rows, which are editable and stay in the component, sit between the two groups.
+   */
+  readonly group: "placement" | "line";
+  readonly label: string;
+  readonly value: string;
+  /** § 6's Avertissement rung on the row it qualifies, without its glyph. */
+  readonly warning: string | null;
+};
+
+/**
+ * `Valeurs déduites`'s read-only rows, in screen order.
+ *
+ * @param cause « Aucun résultat — … », or `null`. **The cause governs, not `deduced.solve`**: the
+ *   rider-free chain is derived from the Scenario, which cannot hold a committed-invalid « −5 » or
+ *   an emptied `m_p`, so under a Solve Gate breach it still resolves — and printing `L₀ 151,64 m`
+ *   beside « aucun résultat » is the stale number invariant 3 forbids. The five solve rows go and
+ *   `corde` and `w`, which need no solve, stay.
+ */
+export function deducedRows(
+  scenario: ScenarioDraft,
+  deduced: Deduced,
+  cause: string | null,
+): readonly ReadOutRow[] {
+  const { material, span, solve } = deduced;
+  const { unit } = scenario;
+  const ladder = warningLadder(scenario, deduced);
+  const rows: ReadOutRow[] = [];
+  const push = (
+    id: DeducedRowId,
+    label: string,
+    value: string,
+    group: ReadOutRow["group"] = "line",
+  ) => {
+    const warning = ladder.find((rung) => rung.row === id)?.text ?? null;
+    rows.push({ id, group, label, value, warning });
+  };
+
+  // In manual mode `L` and `h` are fields, so only an imported profile prints them here.
+  if (span !== null && scenario.geometry.source === "trace") {
+    push("L", "Portée", formatQuantity("L", span.L), "placement");
+    push("h", "Dénivelé", formatQuantity("h", span.h), "placement");
+    // One row per base rather than § 4's « · »-joined line: the Rail is a 255 px column.
+    if (span.bases !== null) {
+      push("zBaseA", "Alt. base A", formatQuantity("zBase", span.bases.zBaseA), "placement");
+      push("zBaseB", "Alt. base B", formatQuantity("zBase", span.bases.zBaseB), "placement");
+    }
+  }
+
+  if (material.family === "textile" && material.strength !== null) {
+    push("MBL", "Charge de rupture", formatQuantity("MBL", material.strength, unit));
+    if (material.EA !== null) {
+      push("EAtextile", "Raideur axiale", formatQuantity("EA", material.EA));
+    }
+  }
+
+  if (material.w !== null) push("w", "Poids linéique", formatQuantity("w", material.w, unit));
+  if (span !== null) push("chord", "Corde", formatQuantity("chord", span.chord));
+
+  if (solve === null || cause !== null) return rows;
+  // The driving quantity is a field, so its read-out would print the same number twice.
+  const driver = TIGHTNESS_FIELD[scenario.tightness.mode];
+  if (driver !== "L0") push("L0", "Longueur non tendue", formatQuantity("L0", solve.L0));
+  if (driver !== "H_target") push("H", "Prétension", formatQuantity("H_target", solve.H, unit));
+  if (driver !== "D_target") {
+    const sag = `${formatQuantity("sag", solve.sag)} (${formatAtX(solve.sagAtX)})`;
+    push("sag", "Flèche à vide", sag);
+  }
+  push("sagRatio", "Flèche / portée", formatQuantity("sagRatio", solve.sagRatio));
+  const standing = formatQuantity("standingTension", solve.standingTension);
+  push("standingTension", "Tension permanente", `${standing} ${strengthSymbol(material.family)}`);
+  return rows;
 }
 
 /** § 3's material read-outs, overrides and stale badges included. */
