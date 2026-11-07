@@ -14,6 +14,7 @@ import {
   fieldSchema,
   gateOf,
   parseDecimal,
+  riderPositionEntry,
   REQUIRED_MESSAGE,
   warningFor,
 } from "./fields.ts";
@@ -309,5 +310,23 @@ describe("the echo reads in the field's own quantity and unit", () => {
     expect(issue?.message).toContain("Valeur : −10,000 kN.");
     // …and the same canonical value reads differently under the selector, which is the point.
     expect(formatQuantity("H_target", -1e4, "daN")).toBe("-1000,0 daN");
+  });
+});
+
+describe("riderPositionEntry — the View Strip's `x` field", () => {
+  test("an emptied or unreadable field commits nothing, rather than reading as 0 m", () => {
+    expect(riderPositionEntry("", 150)).toBeNull();
+    expect(riderPositionEntry("  ", 150)).toBeNull();
+    expect(riderPositionEntry("abc", 150)).toBeNull();
+  });
+
+  test("a comma reads as a decimal mark and an in-range value is not a clamp", () => {
+    expect(riderPositionEntry("12,5", 150)).toEqual({ xD: 12.5, clamped: false });
+    expect(riderPositionEntry("150", 150)).toEqual({ xD: 150, clamped: false });
+  });
+
+  test("a value outside the span lands on its end and says so", () => {
+    expect(riderPositionEntry("400", 150)).toEqual({ xD: 150, clamped: true });
+    expect(riderPositionEntry("-3", 150)).toEqual({ xD: 0, clamped: true });
   });
 });

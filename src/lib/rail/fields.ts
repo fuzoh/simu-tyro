@@ -45,6 +45,7 @@ import type { ForceUnit, TightnessDraft } from "@/lib/scenario/types.ts";
 import type { TextileSpec } from "@/lib/sim";
 
 import { formatQuantity, formatValue, fromDisplay, roundToDisplay } from "@/lib/format/quantity.ts";
+import { clampX } from "@/lib/scenario/geometry.ts";
 
 /**
  * § 7's three gates. Declared here rather than in `./gates.ts` because every field names the gate
@@ -537,6 +538,21 @@ export function parseDecimal(raw: string): number | null {
   if (!/^[+-]?(\d+([.,]\d*)?|[.,]\d+)$/.test(text)) return null;
   const value = Number(text.replace(",", "."));
   return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * What the View Strip's `x` field commits for the text in it: `null` when the text is not a number
+ * (the field reverts to the last committed position and says nothing), otherwise the position
+ * clamped into `[0, L]` and whether the clamp moved it.
+ */
+export function riderPositionEntry(
+  raw: string,
+  L: number,
+): { readonly xD: number; readonly clamped: boolean } | null {
+  const typed = parseDecimal(raw);
+  if (typed === null) return null;
+  const xD = clampX(typed, L);
+  return { xD, clamped: xD !== typed };
 }
 
 /**
