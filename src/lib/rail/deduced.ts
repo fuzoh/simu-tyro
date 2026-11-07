@@ -94,6 +94,8 @@ export type DeducedSolve = {
   readonly sagRatio: number;
   /** `Tension permanente`, **percent of `MBF`** — §9.2's cap is 30 %, the useful regime under 7 %. */
   readonly standingTension: number;
+  /** The unloaded anchor tensions, N — what `lineWarnings` reads §9.2's cap against. */
+  readonly Tvide: { readonly TA: number; readonly TB: number };
 };
 
 /** Everything § 3's `Valeurs déduites` block reports, plus why a row is missing when one is. */
@@ -156,6 +158,7 @@ export function deducedFrom(
       // The **greater unloaded anchor tension**, which is what §9.2's cap is read against — not
       // `H`, whose 2,79 % would flatter the shipped line by a tenth of a point.
       standingTension: (Math.max(state.TA, state.TB) / unloaded.material.strength) * 100,
+      Tvide: { TA: state.TA, TB: state.TB },
     },
     failure: null,
   };

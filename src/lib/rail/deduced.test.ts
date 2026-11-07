@@ -186,6 +186,27 @@ describe("the rider and unit fields the read-outs depend on — `mp` and `unit`"
   });
 });
 
+describe("`Tvide` — the unloaded anchor tensions the creep cap is read against", () => {
+  const tvide = (patch: (draft: ScenarioDraft) => void) => {
+    const solve = deduceValues(scenario(patch), null).solve;
+    if (solve === null) throw new Error("the shipped line solves");
+    return { ...solve.Tvide, H: solve.H };
+  };
+
+  test("a level span hangs symmetrically: TA equals TB", () => {
+    const { TA, TB } = tvide((draft) => {
+      draft.geometry = { source: "manual", L: 150, h: 0 };
+    });
+    expect(TA).toBeCloseTo(TB, 6);
+  });
+
+  test("the higher anchor carries more: A is 18 m above B on the shipped line, so TA > TB > H", () => {
+    const { TA, TB, H } = tvide(() => {});
+    expect(TA).toBeGreaterThan(TB);
+    expect(TB).toBeGreaterThan(H);
+  });
+});
+
 describe("textile — four inputs, exactly one derived value, and no override affordance", () => {
   const rope = (patch: Partial<{ MBL: number | null; mu: number | null; k: number | null }>) =>
     scenario((draft) => {

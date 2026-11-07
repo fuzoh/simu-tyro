@@ -47,11 +47,11 @@
 
 import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
-import type { RegimeId } from "@/lib/sim";
+import type { RegimeId, RegimeMismatch } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
-import { isFamilyAllowed, isRegimeAvailable, REGIMES } from "@/lib/sim";
+import { isFamilyAllowed, REGIMES, regimeMismatch } from "@/lib/sim";
 
 import type { FieldId, FieldIssue, FieldIssueKind, GateId } from "./fields.ts";
 
@@ -203,22 +203,55 @@ export function culprits(grandeur: Grandeur, mode: CulpritMode): readonly FieldI
 
 /**
  * The cause clause of § 8's « Régime × famille / usage » message row, for a régime that
- * {@link isRegimeAvailable} has just rejected.
+ * {@link regimeMismatch} has just rejected.
  *
- * § 10.1 disables a régime on **two independent conditions** — « seul *Secours textile 10:1* est
- * désactivé — sous acier, **ou** sous `PERMANENTE` » — so the clause names the **mismatch**, never
- * the state the Scenario happens to hold. Under `textile` + `PERMANENTE` the rope is this régime's
- * own *precondition*: naming it would send the user to repair the one part already right, and the
- * family breach § 10.4 files alongside it already names the rope. **Family first when both miss**,
- * which keeps § 8's shipped steel string verbatim. `requires.usage` is `TEMPORAIRE` for every
- * régime that constrains it, so a use-class miss can only ever be `PERMANENTE`.
+ * § 10.1 disables a régime on **two independent conditions** — « sous acier, **ou** sous
+ * `PERMANENTE` » — so the clause names each **mismatch**, never the state the Scenario happens to
+ * hold. Under `textile` + `PERMANENTE` the rope is this régime's own *precondition*: naming it
+ * would send the user to repair the one part already right. Steel under `PERMANENTE` misses both,
+ * and the clause names both, family first. `requires.usage` is `TEMPORAIRE` for every régime that
+ * constrains it, so a use-class miss can only ever be `PERMANENTE`.
  */
-function unavailabilityCause(regime: RegimeId, family: "steel" | "textile"): string {
+function unavailabilityCause(mismatch: RegimeMismatch, family: "steel" | "textile"): string {
+  const causes: string[] = [];
+  if (mismatch.family)
+    causes.push(family === "steel" ? "avec un câble acier" : "avec une corde textile");
+  if (mismatch.usage) causes.push("en installation permanente");
+  return causes.join(" et ");
+}
+
+/** What a régime's `requires` asks for, as the noun the select note needs. */
+const FAMILY_REQUIRED = { steel: "un câble acier", textile: "une corde textile" } as const;
+const USAGE_REQUIRED = {
+  PERMANENTE: "un usage permanent",
+  TEMPORAIRE: "un usage temporaire",
+} as const;
+/** And what is currently selected, for the clause that names it. */
+const FAMILY_ACTIVE = { steel: "l'acier", textile: "le textile" } as const;
+
+/**
+ * § 10.1 — « une entrée indisponible **montre sa raison** »: the régime select's note, `null` where
+ * the entry is choosable. The option itself already reads « — indisponible », which says *that*;
+ * this says *why*.
+ *
+ * **Three forms, because both clauses can fail at once** — steel *and* `PERMANENTE`. § 10.1 asks
+ * for one reason per row, so the pair is one sentence rather than two notes.
+ */
+export function regimeUnavailableNote(
+  regime: RegimeId,
+  family: "steel" | "textile",
+  usage: "PERMANENTE" | "TEMPORAIRE",
+): string | null {
+  const mismatch = regimeMismatch(regime, family, usage);
   const { requires } = REGIMES[regime];
-  if (requires !== null && requires.family !== family) {
-    return family === "steel" ? "avec un câble acier" : "avec une corde textile";
+  if (mismatch === null || requires === null) return null;
+  if (mismatch.family && mismatch.usage) {
+    return `Indisponible — ce régime suppose ${FAMILY_REQUIRED[requires.family]} et ${USAGE_REQUIRED[requires.usage]}.`;
   }
-  return "en installation permanente";
+  if (mismatch.family) {
+    return `Indisponible — ce régime suppose ${FAMILY_REQUIRED[requires.family]} ; la famille active est ${FAMILY_ACTIVE[family]}.`;
+  }
+  return `Indisponible — ce régime ne couvre pas ${USAGE_REQUIRED[usage]}.`;
 }
 
 /** Manual or imported geometry — the mode half of every (grandeur × mode) row. */
@@ -326,19 +359,18 @@ export function evaluateGates({ scenario, trace, issues = [] }: GateInput): Gate
   // grid and leaves § 8's rank-4 neutral prompt as the banner's occupant. Filing it as an error
   // would put rank 1 in the slot instead and make that prompt unreachable.
   const noRegime = scenario.regime === null;
-  if (
-    scenario.regime !== null &&
-    !isRegimeAvailable(scenario.regime, scenario.material.family, scenario.usage)
-  ) {
+  const mismatch =
+    scenario.regime === null
+      ? null
+      : regimeMismatch(scenario.regime, scenario.material.family, scenario.usage);
+  if (scenario.regime !== null && mismatch !== null) {
     push({
       gate: "verdict",
       kind: "invalid",
       field: "regime",
       alsoOutlined: [],
-      // The cause clause names the **blocking condition**, not the family — see
-      // {@link unavailabilityCause}: reading the family alone blamed the rope this régime requires.
       message: `⛔ Régime « ${REGIMES[scenario.regime].label} » indisponible ${unavailabilityCause(
-        scenario.regime,
+        mismatch,
         scenario.material.family,
       )}.`,
       fixes: [FIX["choisir-un-autre-regime"]],

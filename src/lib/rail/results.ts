@@ -267,9 +267,6 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
           usage: scenario.usage,
           terminations: { A: scenario.terminations.A.id, B: scenario.terminations.B.id },
           family: scenario.material.family,
-          // **No `sagRatio`**: § 6's two taut-line warnings are scored beside the rows they qualify
-          // — `flèche / portée` and the `DAF` figure — and both must fire *without* a régime, so
-          // `./provenance.ts`'s ladder owns them. Passing it here would render each one twice.
         })
       : null;
 
