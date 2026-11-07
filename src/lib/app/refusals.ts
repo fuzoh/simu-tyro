@@ -41,6 +41,7 @@ import type { SolveError, SolveNote } from "@/lib/sim";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { SOLVER } from "@/lib/sim";
+import { CONSTRUCTION_TOKEN_BY_ID } from "@/lib/url/schema.ts";
 
 /** The three surfaces § 7 names. Three, not two: `no-convergence` has two origins. */
 export type RefusalId = "tension-impossible" | "cible-inatteignable" | "calcul-impossible";
@@ -300,7 +301,7 @@ function materialLine(material: ScenarioDraft["material"], strength: number | nu
     .filter((id) => overrides[id] !== undefined)
     .map((id) => `${id}=${num(overrides[id] as number)}`);
   return `family=steel  d=${num(material.d)}  R0=${material.R0}  cst=${
-    material.construction === "iwrc" ? "iwrc" : "tc"
+    CONSTRUCTION_TOKEN_BY_ID[material.construction]
   }  MBF=${blank(strength)}  overrides=${written.length === 0 ? "none" : written.join(",")}`;
 }
 
