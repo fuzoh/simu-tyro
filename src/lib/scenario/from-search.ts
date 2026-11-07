@@ -9,7 +9,8 @@
  * - **A link is applied whole.** The caller hands over a bag that has already been salvaged and
  *   completed (`salvageSearch` → `completeFromDefaults`), so almost every key is present. The
  *   fallbacks below are defensive, and they read from `FIRST_RUN_SCENARIO` — the *same* constant
- *   the completion reads — so no second set of defaults can drift into existence.
+ *   the completion reads — and the textile ones from the retained textile default, so no second
+ *   set of defaults can drift into existence.
  * - **The URL's daN become the state's newtons here, and nowhere else.** § 3's « SI internally,
  *   always » governs the state object; `te` and `mbl` are the two forces a link can carry.
  * - **A blank is `null`, never a number nobody typed.** `?fam=tx` with no `mbl`/`mu` is § 9's
@@ -25,16 +26,16 @@ import type { EndTermination, TextileDraft, TightnessDraft } from "@/lib/scenari
 import type { SteelSpec, TerminationId } from "@/lib/sim";
 import type { TerminationToken, ValidatedSearch } from "@/lib/url/schema.ts";
 
-import { terminationIdFromToken } from "@/lib/url/schema.ts";
+import {
+  CONSTRUCTION_ID_BY_TOKEN,
+  newtonsFromDaN,
+  ROPE_CLASS_ID_BY_TOKEN,
+  terminationIdFromToken,
+} from "@/lib/url/schema.ts";
 
 import type { ScenarioDraft } from "./types.ts";
 
-import { FIRST_RUN_SCENARIO } from "./first-run.ts";
-
-/** daN → N. § 7 serialises every force in daN, ×10 exactly, so the step back is lossless. */
-function newtons(daN: number): number {
-  return daN * 10;
-}
+import { FIRST_RUN_RETAINED_TEXTILE, FIRST_RUN_SCENARIO } from "./first-run.ts";
 
 /**
  * § 7's `x` clamp. Silent here only in the sense that this function does not render: the caller
@@ -78,7 +79,7 @@ function endTermination(
  * two is a refusal that never reaches this function. */
 function tightness(search: ValidatedSearch): TightnessDraft {
   if (search.fl !== undefined) return { mode: "sag", D_target: search.fl };
-  if (search.te !== undefined) return { mode: "tension", H_target: newtons(search.te) };
+  if (search.te !== undefined) return { mode: "tension", H_target: newtonsFromDaN(search.te) };
   if (search.lo !== undefined) return { mode: "length", L0: search.lo };
   if (search.vr !== undefined) return { mode: "ratio", ratio: search.vr };
   return { ...FIRST_RUN_SCENARIO.tightness };
@@ -88,15 +89,16 @@ function tightness(search: ValidatedSearch): TightnessDraft {
 function steel(search: ValidatedSearch): SteelSpec {
   const shipped = FIRST_RUN_SCENARIO.material;
   const overrides: { MBF?: number; EA?: number; mu?: number } = {};
-  if (search.mbf !== undefined) overrides.MBF = newtons(search.mbf);
-  if (search.ea !== undefined) overrides.EA = newtons(search.ea);
+  if (search.mbf !== undefined) overrides.MBF = newtonsFromDaN(search.mbf);
+  if (search.ea !== undefined) overrides.EA = newtonsFromDaN(search.ea);
   if (search.mu !== undefined) overrides.mu = search.mu;
 
   const spec: SteelSpec = {
     family: "steel",
     d: search.d ?? shipped.d,
     R0: search.r0 ?? shipped.R0,
-    construction: search.cst === "tc" ? "fibre-core" : "iwrc",
+    construction:
+      search.cst === undefined ? shipped.construction : CONSTRUCTION_ID_BY_TOKEN[search.cst],
   };
   // Omit the key entirely when nothing was overridden: `overrides: {}` and `overrides: undefined`
   // read the same to the engine, but only the absent one round-trips back to an absent `mbf`.
@@ -107,8 +109,11 @@ function steel(search: ValidatedSearch): SteelSpec {
 function textile(search: ValidatedSearch): TextileDraft {
   return {
     family: "textile",
-    ropeClass: search.cls === "pa" ? "pa-en1891a" : search.cls === "pes" ? "polyester" : "hmpe",
-    MBL: search.mbl === undefined ? null : newtons(search.mbl),
+    ropeClass:
+      search.cls === undefined
+        ? FIRST_RUN_RETAINED_TEXTILE.spec.ropeClass
+        : ROPE_CLASS_ID_BY_TOKEN[search.cls],
+    MBL: search.mbl === undefined ? null : newtonsFromDaN(search.mbl),
     mu: search.mu ?? null,
     k: search.k ?? null,
   };

@@ -70,9 +70,9 @@ import { defaultParseSearch, defaultStringifySearch } from "@tanstack/react-rout
 import * as v from "valibot";
 
 import type { Scenario } from "@/lib/scenario/types.ts";
-import type { RegimeId, TerminationId } from "@/lib/sim";
+import type { RegimeId, SteelSpec, TerminationId, TextileSpec } from "@/lib/sim";
 
-import { FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
+import { FIRST_RUN_RETAINED_TEXTILE, FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 
 import { P1Error, validateP1 } from "./p1.ts";
 
@@ -161,6 +161,64 @@ export const ROPE_CLASS_TOKENS = ["hmpe", "pa", "pes"] as const;
 
 /** § 7's `cls` token. */
 export type RopeClassToken = (typeof ROPE_CLASS_TOKENS)[number];
+
+/** The write-side direction of `cst`. Total over the engine's constructions. */
+export const CONSTRUCTION_TOKEN_BY_ID = {
+  "fibre-core": "tc",
+  iwrc: "iwrc",
+} as const satisfies Record<SteelSpec["construction"], ConstructionToken>;
+
+/** The write-side direction of `cls`. Total over the engine's rope classes. */
+export const ROPE_CLASS_TOKEN_BY_ID = {
+  hmpe: "hmpe",
+  "pa-en1891a": "pa",
+  polyester: "pes",
+} as const satisfies Record<TextileSpec["ropeClass"], RopeClassToken>;
+
+type Values<T> = T[keyof T];
+
+/** Resolves to `true` only when the token tuple and its table name exactly the same tokens. */
+type Covers<Token extends string, Table> = [Token] extends [Values<Table>]
+  ? [Values<Table>] extends [Token]
+    ? true
+    : never
+  : never;
+
+const TOKEN_TABLES_COVER_TUPLES: [
+  Covers<ConstructionToken, typeof CONSTRUCTION_TOKEN_BY_ID>,
+  Covers<RopeClassToken, typeof ROPE_CLASS_TOKEN_BY_ID>,
+] = [true, true];
+void TOKEN_TABLES_COVER_TUPLES;
+
+/**
+ * The read side of a token table, derived so the two directions cannot disagree. The result is
+ * keyed by token, and a token the schema does not know is `undefined`, never a neighbour's id.
+ */
+function invert<Id extends string, Token extends string>(
+  byId: Readonly<Record<Id, Token>>,
+): Readonly<Record<Token, Id>> {
+  return Object.fromEntries(
+    (Object.keys(byId) as Id[]).map((id): [Token, Id] => [byId[id], id]),
+  ) as Record<Token, Id>;
+}
+
+export const CONSTRUCTION_ID_BY_TOKEN = invert<SteelSpec["construction"], ConstructionToken>(
+  CONSTRUCTION_TOKEN_BY_ID,
+);
+
+export const ROPE_CLASS_ID_BY_TOKEN = invert<TextileSpec["ropeClass"], RopeClassToken>(
+  ROPE_CLASS_TOKEN_BY_ID,
+);
+
+/** N → daN. § 7: forces serialise in daN, **fixed**, and ×10 exactly, so the step is lossless. */
+export function daNFromNewtons(newtons: number): number {
+  return newtons / 10;
+}
+
+/** daN → N, the exact inverse of {@link daNFromNewtons}. */
+export function newtonsFromDaN(daN: number): number {
+  return daN * 10;
+}
 
 /**
  * § 7's `ta` / `tb` tokens — five steel, four textile, `epissure` shared, plus `attelage`, which
@@ -645,7 +703,9 @@ export type Completion = {
  *    are dropped rather than completed; `tr` absent ⇒ manual, and `sa`/`sb` never appear.
  * 3. The **inactive** family, and a rope nobody typed. Under `fam=tx` no steel key is completed
  *    and **no rope is invented**: § 9 ships `MBL` and `μ` « vides et requis », because one made-up
- *    `MBL` decides the verdict. Those two blocking errors are the correct arrival state.
+ *    `MBL` decides the verdict. Those two blocking errors are the correct arrival state. The rope
+ *    **class** is the exception: it is a choice among three, not a measurement, so it is completed
+ *    from the shipped textile default and named.
  *
  * `x` is the one non-literal completion — `L/2` of the *completed* span, 125,0 m for `?L=250&h=-40`
  * rather than the constant 75,0 — because it selects a **view**, and a viewpoint off the end of the
@@ -681,7 +741,7 @@ export function completeFromDefaults(search: ValidatedSearch): Completion {
     // Flèche, because with no driver « the remainder does not describe a line at all ».
     if (hasDriver && TIGHTNESS_KEY_SET.has(key)) continue;
 
-    const fallback = FIRST_RUN_SEARCH[key];
+    const fallback = FIRST_RUN_SEARCH[key] ?? TEXTILE_COMPLETION[key];
     if (fallback === undefined) continue;
     out[key] = fallback;
     completed.push(key);
@@ -737,11 +797,6 @@ function spanOf(bag: Record<string, unknown>): number | undefined {
   return undefined;
 }
 
-/** N → daN. § 7: forces serialise in daN, **fixed**, and ×10 exactly, so the step is lossless. */
-function daN(newtons: number): number {
-  return newtons / 10;
-}
-
 /**
  * A Scenario as § 7's canonical bag — the write side, and the only place the engine's newtons
  * become the URL's daN. Keys are inserted in {@link CANONICAL_KEYS} order, which *is* the emitted
@@ -772,7 +827,7 @@ export function scenarioToSearch(scenario: Scenario): ValidatedSearch {
   out.zb = anchors.zB;
 
   if (tightness.mode === "sag") out.fl = tightness.D_target;
-  else if (tightness.mode === "tension") out.te = daN(tightness.H_target);
+  else if (tightness.mode === "tension") out.te = daNFromNewtons(tightness.H_target);
   else if (tightness.mode === "ratio") out.vr = tightness.ratio;
   else out.lo = tightness.L0;
 
@@ -780,12 +835,12 @@ export function scenarioToSearch(scenario: Scenario): ValidatedSearch {
     out.fam = "ac";
     out.d = material.d;
     out.r0 = material.R0;
-    out.cst = material.construction === "iwrc" ? "iwrc" : "tc";
+    out.cst = CONSTRUCTION_TOKEN_BY_ID[material.construction];
     const overrides = material.overrides;
     // Absence **is** « non surchargée ». An override of `0` is still an override, so the test is
     // `!== undefined` rather than truthiness.
-    if (overrides?.MBF !== undefined) out.mbf = daN(overrides.MBF);
-    if (overrides?.EA !== undefined) out.ea = daN(overrides.EA);
+    if (overrides?.MBF !== undefined) out.mbf = daNFromNewtons(overrides.MBF);
+    if (overrides?.EA !== undefined) out.ea = daNFromNewtons(overrides.EA);
     if (overrides?.mu !== undefined) out.mu = overrides.mu;
   } else {
     out.fam = "tx";
@@ -795,13 +850,8 @@ export function scenarioToSearch(scenario: Scenario): ValidatedSearch {
     // order — emitting `mu` last here made « Copier le lien » and the address bar disagree as
     // strings for a textile line, which is exactly the diffability § 7 buys with a canonical order.
     out.mu = material.mu;
-    out.cls =
-      material.ropeClass === "pa-en1891a"
-        ? "pa"
-        : material.ropeClass === "polyester"
-          ? "pes"
-          : "hmpe";
-    out.mbl = daN(material.MBL);
+    out.cls = ROPE_CLASS_TOKEN_BY_ID[material.ropeClass];
+    out.mbl = daNFromNewtons(material.MBL);
     out.k = material.k;
   }
 
@@ -850,6 +900,15 @@ export function canonicalLink(search: ValidatedSearch): string {
  * transcribed beside it, so a defaults change cannot leave a second copy behind.
  */
 const FIRST_RUN_SEARCH: ValidatedSearch = scenarioToSearch(FIRST_RUN_SCENARIO);
+
+/**
+ * The one textile key a shipped default can complete: the rope class. `mbl`, `mu` and `k` stay
+ * blank on purpose, and the first-run Scenario is steel, so its bag carries no `cls` to complete
+ * from — the class is read from the retained textile default instead.
+ */
+const TEXTILE_COMPLETION: ValidatedSearch = {
+  cls: ROPE_CLASS_TOKEN_BY_ID[FIRST_RUN_RETAINED_TEXTILE.spec.ropeClass],
+};
 
 /**
  * § 9's first-run link, which « Copier le lien » produces from the shipped defaults. The address

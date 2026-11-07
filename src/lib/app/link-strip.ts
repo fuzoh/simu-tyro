@@ -35,12 +35,18 @@ import type { LinkArrival } from "@/lib/app/state.ts";
 import type { QuantityId } from "@/lib/format/quantity.ts";
 import type { FieldId } from "@/lib/rail/fields.ts";
 import type { ForceUnit } from "@/lib/scenario/types.ts";
+import type { SteelSpec, TextileSpec } from "@/lib/sim";
 import type { DroppedKey, SearchKey, TerminationToken, ValidatedSearch } from "@/lib/url/schema.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { FIELDS, lowerFirst } from "@/lib/rail/fields.ts";
 import { TERMINATIONS } from "@/lib/sim";
-import { terminationIdFromToken } from "@/lib/url/schema.ts";
+import {
+  CONSTRUCTION_TOKEN_BY_ID,
+  newtonsFromDaN,
+  ROPE_CLASS_TOKEN_BY_ID,
+  terminationIdFromToken,
+} from "@/lib/url/schema.ts";
 
 /** The three sentences, each `null` when this arrival has nothing to say with it. */
 export type LinkStrip = {
@@ -127,6 +133,28 @@ function isStripKey(key: string): key is StripKey {
   return Object.hasOwn(KEYS, key);
 }
 
+/** One French label per domain value, so a fourth class or construction fails to compile here. */
+const CONSTRUCTION_LABEL = {
+  "fibre-core": "âme textile",
+  iwrc: "âme métallique",
+} as const satisfies Record<SteelSpec["construction"], string>;
+
+const ROPE_CLASS_LABEL = {
+  hmpe: "HMPE 12 torons",
+  "pa-en1891a": "polyamide EN 1891 type A",
+  polyester: "polyester semi-statique",
+} as const satisfies Record<TextileSpec["ropeClass"], string>;
+
+/** A token → label table, walked through the domain → token table the URL already owns. */
+function labelsByToken<Id extends string>(
+  tokenById: Readonly<Record<Id, string>>,
+  labelById: Readonly<Record<Id, string>>,
+): Readonly<Record<string, string>> {
+  return Object.fromEntries(
+    (Object.keys(tokenById) as Id[]).map((id): [string, string] => [tokenById[id], labelById[id]]),
+  );
+}
+
 /** The French wording of the token-valued keys, so the strip never prints a wire token at a user. */
 const TOKENS: Record<StripKey, Readonly<Record<string, string>> | null> = {
   u: { daN: "daN", kN: "kN", kgf: "kgf" },
@@ -145,15 +173,11 @@ const TOKENS: Record<StripKey, Readonly<Record<string, string>> | null> = {
   fam: { ac: "acier", tx: "textile" },
   d: null,
   r0: null,
-  cst: { tc: "âme textile", iwrc: "âme métallique" },
+  cst: labelsByToken(CONSTRUCTION_TOKEN_BY_ID, CONSTRUCTION_LABEL),
   mbf: null,
   ea: null,
   mu: null,
-  cls: {
-    hmpe: "HMPE 12 torons",
-    pa: "polyamide EN 1891 type A",
-    pes: "polyester semi-statique",
-  },
+  cls: labelsByToken(ROPE_CLASS_TOKEN_BY_ID, ROPE_CLASS_LABEL),
   mbl: null,
   k: null,
   ta: null,
@@ -251,7 +275,7 @@ function render(
 ): string {
   if (typeof value === "number" && row.quantity !== null) {
     // § 7 serialises every force in daN, ×10 exactly; `formatQuantity` takes the canonical newtons.
-    return formatQuantity(row.quantity, row.daN === true ? value * 10 : value, unit);
+    return formatQuantity(row.quantity, row.daN === true ? newtonsFromDaN(value) : value, unit);
   }
   const token = String(value);
   if (key === "ta" || key === "tb") return terminationLabel(token, bag);

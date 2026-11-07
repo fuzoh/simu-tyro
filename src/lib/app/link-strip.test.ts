@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
 
+import type { ValidatedSearch } from "@/lib/url/schema.ts";
+
 import { initialAppState } from "@/lib/app/state.ts";
 
 import { linkStrip } from "./link-strip.ts";
@@ -88,6 +90,44 @@ describe("§ 8's second sentence — the completion names the values", () => {
     const sentence = strip("?L=250&h=-40")?.completed ?? "";
     expect(sentence).not.toContain("régime");
     expect(sentence).not.toContain("charge de rupture");
+  });
+});
+
+describe("an unknown rope class is ignored and the default class is named, never assumed", () => {
+  test("`cls=zzz` is reported as unreadable and the completed class is named", () => {
+    const result = strip("?fam=tx&cls=zzz&L=250");
+    expect(result?.ignored).toBe(
+      "Une partie du lien a été ignorée : « cls » n'était pas une valeur reconnue " +
+        "(classe de corde ignorée).",
+    );
+    expect(result?.completed).toContain("classe de corde HMPE 12 torons");
+  });
+
+  test("a textile link with no `cls` at all names the completed class too", () => {
+    expect(strip("?fam=tx&L=250")?.completed).toContain("classe de corde HMPE 12 torons");
+  });
+
+  test("each token reads in the French of its domain value", () => {
+    const base = initialAppState({ query: "", session: null }).link;
+    const completedLabel = (rewrite: ValidatedSearch, key: "cls" | "cst") =>
+      linkStrip({ ...base, completed: [key], rewrite })?.completed;
+    expect(completedLabel({ cls: "hmpe" }, "cls")).toContain("classe de corde HMPE 12 torons");
+    expect(completedLabel({ cls: "pa" }, "cls")).toContain(
+      "classe de corde polyamide EN 1891 type A",
+    );
+    expect(completedLabel({ cls: "pes" }, "cls")).toContain(
+      "classe de corde polyester semi-statique",
+    );
+    expect(completedLabel({ cst: "tc" }, "cst")).toContain("construction âme textile");
+    expect(completedLabel({ cst: "iwrc" }, "cst")).toContain("construction âme métallique");
+  });
+});
+
+describe("a completed force is converted from the URL's daN into the screen's unit", () => {
+  test("`te=900` daN prints as 9,000 kN under the kN selector", () => {
+    const base = initialAppState({ query: "", session: null }).link;
+    const link = { ...base, completed: ["te" as const], rewrite: { te: 900 } };
+    expect(linkStrip(link, "kN")?.completed).toContain("prétension cible 9,000 kN");
   });
 });
 

@@ -18,6 +18,12 @@ import {
   CANONICAL_KEYS,
   canonicalLink,
   completeFromDefaults,
+  CONSTRUCTION_ID_BY_TOKEN,
+  CONSTRUCTION_TOKEN_BY_ID,
+  daNFromNewtons,
+  newtonsFromDaN,
+  ROPE_CLASS_ID_BY_TOKEN,
+  ROPE_CLASS_TOKEN_BY_ID,
   FIRST_RUN_LINK,
   hasScenarioKey,
   isLinkRefusal,
@@ -575,12 +581,13 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
     for (const key of ["sa", "sb", "tr"] satisfies SearchKey[]) expect(key in search).toBe(false);
   });
 
-  test("`fam=tx` completes no steel key and invents no rope — `MBL` and `μ` stay blank", () => {
+  test("`fam=tx` completes no steel key and invents no rope — `MBL` and `μ` stay blank, only the class is named", () => {
     const { search } = completeFromDefaults(validateSearch(parse("?L=250&fam=tx")));
     expect(search.fam).toBe("tx");
-    for (const key of ["d", "r0", "cst", "cls", "mbl", "mu", "k"] satisfies SearchKey[]) {
+    for (const key of ["d", "r0", "cst", "mbl", "mu", "k"] satisfies SearchKey[]) {
       expect(key in search).toBe(false);
     }
+    expect(search.cls).toBe("hmpe");
   });
 
   test("the completed bag is in canonical order", () => {
@@ -594,6 +601,38 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
     // `v` alone is the schema version, not a scenario key: `/?v=1` still means « restore ».
     expect(hasScenarioKey(validateSearch(parse("?v=1")))).toBe(false);
     expect(hasScenarioKey(validateSearch(parse("?L=250")))).toBe(true);
+  });
+});
+
+describe("the token tables", () => {
+  test("write side pins every domain value to its § 7 token", () => {
+    expect(CONSTRUCTION_TOKEN_BY_ID).toEqual({ "fibre-core": "tc", iwrc: "iwrc" });
+    expect(ROPE_CLASS_TOKEN_BY_ID).toEqual({ hmpe: "hmpe", "pa-en1891a": "pa", polyester: "pes" });
+  });
+
+  test("the read side is the exact inverse and knows no other token", () => {
+    expect(CONSTRUCTION_ID_BY_TOKEN).toEqual({ tc: "fibre-core", iwrc: "iwrc" });
+    expect(ROPE_CLASS_ID_BY_TOKEN).toEqual({ hmpe: "hmpe", pa: "pa-en1891a", pes: "polyester" });
+    expect(Reflect.get(ROPE_CLASS_ID_BY_TOKEN, "zzz")).toBeUndefined();
+  });
+
+  test("a force crosses between newtons and daN once, in both directions", () => {
+    expect(daNFromNewtons(52_000)).toBe(5200);
+    expect(newtonsFromDaN(5200)).toBe(52_000);
+  });
+
+  test("a textile link with no `cls` is completed with the shipped class and says so", () => {
+    const { search, completed } = completeFromDefaults(validateSearch(parse("?fam=tx&L=250")));
+    expect(search.cls).toBe("hmpe");
+    expect(completed).toContain("cls");
+  });
+
+  test("an unknown `cls` is dropped as unreadable, never mapped to a class", () => {
+    const salvaged = salvageSearch(parse("?fam=tx&cls=zzz&L=250"));
+    expect(salvaged.dropped).toEqual([{ key: "cls", reason: "valeur-non-représentable" }]);
+    const { search, completed } = completeFromDefaults(salvaged.search);
+    expect(search.cls).toBe("hmpe");
+    expect(completed).toContain("cls");
   });
 });
 
