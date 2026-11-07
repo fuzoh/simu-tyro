@@ -150,7 +150,11 @@ describe("the Verdict Gate's régime × famille rule", () => {
       field: "regime",
       fixes: [{ id: "choisir-un-autre-regime", label: "Choisir un autre régime" }],
     });
-    expect(report.errors[0].message).toContain("indisponible avec un câble acier.");
+    // The shipped line is steel **and** `PERMANENTE`: it misses both of the régime's clauses, and
+    // the message names both, family first.
+    expect(report.errors[0].message).toBe(
+      "⛔ Régime « Secours textile — 10:1 » indisponible avec un câble acier et en installation permanente.",
+    );
     // A bad régime never blocks the solve: `T max` and `Garde min` stay on screen.
     expect(report.passed.solve).toBe(true);
     expect(report.passed.clearance).toBe(true);

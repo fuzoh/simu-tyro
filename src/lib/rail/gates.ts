@@ -208,13 +208,16 @@ export function culprits(grandeur: Grandeur, mode: CulpritMode): readonly FieldI
  * § 10.1 disables a régime on **two independent conditions** — « sous acier, **ou** sous
  * `PERMANENTE` » — so the clause names each **mismatch**, never the state the Scenario happens to
  * hold. Under `textile` + `PERMANENTE` the rope is this régime's own *precondition*: naming it
- * would send the user to repair the one part already right. **Family first when both miss**,
- * which keeps § 8's shipped steel string verbatim. `requires.usage` is `TEMPORAIRE` for every
- * régime that constrains it, so a use-class miss can only ever be `PERMANENTE`.
+ * would send the user to repair the one part already right. Steel under `PERMANENTE` misses both,
+ * and the clause names both, family first. `requires.usage` is `TEMPORAIRE` for every régime that
+ * constrains it, so a use-class miss can only ever be `PERMANENTE`.
  */
 function unavailabilityCause(mismatch: RegimeMismatch, family: "steel" | "textile"): string {
-  if (mismatch.family) return family === "steel" ? "avec un câble acier" : "avec une corde textile";
-  return "en installation permanente";
+  const causes: string[] = [];
+  if (mismatch.family)
+    causes.push(family === "steel" ? "avec un câble acier" : "avec une corde textile");
+  if (mismatch.usage) causes.push("en installation permanente");
+  return causes.join(" et ");
 }
 
 /** What a régime's `requires` asks for, as the noun the select note needs. */
