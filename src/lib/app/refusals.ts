@@ -41,7 +41,7 @@ import type { SolveError, SolveNote } from "@/lib/sim";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { SOLVER } from "@/lib/sim";
-import { CONSTRUCTION_TOKEN_BY_ID } from "@/lib/url/schema.ts";
+import { CONSTRUCTION_TOKEN_BY_ID } from "@/lib/url/scenario.ts";
 
 /** The three surfaces § 7 names. Three, not two: `no-convergence` has two origins. */
 export type RefusalId = "tension-impossible" | "cible-inatteignable" | "calcul-impossible";

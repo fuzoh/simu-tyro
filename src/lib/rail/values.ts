@@ -34,8 +34,7 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { G, roundToDisplay } from "@/lib/format/quantity.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
-import { clampX } from "@/lib/scenario/from-search.ts";
-import { spanOfGeometry } from "@/lib/scenario/geometry.ts";
+import { clampX, spanOfGeometry } from "@/lib/scenario/geometry.ts";
 
 import type { Deduced, DeducedSolve } from "./deduced.ts";
 import type { FieldContext, FieldId } from "./fields.ts";

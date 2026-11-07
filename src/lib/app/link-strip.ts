@@ -46,7 +46,7 @@ import {
   newtonsFromDaN,
   ROPE_CLASS_TOKEN_BY_ID,
   terminationIdFromToken,
-} from "@/lib/url/schema.ts";
+} from "@/lib/url/scenario.ts";
 
 /** The three sentences, each `null` when this arrival has nothing to say with it. */
 export type LinkStrip = {

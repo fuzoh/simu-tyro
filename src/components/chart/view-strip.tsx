@@ -297,7 +297,7 @@ export function ViewStrip({
  *
  * **The note here covers this field's own path**, because a clamp speaks where it was asked for:
  * the Scenario is clamped on the way in — by `applyField`, by the reducer's terrain actions and by
- * `scenarioFromSearch` — so a note keyed on « state holds a position outside the span » could only
+ * `searchToScenario` — so a note keyed on « state holds a position outside the span » could only
  * ever fire where nothing moved. The other two paths are announced by the Rail's own
  * « Position du passager », which is where the geometry that shortened the span was typed.
  */

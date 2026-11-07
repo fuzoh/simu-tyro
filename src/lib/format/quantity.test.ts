@@ -233,7 +233,7 @@ describe("the declared EA-in-MN carve-out", () => {
 
   test("`ea` is canonical newtons like every other force, and daN once in the URL", () => {
     // Canonical in, canonical out: the carve-out is a *display* rule and touches no state. The
-    // URL's ÷10 happens in `src/lib/url/schema.ts`, nowhere else — 6 900 000 N is `ea=690000`.
+    // URL's ÷10 happens in `src/lib/url/scenario.ts`, nowhere else — 6 900 000 N is `ea=690000`.
     expect(roundToDisplay("EA", 6_897_000)).toBe(6_900_000);
     expect(fromDisplay("EA", 6.9)).toBe(6_900_000);
   });

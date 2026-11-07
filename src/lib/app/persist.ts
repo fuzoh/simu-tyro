@@ -35,7 +35,8 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 import type { ValidatedSearch } from "@/lib/url/schema.ts";
 
 import { fitsLinkBudget } from "@/lib/url/p1.ts";
-import { canonicalLink, scenarioToSearch } from "@/lib/url/schema.ts";
+import { scenarioToSearch } from "@/lib/url/scenario.ts";
+import { canonicalLink } from "@/lib/url/schema.ts";
 
 import type { AppState } from "./state.ts";
 

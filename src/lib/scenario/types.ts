@@ -24,7 +24,7 @@
  * - **Display units never cross into state.** `unit` selects how forces *read*, nothing more:
  *   § 3's « SI internally, always — canonical storage is **newtons** » governs here too, so every
  *   force in this type is the engine's newtons and every length is metres, and `daN → kN → daN`
- *   is the identity. Only the URL serialises daN, and `src/lib/url/schema.ts` is where the ÷10
+ *   is the identity. Only the URL serialises daN, and `src/lib/url/scenario.ts` is where the ÷10
  *   happens.
  */
 
@@ -54,7 +54,7 @@ export type UseClass = "PERMANENTE" | "TEMPORAIRE";
  * and neither wants a shared discriminant:
  *
  * - Those that **read an arm's fields** (`rail/deduced.ts`, `rail/values.ts`, `chart/scene.ts`,
- *   `url/schema.ts`, `app/state.ts` …) depend on the **narrowing** `source` gives: it is this
+ *   `url/scenario.ts`, `app/state.ts` …) depend on the **narrowing** `source` gives: it is this
  *   union's discriminant, so `source === "manual"` is what makes `geometry.L` exist at all. A
  *   helper returning a string takes that away and buys nothing.
  * - Those that only ask **which mode is active** are already served — `rail/gates.ts`'s

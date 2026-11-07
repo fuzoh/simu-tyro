@@ -15,3 +15,15 @@ import type { Geometry } from "./types.ts";
 export function spanOfGeometry(geometry: Geometry): number {
   return geometry.source === "manual" ? geometry.L : geometry.sb - geometry.sa;
 }
+
+/**
+ * § 7's `x` clamp. Silent here only in the sense that this function does not render: the caller
+ * compares its own `search.x` against the result and owns the transient inline note
+ * (« position ramenée à la portée : 0 – 150,0 m »), because discarding sender state with no trace
+ * is the thing the clamp was elected *against*.
+ */
+export function clampX(xD: number, L: number): number {
+  if (!Number.isFinite(L) || L <= 0) return xD;
+  if (xD < 0) return 0;
+  return xD > L ? L : xD;
+}

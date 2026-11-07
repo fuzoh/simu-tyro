@@ -50,7 +50,7 @@
  * (`d`), **kilograms**, **kg/m**, **newtons** and **N/m** for every force (including `EA`),
  * **percent** for the percent rows, and plain numbers for the dimensionless ones. `daN` is a
  * *display* unit here exactly like `kN` and `kgf` — and it is the URL's, where
- * `src/lib/url/schema.ts` divides by ten on the write side: the one N → daN conversion in the
+ * `src/lib/url/scenario.ts` divides by ten on the write side: the one N → daN conversion in the
  * codebase.
  */
 
