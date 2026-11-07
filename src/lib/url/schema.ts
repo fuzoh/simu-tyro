@@ -189,24 +189,35 @@ export const GRADES = [1770, 1960] as const;
  */
 export const TIGHTNESS_KEYS = ["fl", "te", "lo", "vr"] as const;
 
+/** One of § 7's tightness-driver keys. */
+export type TightnessKey = (typeof TIGHTNESS_KEYS)[number];
+
+/** What each key's schema returns — the value that arrived, untouched. */
+export type SearchValues = { readonly [K in SearchKey]: v.InferOutput<(typeof KEY_SCHEMAS)[K]> };
+
 /**
- * A validated bag: § 7's key table with every key optional, because **absence is meaning** and
- * because a salvaged key is *omitted* rather than set to `undefined`.
- *
- * Every value is the value that arrived, untouched — a number stays a number and `tr` stays the
- * string the sender sent.
- *
- * {@link refused} is the one member that is **not** a URL key: it is amendment E's marker, set on
- * a link that refuses whole, and when it is set it is the **only** member — the refusal suppresses
- * the rest of the screen rather than merging with it.
+ * A link refused whole: amendment E's marker and **nothing else** — the refusal suppresses the rest
+ * of the screen rather than merging with it. `refused` is not a key of § 7's table: it never
+ * round-trips through the address bar, because {@link canonicalLink} emits {@link CANONICAL_KEYS}
+ * only.
  */
-export type ValidatedSearch = {
-  /**
-   * Amendment E's whole-link refusal, or absent. Not a key of § 7's table: it never round-trips
-   * through the address bar, because {@link canonicalLink} emits {@link CANONICAL_KEYS} only.
-   */
-  readonly refused?: LinkRefusal;
-} & Readonly<Partial<{ [K in SearchKey]: v.InferOutput<(typeof KEY_SCHEMAS)[K]> }>>;
+export type RefusedSearch = { readonly refused: LinkRefusal } & {
+  readonly [K in SearchKey]?: never;
+};
+
+/**
+ * A link that was not refused: § 7's key table with every key optional, because **absence is
+ * meaning** and because a salvaged key is *omitted* rather than set to `undefined`. Every value is
+ * the value that arrived, untouched — a number stays a number and `tr` stays the string the sender
+ * sent.
+ */
+export type AcceptedSearch = { readonly refused?: never } & Partial<SearchValues>;
+
+/**
+ * A validated bag. Testing `refused` tells the two apart, so code past the refusal check holds an
+ * {@link AcceptedSearch} and completion cannot be handed a refused link.
+ */
+export type ValidatedSearch = RefusedSearch | AcceptedSearch;
 
 /**
  * A finite number, and nothing else. `v.number()` already refuses `NaN`; `v.finite()` adds the two

@@ -289,6 +289,5 @@ function render(
  */
 function terminationLabel(token: string, bag: ValidatedSearch): string {
   const family = bag.fam === "tx" ? "textile" : "steel";
-  const id = terminationIdFromToken(token as TerminationToken, family);
-  return id === null ? token : TERMINATIONS[id].label;
+  return TERMINATIONS[terminationIdFromToken(token as TerminationToken, family)].label;
 }

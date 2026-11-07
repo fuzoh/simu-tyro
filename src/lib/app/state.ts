@@ -303,7 +303,7 @@ export function initialAppState(input: MountInput): AppState {
 
   const { search: completedSearch, completed } = completeFromDefaults(search);
   const scenario = searchToScenario(completedSearch);
-  const xClamped = completedSearch.x !== undefined && completedSearch.x !== scenario.rider.xD;
+  const xClamped = completedSearch.x !== scenario.rider.xD;
   // The address bar must hold exactly the state the app holds, so the clamp travels with it.
   const canonical: ValidatedSearch = xClamped
     ? { ...completedSearch, x: scenario.rider.xD }

@@ -23,7 +23,6 @@ import {
 import {
   CANONICAL_KEYS,
   canonicalLink,
-  hasScenarioKey,
   parseLinkSearch,
   salvageSearch,
   validateSearch,
@@ -45,19 +44,21 @@ const TRACE = encodeP1({
   dev: null,
 });
 
-describe("a refused link", () => {
-  test("a refused bag is never completed from the defaults", () => {
-    // Completion is the one operation that would turn « refused whole » into a silent repair.
-    const { search, completed } = completeFromDefaults(validateSearch(parse("?v=3&L=250")));
-    expect(completed).toEqual([]);
-    expect(Object.keys(search)).toEqual(["refused"]);
-    expect(hasScenarioKey(search)).toBe(false);
-  });
-});
+/** A query as the app completes it: the router's parse, the validator, then completion. */
+function complete(query: string) {
+  const search = validateSearch(parse(query));
+  if (search.refused !== undefined) throw new Error(`${query} refused: ${search.refused.kind}`);
+  return completeFromDefaults(search);
+}
+
+/** A query as the app holds it once it has arrived. */
+function decode(query: string) {
+  return searchToScenario(complete(query).search);
+}
 
 describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
   test("a bare partial link is completed literally, and `x` to L/2 of the completed span", () => {
-    const { search, completed } = completeFromDefaults(validateSearch(parse("?L=250&h=-40")));
+    const { search, completed } = complete("?L=250&h=-40");
     expect(search).toEqual({
       v: 1,
       u: "daN",
@@ -107,13 +108,13 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
   });
 
   test("`reg` is exempt — its absence is « — choisir — », never a value waiting to be filled", () => {
-    const { search, completed } = completeFromDefaults(validateSearch(parse("?L=250")));
+    const { search, completed } = complete("?L=250");
     expect("reg" in search).toBe(false);
     expect(completed).not.toContain("reg");
   });
 
   test("`mbf` / `ea` / `mu` are exempt — their absence is « non surchargée »", () => {
-    const { search, completed } = completeFromDefaults(validateSearch(parse("?L=250&fam=ac")));
+    const { search, completed } = complete("?L=250&fam=ac");
     for (const key of ["mbf", "ea", "mu"] satisfies SearchKey[]) {
       expect(key in search).toBe(false);
       expect(completed).not.toContain(key);
@@ -121,7 +122,7 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
   });
 
   test("a present key is never overwritten by its default", () => {
-    const { search, completed } = completeFromDefaults(validateSearch(parse("?za=4&zb=2.5&mp=95")));
+    const { search, completed } = complete("?za=4&zb=2.5&mp=95");
     expect(search.za).toBe(4);
     expect(search.zb).toBe(2.5);
     expect(search.mp).toBe(95);
@@ -130,14 +131,14 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
   });
 
   test("a driver that arrived is never joined by a completed one", () => {
-    const { search } = completeFromDefaults(validateSearch(parse("?L=250&lo=251.4")));
+    const { search } = complete("?L=250&lo=251.4");
     expect(search.lo).toBe(251.4);
     expect("fl" in search).toBe(false);
     expect("te" in search).toBe(false);
   });
 
   test("an imported link keeps `tr`/`sa`/`sb` and grows no `L`/`h`", () => {
-    const { search } = completeFromDefaults(validateSearch(parse(`?tr=${TRACE}&sa=10&sb=90`)));
+    const { search } = complete(`?tr=${TRACE}&sa=10&sb=90`);
     expect(search.tr).toBe(TRACE);
     expect(search.sa).toBe(10);
     expect(search.sb).toBe(90);
@@ -148,12 +149,12 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
   });
 
   test("a manual link never grows `sa` / `sb`, and a `tr`-less link never grows `tr`", () => {
-    const { search } = completeFromDefaults(validateSearch(parse("?L=250")));
+    const { search } = complete("?L=250");
     for (const key of ["sa", "sb", "tr"] satisfies SearchKey[]) expect(key in search).toBe(false);
   });
 
-  test("`fam=tx` completes no steel key and invents no rope — `MBL` and `μ` stay blank, only the class is named", () => {
-    const { search } = completeFromDefaults(validateSearch(parse("?L=250&fam=tx")));
+  test("`fam=tx` completes no steel key and invents no rope — `MBL`, `μ` and `k` stay blank", () => {
+    const { search } = complete("?L=250&fam=tx");
     expect(search.fam).toBe("tx");
     for (const key of ["d", "r0", "cst", "mbl", "mu", "k"] satisfies SearchKey[]) {
       expect(key in search).toBe(false);
@@ -162,9 +163,59 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
   });
 
   test("the completed bag is in canonical order", () => {
-    const { search } = completeFromDefaults(validateSearch(parse("?x=10&h=-40&L=250")));
+    const { search } = complete("?x=10&h=-40&L=250");
     const order = Object.keys(search);
     expect(order).toEqual([...CANONICAL_KEYS].filter((key) => order.includes(key)));
+  });
+});
+
+describe("completion follows the active family and names every key it fills", () => {
+  test("`?fam=tx&L=250` completes both ends from the textile default, and names them", () => {
+    // § 9's retained textile ends: « Œil cousu / épissuré », η 0,90 — never the steel cosse.
+    const { search, completed } = complete("?fam=tx&L=250");
+    expect(search).toMatchObject({ ta: "oeil", tb: "oeil", na: 0.9, nb: 0.9 });
+    expect(completed).toEqual(expect.arrayContaining(["ta", "tb", "na", "nb"]));
+    expect(searchToScenario(search).terminations).toEqual({
+      A: { id: "oeil-cousu-epissure", eta: 0.9 },
+      B: { id: "oeil-cousu-epissure", eta: 0.9 },
+    });
+  });
+
+  test("`?fam=tx&ta=cosse&L=250` keeps the steel cosse as given and completes only the other end", () => {
+    const { search, completed } = complete("?fam=tx&ta=cosse&L=250");
+    expect(search.ta).toBe("cosse");
+    expect(completed).not.toContain("ta");
+    expect(searchToScenario(search).terminations).toEqual({
+      A: { id: "cosse-oeil-flamand", eta: 0.9 },
+      B: { id: "oeil-cousu-epissure", eta: 0.9 },
+    });
+  });
+
+  test("an imported link with no stations completes them from the file's origin, and names them", () => {
+    // Station A at the origin of the file, station B the shipped 150 m further on.
+    const { search, completed } = complete(`?tr=${TRACE}`);
+    expect(search).toMatchObject({ sa: 0, sb: 150 });
+    expect(completed).toEqual(expect.arrayContaining(["sa", "sb"]));
+    expect(searchToScenario(search).geometry).toEqual({
+      source: "trace",
+      trace: TRACE,
+      sa: 0,
+      sb: 150,
+    });
+  });
+
+  test.each([
+    { path: "manual, `L` given", query: "?L=250", x: 125 },
+    { path: "manual, `L` completed to 150", query: "?h=-40", x: 75 },
+    { path: "imported, stations 10 → 90", query: `?tr=${TRACE}&sa=10&sb=90`, x: 40 },
+    { path: "imported, `sa` completed to 0 before 90", query: `?tr=${TRACE}&sb=90`, x: 45 },
+    { path: "imported, `sb` completed to 10 + 150", query: `?tr=${TRACE}&sa=10`, x: 75 },
+    { path: "imported, both stations completed", query: `?tr=${TRACE}`, x: 75 },
+  ])("`x` completes to half the completed span — $path", ({ query, x }) => {
+    const { search, completed } = complete(query);
+    expect(search.x).toBe(x);
+    expect(completed).toContain("x");
+    expect(searchToScenario(search).rider.xD).toBe(x);
   });
 });
 
@@ -186,15 +237,16 @@ describe("the token tables", () => {
   });
 
   test("a textile link with no `cls` is completed with the shipped class and says so", () => {
-    const { search, completed } = completeFromDefaults(validateSearch(parse("?fam=tx&L=250")));
+    const { search, completed } = complete("?fam=tx&L=250");
     expect(search.cls).toBe("hmpe");
     expect(completed).toContain("cls");
   });
 
   test("an unknown `cls` is dropped as unreadable, never mapped to a class", () => {
-    const salvaged = salvageSearch(parse("?fam=tx&cls=zzz&L=250"));
-    expect(salvaged.dropped).toEqual([{ key: "cls", reason: "valeur-non-représentable" }]);
-    const { search, completed } = completeFromDefaults(salvaged.search);
+    expect(salvageSearch(parse("?fam=tx&cls=zzz&L=250")).dropped).toEqual([
+      { key: "cls", reason: "valeur-non-représentable" },
+    ]);
+    const { search, completed } = complete("?fam=tx&cls=zzz&L=250");
     expect(search.cls).toBe("hmpe");
     expect(completed).toContain("cls");
   });
@@ -228,7 +280,7 @@ describe("the first-run link", () => {
     const search = validateSearch(parse(FIRST_RUN_LINK.slice(1)));
     expect(search).toEqual(scenarioToSearch(FIRST_RUN_SCENARIO));
     expect(canonicalLink(search)).toBe(FIRST_RUN_LINK);
-    expect(completeFromDefaults(search).completed).toEqual([]);
+    expect(complete(FIRST_RUN_LINK.slice(1)).completed).toEqual([]);
   });
 });
 
@@ -334,17 +386,13 @@ describe("searchToScenario — the read side of § 7's key table", () => {
   });
 
   it("keeps `reg` absent as « — choisir — », never as a defaulted régime", () => {
-    expect(searchToScenario({}).regime).toBeNull();
-    expect(searchToScenario({ reg: "en15567" }).regime).toBe("en15567");
+    expect(decode("?L=250").regime).toBeNull();
+    expect(decode("?L=250&reg=en15567").regime).toBe("en15567");
   });
 
   it("turns the URL's daN back into the state's newtons — `te` and `mbl`", () => {
-    expect(searchToScenario({ te: 253.5 }).tightness).toEqual({
-      mode: "tension",
-      H_target: 2535,
-    });
-    const textile = searchToScenario({ fam: "tx", cls: "hmpe", mbl: 10_000, mu: 0.1, k: 22 });
-    expect(textile.material).toEqual({
+    expect(decode("?te=253.5").tightness).toEqual({ mode: "tension", H_target: 2535 });
+    expect(decode("?fam=tx&cls=hmpe&mbl=10000&mu=0.1&k=22").material).toEqual({
       family: "textile",
       ropeClass: "hmpe",
       MBL: 100_000,
@@ -354,64 +402,75 @@ describe("searchToScenario — the read side of § 7's key table", () => {
   });
 
   it("reads the tightness driver from **which** key is present", () => {
-    expect(searchToScenario({ fl: 6 }).tightness).toEqual({ mode: "sag", D_target: 6 });
-    expect(searchToScenario({ lo: 151.64 }).tightness).toEqual({ mode: "length", L0: 151.64 });
-    expect(searchToScenario({ vr: 0.82 }).tightness).toEqual({ mode: "ratio", ratio: 0.82 });
+    expect(decode("?fl=6").tightness).toEqual({ mode: "sag", D_target: 6 });
+    expect(decode("?lo=151.64").tightness).toEqual({ mode: "length", L0: 151.64 });
+    expect(decode("?vr=0.82").tightness).toEqual({ mode: "ratio", ratio: 0.82 });
   });
 
-  it("leaves § 9's two textile blanks blank — a rope nobody typed has no numbers", () => {
-    const material = searchToScenario({ fam: "tx", cls: "hmpe", k: 22 }).material;
-    expect(material).toEqual({ family: "textile", ropeClass: "hmpe", MBL: null, mu: null, k: 22 });
+  it("leaves § 9's textile blanks blank — a rope nobody typed has no numbers", () => {
+    expect(decode("?fam=tx&cls=hmpe&k=22").material).toEqual({
+      family: "textile",
+      ropeClass: "hmpe",
+      MBL: null,
+      mu: null,
+      k: 22,
+    });
+    expect(decode("?fam=tx&cls=pes").material).toEqual({
+      family: "textile",
+      ropeClass: "polyester",
+      MBL: null,
+      mu: null,
+      k: null,
+    });
   });
 
   it("treats an absent steel override as « non surchargée », not as the formula value", () => {
-    expect(searchToScenario({ fam: "ac", d: 12, r0: 1770, cst: "iwrc" }).material).toEqual({
+    expect(decode("?fam=ac&d=12&r0=1770&cst=iwrc").material).toEqual({
       family: "steel",
       d: 12,
       R0: 1770,
       construction: "iwrc",
     });
-    expect(searchToScenario({ fam: "ac", mbf: 9074, mu: 0.5465 }).material).toMatchObject({
+    expect(decode("?fam=ac&mbf=9074&mu=0.5465").material).toMatchObject({
       overrides: { MBF: 90_740, mu: 0.5465 },
     });
   });
 
   it("resolves a termination token under the family `fam` fixes", () => {
-    expect(searchToScenario({ fam: "ac", ta: "epissure" }).terminations.A.id).toBe("epissure");
-    expect(searchToScenario({ fam: "tx", ta: "epissure" }).terminations.A.id).toBe(
-      "epissure-longue-hmpe",
-    );
+    expect(decode("?fam=ac&ta=epissure").terminations.A.id).toBe("epissure");
+    expect(decode("?fam=tx&ta=epissure").terminations.A.id).toBe("epissure-longue-hmpe");
   });
 
-  it("refuses an out-of-family token at the app's tier, where § 7 puts it", () => {
-    // `?fam=ac&ta=huit` types cleanly — the URL is a typing boundary — and there is no steel
-    // « nœud de huit », so the app falls back rather than inventing one.
-    expect(searchToScenario({ fam: "ac", ta: "huit" }).terminations.A.id).toBe(
-      FIRST_RUN_SCENARIO.terminations.A.id,
-    );
+  it("keeps an out-of-family termination as given, for the gate to raise", () => {
+    // ADR-0001: `?fam=ac&ta=huit` types cleanly, and the only hardware `huit` names is the knot.
+    // Swapping in the steel cosse would be a silent repair of the sender's line.
+    expect(decode("?fam=ac&ta=huit").terminations.A.id).toBe("noeud-de-huit");
   });
 
   it("carries an imported link's `tr` verbatim and never decodes it", () => {
-    const geometry = searchToScenario({ tr: "p1.AAAA", sa: 10, sb: 210 }).geometry;
-    expect(geometry).toEqual({ source: "trace", trace: "p1.AAAA", sa: 10, sb: 210 });
+    expect(decode(`?tr=${TRACE}&sa=10&sb=210`).geometry).toEqual({
+      source: "trace",
+      trace: TRACE,
+      sa: 10,
+      sb: 210,
+    });
   });
 
   it("clamps `x` to the span on arrival — the one elected exception", () => {
-    expect(searchToScenario({ L: 150, h: 0, x: 400 }).rider.xD).toBe(150);
-    expect(searchToScenario({ L: 150, h: 0, x: -12 }).rider.xD).toBe(0);
-    expect(searchToScenario({ tr: "p1.AAAA", sa: 10, sb: 210, x: 500 }).rider.xD).toBe(200);
+    expect(decode("?L=150&h=0&x=400").rider.xD).toBe(150);
+    expect(decode("?L=150&h=0&x=-12").rider.xD).toBe(0);
+    expect(decode(`?tr=${TRACE}&sa=10&sb=210&x=500`).rider.xD).toBe(200);
   });
 
   it("applies an out-of-range value as it arrived — everything but `x`", () => {
     // § 7: « ?L=-5 loads into the field and lights up the Solve Gate's existing form validation
     // exactly as typing −5 would ». The URL repairs nothing.
-    expect(searchToScenario({ L: -5, h: 0 }).geometry).toEqual({ source: "manual", L: -5, h: 0 });
-    expect(searchToScenario({ mp: 0 }).rider.mp).toBe(0);
+    expect(decode("?L=-5&h=0").geometry).toEqual({ source: "manual", L: -5, h: 0 });
+    expect(decode("?mp=0").rider.mp).toBe(0);
   });
 
   it("is total over a completed link — every field is filled or blank on purpose", () => {
-    const { search } = completeFromDefaults({ L: 250, h: -40 });
-    const scenario = searchToScenario(search);
+    const scenario = decode("?L=250&h=-40");
     expect(scenario.geometry).toEqual({ source: "manual", L: 250, h: -40 });
     // § 7 completes `fl` **literally** to 6,0 m, and `x` to `L/2` of the *completed* span.
     expect(scenario.tightness).toEqual({ mode: "sag", D_target: 6 });
