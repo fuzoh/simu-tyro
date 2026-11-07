@@ -343,8 +343,8 @@ export const FIELDS = {
     label: "Terminaison A",
     errorLabel: "Terminaison A",
     quantity: null,
-    // Terminations are handled by **disabling with the reason**, never by an error: where §10.3
-    // publishes no defensible `η_t` there is no number to compute with, hence nothing to judge.
+    // No tier-one rule: the picker disables what the line cannot use, and an end that arrives
+    // anyway is a scenario-level Verdict error in `./gates.ts` (ADR-0001).
     rule: null,
     warning: null,
     gate: "verdict",

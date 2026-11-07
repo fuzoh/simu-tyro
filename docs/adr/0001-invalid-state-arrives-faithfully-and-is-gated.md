@@ -27,6 +27,9 @@ change when the old behaviour was accidental, and the PR explains the re-pin.
 - Links restore state faithfully, including invalid state (`?L=-5` already does).
 - Rules that gate choices live in `lib/rail` gates, not in JSX, so link, Session and
   click paths share one check.
-- A fifth Fix Action (« Passer à l'épissure ») is admitted beyond spec § 7's four.
+- A fifth Fix Action (`passer-a-la-terminaison-de-depart`) is admitted beyond spec § 7's four.
+  Its label names the active family's shipped end (« Passer à « Œil cousu / épissuré » » on a
+  textile line). It repairs a knot on HMPE and an end of the other family that arrived in a link
+  or a Session.
 - The spec's assumption that knots on HMPE "never reach a warning" no longer holds; the
   state is reachable and is a Blocking Error, not a warning.

@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
 
-import type { ScenarioDraft } from "@/lib/scenario/types.ts";
+import type { ScenarioDraft, TextileDraft } from "@/lib/scenario/types.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
-import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
+import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
 
 import type { FieldId, GateId } from "./fields.ts";
 
@@ -17,7 +17,9 @@ import {
   isFieldActive,
   regimeUnavailableNote,
   saisieEnCours,
+  terminationOptions,
 } from "./gates.ts";
+import { applyRopeClass, applyShippedTerminations } from "./values.ts";
 
 /**
  * The three gates — « v1 build spec » § 7 (*Les trois grilles de validation*, *Le résumé bloquant*,
@@ -45,6 +47,12 @@ function scenario(patch: (draft: ScenarioDraft) => void = () => {}): ScenarioDra
   const draft = firstRunDefaults() as ScenarioDraft;
   patch(draft);
   return draft;
+}
+
+/** A textile line as a family flip lands on it: the rope, and the retained textile ends with it. */
+function onRope(draft: ScenarioDraft, material: TextileDraft) {
+  draft.material = material;
+  draft.terminations = structuredClone(FIRST_RUN_RETAINED_TEXTILE.terminations);
 }
 
 /** The gate a given field's breach was filed under, or `undefined` when nothing was raised. */
@@ -94,7 +102,7 @@ describe("the first screen — verdict-less, and it still computes", () => {
 
 describe("§10.4 — the use-class gate, family first, two Fix Actions", () => {
   const textileUnderPermanente = scenario((draft) => {
-    draft.material = { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 };
+    onRope(draft, { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 });
     draft.regime = "secours10";
   });
   const report = evaluateGates({ scenario: textileUnderPermanente, trace: null });
@@ -128,7 +136,7 @@ describe("§10.4 — the use-class gate, family first, two Fix Actions", () => {
     const ok = evaluateGates({
       scenario: scenario((draft) => {
         draft.usage = "TEMPORAIRE";
-        draft.material = { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 };
+        onRope(draft, { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 });
         draft.regime = "secours10";
       }),
       trace: null,
@@ -168,7 +176,7 @@ describe("the Verdict Gate's régime × famille rule", () => {
     // rope is never the cause here — § 10.4's own breach, filed alongside, is the one that names it.
     const report = evaluateGates({
       scenario: scenario((draft) => {
-        draft.material = { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 };
+        onRope(draft, { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 });
         draft.regime = "secours10";
       }),
       trace: null,
@@ -186,7 +194,7 @@ describe("the Verdict Gate's régime × famille rule", () => {
     const report = evaluateGates({
       scenario: scenario((draft) => {
         draft.usage = "TEMPORAIRE";
-        draft.material = { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 };
+        onRope(draft, { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 });
         draft.regime = "secours10";
       }),
       trace: null,
@@ -242,7 +250,7 @@ describe("« No rope ships » — the two blanks a family flip lands on", () => 
   const report = evaluateGates({
     scenario: scenario((draft) => {
       draft.usage = "TEMPORAIRE";
-      draft.material = { family: "textile", ropeClass: "hmpe", MBL: null, mu: null, k: 22 };
+      onRope(draft, { family: "textile", ropeClass: "hmpe", MBL: null, mu: null, k: 22 });
       draft.regime = "secours10";
     }),
     trace: null,
@@ -266,13 +274,13 @@ describe("« No rope ships » — the two blanks a family flip lands on", () => 
     const polyester = evaluateGates({
       scenario: scenario((draft) => {
         draft.usage = "TEMPORAIRE";
-        draft.material = {
+        onRope(draft, {
           family: "textile",
           ropeClass: "polyester",
           MBL: null,
           mu: null,
           k: null,
-        };
+        });
         draft.regime = "secours10";
       }),
       trace: null,
@@ -599,5 +607,182 @@ describe("the culprit table — static, indexed by (grandeur × mode), never inf
     // `flèche à vide`, `H à vide`, `tension permanente`, `corde` and `FS effectif` are solve
     // outputs judged by warnings and by the verdict, so they never need a culprit.
     expect(culprits("L", "acier")).toEqual([]);
+  });
+});
+
+const KNOT_ON_HMPE =
+  "⛔ Nœud impossible sur HMPE — il y glisse, sans rendement défendable (§10.3).";
+const TO_SPLICED_EYE = {
+  id: "passer-a-la-terminaison-de-depart",
+  label: "Passer à « Œil cousu / épissuré »",
+};
+
+describe("ADR-0001 — a knot on HMPE is kept as given and blocks the verdict", () => {
+  const knotted = scenario((draft) => {
+    draft.usage = "TEMPORAIRE";
+    draft.regime = "secours10";
+    draft.material = { family: "textile", ropeClass: "hmpe", MBL: 2e5, mu: 0.07, k: 22 };
+    draft.terminations = {
+      A: { id: "noeud-de-huit", eta: 0.6 },
+      B: { id: "noeud-de-chaise", eta: 0.55 },
+    };
+  });
+  const report = evaluateGates({ scenario: knotted, trace: null });
+
+  test("one Verdict-gate error on Terminaison A, B outlined", () => {
+    expect(report.errors).toEqual([
+      {
+        gate: "verdict",
+        kind: "invalid",
+        field: "ta",
+        alsoOutlined: ["tb"],
+        message: KNOT_ON_HMPE,
+        fixes: [TO_SPLICED_EYE],
+      },
+    ]);
+  });
+
+  test("geometry and clearance still solve; only the verdict goes", () => {
+    expect(report.passed).toEqual({ solve: true, clearance: true, verdict: false });
+    expect(blockingSummary(report)).toBe("⛔ 1 erreur bloquante — aucun verdict");
+  });
+
+  test("the Fix Action puts the spliced eye on both ends and clears the list", () => {
+    const fixed = applyShippedTerminations(knotted, report.errors[0]);
+    expect(fixed.terminations).toEqual({
+      A: { id: "oeil-cousu-epissure", eta: 0.9 },
+      B: { id: "oeil-cousu-epissure", eta: 0.9 },
+    });
+    expect(evaluateGates({ scenario: fixed, trace: null }).errors).toEqual([]);
+  });
+
+  test("switching a knotted PA rope to HMPE keeps the knots and raises the error", () => {
+    const pa = scenario((draft) => {
+      draft.usage = "TEMPORAIRE";
+      draft.material = { family: "textile", ropeClass: "pa-en1891a", MBL: 3e5, mu: 0.08, k: 1.5 };
+      draft.terminations = {
+        A: { id: "noeud-de-huit", eta: 0.6 },
+        B: { id: "noeud-de-chaise", eta: 0.55 },
+      };
+    });
+    expect(evaluateGates({ scenario: pa, trace: null }).errors).toEqual([]);
+    const hmpe = evaluateGates({ scenario: applyRopeClass(pa, "hmpe"), trace: null });
+    expect(hmpe.errors.map((error) => [error.field, error.message])).toEqual([
+      ["ta", KNOT_ON_HMPE],
+    ]);
+  });
+});
+
+describe("ADR-0001 — an end of the other family is kept as given and blocks the verdict", () => {
+  test("a textile knot on a steel line, repaired with the steel cosse", () => {
+    const steel = scenario((draft) => {
+      draft.terminations.A = { id: "noeud-de-huit", eta: 0.6 };
+    });
+    const report = evaluateGates({ scenario: steel, trace: null });
+    expect(report.errors).toEqual([
+      {
+        gate: "verdict",
+        kind: "invalid",
+        field: "ta",
+        alsoOutlined: [],
+        message: "⛔ Terminaison de corde textile impossible sur un câble acier (§10.2).",
+        fixes: [
+          {
+            id: "passer-a-la-terminaison-de-depart",
+            label: "Passer à « Cosse à sertir / œil Flamand (EN 13411-3) »",
+          },
+        ],
+      },
+    ]);
+    const fixed = applyShippedTerminations(steel, report.errors[0]);
+    expect(fixed.terminations.A).toEqual({ id: "cosse-oeil-flamand", eta: 0.9 });
+    expect(evaluateGates({ scenario: fixed, trace: null }).errors).toEqual([]);
+  });
+
+  test("a steel termination on a rope, repaired with the spliced eye", () => {
+    const rope = scenario((draft) => {
+      draft.usage = "TEMPORAIRE";
+      onRope(draft, { family: "textile", ropeClass: "pa-en1891a", MBL: 3e5, mu: 0.08, k: 1.5 });
+      draft.terminations.B = { id: "cosse-oeil-flamand", eta: 0.9 };
+    });
+    const report = evaluateGates({ scenario: rope, trace: null });
+    expect(report.errors).toEqual([
+      {
+        gate: "verdict",
+        kind: "invalid",
+        field: "tb",
+        alsoOutlined: [],
+        message: "⛔ Terminaison de câble acier impossible sur une corde textile (§10.3).",
+        fixes: [TO_SPLICED_EYE],
+      },
+    ]);
+    const fixed = applyShippedTerminations(rope, report.errors[0]);
+    expect(evaluateGates({ scenario: fixed, trace: null }).errors).toEqual([]);
+  });
+
+  test("two causes are two errors, and repairing one leaves the other standing", () => {
+    const mixed = scenario((draft) => {
+      draft.usage = "TEMPORAIRE";
+      onRope(draft, { family: "textile", ropeClass: "hmpe", MBL: 2e5, mu: 0.07, k: 22 });
+      draft.terminations = {
+        A: { id: "noeud-de-huit", eta: 0.6 },
+        B: { id: "cosse-oeil-flamand", eta: 0.9 },
+      };
+    });
+    const report = evaluateGates({ scenario: mixed, trace: null });
+    expect(report.errors.map((error) => [error.field, error.alsoOutlined])).toEqual([
+      ["ta", []],
+      ["tb", []],
+    ]);
+    const once = evaluateGates({
+      scenario: applyShippedTerminations(mixed, report.errors[0]),
+      trace: null,
+    });
+    expect(once.errors.map((error) => error.field)).toEqual(["tb"]);
+  });
+});
+
+describe("terminationOptions — the picker's entries and its one reason", () => {
+  const ids = (options: readonly { value: string; disabled: boolean }[]) =>
+    options.map((option) => [option.value, option.disabled]);
+
+  test("steel lists §10.2's five ends and the hitch, none disabled", () => {
+    const { options, reason } = terminationOptions("steel", null, "cosse-oeil-flamand");
+    expect(ids(options)).toEqual([
+      ["manchon-metal-resine", false],
+      ["cosse-oeil-flamand", false],
+      ["epissure", false],
+      ["manchon-a-coin", false],
+      ["serre-cables-etrier", false],
+      ["attelage-sans-tension", false],
+    ]);
+    expect(reason).toBeNull();
+  });
+
+  test("HMPE disables both knots, with §10.3's reason once", () => {
+    const { options, reason } = terminationOptions("textile", "hmpe", "oeil-cousu-epissure");
+    expect(ids(options)).toEqual([
+      ["oeil-cousu-epissure", false],
+      ["epissure-longue-hmpe", false],
+      ["noeud-de-huit", true],
+      ["noeud-de-chaise", true],
+      ["attelage-sans-tension", false],
+    ]);
+    expect(reason).toBe(
+      "§10.3 : sur HMPE le nœud glisse (0,25–0,50). Aucun rendement défendable ⇒ épissure obligatoire.",
+    );
+  });
+
+  test("PA keeps the knots choosable", () => {
+    const { options, reason } = terminationOptions("textile", "pa-en1891a", "noeud-de-huit");
+    expect(options.some((option) => option.disabled)).toBe(false);
+    expect(reason).toBeNull();
+  });
+
+  test("a held end of the other family is listed last, disabled, and adds no knot reason", () => {
+    const { options, reason } = terminationOptions("steel", null, "noeud-de-huit");
+    expect(ids(options).at(-1)).toEqual(["noeud-de-huit", true]);
+    expect(options.filter((option) => option.value === "noeud-de-huit")).toHaveLength(1);
+    expect(reason).toBeNull();
   });
 });

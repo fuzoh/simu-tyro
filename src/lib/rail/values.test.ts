@@ -8,6 +8,8 @@ import { deduceValues } from "./deduced.ts";
 import { commitField } from "./fields.ts";
 import {
   applyField,
+  applyRopeClass,
+  applyShippedTerminations,
   clearOverride,
   drivingField,
   FIELD_ACCESS,
@@ -392,5 +394,79 @@ describe("the Tightness Spec — one editable field, prefilled from its own read
 
   test("switching to the mode already active is a no-op", () => {
     expect(switchTightness(first, "sag", deduced)).toBe(first);
+  });
+});
+
+describe("applyRopeClass — `Classe de corde` sets `k` and keeps the ends", () => {
+  /** A PA rope tied with a figure-eight at A and a bowline at B, both §10.3 knots. */
+  const knotted = scenario((draft) => {
+    draft.usage = "TEMPORAIRE";
+    draft.material = { family: "textile", ropeClass: "pa-en1891a", MBL: 3e5, mu: 0.08, k: 1.5 };
+    draft.terminations = {
+      A: { id: "noeud-de-huit", eta: 0.6 },
+      B: { id: "noeud-de-chaise", eta: 0.55 },
+    };
+  });
+
+  test("HMPE ships §13.2's `k` 22, and the knots stay as given for the gate to raise", () => {
+    const next = applyRopeClass(knotted, "hmpe");
+    expect(next.material).toEqual({
+      family: "textile",
+      ropeClass: "hmpe",
+      MBL: 3e5,
+      mu: 0.08,
+      k: 22,
+    });
+    expect(next.terminations).toEqual({
+      A: { id: "noeud-de-huit", eta: 0.6 },
+      B: { id: "noeud-de-chaise", eta: 0.55 },
+    });
+  });
+
+  test("polyester's `k` is blank, not a number nobody published", () => {
+    expect(applyRopeClass(knotted, "polyester").material).toMatchObject({ k: null });
+  });
+
+  test("PA's `k` is §13.2's 1,5", () => {
+    expect(applyRopeClass(applyRopeClass(knotted, "hmpe"), "pa-en1891a").material).toMatchObject({
+      k: 1.5,
+    });
+  });
+
+  test("a steel line has no rope class to change", () => {
+    const steel = scenario();
+    expect(applyRopeClass(steel, "hmpe")).toBe(steel);
+  });
+});
+
+describe("applyShippedTerminations — the termination Fix Action's effect", () => {
+  test("only the ends the error names take the family's shipped end", () => {
+    const line = scenario((draft) => {
+      draft.terminations = {
+        A: { id: "noeud-de-huit", eta: 0.6 },
+        B: { id: "manchon-a-coin", eta: 0.8 },
+      };
+    });
+    expect(applyShippedTerminations(line, { field: "ta", alsoOutlined: [] }).terminations).toEqual({
+      A: { id: "cosse-oeil-flamand", eta: 0.9 },
+      B: { id: "manchon-a-coin", eta: 0.8 },
+    });
+  });
+
+  test("on a rope both ends take « Œil cousu / épissuré » at η 0,90", () => {
+    const rope = scenario((draft) => {
+      draft.usage = "TEMPORAIRE";
+      draft.material = { family: "textile", ropeClass: "hmpe", MBL: 3e5, mu: 0.08, k: 22 };
+      draft.terminations = {
+        A: { id: "noeud-de-huit", eta: 0.6 },
+        B: { id: "noeud-de-chaise", eta: 0.55 },
+      };
+    });
+    expect(
+      applyShippedTerminations(rope, { field: "ta", alsoOutlined: ["tb"] }).terminations,
+    ).toEqual({
+      A: { id: "oeil-cousu-epissure", eta: 0.9 },
+      B: { id: "oeil-cousu-epissure", eta: 0.9 },
+    });
   });
 });

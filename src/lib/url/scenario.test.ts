@@ -3,6 +3,8 @@ import { describe, expect, it, test } from "vitest";
 
 import type { Scenario } from "@/lib/scenario/types.ts";
 
+import { evaluateGates } from "@/lib/rail/gates.ts";
+import { applyShippedTerminations } from "@/lib/rail/values.ts";
 import {
   FIRST_RUN_RETAINED_TEXTILE,
   FIRST_RUN_SCENARIO,
@@ -542,5 +544,41 @@ describe("searchToScenario — the read side of § 7's key table", () => {
     // § 7 completes `fl` **literally** to 6,0 m, and `x` to `L/2` of the *completed* span.
     expect(scenario.tightness).toEqual({ mode: "sag", D_target: 6 });
     expect(scenario.rider.xD).toBe(125);
+  });
+});
+
+describe("ADR-0001 — a link arrives as given, and the gates judge it", () => {
+  test("a knot on HMPE decodes unchanged, blocks the verdict, and its Fix Action clears it", () => {
+    const link = decode(
+      "?use=tempo&reg=secours10&fam=tx&cls=hmpe&mbl=20000&mu=0.07&k=22&ta=huit&tb=chaise",
+    );
+    expect(link.terminations).toEqual({
+      A: { id: "noeud-de-huit", eta: 0.6 },
+      B: { id: "noeud-de-chaise", eta: 0.55 },
+    });
+    const { errors } = evaluateGates({ scenario: link, trace: null });
+    expect(errors).toEqual([
+      {
+        gate: "verdict",
+        kind: "invalid",
+        field: "ta",
+        alsoOutlined: ["tb"],
+        message: "⛔ Nœud impossible sur HMPE — il y glisse, sans rendement défendable (§10.3).",
+        fixes: [
+          { id: "passer-a-la-terminaison-de-depart", label: "Passer à « Œil cousu / épissuré »" },
+        ],
+      },
+    ]);
+    const fixed = applyShippedTerminations(link, errors[0]);
+    expect(evaluateGates({ scenario: fixed, trace: null }).errors).toEqual([]);
+  });
+
+  test("an end of the other family is kept, not swapped for the family's own", () => {
+    expect(decode("?fam=ac&ta=huit").terminations.A).toEqual({ id: "noeud-de-huit", eta: 0.6 });
+    const steelEnd = decode("?use=tempo&fam=tx&cls=pa&mbl=30000&mu=0.08&tb=cosse");
+    expect(steelEnd.terminations.B).toEqual({ id: "cosse-oeil-flamand", eta: 0.9 });
+    expect(evaluateGates({ scenario: steelEnd, trace: null }).errors.map((e) => e.field)).toEqual([
+      "tb",
+    ]);
   });
 });

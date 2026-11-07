@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import type { Scenario } from "@/lib/scenario/types.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
+import { evaluateGates } from "@/lib/rail/gates.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { encodeP1, URL_BUDGET_CHARS } from "@/lib/url/p1.ts";
 
@@ -510,5 +511,38 @@ describe("a storage that throws is « no session », never a crash", () => {
 
   test("the clear is silent", () => {
     expect(() => clearSession(HOSTILE)).not.toThrow();
+  });
+});
+
+describe("ADR-0001 — a restored Session is kept as given, and the gates judge it", () => {
+  test("a knot on HMPE comes back unchanged and blocks the verdict on Terminaison A", () => {
+    const knotted: Scenario = {
+      ...firstRunDefaults(),
+      usage: "TEMPORAIRE",
+      regime: "secours10",
+      material: { family: "textile", ropeClass: "hmpe", MBL: 200_000, mu: 0.07, k: 22 },
+      terminations: {
+        A: { id: "noeud-de-huit", eta: 0.6 },
+        B: { id: "noeud-de-chaise", eta: 0.55 },
+      },
+    };
+    const storage = memoryStorage();
+    writeSession(storage, { ...bareSession(), scenario: knotted });
+
+    const restored = readSession(storage);
+    if (restored === null) throw new Error("the stored Session was discarded");
+    expect(restored.scenario.terminations).toEqual(knotted.terminations);
+    expect(evaluateGates({ scenario: restored.scenario, trace: null }).errors).toEqual([
+      {
+        gate: "verdict",
+        kind: "invalid",
+        field: "ta",
+        alsoOutlined: ["tb"],
+        message: "⛔ Nœud impossible sur HMPE — il y glisse, sans rendement défendable (§10.3).",
+        fixes: [
+          { id: "passer-a-la-terminaison-de-depart", label: "Passer à « Œil cousu / épissuré »" },
+        ],
+      },
+    ]);
   });
 });
