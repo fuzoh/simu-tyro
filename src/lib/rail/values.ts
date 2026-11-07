@@ -27,6 +27,9 @@
  *   in imported mode — so state never holds an out-of-span `x_D` for one mode and not the other,
  *   and the transient note has a single event to fire on: the value that *entered* state differing
  *   from the one that was asked for.
+ * - **One lens per numeric field.** {@link FIELD_ACCESS} is the only place a field is read out of
+ *   or written into the Scenario, so the Rail, the gates and « Saisie en cours » cannot disagree on
+ *   what a field holds — the drift that left « Rapport V cible » without a committed value.
  */
 
 import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
@@ -37,52 +40,42 @@ import { G, roundToDisplay } from "@/lib/format/quantity.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { clampX, spanOfGeometry } from "@/lib/scenario/geometry.ts";
 
-import type { Deduced, DeducedSolve } from "./deduced.ts";
-import type { FieldContext, FieldId } from "./fields.ts";
+import type { Deduced, DeducedMaterial, DeducedSolve } from "./deduced.ts";
+import type { FieldContext, FieldId, TightnessFieldId } from "./fields.ts";
 
 import { deduceValues } from "./deduced.ts";
-import { displayField, FIELDS } from "./fields.ts";
-import { isFieldActive } from "./gates.ts";
+import { displayField, FIELD_ORDER, FIELDS, TIGHTNESS_FIELD } from "./fields.ts";
 
 /**
- * The fields the form holds as **text**. Every one of them is § 3's elected widget — `<input
- * type="text" inputMode="decimal">` — and every other control is a picker that cannot be emptied
- * and therefore has no text state to validate.
+ * The fields the form holds as **text**: the rows of `FIELDS` with a display-precision row. Every
+ * one of them is § 3's elected widget — `<input type="text" inputMode="decimal">` — and every other
+ * control is a picker that cannot be emptied and therefore has no text state to validate.
  */
-export const NUMERIC_FIELDS = [
-  "L",
-  "h",
-  "zA",
-  "zB",
-  "sa",
-  "sb",
-  "d",
-  "mbfOverride",
-  "eaOverride",
-  "muOverride",
-  "MBL",
-  "muTextile",
-  "k",
-  "etaA",
-  "etaB",
-  "D_target",
-  "H_target",
-  "L0",
-  "vRatio",
-  "mp",
-  "hRider",
-  "hClearMin",
-  "DAF",
-  "xD",
-] as const;
+export type NumericFieldId = {
+  [K in FieldId]: (typeof FIELDS)[K]["quantity"] extends null ? never : K;
+}[FieldId];
 
-export type NumericFieldId = (typeof NUMERIC_FIELDS)[number];
+/** The numeric fields a gate reads: all but `x_D`, which sits in no gate. */
+export type GatedFieldId = {
+  [K in NumericFieldId]: (typeof FIELDS)[K]["gate"] extends null ? never : K;
+}[NumericFieldId];
+
+export function isNumericField(id: FieldId): id is NumericFieldId {
+  return FIELDS[id].quantity !== null;
+}
+
+export function isGatedField(id: FieldId): id is GatedFieldId {
+  return isNumericField(id) && FIELDS[id].gate !== null;
+}
+
+/** Every {@link NumericFieldId}, in rail order. */
+export const NUMERIC_FIELDS: readonly NumericFieldId[] = FIELD_ORDER.filter(isNumericField);
+
+/** Every {@link GatedFieldId}, in rail order. */
+export const GATED_FIELDS: readonly GatedFieldId[] = FIELD_ORDER.filter(isGatedField);
 
 /** The form's value bag: one string per numeric field, `""` where the state holds no value. */
 export type RailValues = Record<NumericFieldId, string>;
-
-/** The numeric fields a gate reads: all but `x_D`, which sits in no gate. */
-export const GATED_FIELDS = NUMERIC_FIELDS.filter((id) => FIELDS[id].gate !== null);
 
 /**
  * Do two value bags hold the same text in every gated field? A scrub writes `x_D`'s text on every
@@ -90,6 +83,185 @@ export const GATED_FIELDS = NUMERIC_FIELDS.filter((id) => FIELDS[id].gate !== nu
  */
 export function sameGatedText(a: RailValues, b: RailValues): boolean {
   return GATED_FIELDS.every((id) => a[id] === b[id]);
+}
+
+/**
+ * One numeric field's way into and out of the Scenario.
+ *
+ * `read` is `undefined` where the mode, family or Tightness Driver does not render the field, and
+ * `null` where the field is on screen and blank. `V` is what `write` takes: a required field
+ * refuses `null`, and a nullable one — a textile blank, an Override — is cleared by it.
+ */
+export type FieldLens<S, V extends number | null = number> = {
+  readonly read: (scenario: S) => V | undefined;
+  readonly write: (scenario: ScenarioDraft, value: V) => ScenarioDraft;
+};
+
+/**
+ * A steel Override's lens, which alone knows what its row shows — override or formula, off the
+ * deduced material.
+ */
+type OverrideLens<S> = FieldLens<S, number | null> & {
+  readonly effective: (material: DeducedMaterial) => number | null;
+};
+
+const OVERRIDE_FIELDS = ["mbfOverride", "eaOverride", "muOverride"] as const;
+
+/** The three steel Overrides, whose blank is « non surchargée », never « vide et requis ». */
+export type OverrideFieldId = (typeof OVERRIDE_FIELDS)[number];
+
+export function isOverrideField(id: FieldId): id is OverrideFieldId {
+  return (OVERRIDE_FIELDS as readonly FieldId[]).includes(id);
+}
+
+/** The fields whose blank is state: § 9's textile blanks and the three Overrides. */
+type NullableFieldId = OverrideFieldId | "MBL" | "muTextile" | "k";
+
+/**
+ * What each lens reads. A Tightness Driver's reads the driver alone, so a refusal holding only the
+ * `tightness` can name its target; `x_D`'s reads the whole draft; every other lens reads the
+ * Traverse-scope Scenario, so no lens the gates call can reach `x_D`.
+ */
+type LensScope<K extends NumericFieldId> = K extends TightnessFieldId
+  ? Pick<TraverseScenario, "tightness">
+  : K extends GatedFieldId
+    ? TraverseScenario
+    : ScenarioDraft;
+
+type FieldAccess = {
+  readonly [K in NumericFieldId]: K extends OverrideFieldId
+    ? OverrideLens<LensScope<K>>
+    : FieldLens<LensScope<K>, K extends NullableFieldId ? number | null : number>;
+};
+
+/**
+ * Every numeric field's lens, **total**: a row added to `FIELDS` with a precision row does not
+ * compile until it can be read and written.
+ *
+ * A write to a field the Scenario does not render is the mode's own rule: a Tightness Driver field
+ * becomes the driver, and `Portée` and `Dénivelé` in imported mode, the steel fields on a rope and
+ * the rope fields on steel leave the Scenario as it was.
+ */
+export const FIELD_ACCESS: FieldAccess = {
+  L: {
+    read: ({ geometry }) => (geometry.source === "manual" ? geometry.L : undefined),
+    // `x_D` selects a view, so a shorter span moves the viewpoint rather than refusing the span.
+    write: (s, L) => (s.geometry.source === "manual" ? applyGeometry(s, { ...s.geometry, L }) : s),
+  },
+  h: {
+    read: ({ geometry }) => (geometry.source === "manual" ? geometry.h : undefined),
+    write: (s, h) =>
+      s.geometry.source === "manual" ? { ...s, geometry: { ...s.geometry, h } } : s,
+  },
+  zA: {
+    read: ({ anchors }) => anchors.zA,
+    write: (s, zA) => ({ ...s, anchors: { ...s.anchors, zA } }),
+  },
+  zB: {
+    read: ({ anchors }) => anchors.zB,
+    write: (s, zB) => ({ ...s, anchors: { ...s.anchors, zB } }),
+  },
+  // The stations *are* the span in imported mode (`L = s_B − s_A`), so moving one moves the
+  // viewpoint exactly as `Portée` does in the other mode.
+  sa: {
+    read: ({ geometry }) => (geometry.source === "trace" ? geometry.sa : undefined),
+    write: (s, sa) => (s.geometry.source === "trace" ? applyGeometry(s, { ...s.geometry, sa }) : s),
+  },
+  sb: {
+    read: ({ geometry }) => (geometry.source === "trace" ? geometry.sb : undefined),
+    write: (s, sb) => (s.geometry.source === "trace" ? applyGeometry(s, { ...s.geometry, sb }) : s),
+  },
+  d: {
+    read: ({ material }) => (material.family === "steel" ? material.d : undefined),
+    write: (s, d) => (s.material.family === "steel" ? { ...s, material: { ...s.material, d } } : s),
+  },
+  mbfOverride: overrideLens("MBF", "strength"),
+  eaOverride: overrideLens("EA", "EA"),
+  muOverride: overrideLens("mu", "mu"),
+  MBL: {
+    read: ({ material }) => (material.family === "textile" ? material.MBL : undefined),
+    write: (s, MBL) =>
+      s.material.family === "textile" ? { ...s, material: { ...s.material, MBL } } : s,
+  },
+  muTextile: {
+    read: ({ material }) => (material.family === "textile" ? material.mu : undefined),
+    write: (s, mu) =>
+      s.material.family === "textile" ? { ...s, material: { ...s.material, mu } } : s,
+  },
+  k: {
+    read: ({ material }) => (material.family === "textile" ? material.k : undefined),
+    write: (s, k) =>
+      s.material.family === "textile" ? { ...s, material: { ...s.material, k } } : s,
+  },
+  etaA: {
+    read: ({ terminations }) => terminations.A.eta,
+    write: (s, eta) => ({
+      ...s,
+      terminations: { ...s.terminations, A: { ...s.terminations.A, eta } },
+    }),
+  },
+  etaB: {
+    read: ({ terminations }) => terminations.B.eta,
+    write: (s, eta) => ({
+      ...s,
+      terminations: { ...s.terminations, B: { ...s.terminations.B, eta } },
+    }),
+  },
+  D_target: {
+    read: ({ tightness }) => (tightness.mode === "sag" ? tightness.D_target : undefined),
+    write: (s, D_target) => ({ ...s, tightness: { mode: "sag", D_target } }),
+  },
+  H_target: {
+    read: ({ tightness }) => (tightness.mode === "tension" ? tightness.H_target : undefined),
+    write: (s, H_target) => ({ ...s, tightness: { mode: "tension", H_target } }),
+  },
+  L0: {
+    read: ({ tightness }) => (tightness.mode === "length" ? tightness.L0 : undefined),
+    write: (s, L0) => ({ ...s, tightness: { mode: "length", L0 } }),
+  },
+  vRatio: {
+    read: ({ tightness }) => (tightness.mode === "ratio" ? tightness.ratio : undefined),
+    write: (s, ratio) => ({ ...s, tightness: { mode: "ratio", ratio } }),
+  },
+  mp: {
+    read: ({ rider }) => rider.mp,
+    write: (s, mp) => ({ ...s, rider: { ...s.rider, mp } }),
+  },
+  hRider: {
+    read: ({ rider }) => rider.hRider,
+    write: (s, hRider) => ({ ...s, rider: { ...s.rider, hRider } }),
+  },
+  hClearMin: {
+    read: ({ rider }) => rider.hClearMin,
+    write: (s, hClearMin) => ({ ...s, rider: { ...s.rider, hClearMin } }),
+  },
+  DAF: {
+    read: ({ rider }) => rider.DAF,
+    write: (s, DAF) => ({ ...s, rider: { ...s.rider, DAF } }),
+  },
+  xD: {
+    read: ({ rider }) => rider.xD,
+    // **Both modes**: an imported span is a span, and a viewpoint past station B is as stale there
+    // as one past `Portée` is here.
+    write: (s, xD) => ({ ...s, rider: { ...s.rider, xD: clampRider(xD, s.geometry) } }),
+  },
+};
+
+/**
+ * A steel Override. The three derived rows are editable at all times on a steel line — typing
+ * into one is what creates the override — and they show the **effective** value, because § 3
+ * draws them as editable fields with a reset control, not as read-outs that sprout an input.
+ */
+function overrideLens(
+  key: "MBF" | "EA" | "mu",
+  readOut: "strength" | "EA" | "mu",
+): OverrideLens<TraverseScenario> {
+  return {
+    read: ({ material }) =>
+      material.family === "steel" ? (material.overrides?.[key] ?? null) : undefined,
+    write: (s, value) => (value === null ? clearOverride(s, key) : withOverride(s, key, value)),
+    effective: (material) => material[readOut],
+  };
 }
 
 /** Everything tier one needs beside a field's own text, gathered once from the Scenario. */
@@ -107,76 +279,26 @@ export function fieldContext(scenario: TraverseScenario, trace: Trace | null): F
  * the only place in the app that direction is taken for an input.
  */
 export function railValues(scenario: ScenarioDraft, deduced?: Deduced): RailValues {
-  const value = (id: NumericFieldId): string => {
-    if (!isFieldActive(id, scenario)) return "";
-    const held = heldValue(scenario, id, deduced);
-    return held === null ? "" : displayField(id, held, scenario.unit);
-  };
   const out = {} as RailValues;
-  for (const id of NUMERIC_FIELDS) out[id] = value(id);
+  for (const id of NUMERIC_FIELDS) {
+    const held = heldValue(scenario, id, deduced);
+    out[id] = held === null || held === undefined ? "" : displayField(id, held, scenario.unit);
+  }
   return out;
 }
 
-/** What the Scenario holds for one numeric field. `null` **is** « blank and required ». */
-function heldValue(
+/**
+ * What one numeric field shows: its lens's read, except an Override, which shows its effective
+ * value off `deduced`. `undefined` where the field is not on screen, `null` where it is blank.
+ */
+export function heldValue(
   scenario: ScenarioDraft,
   id: NumericFieldId,
   deduced: Deduced | undefined,
-): number | null {
-  const { geometry, anchors, rider, tightness, terminations, material } = scenario;
-  switch (id) {
-    case "L":
-      return geometry.source === "manual" ? geometry.L : (deduced?.span?.L ?? null);
-    case "h":
-      return geometry.source === "manual" ? geometry.h : (deduced?.span?.h ?? null);
-    case "sa":
-      return geometry.source === "trace" ? geometry.sa : null;
-    case "sb":
-      return geometry.source === "trace" ? geometry.sb : null;
-    case "zA":
-      return anchors.zA;
-    case "zB":
-      return anchors.zB;
-    case "mp":
-      return rider.mp;
-    case "hRider":
-      return rider.hRider;
-    case "hClearMin":
-      return rider.hClearMin;
-    case "DAF":
-      return rider.DAF;
-    case "xD":
-      return rider.xD;
-    case "etaA":
-      return terminations.A.eta;
-    case "etaB":
-      return terminations.B.eta;
-    case "D_target":
-      return tightness.mode === "sag" ? tightness.D_target : null;
-    case "H_target":
-      return tightness.mode === "tension" ? tightness.H_target : null;
-    case "L0":
-      return tightness.mode === "length" ? tightness.L0 : null;
-    case "vRatio":
-      return tightness.mode === "ratio" ? tightness.ratio : null;
-    case "d":
-      return material.family === "steel" ? material.d : null;
-    case "MBL":
-      return material.family === "textile" ? material.MBL : null;
-    case "muTextile":
-      return material.family === "textile" ? material.mu : null;
-    case "k":
-      return material.family === "textile" ? material.k : null;
-    // The three derived rows show the **effective** value — override or formula — because § 3
-    // draws them as editable fields with a reset control, not as read-outs that sprout an input.
-    // Typing into one is what creates the override; « Recalculer » is what drops it again.
-    case "mbfOverride":
-      return material.family === "steel" ? (deduced?.material.strength ?? null) : null;
-    case "eaOverride":
-      return material.family === "steel" ? (deduced?.material.EA ?? null) : null;
-    case "muOverride":
-      return material.family === "steel" ? (deduced?.material.mu ?? null) : null;
-  }
+): number | null | undefined {
+  const held = FIELD_ACCESS[id].read(scenario);
+  if (held === undefined || !isOverrideField(id)) return held;
+  return deduced === undefined ? null : FIELD_ACCESS[id].effective(deduced.material);
 }
 
 /**
@@ -192,87 +314,7 @@ export function applyField(
   id: NumericFieldId,
   value: number,
 ): ScenarioDraft {
-  const { geometry, material } = scenario;
-  switch (id) {
-    case "L":
-      // `x_D` selects a view, so a shorter span moves the viewpoint rather than refusing the span.
-      return geometry.source === "manual"
-        ? applyGeometry(scenario, { ...geometry, L: value })
-        : scenario;
-    case "h":
-      return geometry.source === "manual"
-        ? { ...scenario, geometry: { ...geometry, h: value } }
-        : scenario;
-    // The stations *are* the span in imported mode (`L = s_B − s_A`), so moving one moves the
-    // viewpoint exactly as `Portée` does in the other mode.
-    case "sa":
-      return geometry.source === "trace"
-        ? applyGeometry(scenario, { ...geometry, sa: value })
-        : scenario;
-    case "sb":
-      return geometry.source === "trace"
-        ? applyGeometry(scenario, { ...geometry, sb: value })
-        : scenario;
-    case "zA":
-      return { ...scenario, anchors: { ...scenario.anchors, zA: value } };
-    case "zB":
-      return { ...scenario, anchors: { ...scenario.anchors, zB: value } };
-    case "mp":
-      return { ...scenario, rider: { ...scenario.rider, mp: value } };
-    case "hRider":
-      return { ...scenario, rider: { ...scenario.rider, hRider: value } };
-    case "hClearMin":
-      return { ...scenario, rider: { ...scenario.rider, hClearMin: value } };
-    case "DAF":
-      return { ...scenario, rider: { ...scenario.rider, DAF: value } };
-    case "xD":
-      return {
-        ...scenario,
-        // **Both modes**: an imported span is a span, and a viewpoint past station B is as stale
-        // there as one past `Portée` is here.
-        rider: { ...scenario.rider, xD: clampRider(value, geometry) },
-      };
-    case "etaA":
-      return {
-        ...scenario,
-        terminations: { ...scenario.terminations, A: { ...scenario.terminations.A, eta: value } },
-      };
-    case "etaB":
-      return {
-        ...scenario,
-        terminations: { ...scenario.terminations, B: { ...scenario.terminations.B, eta: value } },
-      };
-    case "D_target":
-      return { ...scenario, tightness: { mode: "sag", D_target: value } };
-    case "H_target":
-      return { ...scenario, tightness: { mode: "tension", H_target: value } };
-    case "L0":
-      return { ...scenario, tightness: { mode: "length", L0: value } };
-    case "vRatio":
-      return { ...scenario, tightness: { mode: "ratio", ratio: value } };
-    case "d":
-      return material.family === "steel"
-        ? { ...scenario, material: { ...material, d: value } }
-        : scenario;
-    case "MBL":
-      return material.family === "textile"
-        ? { ...scenario, material: { ...material, MBL: value } }
-        : scenario;
-    case "muTextile":
-      return material.family === "textile"
-        ? { ...scenario, material: { ...material, mu: value } }
-        : scenario;
-    case "k":
-      return material.family === "textile"
-        ? { ...scenario, material: { ...material, k: value } }
-        : scenario;
-    case "mbfOverride":
-      return withOverride(scenario, "MBF", value);
-    case "eaOverride":
-      return withOverride(scenario, "EA", value);
-    case "muOverride":
-      return withOverride(scenario, "mu", value);
-  }
+  return FIELD_ACCESS[id].write(scenario, value);
 }
 
 /**
@@ -361,29 +403,26 @@ export function switchTightness(
   if (scenario.tightness.mode === mode) return scenario;
   const solve = deduced.solve ?? lastGood ?? firstRunSolve();
   if (solve === null) return scenario;
-  switch (mode) {
-    case "sag":
-      return { ...scenario, tightness: { mode, D_target: roundToDisplay("D_target", solve.sag) } };
-    case "tension":
-      return {
-        ...scenario,
-        tightness: {
-          mode,
-          // The prefill is at the **field's** grain in the **displayed** unit, which is what makes
-          // a daN → kN → daN round trip through the selector leave the number alone.
-          H_target: roundToDisplay("H_target", solve.H, scenario.unit),
-        },
-      };
-    case "length":
-      return { ...scenario, tightness: { mode, L0: roundToDisplay("L0", solve.L0) } };
-    case "ratio":
-      // `P / H` from the read-out `H`, at the field's grain — voir `scenario/tightness.ts`.
-      return {
-        ...scenario,
-        tightness: { mode, ratio: roundToDisplay("vRatio", (scenario.rider.mp * G) / solve.H) },
-      };
-  }
+  const field = TIGHTNESS_FIELD[mode];
+  // The prefill is at the **field's** grain in the **displayed** unit, which is what makes a
+  // daN → kN → daN round trip through the selector leave the number alone.
+  const value = roundToDisplay(
+    FIELDS[field].quantity,
+    PREFILL[field](solve, scenario),
+    scenario.unit,
+  );
+  return FIELD_ACCESS[field].write(scenario, value);
 }
+
+/** The read-out each driver is prefilled from when the segmented control switches to it. */
+const PREFILL: Record<TightnessFieldId, (solve: DeducedSolve, scenario: ScenarioDraft) => number> =
+  {
+    D_target: (solve) => solve.sag,
+    H_target: (solve) => solve.H,
+    L0: (solve) => solve.L0,
+    // `P / H` from the read-out `H` — voir `scenario/tightness.ts`.
+    vRatio: (solve, { rider }) => (rider.mp * G) / solve.H,
+  };
 
 let firstRun: DeducedSolve | null | undefined;
 
@@ -394,15 +433,17 @@ function firstRunSolve(): DeducedSolve | null {
 }
 
 /** Which field the segmented control is currently pointing at. */
-export function drivingField(scenario: ScenarioDraft): FieldId {
-  switch (scenario.tightness.mode) {
-    case "sag":
-      return "D_target";
-    case "tension":
-      return "H_target";
-    case "length":
-      return "L0";
-    case "ratio":
-      return "vRatio";
-  }
+export function drivingField(scenario: Pick<TraverseScenario, "tightness">): TightnessFieldId {
+  return TIGHTNESS_FIELD[scenario.tightness.mode];
+}
+
+/** The Tightness Driver: the field the segmented control points at, and the number it holds. */
+export function tightnessDriver(scenario: Pick<TraverseScenario, "tightness">): {
+  readonly field: TightnessFieldId;
+  readonly value: number;
+} {
+  const field = drivingField(scenario);
+  const value = FIELD_ACCESS[field].read(scenario);
+  if (value === undefined) throw new Error(`tightnessDriver: ${field} does not read its own mode`);
+  return { field, value };
 }

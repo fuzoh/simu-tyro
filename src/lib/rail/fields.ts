@@ -41,7 +41,7 @@
 import * as v from "valibot";
 
 import type { QuantityId } from "@/lib/format/quantity.ts";
-import type { ForceUnit } from "@/lib/scenario/types.ts";
+import type { ForceUnit, TightnessDraft } from "@/lib/scenario/types.ts";
 import type { TextileSpec } from "@/lib/sim";
 
 import { formatQuantity, formatValue, fromDisplay, roundToDisplay } from "@/lib/format/quantity.ts";
@@ -468,6 +468,20 @@ export const FIELDS = {
 
 /** Rail order — what « the first culpable field in table order » means. */
 export const FIELD_ORDER = Object.keys(FIELDS) as readonly FieldId[];
+
+/**
+ * The field each Tightness Driver edits — the one place a driver is mapped to its field, so the
+ * segmented control, the gates, the refusals and the link all agree on it.
+ */
+export const TIGHTNESS_FIELD = {
+  sag: "D_target",
+  tension: "H_target",
+  length: "L0",
+  ratio: "vRatio",
+} as const satisfies Record<TightnessDraft["mode"], FieldId>;
+
+/** A field a Tightness Driver edits. */
+export type TightnessFieldId = (typeof TIGHTNESS_FIELD)[TightnessDraft["mode"]];
 
 /**
  * The three fields of the `Passager` group land in **three different gates**, which is itself the
