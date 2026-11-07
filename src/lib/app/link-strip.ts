@@ -80,7 +80,10 @@ function fromField(id: FieldId, genre: "m" | "f", daN?: true): KeyRow {
     : { label: errorLabel, genre, quantity, daN };
 }
 
-const KEYS: Partial<Record<SearchKey, KeyRow>> = {
+/** Every key but `v`, so a new search key does not compile until the strip can name it. */
+type StripKey = Exclude<SearchKey, "v">;
+
+const KEYS: Record<StripKey, KeyRow> = {
   u: { label: "Unité de force", genre: "f", quantity: null },
   use: fromField("usage", "m"),
   reg: fromField("regime", "m"),
@@ -93,6 +96,7 @@ const KEYS: Partial<Record<SearchKey, KeyRow>> = {
   fl: fromField("D_target", "f"),
   te: fromField("H_target", "f", true),
   lo: fromField("L0", "f"),
+  vr: fromField("vRatio", "m"),
   fam: fromField("family", "f"),
   d: fromField("d", "m"),
   r0: fromField("R0", "m"),
@@ -109,6 +113,7 @@ const KEYS: Partial<Record<SearchKey, KeyRow>> = {
   nb: fromField("etaB", "m"),
   mp: fromField("mp", "f"),
   hr: fromField("hRider", "f"),
+  gm: fromField("hClearMin", "f"),
   daf: fromField("DAF", "m"),
   x: fromField("xD", "f"),
   tr: { label: "Tracé", genre: "m", quantity: null },
@@ -117,17 +122,50 @@ const KEYS: Partial<Record<SearchKey, KeyRow>> = {
   // An unrecognised `v` refuses the link whole, so it never reaches the first sentence either.
 };
 
+/** `dropped` carries arbitrary sender strings, and `v` has no row on purpose. */
+function isStripKey(key: string): key is StripKey {
+  return Object.hasOwn(KEYS, key);
+}
+
 /** The French wording of the token-valued keys, so the strip never prints a wire token at a user. */
-const TOKENS: Partial<Record<SearchKey, Readonly<Record<string, string>>>> = {
+const TOKENS: Record<StripKey, Readonly<Record<string, string>> | null> = {
   u: { daN: "daN", kN: "kN", kgf: "kgf" },
   use: { perm: "permanente", tempo: "temporaire" },
+  reg: null,
+  L: null,
+  h: null,
+  sa: null,
+  sb: null,
+  za: null,
+  zb: null,
+  fl: null,
+  te: null,
+  lo: null,
+  vr: null,
   fam: { ac: "acier", tx: "textile" },
+  d: null,
+  r0: null,
   cst: { tc: "âme textile", iwrc: "âme métallique" },
+  mbf: null,
+  ea: null,
+  mu: null,
   cls: {
     hmpe: "HMPE 12 torons",
     pa: "polyamide EN 1891 type A",
     pes: "polyester semi-statique",
   },
+  mbl: null,
+  k: null,
+  ta: null,
+  tb: null,
+  na: null,
+  nb: null,
+  mp: null,
+  hr: null,
+  gm: null,
+  daf: null,
+  x: null,
+  tr: null,
 };
 
 /**
@@ -171,8 +209,8 @@ function ignoredSentence(dropped: readonly DroppedKey[]): string | null {
  */
 function clause({ key, reason }: DroppedKey): string {
   if (reason === "clé-inconnue") return `clé inconnue « ${key} »`;
-  const row = KEYS[key as SearchKey];
-  if (row === undefined) return `« ${key} » n'était pas une valeur exploitable`;
+  if (!isStripKey(key)) return `« ${key} » n'était pas une valeur exploitable`;
+  const row = KEYS[key];
   const label = lowerFirst(row.label);
   // « n'était pas un nombre » is § 8's own wording and is true of every numeric key; a token-valued
   // key is not a number at all, and saying so of `?fam=zz` would be a lie in the one sentence whose
@@ -194,9 +232,9 @@ function completedSentence(
 ): string | null {
   if (completed.length === 0 || rewrite === null) return null;
   const named = completed.flatMap((key) => {
-    const row = KEYS[key];
     const value = rewrite[key];
-    if (row === undefined || value === undefined) return [];
+    if (!isStripKey(key) || value === undefined) return [];
+    const row = KEYS[key];
     return [`${lowerFirst(row.label)} ${render(key, row, value, rewrite, unit)}`];
   });
   if (named.length === 0) return null;
@@ -205,7 +243,7 @@ function completedSentence(
 
 /** One completed value, at § 3's display precision for a number and in French for a token. */
 function render(
-  key: SearchKey,
+  key: StripKey,
   row: KeyRow,
   value: unknown,
   bag: ValidatedSearch,

@@ -34,7 +34,7 @@ const REASON: Record<RefusalKind, (received: unknown) => string> = {
   "tracé-illisible": () => "Tracé illisible.",
   "tracé-hors-budget": () => "Tracé trop volumineux pour cette adresse.",
   "deux-directeurs": () =>
-    "Flèche, prétension et longueur non tendue : deux valeurs de tension dans le même lien.",
+    "Flèche à vide cible, prétension cible, longueur non tendue et rapport V cible : deux valeurs de tension dans le même lien.",
 };
 
 /**
