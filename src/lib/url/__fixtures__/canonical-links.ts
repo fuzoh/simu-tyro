@@ -1,0 +1,347 @@
+/**
+ * Golden canonical links — one pinned string per encoding branch of `url/schema.ts`, so the codec
+ * refactors (total key tables, token tables, the decoder's move into `lib/url`) can prove they
+ * changed no byte.
+ *
+ * Provenance: `[MEASURED]` in `testing.md`'s sense, tagged on every row. Each link is this app's own
+ * output as of 2026-11-07, written out here in § 7's canonical key order and checked against the
+ * codec, not produced by it. A failing row after a refactor is a changed contract, not a stale
+ * fixture.
+ *
+ * Plain data, no codec import: a fixture must never be re-derived from the code it checks. The
+ * scenarios are literals for the same reason — they do not spread `FIRST_RUN_SCENARIO`, so a
+ * defaults change cannot silently move a row.
+ */
+
+import type { Scenario, ScenarioDraft } from "@/lib/scenario/types.ts";
+
+/** The encoding branches the table must cover; the test asserts none is left without a row. */
+export const BRANCHES = [
+  "steel",
+  "textile",
+  "manual",
+  "trace",
+  "driver-sag",
+  "driver-tension",
+  "driver-ratio",
+  "driver-length",
+  "override-mbf",
+  "override-ea",
+  "override-mu",
+  "override-all",
+  "regime-en15567",
+  "regime-wsqld",
+  "regime-acct10",
+  "regime-ansi5",
+  "regime-secours10",
+  "use-perm",
+  "use-tempo",
+  "x-at-span-end",
+  "x-clamped",
+  "textile-blanks",
+] as const;
+
+export type Branch = (typeof BRANCHES)[number];
+
+/** A Scenario and the one link that encodes it — asserted in both directions. */
+export type CanonicalLinkFixture = {
+  name: string;
+  source: typeof MEASURED;
+  covers: readonly Branch[];
+  scenario: Scenario;
+  link: string;
+};
+
+/**
+ * A link that is decoded but not the encoder's output for what it decodes to: a clamped `x`
+ * arrives as typed and leaves clamped, and a textile blank is a draft a `Scenario` cannot hold.
+ * `canonical` is what the decoded scenario encodes back to, or `null` for a draft with blanks,
+ * which has no encoding — those links are canonical as written.
+ */
+export type DecodeOnlyFixture = {
+  name: string;
+  source: typeof MEASURED;
+  covers: readonly Branch[];
+  link: string;
+} & ({ scenario: Scenario; canonical: string } | { scenario: ScenarioDraft; canonical: null });
+
+const MEASURED = "[MEASURED] issue #34, codec as of 2026-11-07";
+
+/** Three stations `(0,0) (50,-4) (100,-9)`, as `encodeP1` writes them. */
+export const TRACE_P1 = "p1.AwCQTpBOAJ8G5wcA";
+
+const STEEL: Scenario = {
+  unit: "daN",
+  usage: "PERMANENTE",
+  regime: null,
+  geometry: { source: "manual", L: 150, h: -18 },
+  anchors: { zA: 12, zB: 12 },
+  tightness: { mode: "sag", D_target: 6 },
+  material: { family: "steel", d: 12, R0: 1770, construction: "iwrc" },
+  terminations: {
+    A: { id: "cosse-oeil-flamand", eta: 0.9 },
+    B: { id: "cosse-oeil-flamand", eta: 0.9 },
+  },
+  rider: { mp: 120, hRider: 2.1, hClearMin: 1, DAF: 1.2, xD: 75 },
+};
+
+const TEXTILE: Scenario = {
+  ...STEEL,
+  usage: "TEMPORAIRE",
+  material: { family: "textile", ropeClass: "hmpe", MBL: 300000, mu: 0.16, k: 22 },
+  terminations: {
+    A: { id: "oeil-cousu-epissure", eta: 0.9 },
+    B: { id: "epissure-longue-hmpe", eta: 0.85 },
+  },
+};
+
+/** What follows `za=12&zb=12&` through `fam=ac&d=12&r0=1770&cst=iwrc` on the steel baseline. */
+const TAIL = "ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=75";
+const STEEL_HEAD = "fam=ac&d=12&r0=1770&cst=iwrc";
+
+const withMaterial = (overrides: { MBF?: number; EA?: number; mu?: number }): Scenario => ({
+  ...STEEL,
+  material: { family: "steel", d: 12, R0: 1770, construction: "iwrc", overrides },
+});
+
+const withRegime = (regime: NonNullable<Scenario["regime"]>): Scenario => ({ ...STEEL, regime });
+
+export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
+  {
+    name: "first-run: steel, manual, sag driver, perm, no regime",
+    source: MEASURED,
+    covers: ["steel", "manual", "driver-sag", "use-perm"],
+    scenario: STEEL,
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "tension driver, daN on the wire whatever u says",
+    source: MEASURED,
+    covers: ["driver-tension"],
+    scenario: { ...STEEL, unit: "kN", tightness: { mode: "tension", H_target: 2535 } },
+    link: `/?v=1&u=kN&use=perm&L=150&h=-18&za=12&zb=12&te=253.5&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "ratio driver, kgf display",
+    source: MEASURED,
+    covers: ["driver-ratio"],
+    scenario: { ...STEEL, unit: "kgf", tightness: { mode: "ratio", ratio: 0.82 } },
+    link: `/?v=1&u=kgf&use=perm&L=150&h=-18&za=12&zb=12&vr=0.82&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "length driver",
+    source: MEASURED,
+    covers: ["driver-length"],
+    scenario: { ...STEEL, tightness: { mode: "length", L0: 151.644 } },
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&lo=151.644&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "steel override: MBF alone",
+    source: MEASURED,
+    covers: ["override-mbf"],
+    scenario: withMaterial({ MBF: 90740 }),
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&mbf=9074&${TAIL}`,
+  },
+  {
+    name: "steel override: EA alone",
+    source: MEASURED,
+    covers: ["override-ea"],
+    scenario: withMaterial({ EA: 69000000 }),
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&ea=6900000&${TAIL}`,
+  },
+  {
+    name: "steel override: mu alone",
+    source: MEASURED,
+    covers: ["override-mu"],
+    scenario: withMaterial({ mu: 0.5465 }),
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&mu=0.5465&${TAIL}`,
+  },
+  {
+    name: "steel overrides: MBF, EA and mu together, fibre-core construction",
+    source: MEASURED,
+    covers: ["override-all"],
+    scenario: {
+      ...STEEL,
+      material: {
+        family: "steel",
+        d: 12,
+        R0: 1960,
+        construction: "fibre-core",
+        overrides: { MBF: 90740, EA: 69000000, mu: 0.5465 },
+      },
+    },
+    link:
+      "/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&fam=ac&d=12&r0=1960&cst=tc" +
+      `&mbf=9074&ea=6900000&mu=0.5465&${TAIL}`,
+  },
+  ...(["en15567", "wsqld", "acct10", "ansi5", "secours10"] as const).map(
+    (regime): CanonicalLinkFixture => ({
+      name: `regime ${regime}`,
+      source: MEASURED,
+      covers: [`regime-${regime}`],
+      scenario: withRegime(regime),
+      link: `/?v=1&u=daN&use=perm&reg=${regime}&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
+    }),
+  ),
+  {
+    name: "use tempo",
+    source: MEASURED,
+    covers: ["use-tempo"],
+    scenario: { ...STEEL, usage: "TEMPORAIRE" },
+    link: `/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "steel terminations: manchon and coin, uneven anchors",
+    source: MEASURED,
+    covers: ["steel"],
+    scenario: {
+      ...STEEL,
+      anchors: { zA: 14, zB: 9.5 },
+      terminations: {
+        A: { id: "manchon-metal-resine", eta: 1 },
+        B: { id: "manchon-a-coin", eta: 0.8 },
+      },
+    },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=14&zb=9.5&fl=6&${STEEL_HEAD}` +
+      "&ta=manchon&tb=coin&na=1&nb=0.8&mp=120&hr=2.1&gm=1&daf=1.2&x=75",
+  },
+  {
+    name: "steel terminations: serre-cables and the steel epissure",
+    source: MEASURED,
+    covers: ["steel"],
+    scenario: {
+      ...STEEL,
+      terminations: {
+        A: { id: "serre-cables-etrier", eta: 0.8 },
+        B: { id: "epissure", eta: 0.9 },
+      },
+    },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=serre&tb=epissure&na=0.8&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=75",
+  },
+  {
+    name: "steel termination: attelage sans tension",
+    source: MEASURED,
+    covers: ["steel"],
+    scenario: {
+      ...STEEL,
+      terminations: {
+        A: { id: "attelage-sans-tension", eta: 1 },
+        B: { id: "cosse-oeil-flamand", eta: 0.9 },
+      },
+    },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=attelage&tb=cosse&na=1&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=75",
+  },
+  {
+    name: "rider at the far end of the span, garde min. disabled",
+    source: MEASURED,
+    covers: ["x-at-span-end"],
+    scenario: { ...STEEL, rider: { ...STEEL.rider, xD: 150, hClearMin: 0 } },
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=0&daf=1.2&x=150`,
+  },
+  {
+    name: "imported trace geometry",
+    source: MEASURED,
+    covers: ["trace", "steel"],
+    scenario: { ...STEEL, geometry: { source: "trace", trace: TRACE_P1, sa: 10, sb: 90 } },
+    link: `/?v=1&u=daN&use=perm&sa=10&sb=90&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}&tr=${TRACE_P1}`,
+  },
+  {
+    name: "textile hmpe: sag driver, tempo, oeil and epissure",
+    source: MEASURED,
+    covers: ["textile", "use-tempo"],
+    scenario: TEXTILE,
+    link:
+      "/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&fam=tx&mu=0.16&cls=hmpe&mbl=30000&k=22" +
+      "&ta=oeil&tb=epissure&na=0.9&nb=0.85&mp=120&hr=2.1&gm=1&daf=1.2&x=75",
+  },
+  {
+    name: "textile polyamide: huit and chaise",
+    source: MEASURED,
+    covers: ["textile"],
+    scenario: {
+      ...TEXTILE,
+      material: { family: "textile", ropeClass: "pa-en1891a", MBL: 300000, mu: 0.082, k: 1.5 },
+      terminations: {
+        A: { id: "noeud-de-huit", eta: 0.6 },
+        B: { id: "noeud-de-chaise", eta: 0.65 },
+      },
+    },
+    link:
+      "/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&fam=tx&mu=0.082&cls=pa&mbl=30000&k=1.5" +
+      "&ta=huit&tb=chaise&na=0.6&nb=0.65&mp=120&hr=2.1&gm=1&daf=1.2&x=75",
+  },
+  {
+    name: "textile polyester on a trace, tension driver, attelage",
+    source: MEASURED,
+    covers: ["textile", "trace", "driver-tension"],
+    scenario: {
+      ...TEXTILE,
+      geometry: { source: "trace", trace: TRACE_P1, sa: 0, sb: 100 },
+      tightness: { mode: "tension", H_target: 1500 },
+      material: { family: "textile", ropeClass: "polyester", MBL: 250000, mu: 0.07, k: 12 },
+      terminations: {
+        A: { id: "attelage-sans-tension", eta: 1 },
+        B: { id: "oeil-cousu-epissure", eta: 0.9 },
+      },
+    },
+    link:
+      "/?v=1&u=daN&use=tempo&sa=0&sb=100&za=12&zb=12&te=150&fam=tx&mu=0.07&cls=pes&mbl=25000&k=12" +
+      `&ta=attelage&tb=oeil&na=1&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=75&tr=${TRACE_P1}`,
+  },
+];
+
+const CLAMPED = CANONICAL_LINKS.find((fixture) => fixture.covers.includes("x-at-span-end"));
+if (CLAMPED === undefined)
+  throw new Error("the far-end fixture the clamped rows decode to is missing");
+
+export const DECODE_ONLY_LINKS: readonly DecodeOnlyFixture[] = [
+  {
+    name: "x past the span is brought back to the far end",
+    source: MEASURED,
+    covers: ["x-clamped"],
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=0&daf=1.2&x=200`,
+    scenario: CLAMPED.scenario,
+    canonical: CLAMPED.link,
+  },
+  {
+    name: "x below zero is brought back to the near end",
+    source: MEASURED,
+    covers: ["x-clamped"],
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=-5`,
+    scenario: { ...STEEL, rider: { ...STEEL.rider, xD: 0 } },
+    canonical:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=0",
+  },
+  {
+    name: "textile with MBL, mu and k left blank",
+    source: MEASURED,
+    covers: ["textile", "textile-blanks"],
+    link:
+      "/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&fam=tx&cls=hmpe" +
+      "&ta=oeil&tb=epissure&na=0.9&nb=0.85&mp=120&hr=2.1&gm=1&daf=1.2&x=75",
+    scenario: {
+      ...TEXTILE,
+      material: { family: "textile", ropeClass: "hmpe", MBL: null, mu: null, k: null },
+    },
+    canonical: null,
+  },
+  {
+    name: "textile polyester with only MBL typed",
+    source: MEASURED,
+    covers: ["textile", "textile-blanks"],
+    link:
+      "/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&fam=tx&cls=pes&mbl=25000" +
+      "&ta=oeil&tb=epissure&na=0.9&nb=0.85&mp=120&hr=2.1&gm=1&daf=1.2&x=75",
+    scenario: {
+      ...TEXTILE,
+      material: { family: "textile", ropeClass: "polyester", MBL: 250000, mu: null, k: null },
+    },
+    canonical: null,
+  },
+];
