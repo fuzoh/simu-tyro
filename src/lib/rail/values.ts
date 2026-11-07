@@ -34,11 +34,17 @@
 
 import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 import type { Geometry, ScenarioDraft, TightnessDraft } from "@/lib/scenario/types.ts";
+import type { TextileSpec } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { G, roundToDisplay } from "@/lib/format/quantity.ts";
-import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
+import {
+  FIRST_RUN_RETAINED_TEXTILE,
+  FIRST_RUN_SCENARIO,
+  firstRunDefaults,
+} from "@/lib/scenario/first-run.ts";
 import { clampX, spanOfGeometry } from "@/lib/scenario/geometry.ts";
+import { TEXTILE } from "@/lib/sim";
 
 import type { Deduced, DeducedMaterial, DeducedSolve } from "./deduced.ts";
 import type { FieldContext, FieldId, TightnessFieldId } from "./fields.ts";
@@ -381,6 +387,45 @@ export function clearOverride(scenario: ScenarioDraft, key: "MBF" | "EA" | "mu")
   const { [key]: _dropped, ...rest } = material.overrides;
   const overrides = Object.keys(rest).length === 0 ? undefined : rest;
   return { ...scenario, material: { ...material, d: material.d, overrides } };
+}
+
+/**
+ * `Classe de corde`'s change, with the `k` it ships — polyester's `null` included, since nobody
+ * published one. **The terminations are kept**: ADR-0001 forbids re-selecting an end silently, so
+ * a knot that HMPE now disables stays as given and the Verdict Gate raises it.
+ */
+export function applyRopeClass(
+  scenario: ScenarioDraft,
+  ropeClass: TextileSpec["ropeClass"],
+): ScenarioDraft {
+  const { material } = scenario;
+  if (material.family !== "textile") return scenario;
+  return { ...scenario, material: { ...material, ropeClass, k: TEXTILE.kDefault[ropeClass] } };
+}
+
+/** Each family's ends as § 9 ships them: what the termination Fix Action puts back. */
+export const SHIPPED_TERMINATIONS = {
+  steel: FIRST_RUN_SCENARIO.terminations,
+  textile: FIRST_RUN_RETAINED_TEXTILE.terminations,
+} as const satisfies Record<ScenarioDraft["material"]["family"], ScenarioDraft["terminations"]>;
+
+/** The termination field of each end. */
+export const TERMINATION_FIELD = { A: "ta", B: "tb" } as const satisfies Record<"A" | "B", FieldId>;
+
+/**
+ * The termination Fix Action's effect, given the Blocking Error whose button was pressed: every end
+ * the error names takes the active family's shipped end, `η` included. An end it does not name is
+ * left alone, so another breach stands.
+ */
+export function applyShippedTerminations(
+  scenario: ScenarioDraft,
+  { field, alsoOutlined }: { readonly field: FieldId; readonly alsoOutlined: readonly FieldId[] },
+): ScenarioDraft {
+  const shipped = SHIPPED_TERMINATIONS[scenario.material.family];
+  const named = (key: "A" | "B") =>
+    field === TERMINATION_FIELD[key] || alsoOutlined.includes(TERMINATION_FIELD[key]);
+  const end = (key: "A" | "B") => (named(key) ? { ...shipped[key] } : scenario.terminations[key]);
+  return { ...scenario, terminations: { A: end("A"), B: end("B") } };
 }
 
 /**

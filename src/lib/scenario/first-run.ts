@@ -37,6 +37,8 @@
  *   is where those figures are locked.
  */
 
+import { TEXTILE } from "@/lib/sim";
+
 import type { EndTermination, Scenario, TextileDraft } from "./types.ts";
 
 /**
@@ -111,7 +113,7 @@ export const FIRST_RUN_SCENARIO = {
  * blocking errors attributed through the culprit table, and no stale picture is kept.
  */
 export const FIRST_RUN_RETAINED_TEXTILE = {
-  spec: { family: "textile", ropeClass: "hmpe", MBL: null, mu: null, k: 22 },
+  spec: { family: "textile", ropeClass: "hmpe", MBL: null, mu: null, k: TEXTILE.kDefault.hmpe },
   /**
    * **The terminations are retained with the spec** — § 3, « overrides *and* terminations
    * included » — and the whitelist is scoped by family, so the retained textile ships the textile
