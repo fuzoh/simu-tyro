@@ -158,8 +158,9 @@ function useRailRowContext(): RailRowContext {
 
 /**
  * `deduced` is the rider-free chain and `rail` the field state, **both from the app root** — one
- * `deduceValues` for the Rail's two halves, and one form for the Rail, the banner, the chart and
- * the write side, which is what makes « Saisie en cours » one fact rather than four opinions.
+ * `useUnloaded` line formatted once by `deducedFrom` for the Rail's two halves, and one form for
+ * the Rail, the banner, the chart and the write side, which is what makes « Saisie en cours » one
+ * fact rather than four opinions.
  */
 export function RailInputs({
   cause,

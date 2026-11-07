@@ -6,8 +6,8 @@
  * `./refusals.ts` writes the payload's *format*; this module is the one place that says **where
  * each field comes from**, and it is separate for two reasons that are not tidiness:
  *
- * - `./refusals.ts` may not import `@/lib/rail/deduced.ts`, which imports it. A type-only cycle is
- *   still a cycle to the linter and to anyone reading the graph.
+ * - `./refusals.ts` is the surface mapping and the payload format; reading `@/lib/rail/deduced.ts`
+ *   from there would tie the mapping to one producer of the failure.
  * - It keeps the assembly a **pure function with no clock and no clipboard**, so the `node` suite
  *   can assert the payload for a scenario whose refusal was injected. The instant, the build and
  *   the origin arrive as parameters for exactly that reason.
@@ -28,7 +28,7 @@ export type DiagnosticContext = {
   readonly scenario: ScenarioDraft;
   /** The cached profile — read only by `copyLink`, to count its points in a refusal sentence. */
   readonly trace: Trace | null;
-  /** The rider-free chain, refusal included. `failure === null` means there is nothing to copy. */
+  /** The rider-free chain, refusal included. No engine error on `failure`: nothing to copy. */
   readonly deduced: Deduced;
   /** The instant, ISO-8601. **A parameter**: the payload stays a pure function with no clock. */
   readonly at: string;
@@ -39,9 +39,9 @@ export type DiagnosticContext = {
 };
 
 /**
- * @returns the clipboard text, or `null` when this Scenario has no engine failure to report — the
- *   surface that offers the action only exists where one does, so `null` is a caller bug rather
- *   than a state.
+ * @returns the clipboard text, or `null` when this Scenario has no engine error to report — no
+ *   failure, or a `geometry` / `material` stage with nothing solved yet. The surface that offers
+ *   the action only exists where one does, so `null` is a caller bug rather than a state.
  */
 export function buildDiagnostic({
   scenario,
@@ -52,7 +52,7 @@ export function buildDiagnostic({
   origin,
 }: DiagnosticContext): string | null {
   const { failure, material, span, solve } = deduced;
-  if (failure === null) return null;
+  if (failure === null || failure.error === null) return null;
 
   const link = copyLink({ scenario, trace, origin });
   const { strength, EA, w } = material;

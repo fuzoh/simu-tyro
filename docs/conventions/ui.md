@@ -185,12 +185,15 @@ the two scales are *deliberately mismatched*, which is the whole point (« v1 bu
   at low anchors has every rider position violating at −0,36 m while the passenger flies a valley at
   +62,6 m — so one linear domain leaves the zero crossing **0,2 px** tall. Whatever the curve is,
   `clearanceDomain()` is fed **that** quantity and nothing else.
-- What the charts draw comes from `@/lib/chart/scene.ts` — a pure `Scenario → ChartScene`
-  derivation, so the questions worth testing are `node` tests and the components stay thin.
-- **One sweep per parameter change, at the app root.** `useSceneBase()`
-  (`src/components/app/use-scene-base.ts`) is § 2's `useSweep` seam: the Chart Block *and* the
-  Rail's output half read the same traverse, so the memo lives once in `app.tsx` and the value is
-  passed down. `x_D` is deliberately not one of its inputs — a scrub re-runs `placeRider` alone.
+- What the charts draw comes from `@/lib/chart/scene.ts` — pure functions over the unloaded line
+  `deriveUnloaded` returns (`@/lib/scenario/unloaded.ts`), so the questions worth testing are `node`
+  tests and the components stay thin.
+- **One unloaded line and one sweep per parameter change, at the app root.** `useUnloaded()`
+  (`src/components/app/use-unloaded.ts`) memoises the line on `unloadedInputs`' fields and hands it
+  to `useDeduced()`, which formats it with `deducedFrom`, and to `useScene()`
+  (`src/components/app/use-scene.ts`), § 2's `useSweep` seam: the Chart Block *and* the Rail's
+  output half read the same traverse, so the memo lives once in `app.tsx` and the value is passed
+  down. `x_D` is deliberately not one of their inputs — a scrub re-runs `placeRider` alone.
 - `visx`'s low-level primitives are the **pre-approved fallback** if the hand-rolled path logic
   becomes unwieldy; it is not a new decision.
 

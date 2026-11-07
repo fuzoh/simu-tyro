@@ -1,15 +1,15 @@
 import { describe, expect, test } from "vitest";
 
-import type { SceneBase } from "@/lib/chart/scene.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { RegimeId, SweepStep, VerdictInput } from "@/lib/sim";
 
-import { buildSceneBase, sceneInputs } from "@/lib/chart/scene.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
+import { sweepRider } from "@/lib/scenario/traverse.ts";
+import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { evaluateVerdict } from "@/lib/sim";
 
-import type { ResultRowId, Results } from "./results.ts";
+import type { ResultRowId, Results, SolvedTraverse } from "./results.ts";
 
 import {
   clearanceBreached,
@@ -47,15 +47,23 @@ import {
 
 const SHIPPED = firstRunDefaults();
 
-function sceneOf(scenario: ScenarioDraft): SceneBase {
-  const base = buildSceneBase(sceneInputs(scenario, null));
-  if (base === null) throw new Error("the shipped scenario builds a scene");
-  return base;
+/**
+ * The fields of the chart's `SceneBase` that `deriveResults` reads, built from the same two
+ * `lib/scenario` calls `buildSceneBase` makes — `lib/rail` may not import `lib/chart`.
+ */
+function solvedTraverseOf(scenario: ScenarioDraft): SolvedTraverse {
+  const unloaded = deriveUnloaded(unloadedInputs(scenario, null));
+  if (!unloaded.ok) throw new Error("the shipped scenario solves");
+  const swept = sweepRider(unloaded, scenario.rider);
+  if (swept === null) throw new Error("the shipped traverse solves");
+  const { span, state, material } = unloaded;
+  const { traverse, clearance } = swept;
+  return { L: span.L, h: span.h, unloaded: state, material, traverse, clearance };
 }
 
 function resultsOf(patch: Partial<ScenarioDraft> = {}): Results {
   const scenario: ScenarioDraft = { ...SHIPPED, ...patch };
-  const results = deriveResults({ scenario, trace: null, base: sceneOf(scenario) });
+  const results = deriveResults({ scenario, trace: null, base: solvedTraverseOf(scenario) });
   if (results === null) throw new Error("expected the shipped line to report results");
   return results;
 }

@@ -5,13 +5,13 @@
  * Skeleton paints. A8 filled the two charts and the View Strip, A9 and A10 the Rail's two halves,
  * and A11 the error surfaces — which is the stage that gives this file its shape.
  *
- * **Five things are computed here, once, and handed down**, because more than one consumer reads
- * each of them and two copies could disagree: the scene's expensive half (`useScene`), the
- * rider-free chain (`useDeduced`), the Rail's field state (`useRailForm`), the traverse aggregate
- * (`useResults`) and the error surfaces over all four (`useErrorSurfaces`). The last one is the
- * reason the other four moved: « the banner slot holds exactly one occupant » and « the cause
- * sentence is written once and echoed » are invariants about the *screen*, so the screen needs one
- * place that decides them.
+ * **Six things are computed here, once, and handed down**, because more than one consumer reads
+ * each of them and two copies could disagree: the unloaded line (`useUnloaded`), the scene's
+ * expensive half (`useScene`), the rider-free read-outs (`useDeduced`), the Rail's field state
+ * (`useRailForm`), the traverse aggregate (`useResults`) and the error surfaces over the rest
+ * (`useErrorSurfaces`). The last one is the reason the others moved: « the banner slot holds
+ * exactly one occupant » and « the cause sentence is written once and echoed » are invariants
+ * about the *screen*, so the screen needs one place that decides them.
  */
 
 import { useState } from "react";
@@ -37,6 +37,7 @@ import { useErrorSurfaces } from "./use-error-surfaces.ts";
 import { usePersist } from "./use-persist.ts";
 import { useRailForm } from "./use-rail-form.ts";
 import { useScene } from "./use-scene.ts";
+import { useUnloaded } from "./use-unloaded.ts";
 import { useBandHeight, useViewport } from "./use-viewport.ts";
 
 export function App() {
@@ -58,8 +59,9 @@ export function App() {
  * inside each would run the sweep and the §11 reducer twice per parameter change. `x_D` is not one
  * of its inputs, so a scrub still re-runs nothing but `placeRider`, inside the Chart Block.
  *
- * **One `deduceValues`, two readers**, for the same reason one rung down: both halves of the Rail
- * print the rider-free chain, and neither the sweep nor this one may run twice per keystroke.
+ * **One unloaded line, two readers**, for the same reason one rung down: the scene sweeps it and
+ * both halves of the Rail print it, and neither the sweep nor the `L₀` bisection may run twice per
+ * keystroke.
  */
 function Live() {
   const state = useAppState();
@@ -78,8 +80,9 @@ function Live() {
    * also what dismissing it restores.
    */
   const chrome = useBandHeight();
-  const scene = useScene();
-  const deduced = useDeduced();
+  const unloaded = useUnloaded();
+  const scene = useScene(unloaded);
+  const deduced = useDeduced(unloaded);
   /**
    * § 8's « clé ignorée » strip. **Computed once**: the arrival is fixed at first render, the strip
    * is shown once at load, and the unit is the one the app opened on — a value re-formatted later

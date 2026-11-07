@@ -8,7 +8,7 @@
  * goes inert and freezes under « Saisie en cours », and the **write side** suspends both writes on
  * the same condition. All four have to agree — « the banner slot holds exactly one occupant » is
  * not a property a second copy of the form's issues can have — so the state is lifted here and
- * handed down, exactly as `useSceneBase` and `useDeduced` already are.
+ * handed down, exactly as `useScene` and `useDeduced` already are.
  *
  * What is lifted is **only** what more than one consumer reads: the form itself, the text it holds,
  * the focused field and the gate report over both. Every affordance — the rows, the Fix Actions,

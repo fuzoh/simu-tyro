@@ -19,11 +19,11 @@
  *   `MBL` collapsing the frame the same way a negative span does — applies an exception the spec
  *   wrote down *as* an exception.
  * - **`x_D` is not a solve input, so the derivation is split in two.** {@link buildSceneBase} runs
- *   the material, `L₀`, the unloaded solve, the sweep and the §11 pass — everything the *scenario*
- *   decides — and {@link placeRider} runs the rider's exact solve and its one-step clearance. That
- *   split **is** § 7's « memo on the solve inputs behind the `useSweep` seam »: dragging the rider
+ *   the sweep and the §11 pass over `deriveUnloaded`'s line — everything the *scenario* decides —
+ *   and {@link placeRider} runs the rider's exact solve and its one-step clearance. That split
+ *   **is** § 7's « memo on the solve inputs behind the `useSweep` seam »: dragging the rider
  *   dispatches a new Scenario on every `pointermove`, and only the second half may re-run for it.
- *   {@link sceneInputs} is what a memo keys on, and `x_D` is deliberately absent from it.
+ *   `unloadedInputs`, `mp` and `hRider` are what a memo keys on, and `x_D` is absent from them.
  * - **No polyline is ever stored in a result object.** The cable is regenerated per render from
  *   `sampleCable(state, n)`; what is stored here is this render's samples, not a field on a
  *   `SpanState` — voir § 2 — le contrat du moteur.
@@ -46,11 +46,14 @@
  *   axis: on an imported profile the passenger flies a valley at **+62,6 m** while the envelope
  *   minimum sits at **−0,36 m** against a ridge, so one linear axis leaves the crossing this whole
  *   Chart Block exists to show **0,2 px** tall at § 5's reference column.
- * - **Terrain enters at one joint.** `deriveTerrain` builds the engine's `Terrain` over `[0, L]`;
- *   the *drawn* ground spans the whole shared domain, holding the ends exactly as `zGroundAt` does.
+ * - **Terrain enters at one joint.** `placeSpan` builds the engine's `Terrain` over `[0, L]`; the
+ *   *drawn* ground spans the whole shared domain, holding the ends exactly as `zGroundAt` does.
  */
 
+import type { PlacedSpan } from "@/lib/scenario/geometry.ts";
+import type { SweepRider } from "@/lib/scenario/traverse.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
+import type { Unloaded } from "@/lib/scenario/unloaded.ts";
 import type {
   ClearanceResult,
   DerivedMaterial,
@@ -60,24 +63,19 @@ import type {
   SweepStep,
   Terrain,
 } from "@/lib/sim";
-import type { Trace } from "@/lib/terrain/trace.ts";
+import type { AnchorPlacement, Trace } from "@/lib/terrain/trace.ts";
 
-import { G } from "@/lib/format/quantity.ts";
 import { xDomain } from "@/lib/layout/contract.ts";
-import { engineTightness } from "@/lib/scenario/tightness.ts";
+import { sweepRider } from "@/lib/scenario/traverse.ts";
+import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import {
-  deriveSteel,
-  deriveTextile,
   evaluateClearance,
-  resolveL0,
   sampleCable,
   solveAtHorizontalPosition,
-  solveSpan,
-  sweep,
   sweepStep,
   zGroundAt,
 } from "@/lib/sim";
-import { altitudeAt, deriveSpan, deriveTerrain } from "@/lib/terrain/trace.ts";
+import { altitudeAt } from "@/lib/terrain/trace.ts";
 
 /**
  * Vertices minus one on a drawn cable. Nothing downstream is measured against it — it is a drawing
@@ -218,8 +216,8 @@ export type SceneFrame = {
  * keeps drawing.
  *
  * This is the expensive half: the sweep plus the clearance reducer, p95 1,30 ms at 240 steps. It is
- * a function of {@link SceneInputs} alone, so a scrub — which changes `x_D` and nothing else —
- * cannot invalidate it.
+ * a function of the frame, the unloaded line, `mp` and `hRider` alone, so a scrub — which changes
+ * `x_D` and nothing else — cannot invalidate it.
  */
 export type SceneBase = SceneFrame & {
   /** The span posed to the solver, rider excluded. */
@@ -255,59 +253,20 @@ export type ChartScene = SceneBase & {
 };
 
 /**
- * **The solve inputs.** Every Scenario field {@link buildSceneBase} reads, and `x_D` is not one of
- * them: it selects a view over a scene that is already solved.
- *
- * This type exists to be a memo key. § 7's store decision rests on « the real performance mechanism
- * is the memo on the solve inputs behind the `useSweep` seam », and a memo keyed on the whole
- * Scenario is not that memo — `moveRider` dispatches a new Scenario on every `pointermove`, so it
- * would re-run the sweep and the §11 pass for a 1 px drag that lands back on the same step.
- */
-export type SceneInputs = {
-  readonly geometry: ScenarioDraft["geometry"];
-  readonly anchors: ScenarioDraft["anchors"];
-  readonly material: ScenarioDraft["material"];
-  readonly tightness: ScenarioDraft["tightness"];
-  /** Passenger mass, kg — the traverse's load, so a scenario input. */
-  readonly mp: number;
-  /** §6.3's passenger envelope, m — §11's third term, so a scenario input too. */
-  readonly hRider: number;
-  /** The imported profile, or `null` in manual mode. */
-  readonly trace: Trace | null;
-};
-
-/**
- * What the input half of the picture is a function of: the placement and nothing else. A subset of
- * {@link SceneInputs}, so a caller with solve inputs in hand can pass them straight in.
- */
-export type SceneFrameInputs = Pick<SceneInputs, "anchors" | "geometry" | "trace">;
-
-/** A Scenario's solve inputs, `x_D` dropped. What a memo over {@link buildSceneBase} keys on. */
-export function sceneInputs(scenario: ScenarioDraft, trace: Trace | null): SceneInputs {
-  return {
-    geometry: scenario.geometry,
-    anchors: scenario.anchors,
-    material: scenario.material,
-    tightness: scenario.tightness,
-    mp: scenario.rider.mp,
-    hRider: scenario.rider.hRider,
-    trace,
-  };
-}
-
-/**
  * The input half of the picture — the placement, the terrain and the shared x domain. **No
  * material, no `L₀`, no solve**, so it survives every failure but its own.
  *
- * @returns `null` for § 8's *exception géométrique* and nothing else: a non-finite or non-positive
- *   `L`, a non-finite `h`, `station B ≤ station A`, or a `tr` geometry with no Trace. Those are the
- *   states where the shared x domain — span + 5 % — does not exist, so `x_D` has no interval to
- *   live in and the scrub track has nothing to be a pointer path over.
+ * @param placed the unloaded line's `span`, which every outcome but stage `geometry` carries: the
+ *   frame is drawn on the placement the line was solved on, and `placeSpan` runs once per edit.
+ * @returns `null` for § 8's *exception géométrique* and nothing else — a `null` placement: a
+ *   non-finite or non-positive `L`, a non-finite `h`, `station B ≤ station A`, or a `tr` geometry
+ *   with no Trace. Those are the states where the shared x domain — span + 5 % — does not exist,
+ *   so `x_D` has no interval to live in and the scrub track has nothing to be a pointer path over.
  */
-export function buildSceneFrame({ geometry, anchors, trace }: SceneFrameInputs): SceneFrame | null {
-  const placed = place({ geometry, anchors }, trace);
+export function buildSceneFrame(placed: PlacedSpan | null): SceneFrame | null {
   if (placed === null) return null;
-  const { L, h, terrain, ground, extent } = placed;
+  const { L, h, anchors, terrain } = placed;
+  const { ground, extent } = drawnGround(placed);
   return {
     L,
     h,
@@ -321,75 +280,51 @@ export function buildSceneFrame({ geometry, anchors, trace }: SceneFrameInputs):
 }
 
 /**
- * The whole chain a **parameter** change runs — derive the material, resolve `L₀`, solve the
- * unloaded line, sweep, reduce §11 over it — reduced to what the Chart Block draws. The rider is
- * {@link placeRider}'s, and deliberately not here.
+ * The traverse over the unloaded line — sweep, reduce §11 over it — reduced to what the Chart Block
+ * draws. The material, `L₀` and the unloaded solve are `deriveUnloaded`'s, run once and shared
+ * with the `Valeurs déduites`; the Sweep and §11 are `sweepRider`'s; the rider is
+ * {@link placeRider}'s.
  *
- * @param frame the already-built {@link SceneFrame} for these same inputs, when the caller holds
- *   one — the Chart Block does, because the frame outlives the solve and is memoised on its own.
- * @returns `null` when the scenario cannot be **solved**: a textile draft with blanks, an
- *   unreachable tightness target, a refused solve, a traverse that lost every step. The frame is
- *   unaffected, and § 8's « Aucun résultat » is exactly that state — « les entrées se dessinent
- *   toujours ». A `null` frame is the *other* state and is the caller's to distinguish. **Which**
+ * @param frame the {@link SceneFrame} for the same placement — the Chart Block memoises it on its
+ *   own, because the frame outlives the solve.
+ * @returns `null` when the scenario cannot be **solved**: no frame, an unloaded line that did not
+ *   solve, or a traverse that lost every step. A non-`null` frame is unaffected, and § 8's
+ *   « Aucun résultat » is exactly that state — « les entrées se dessinent toujours ». **Which**
  *   failure it was is the error surfaces' business (A11), not the chart's.
  */
 export function buildSceneBase(
-  { geometry, anchors, material: materialSpec, tightness, mp, hRider, trace }: SceneInputs,
-  frame?: SceneFrame | null,
+  frame: SceneFrame | null,
+  unloaded: Unloaded,
+  rider: SweepRider,
 ): SceneBase | null {
-  const material = deriveMaterial(materialSpec);
-  if (material === null) return null;
-
-  const placed = frame === undefined ? buildSceneFrame({ geometry, anchors, trace }) : frame;
-  if (placed === null) return null;
-  const { L, h, terrain } = placed;
-
-  const L0 = resolveL0(engineTightness(tightness, mp), { L, h, ...material });
-  if (!L0.ok) return null;
-
-  const span: SpanInput = {
-    L,
-    h,
-    L0: L0.value,
-    w: material.w,
-    EA: material.EA,
-    loads: [],
-    strength: material.strength,
-  };
-
-  const unloaded = solveSpan(span);
-  if (!unloaded.ok) return null;
-
-  const P = mp * G;
-  const traverse = sweep(span, P);
-  // A traverse that lost every step has no picture and no `h_min`: `atStepIndex` is −1, which is
-  // the flag § 2 says to check rather than reading a garde off a traverse that never happened.
-  if (traverse.steps.length === 0) return null;
-
-  const clearance = evaluateClearance(span, P, traverse.steps, terrain, hRider);
-  const unloadedCable = polyline(sampleCable(unloaded.state, CABLE_SAMPLES));
+  if (frame === null || !unloaded.ok) return null;
+  const swept = sweepRider(unloaded, rider);
+  if (swept === null) return null;
+  const { input: span, material, state } = unloaded;
+  const { P, traverse, clearance } = swept;
+  const unloadedCable = polyline(sampleCable(state, CABLE_SAMPLES));
 
   return {
-    ...placed,
+    ...frame,
     span,
     P,
     material,
-    unloaded: unloaded.state,
+    unloaded: state,
     unloadedCable,
     traverse,
     trajectory: trajectoryRuns(traverse),
     clearance,
-    hRider,
+    hRider: rider.hRider,
     violating: violatingBands(traverse, clearance),
-    zExtent: solvedZExtent(placed.zExtent, { traverse, unloadedCable }),
+    zExtent: solvedZExtent(frame.zExtent, { traverse, unloadedCable }),
   };
 }
 
 /**
  * Both halves at once, for a caller that has no memo to split — the `node` tests, and anything
  * that wants one scene from one Scenario. **The Chart Block does not use it**: it keys
- * {@link buildSceneBase} on {@link sceneInputs} and {@link placeRider} on `x_D`, which is the
- * whole point of the split.
+ * {@link buildSceneBase} on the unloaded line and the two rider inputs, and {@link placeRider} on
+ * `x_D`, which is the whole point of the split.
  */
 export function buildScene({
   scenario,
@@ -398,7 +333,8 @@ export function buildScene({
   scenario: ScenarioDraft;
   trace: Trace | null;
 }): ChartScene | null {
-  const base = buildSceneBase(sceneInputs(scenario, trace));
+  const unloaded = deriveUnloaded(unloadedInputs(scenario, trace));
+  const base = buildSceneBase(buildSceneFrame(unloaded.span), unloaded, scenario.rider);
   if (base === null) return null;
   const rider = placeRider(base, scenario.rider.xD);
   return rider === null ? null : { ...base, rider };
@@ -430,43 +366,17 @@ export function clampToSpan(x: number, L: number): number {
   return x < 0 ? 0 : x > L ? L : x;
 }
 
-/** What the solver consumes, or `null` while a textile draft still has § 9's two blanks. */
-function deriveMaterial(material: ScenarioDraft["material"]): DerivedMaterial | null {
-  if (material.family === "steel") return deriveSteel(material);
-  const { MBL, mu, k } = material;
-  if (MBL === null || mu === null || k === null) return null;
-  return deriveTextile({ family: "textile", ropeClass: material.ropeClass, MBL, mu, k });
-}
-
-/** The span, the engine's ground and the drawn ground — the one place the two modes differ. */
-function place(
-  { geometry, anchors }: Pick<SceneInputs, "anchors" | "geometry">,
-  trace: Trace | null,
-): {
-  L: number;
-  h: number;
-  terrain: Terrain;
+/** What only the picture needs on top of the placement: the drawn ground and the trace's extent. */
+function drawnGround({ L, terrain, onTrace }: PlacedSpan): {
   ground: Polyline;
   extent: { min: number; max: number } | null;
-} | null {
-  if (geometry.source === "manual") {
-    const { L, h } = geometry;
-    if (!Number.isFinite(L) || L <= 0 || !Number.isFinite(h)) return null;
-    // § 4's manual ground: the straight line between the two anchor bases, in the anchor-A-top
-    // frame. Its two points are the cable's own ends, so it costs the clearance reducer nothing.
-    const zBaseA = -anchors.zA;
-    const zBaseB = h - anchors.zB;
-    const terrain: Terrain = {
-      kind: "profile",
-      xs: Float64Array.from([0, L]),
-      zs: Float64Array.from([zBaseA, zBaseB]),
-    };
+} {
+  if (onTrace === null) {
     const [lo, hi] = xDomain(L, null);
+    const zBaseA = zGroundAt(terrain, 0);
+    const zBaseB = zGroundAt(terrain, L);
     // Outside the span the ends are **held, never extrapolated** — `zGroundAt`'s own rule, drawn.
     return {
-      L,
-      h,
-      terrain,
       ground: {
         xs: Float64Array.from([lo, 0, L, hi]),
         zs: Float64Array.from([zBaseA, zBaseA, zBaseB, zBaseB]),
@@ -475,20 +385,12 @@ function place(
     };
   }
 
-  if (trace === null) return null;
-  const a = { station: geometry.sa, height: anchors.zA };
-  const b = { station: geometry.sb, height: anchors.zB };
-  // `station B ≤ station A` is § 4's blocked placement, repaired by `[ Inverser A et B ]`. It has
-  // no picture, and `deriveTerrain` would throw on it.
-  if (!(b.station > a.station)) return null;
-
-  const { L, h } = deriveSpan(trace, a, b);
-  const terrain = deriveTerrain(trace, a, b);
+  const { trace, a } = onTrace;
   const extent = {
     min: trace.d[0] - a.station,
     max: trace.d[trace.d.length - 1] - a.station,
   };
-  return { L, h, terrain, ground: drawnTrace(trace, a, xDomain(L, extent)), extent };
+  return { ground: drawnTrace(trace, a, xDomain(L, extent)), extent };
 }
 
 /**
@@ -499,7 +401,7 @@ function place(
  */
 function drawnTrace(
   trace: Trace,
-  a: { station: number; height: number },
+  a: AnchorPlacement,
   [lo, hi]: readonly [number, number],
 ): Polyline {
   const zRef = altitudeAt(trace, a.station) + a.height;

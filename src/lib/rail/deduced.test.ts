@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import type { ForceUnit, ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
@@ -144,7 +144,7 @@ describe("the stale Override badge — derived on every load, at display precisi
   });
 });
 
-describe("rider and unit fields `deduceValues` reads, which `useDeduced` must key on", () => {
+describe("the rider and unit fields the read-outs depend on — `mp` and `unit`", () => {
   test("Rapport V resolves `L₀` against the passenger mass: mp 80 and 120 kg differ", () => {
     const at = (mp: number) =>
       deduceValues(
@@ -220,10 +220,62 @@ describe("textile — four inputs, exactly one derived value, and no override af
 
   test("a spec with blanks reaches no solve and reports no engine error", () => {
     // The engine is never handed an incomplete spec: that is what the Solve Gate is for, and an
-    // absent solve here is a gate's business, not a refusal to surface.
+    // absent solve here is a gate's business, not a refusal to surface — stage `material`, no
+    // error.
     const { solve, failure } = deduceValues(rope({}), null);
     expect(solve).toBeNull();
-    expect(failure).toBeNull();
+    expect(failure).toEqual({ stage: "material", error: null });
+  });
+});
+
+describe("an invalid span — stage `geometry`, and the material still reads", () => {
+  test("`L` −5 stops at `geometry` while every material row stays populated", () => {
+    const negative = scenario((draft) => {
+      draft.geometry = { source: "manual", L: -5, h: -18 };
+    });
+    const { material, span, solve, failure } = deduceValues(negative, null);
+    expect(failure).toEqual({ stage: "geometry", error: null });
+    expect(span).toBeNull();
+    expect(solve).toBeNull();
+    expect(formatQuantity("MBF", material.strength ?? NaN)).toBe("9074 daN");
+    expect(formatQuantity("EA", material.EA ?? NaN)).toBe("6,90 MN");
+    expect(formatQuantity("mu", material.mu ?? NaN)).toBe("0,5465 kg/m");
+    expect(formatQuantity("w", material.w ?? NaN)).toBe("0,536 daN/m");
+  });
+});
+
+describe("a formatter, not a second chain — `vi.mock` on the engine barrel", () => {
+  test("`deducedFrom` adds no solve and no sample scan to the one derivation", async () => {
+    vi.resetModules();
+    const spies: {
+      resolveL0?: ReturnType<typeof vi.fn>;
+      solveSpan?: ReturnType<typeof vi.fn>;
+      sampleCable?: ReturnType<typeof vi.fn>;
+    } = {};
+    vi.doMock("@/lib/sim", async () => {
+      const sim = await vi.importActual<typeof import("@/lib/sim")>("@/lib/sim");
+      spies.resolveL0 = vi.fn<typeof sim.resolveL0>(sim.resolveL0);
+      spies.solveSpan = vi.fn<typeof sim.solveSpan>(sim.solveSpan);
+      spies.sampleCable = vi.fn<typeof sim.sampleCable>(sim.sampleCable);
+      return {
+        ...sim,
+        resolveL0: spies.resolveL0,
+        solveSpan: spies.solveSpan,
+        sampleCable: spies.sampleCable,
+      };
+    });
+    const { deriveUnloaded, unloadedInputs } = await import("@/lib/scenario/unloaded.ts");
+    const { deducedFrom } = await import("./deduced.ts");
+
+    const draft = scenario();
+    const unloaded = deriveUnloaded(unloadedInputs(draft, null));
+    const { solve } = deducedFrom(draft, unloaded);
+    expect(formatQuantity("extremumX", solve?.sagAtX ?? NaN)).toBe("74,8 m");
+    expect(spies.resolveL0).toHaveBeenCalledTimes(1);
+    expect(spies.solveSpan).toHaveBeenCalledTimes(1);
+    expect(spies.sampleCable).not.toHaveBeenCalled();
+    vi.doUnmock("@/lib/sim");
+    vi.resetModules();
   });
 });
 
