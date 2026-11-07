@@ -46,6 +46,10 @@ import { equalAtDisplayPrecision, formatQuantity } from "@/lib/format/quantity.t
 import { FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 import { lineWarnings, REGIMES, TERMINATIONS } from "@/lib/sim";
 
+import type { StrengthSymbol } from "./fields.ts";
+
+import { strengthSymbol } from "./fields.ts";
+
 /**
  * The popover copy, one entry per provenance surface. §0.2's fine-grained tag and the
  * `docs/simulation-theory.md` § reference travel **together**: a tag with no § is a claim nobody
@@ -333,22 +337,31 @@ export type LadderWarning = {
   readonly text: string;
 };
 
-/** The row and the copy of each engine warning. The text carries no glyph: the renderer owns ⚠. */
-const LINE_WARNING_RUNGS: Record<VerdictWarningId, { row: LadderRow; text: string }> = {
+/**
+ * The row and the copy of each engine warning, given what the line's strength is called. The text
+ * carries no glyph: the renderer owns ⚠.
+ */
+const LINE_WARNING_RUNGS: Record<
+  VerdictWarningId,
+  { row: LadderRow; text: (strength: StrengthSymbol) => string }
+> = {
   "tension-permanente-sur-30-pct-mbl": {
     row: "standingTension",
-    text: "tension permanente au-dessus de 30 % MBL — fluage et durée de vie (§9.2), pas résistance.",
+    text: (strength) =>
+      `tension permanente au-dessus de 30 % ${strength} — fluage et durée de vie (§9.2), pas résistance.`,
   },
   "fleche-sur-portee-sous-3-pct": {
     row: "sagRatio",
-    text: "flèche / portée sous 3 % — la ligne se raidit et le modèle rapporte mal la réponse dynamique (§8.2).",
+    text: () =>
+      "flèche / portée sous 3 % — la ligne se raidit et le modèle rapporte mal la réponse dynamique (§8.2).",
   },
   // **Two places, one condition.** The DAF 1,2 ceiling was measured on a controlled step-off on a
   // *taut* line, so a stiff line is outside the regime it was measured in. Removing either half
   // hides half the finding.
   "daf-hors-de-son-regime-de-mesure": {
     row: "DAF",
-    text: "hors du régime où 1,2 a été mesuré : la ligne est trop raide (flèche / portée sous 3 %, §8.2).",
+    text: () =>
+      "hors du régime où 1,2 a été mesuré : la ligne est trop raide (flèche / portée sous 3 %, §8.2).",
   },
 };
 
@@ -388,7 +401,13 @@ export function warningLadder(scenario: ScenarioDraft, deduced: Deduced): readon
     strength,
   });
   for (const id of fired) {
-    warnings.push({ id, tier: WARNING_LADDER[id].tier, ...LINE_WARNING_RUNGS[id] });
+    const { row, text } = LINE_WARNING_RUNGS[id];
+    warnings.push({
+      id,
+      tier: WARNING_LADDER[id].tier,
+      row,
+      text: text(strengthSymbol(spec.family)),
+    });
   }
 
   return warnings;

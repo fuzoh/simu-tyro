@@ -42,7 +42,7 @@ import * as v from "valibot";
 
 import type { QuantityId } from "@/lib/format/quantity.ts";
 import type { ForceUnit, TightnessDraft } from "@/lib/scenario/types.ts";
-import type { TextileSpec } from "@/lib/sim";
+import type { SteelSpec, TextileSpec } from "@/lib/sim";
 
 import { formatQuantity, formatValue, fromDisplay, roundToDisplay } from "@/lib/format/quantity.ts";
 import { clampX } from "@/lib/scenario/geometry.ts";
@@ -584,6 +584,45 @@ export function lowerFirst(label: string): string {
     return label;
   }
   return first.toLocaleLowerCase("fr") + label.slice(1);
+}
+
+/** The breaking strength's symbol: `MBF` for a steel cable, `MBL` for a textile rope. */
+export type StrengthSymbol = "MBF" | "MBL";
+
+/** What the strength a percentage or a formula is read against is called on this family. */
+export function strengthSymbol(family: "steel" | "textile"): StrengthSymbol {
+  return family === "steel" ? "MBF" : "MBL";
+}
+
+/**
+ * `Classe de corde`'s entries, in the Rail's order. The link strip prints them mid-sentence
+ * through {@link lowerFirst}, so « Polyamide » reads « polyamide » there and « HMPE » stays.
+ */
+export const ROPE_CLASS_LABEL = {
+  hmpe: "HMPE 12 torons",
+  "pa-en1891a": "Polyamide EN 1891 type A",
+  polyester: "Polyester semi-statique",
+} as const satisfies Record<TextileSpec["ropeClass"], string>;
+
+/** `Construction`'s core, which is all the link strip names; the Rail's picker prefixes the lay. */
+export const CONSTRUCTION_LABEL = {
+  "fibre-core": "âme textile",
+  iwrc: "âme métallique",
+} as const satisfies Record<SteelSpec["construction"], string>;
+
+/** One picker entry. */
+export type PickerOption<Id extends string> = { readonly value: Id; readonly label: string };
+
+export const ROPE_CLASS_OPTIONS = pickerOptions(ROPE_CLASS_LABEL);
+
+export const CONSTRUCTION_OPTIONS = pickerOptions(CONSTRUCTION_LABEL, "6×19 ");
+
+/** A label table as a picker's entries, in the table's order. */
+function pickerOptions<Id extends string>(
+  labels: Readonly<Record<Id, string>>,
+  prefix = "",
+): readonly PickerOption<Id>[] {
+  return (Object.keys(labels) as Id[]).map((value) => ({ value, label: prefix + labels[value] }));
 }
 
 /**

@@ -390,6 +390,14 @@ export function formatQuantity(id: QuantityId, value: number, unit: ForceUnit = 
 }
 
 /**
+ * « à x 74,8 m » — where along the span an extremum or the rider sits. The flèche à vide, the
+ * read-out cell's garde and the Rail's « passager à x » all name a position this way.
+ */
+export function formatAtX(x: number): string {
+  return `à x ${formatQuantity("extremumX", x)}`;
+}
+
+/**
  * Do two canonical values read the same? **The stale-Override badge's comparison**, which § 3
  * requires to run at the field's display precision and never on floats: a freshly prefilled
  * override holds 9074 daN against a formula value of 9073,98, and float equality would badge

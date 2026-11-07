@@ -70,8 +70,8 @@ export const CELL_ROW = 52;
 export const CELL_BASIS_PX = 124;
 
 /**
- * Each read-out cell's width in {@link CELL_BASIS_PX} units, in the row's own order — `shell.tsx`'s
- * `READ_OUT_CELLS` — so {@link cellRows} can lay the row out without a DOM. « Garde min. ligne » is
+ * Each read-out cell's width in {@link CELL_BASIS_PX} units, in the row's own order — `CELL_IDS` in
+ * `lib/rail/cells.ts` — so {@link cellRows} can lay the row out without a DOM. « Garde min. ligne » is
  * **two**: its relabelled form « Garde min. ligne (à x 74,3 m) » needs ≈ 200 px of label.
  */
 export const READ_OUT_SPANS = [2, 1, 1, 1, 1, 1, 1] as const;

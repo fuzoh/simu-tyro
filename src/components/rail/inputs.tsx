@@ -41,7 +41,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { createContext, use, useEffect, useRef, useState } from "react";
 
 import type { RailFormApi, RailFormState } from "@/components/app/use-rail-form.ts";
-import type { Deduced, DeducedSolve } from "@/lib/rail/deduced.ts";
+import type { Deduced, DeducedSolve, ReadOutRow } from "@/lib/rail/deduced.ts";
 import type { FieldContext, FieldId } from "@/lib/rail/fields.ts";
 import type { BlockingError, FixActionId } from "@/lib/rail/gates.ts";
 import type { LadderRow } from "@/lib/rail/provenance.ts";
@@ -61,14 +61,17 @@ import { Separator } from "@/components/ui/separator.tsx";
 import { COPY_INCOMPLETE, copyLink } from "@/lib/app/persist.ts";
 import { siteOrigin } from "@/lib/app/site.ts";
 import { DOC_PAGES } from "@/lib/docs/pages.ts";
-import { formatQuantity, formatValue } from "@/lib/format/quantity.ts";
+import { formatQuantity } from "@/lib/format/quantity.ts";
+import { deducedRows } from "@/lib/rail/deduced.ts";
 import {
   checkField,
   commitField,
+  CONSTRUCTION_OPTIONS,
   displayField,
   FIELDS,
   fieldSchema,
   parseDecimal,
+  ROPE_CLASS_OPTIONS,
   warningFor,
 } from "@/lib/rail/fields.ts";
 import {
@@ -121,13 +124,6 @@ const PROVENANCE = PROVENANCE_COPY;
 
 /** The three numeric fields that change the span, and therefore what `x_D` is clamped against. */
 const SPAN_FIELDS = new Set<NumericFieldId>(["L", "sa", "sb"]);
-
-/** § 3's `Classe de corde` entries. It drives exactly two things: `k`'s default and this list. */
-const ROPE_CLASSES = [
-  { value: "hmpe", label: "HMPE 12 torons" },
-  { value: "pa-en1891a", label: "Polyamide EN 1891 type A" },
-  { value: "polyester", label: "Polyester semi-statique" },
-] as const;
 
 /** What a row needs of the screen around it. **The reason every row is a module-scope component.** */
 type RailRowContext = {
@@ -205,6 +201,7 @@ export function RailInputs({
   const ladder = warningLadder(scenario, deduced);
   const rung = (row: LadderRow): string | null =>
     ladder.find((warning) => warning.row === row)?.text ?? null;
+  const readOuts = deducedRows(scenario, deduced, cause);
   const context = fieldContext(scenario, trace);
 
   const breaches = new Map<FieldId, BlockingError>();
@@ -541,16 +538,10 @@ export function RailInputs({
                   control={
                     <Picker
                       id="rail-cst"
-                      onChange={(value) =>
-                        patch({
-                          ...scenario,
-                          material: { ...steelSpec, construction: value as "fibre-core" | "iwrc" },
-                        })
+                      onChange={(construction) =>
+                        patch({ ...scenario, material: { ...steelSpec, construction } })
                       }
-                      options={[
-                        { value: "fibre-core", label: "6×19 âme textile" },
-                        { value: "iwrc", label: "6×19 âme métallique" },
-                      ]}
+                      options={CONSTRUCTION_OPTIONS}
                       value={steelSpec.construction}
                     />
                   }
@@ -565,12 +556,8 @@ export function RailInputs({
                   control={
                     <Picker
                       id="rail-cls"
-                      onChange={(value) =>
-                        patch(
-                          applyRopeClass(scenario, value as (typeof ROPE_CLASSES)[number]["value"]),
-                        )
-                      }
-                      options={ROPE_CLASSES}
+                      onChange={(ropeClass) => patch(applyRopeClass(scenario, ropeClass))}
+                      options={ROPE_CLASS_OPTIONS}
                       value={textileSpec?.ropeClass ?? "hmpe"}
                     />
                   }
@@ -685,41 +672,13 @@ export function RailInputs({
 
       <RailSection title="Valeurs déduites">
         <div className="mt-2">
-          {deduced.span !== null && scenario.geometry.source === "trace" && (
-            <>
-              <ReadOut
-                help={DEDUCED_HELP.L}
-                label="Portée"
-                value={formatQuantity("L", deduced.span.L)}
-              />
-              <ReadOut
-                help={DEDUCED_HELP.h}
-                label="Dénivelé"
-                value={formatQuantity("h", deduced.span.h)}
-              />
-              {/* § 4's anchor-placement block prints the two base altitudes **beside** `Portée` and
-                  `Dénivelé`: they are what says *where on the hill* the placement sits, and without
-                  them a station read-out is a number with no altitude behind it. One row each rather
-                  than the block's single « · »-joined line — the Rail is a 255 px column, and `·` is
-                  the sketch's layout, not its copy. */}
-              {deduced.span.bases !== null && (
-                <>
-                  <ReadOut
-                    help={DEDUCED_HELP.zBaseA}
-                    label="Alt. base A"
-                    value={formatQuantity("zBase", deduced.span.bases.zBaseA)}
-                  />
-                  <ReadOut
-                    help={DEDUCED_HELP.zBaseB}
-                    label="Alt. base B"
-                    value={formatQuantity("zBase", deduced.span.bases.zBaseB)}
-                  />
-                </>
-              )}
-            </>
-          )}
+          {readOuts
+            .filter((row) => row.group === "placement")
+            .map((row) => (
+              <DeducedReadOut key={row.id} row={row} />
+            ))}
 
-          {steelSpec !== null ? (
+          {steelSpec !== null && (
             <>
               <DerivedRow
                 chip={
@@ -766,88 +725,13 @@ export function RailInputs({
                 <NumericRow hint="kg/m" id="muOverride" label="Masse linéique" />
               </DerivedRow>
             </>
-          ) : (
-            deduced.material.strength !== null && (
-              <>
-                <ReadOut
-                  help={DEDUCED_HELP.MBL}
-                  label="Charge de rupture"
-                  value={formatQuantity("MBL", deduced.material.strength, unit)}
-                />
-                {deduced.material.EA !== null && (
-                  <ReadOut
-                    help={DEDUCED_HELP.EAtextile}
-                    label="Raideur axiale"
-                    value={formatQuantity("EA", deduced.material.EA)}
-                  />
-                )}
-              </>
-            )
           )}
 
-          {/* `corde` and `w` are the only two rows independent of a solve. */}
-          {deduced.material.w !== null && (
-            <ReadOut
-              help={DEDUCED_HELP.w}
-              label="Poids linéique"
-              value={formatQuantity("w", deduced.material.w, unit)}
-            />
-          )}
-          {deduced.span !== null && (
-            <ReadOut
-              help={DEDUCED_HELP.chord}
-              label="Corde"
-              value={formatQuantity("chord", deduced.span.chord)}
-            />
-          )}
-
-          {/* **The cause governs, not `deduced.solve`.** The rider-free chain is derived from the
-              Scenario, which cannot hold a committed-invalid « −5 » or an emptied `m_p` — so under
-              a Solve Gate breach it still resolves, and printing `L₀ 151,64 m` beside « aucun
-              résultat » is the stale number invariant 3 forbids. A refusal and a gate breach both
-              arrive here as the one sentence § 7 writes once. */}
-          {deduced.solve !== null && cause === null && (
-            <>
-              {driver !== "L0" && (
-                <ReadOut
-                  help={DEDUCED_HELP.L0}
-                  label="Longueur non tendue"
-                  value={formatQuantity("L0", deduced.solve.L0)}
-                />
-              )}
-              {driver !== "H_target" && (
-                <ReadOut
-                  help={DEDUCED_HELP.H}
-                  label="Prétension"
-                  value={formatQuantity("H_target", deduced.solve.H, unit)}
-                />
-              )}
-              {driver !== "D_target" && (
-                <ReadOut
-                  help={DEDUCED_HELP.sag}
-                  label="Flèche à vide"
-                  value={`${formatQuantity("sag", deduced.solve.sag)} (à x ${formatValue(
-                    "extremumX",
-                    deduced.solve.sagAtX,
-                  )} m)`}
-                />
-              )}
-              <ReadOut
-                help={DEDUCED_HELP.sagRatio}
-                label="Flèche / portée"
-                value={formatQuantity("sagRatio", deduced.solve.sagRatio)}
-                warning={rung("sagRatio")}
-              />
-              <ReadOut
-                help={DEDUCED_HELP.standingTension}
-                label="Tension permanente"
-                value={`${formatQuantity("standingTension", deduced.solve.standingTension)} ${
-                  scenario.material.family === "steel" ? "MBF" : "MBL"
-                }`}
-                warning={rung("standingTension")}
-              />
-            </>
-          )}
+          {readOuts
+            .filter((row) => row.group === "line")
+            .map((row) => (
+              <DeducedReadOut key={row.id} row={row} />
+            ))}
 
           {/* § 7's third echo. The cause sentence is written **once** and repeated in each
               suppressed region, because the Rail is one scrolling column and a rail reader may
@@ -858,6 +742,18 @@ export function RailInputs({
         </div>
       </RailSection>
     </RailRow.Provider>
+  );
+}
+
+/** One read-only `Valeurs déduites` row, decided whole by `deducedRows`. */
+function DeducedReadOut({ row }: { row: ReadOutRow }) {
+  return (
+    <ReadOut
+      help={DEDUCED_HELP[row.id]}
+      label={row.label}
+      value={row.value}
+      warning={row.warning}
+    />
   );
 }
 

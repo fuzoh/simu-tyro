@@ -35,11 +35,10 @@ import type { LinkArrival } from "@/lib/app/state.ts";
 import type { QuantityId } from "@/lib/format/quantity.ts";
 import type { FieldId } from "@/lib/rail/fields.ts";
 import type { ForceUnit } from "@/lib/scenario/types.ts";
-import type { SteelSpec, TextileSpec } from "@/lib/sim";
 import type { DroppedKey, SearchKey, TerminationToken, ValidatedSearch } from "@/lib/url/schema.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
-import { FIELDS, lowerFirst } from "@/lib/rail/fields.ts";
+import { CONSTRUCTION_LABEL, FIELDS, lowerFirst, ROPE_CLASS_LABEL } from "@/lib/rail/fields.ts";
 import { TERMINATIONS } from "@/lib/sim";
 import {
   CONSTRUCTION_TOKEN_BY_ID,
@@ -133,25 +132,19 @@ function isStripKey(key: string): key is StripKey {
   return Object.hasOwn(KEYS, key);
 }
 
-/** One French label per domain value, so a fourth class or construction fails to compile here. */
-const CONSTRUCTION_LABEL = {
-  "fibre-core": "âme textile",
-  iwrc: "âme métallique",
-} as const satisfies Record<SteelSpec["construction"], string>;
-
-const ROPE_CLASS_LABEL = {
-  hmpe: "HMPE 12 torons",
-  "pa-en1891a": "polyamide EN 1891 type A",
-  polyester: "polyester semi-statique",
-} as const satisfies Record<TextileSpec["ropeClass"], string>;
-
-/** A token → label table, walked through the domain → token table the URL already owns. */
+/**
+ * A token → label table, walked through the domain → token table the URL already owns. The labels
+ * are the Rail's own, lowered because the strip prints them mid-sentence.
+ */
 function labelsByToken<Id extends string>(
   tokenById: Readonly<Record<Id, string>>,
   labelById: Readonly<Record<Id, string>>,
 ): Readonly<Record<string, string>> {
   return Object.fromEntries(
-    (Object.keys(tokenById) as Id[]).map((id): [string, string] => [tokenById[id], labelById[id]]),
+    (Object.keys(tokenById) as Id[]).map((id): [string, string] => [
+      tokenById[id],
+      lowerFirst(labelById[id]),
+    ]),
   );
 }
 
