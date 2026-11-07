@@ -8,10 +8,11 @@
  * each ran `deduceValues` — an unloaded solve plus a 2400-sample sag scan — **twice** per parameter
  * change. It is lifted here and handed to both.
  *
- * **`rider` is deliberately not a dependency.** {@link deduceValues} reads `material`, `geometry`,
- * `anchors`, `tightness` and the trace, and nothing else — the whole point of § 6's split is that
- * these are the consequences of the Tightness Spec *without* a rider. Keying on the whole Scenario
- * would re-solve on every `pointermove` of a scrub, which dispatches a fresh Scenario per frame.
+ * **The rider is a dependency only through `rider.mp`.** {@link deduceValues} reads `material`,
+ * `geometry`, `anchors`, `tightness`, the trace, `unit` (the Stale Badge compares at display
+ * precision) and `rider.mp` (Rapport V resolves `L₀` against the passenger mass), and nothing else.
+ * Keying on the whole Scenario would re-solve on every `pointermove` of a scrub, which dispatches
+ * a fresh Scenario per frame; `x_D` and the other rider fields stay out.
  */
 
 import { useMemo } from "react";
@@ -24,13 +25,15 @@ import { useAppState } from "./store.tsx";
 
 export function useDeduced(): Deduced {
   const { scenario, trace } = useAppState();
-  const { anchors, geometry, material, tightness } = scenario;
+  const { anchors, geometry, material, tightness, unit } = scenario;
+  const { mp } = scenario.rider;
 
   return useMemo(
     () => deduceValues(scenario, trace),
-    // The Scenario itself is **not** a dependency: a rider patch merges shallowly, so these five
-    // survive a scrub untouched while `scenario` does not.
+    // The Scenario itself is **not** a dependency: a rider patch merges shallowly, so these
+    // survive a scrub untouched while `scenario` does not. The disable is for that whole-object
+    // argument only; every field the function reads is listed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [anchors, geometry, material, tightness, trace],
+    [anchors, geometry, material, tightness, unit, mp, trace],
   );
 }
