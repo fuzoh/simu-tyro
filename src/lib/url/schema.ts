@@ -69,7 +69,7 @@ import type { SearchMiddleware } from "@tanstack/react-router";
 import { defaultParseSearch, defaultStringifySearch } from "@tanstack/react-router";
 import * as v from "valibot";
 
-import type { ForceUnit, Scenario } from "@/lib/scenario/types.ts";
+import type { Scenario } from "@/lib/scenario/types.ts";
 import type { RegimeId, TerminationId } from "@/lib/sim";
 
 import { FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
@@ -126,7 +126,7 @@ export const CANONICAL_KEYS = [
 /** One of § 7's ~30 readable flat keys. */
 export type SearchKey = (typeof CANONICAL_KEYS)[number];
 
-/** § 7's `u` tokens. Identical to {@link ForceUnit} — the URL spells the unit the app spells. */
+/** § 7's `u` tokens. Identical to `ForceUnit` — the URL spells the unit the app spells. */
 export const FORCE_UNIT_TOKENS = ["daN", "kN", "kgf"] as const;
 
 /** § 7's `use` tokens. `perm` is §10.4's restrictive branch. */
@@ -264,68 +264,7 @@ export type ValidatedSearch = {
    * through the address bar, because {@link canonicalLink} emits {@link CANONICAL_KEYS} only.
    */
   readonly refused?: LinkRefusal;
-  /** Schema version. Absent ⇒ 1; anything but 1 refuses the whole link. */
-  readonly v?: 1;
-  /** Display unit. Changes no number's meaning anywhere. */
-  readonly u?: ForceUnit;
-  readonly use?: UseToken;
-  /** Absent **is** « — choisir — », never a fallback to be filled in. */
-  readonly reg?: RegimeId;
-  /** Portée, m — manual geometry only. */
-  readonly L?: number;
-  /** Dénivelé, m — manual geometry only. */
-  readonly h?: number;
-  /** Station A, m in file coordinates — imported geometry only. */
-  readonly sa?: number;
-  /** Station B, m in file coordinates — imported geometry only. `L = sb − sa`. */
-  readonly sb?: number;
-  /** Hauteur d'ancrage A, m. */
-  readonly za?: number;
-  /** Hauteur d'ancrage B, m. */
-  readonly zb?: number;
-  /** Flèche à vide cible, m. */
-  readonly fl?: number;
-  /** Prétension cible, **daN**. */
-  readonly te?: number;
-  /** Longueur non tendue, m. */
-  readonly lo?: number;
-  /** « Rapport V » `P / H`, dimensionless. Presence selects the driver, like the three above. */
-  readonly vr?: number;
-  readonly fam?: FamilyToken;
-  /** Diamètre nominal, mm — acier. */
-  readonly d?: number;
-  readonly r0?: (typeof GRADES)[number];
-  readonly cst?: ConstructionToken;
-  /** `MBF` surchargée, **daN** — acier. Absent = non surchargée. */
-  readonly mbf?: number;
-  /** `EA` surchargée, **daN** — acier. Absent = non surchargée. */
-  readonly ea?: number;
-  /** Masse linéique, kg/m — surcharge acier *or* saisie textile; `fam` fixes which. */
-  readonly mu?: number;
-  readonly cls?: RopeClassToken;
-  /** Charge de rupture, **daN** — textile. */
-  readonly mbl?: number;
-  /** Raideur relative `EA/MBL` — textile. */
-  readonly k?: number;
-  readonly ta?: TerminationToken;
-  readonly tb?: TerminationToken;
-  /** `η_t` A. */
-  readonly na?: number;
-  /** `η_t` B. */
-  readonly nb?: number;
-  /** Masse passager, kg. */
-  readonly mp?: number;
-  /** Enveloppe passager, m. */
-  readonly hr?: number;
-  /** Garde min. admise, m (2026-09-23). */
-  readonly gm?: number;
-  /** Coefficient dynamique. */
-  readonly daf?: number;
-  /** Position du passager, m — clamped to `[0, L]` by the store, **never here**. */
-  readonly x?: number;
-  /** The `p1.` payload, verbatim — imported geometry only. */
-  readonly tr?: string;
-};
+} & Readonly<Partial<{ [K in SearchKey]: v.InferOutput<(typeof KEY_SCHEMAS)[K]> }>>;
 
 /**
  * A finite number, and nothing else. `v.number()` already refuses `NaN`; `v.finite()` adds the two
@@ -336,46 +275,50 @@ const FINITE = v.pipe(v.number(), v.finite());
 /**
  * One schema per key, § 7's key table transcribed. Applied **per key**, never as an object schema:
  * an object schema fails whole, and the required behaviour is per-key salvage with a report.
+ *
+ * `ValidatedSearch` is derived from this table; the per-key notes live on the entries.
  */
-const KEY_SCHEMAS: Record<SearchKey, v.GenericSchema> = {
-  v: v.literal(1),
-  u: v.picklist(FORCE_UNIT_TOKENS),
+const KEY_SCHEMAS = {
+  v: v.literal(1), // Schema version. Absent ⇒ 1; anything but 1 refuses the whole link.
+  u: v.picklist(FORCE_UNIT_TOKENS), // Display unit. Changes no number's meaning anywhere.
   use: v.picklist(USE_TOKENS),
+  // Absent **is** « — choisir — », never a fallback to be filled in.
   reg: v.picklist(REGIME_TOKENS),
-  L: FINITE,
-  h: FINITE,
-  sa: FINITE,
-  sb: FINITE,
-  za: FINITE,
-  zb: FINITE,
-  fl: FINITE,
-  te: FINITE,
-  lo: FINITE,
+  L: FINITE, // Portée, m — manual geometry only.
+  h: FINITE, // Dénivelé, m — manual geometry only.
+  sa: FINITE, // Station A, m in file coordinates — imported geometry only.
+  sb: FINITE, // Station B, m in file coordinates — imported geometry only. `L = sb − sa`.
+  za: FINITE, // Hauteur d'ancrage A, m.
+  zb: FINITE, // Hauteur d'ancrage B, m.
+  fl: FINITE, // Flèche à vide cible, m.
+  te: FINITE, // Prétension cible, **daN**.
+  lo: FINITE, // Longueur non tendue, m.
+  // « Rapport V » `P / H`, dimensionless. Presence selects the driver, like the three above.
   vr: FINITE,
   fam: v.picklist(FAMILY_TOKENS),
-  d: FINITE,
+  d: FINITE, // Diamètre nominal, mm — acier.
   r0: v.picklist(GRADES),
   cst: v.picklist(CONSTRUCTION_TOKENS),
-  mbf: FINITE,
-  ea: FINITE,
-  mu: FINITE,
+  mbf: FINITE, // `MBF` surchargée, **daN** — acier. Absent = non surchargée.
+  ea: FINITE, // `EA` surchargée, **daN** — acier. Absent = non surchargée.
+  mu: FINITE, // Masse linéique, kg/m — surcharge acier *or* saisie textile; `fam` fixes which.
   cls: v.picklist(ROPE_CLASS_TOKENS),
-  mbl: FINITE,
-  k: FINITE,
+  mbl: FINITE, // Charge de rupture, **daN** — textile.
+  k: FINITE, // Raideur relative `EA/MBL` — textile.
   ta: v.picklist(TERMINATION_TOKENS),
   tb: v.picklist(TERMINATION_TOKENS),
-  na: FINITE,
-  nb: FINITE,
-  mp: FINITE,
-  hr: FINITE,
-  gm: FINITE,
-  daf: FINITE,
-  x: FINITE,
+  na: FINITE, // `η_t` A.
+  nb: FINITE, // `η_t` B.
+  mp: FINITE, // Masse passager, kg.
+  hr: FINITE, // Enveloppe passager, m.
+  gm: FINITE, // Garde min. admise, m (2026-09-23).
+  daf: FINITE, // Coefficient dynamique.
+  x: FINITE, // Position du passager, m — clamped to `[0, L]` by the store, **never here**.
   // `tr` is validated **structurally** by the codec, not by valibot: sentinel, base64url alphabet,
   // varint walk, declared `n` against bytes consumed, character budget. A structural failure is a
   // refusal, not a salvage, so it is handled in {@link refuse} rather than here.
   tr: v.string(),
-};
+} satisfies Record<SearchKey, v.GenericSchema>;
 
 /** Set membership, hoisted out of the per-request path — `validateSearch` runs 3× per request. */
 const KEY_SET: ReadonlySet<string> = new Set<string>(CANONICAL_KEYS);
@@ -394,8 +337,8 @@ const SCENARIO_KEY_SET: ReadonlySet<string> = new Set<string>(
  * - `version-inconnue` — « version de schéma inconnue (v = 3) »
  * - `tracé-illisible` — « tracé illisible »
  * - `tracé-hors-budget` — « tracé trop volumineux pour cette adresse »
- * - `deux-directeurs` — « flèche, prétension et longueur non tendue : deux valeurs de tension dans
- *   le même lien »
+ * - `deux-directeurs` — « flèche à vide cible, prétension cible, longueur non tendue et rapport V
+ *   cible : deux valeurs de tension dans le même lien »
  */
 export const REFUSAL_KINDS = [
   "version-inconnue",

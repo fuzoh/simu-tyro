@@ -42,6 +42,20 @@ describe("§ 8's first sentence — each dropped key with its reason", () => {
   });
 });
 
+describe("§ 8's first sentence — the `vr` and `gm` keys are named like every other key", () => {
+  test("an unreadable `gm` names the minimum clearance", () => {
+    expect(strip("?L=250&gm=abc")?.ignored).toBe(
+      "Une partie du lien a été ignorée : « gm » n'était pas un nombre (garde min. admise ignorée).",
+    );
+  });
+
+  test("an unreadable `vr` names Rapport V", () => {
+    expect(strip("?L=250&vr=abc")?.ignored).toBe(
+      "Une partie du lien a été ignorée : « vr » n'était pas un nombre (rapport V cible ignoré).",
+    );
+  });
+});
+
 describe("§ 8's second sentence — the completion names the values", () => {
   test("it prints every number the recipient got, at display precision", () => {
     const sentence = strip("?L=250&h=-40")?.completed ?? "";
@@ -52,6 +66,10 @@ describe("§ 8's second sentence — the completion names the values", () => {
     // § 9's `x` is the one non-literal completion: `L/2` of the **completed** span.
     expect(sentence).toContain("position du passager 125,0 m");
     expect(sentence).toMatch(/\.$/);
+  });
+
+  test("the minimum clearance, a safety criterion, is named with its value", () => {
+    expect(strip("?L=250&h=-40")?.completed).toContain("garde min. admise 1,0 m");
   });
 
   test("a token-valued completion is French, never the wire token", () => {
