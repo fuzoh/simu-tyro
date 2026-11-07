@@ -30,10 +30,17 @@ import type { Deduced } from "@/lib/rail/deduced.ts";
 import type { FieldId, FieldIssue } from "@/lib/rail/fields.ts";
 import type { GateReport } from "@/lib/rail/gates.ts";
 import type { RailValues } from "@/lib/rail/values.ts";
+import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 
 import { checkField } from "@/lib/rail/fields.ts";
 import { evaluateGates, isFieldActive } from "@/lib/rail/gates.ts";
-import { fieldContext, NUMERIC_FIELDS, railValues } from "@/lib/rail/values.ts";
+import {
+  fieldContext,
+  GATED_FIELDS,
+  NUMERIC_FIELDS,
+  railValues,
+  sameGatedText,
+} from "@/lib/rail/values.ts";
 
 import { useAppState } from "./store.tsx";
 
@@ -52,13 +59,17 @@ export type RailFormState = {
   /** Which field holds the caret, or `null`. **Focus, never `isTouched`.** */
   readonly focused: FieldId | null;
   readonly setFocused: (id: FieldId | null) => void;
-  /** Tier one's standing failures: text a Scenario of numbers cannot hold. */
+  /** Tier one's standing failures in the gated fields: text a Scenario of numbers cannot hold. */
   readonly issues: readonly FieldIssue[];
   /** The three gates over the Scenario **and** that text — the one report every surface reads. */
   readonly report: GateReport;
 };
 
-export function useRailForm(deduced: Deduced): RailFormState {
+/**
+ * @param traverse `useTraverse`'s Scenario without `x_D`: the gates read nothing else, so a scrub
+ *   leaves the report identical.
+ */
+export function useRailForm(deduced: Deduced, traverse: TraverseScenario): RailFormState {
   const { scenario, trace } = useAppState();
 
   const [focused, setFocused] = useState<FieldId | null>(null);
@@ -66,6 +77,8 @@ export function useRailForm(deduced: Deduced): RailFormState {
 
   const form = useRailFormApi(values);
   const text = useStore(form.store, (store) => store.values);
+  // Current in every gated field only: a scrub rewrites `x_D`'s text and must not move tier one.
+  const gatedText = useStore(form.store, (store) => store.values, sameGatedText);
 
   // Store → form, one way, and **only where the store's own value moved**. Comparing against the
   // previous *state* rendering rather than against the field's text is what lets a committed-invalid
@@ -85,18 +98,18 @@ export function useRailForm(deduced: Deduced): RailFormState {
   // Tier one, over the text the form currently holds. The gates take it beside the Scenario,
   // because an emptied field and « 12,3,4 » are states a Scenario of numbers cannot represent.
   const issues = useMemo(() => {
-    const context = fieldContext(scenario, trace);
-    return NUMERIC_FIELDS.filter((id) => isFieldActive(id, scenario)).flatMap(
-      (id) => checkField(id, text[id] ?? "", context) ?? [],
+    const context = fieldContext(traverse, trace);
+    return GATED_FIELDS.filter((id) => isFieldActive(id, traverse)).flatMap(
+      (id) => checkField(id, gatedText[id] ?? "", context) ?? [],
     );
-  }, [text, scenario, trace]);
+  }, [gatedText, traverse, trace]);
 
   // Memoised because A11 made the report a **memo key**: the results, the scene's suppression and
   // the banner all hang off it, and a fresh object per render would re-run `evaluateVerdict` over
-  // 260 steps on every keystroke — the one measured cost in the app.
+  // 260 steps on every keystroke and every scrub frame — the one measured cost in the app.
   const report = useMemo(
-    () => evaluateGates({ scenario, trace, issues }),
-    [scenario, trace, issues],
+    () => evaluateGates({ scenario: traverse, trace, issues }),
+    [traverse, trace, issues],
   );
 
   return { form, text, focused, setFocused, issues, report };

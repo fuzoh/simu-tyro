@@ -12,6 +12,7 @@ import {
   drivingField,
   NUMERIC_FIELDS,
   railValues,
+  sameGatedText,
   switchTightness,
   withOverride,
 } from "./values.ts";
@@ -96,6 +97,19 @@ describe("railValues — the read direction of the force selector", () => {
     expect(values.sb).toBe("200,0");
     expect(values.L).toBe("");
     expect(values.h).toBe("");
+  });
+});
+
+describe("sameGatedText — the text tier one reads, through a scrub", () => {
+  const shown = railValues(scenario());
+
+  test("a bag that moved only `x_D` holds the same gated text", () => {
+    expect(sameGatedText(shown, { ...shown, xD: "12,5" })).toBe(true);
+  });
+
+  test("a bag that moved a gated field does not", () => {
+    expect(sameGatedText(shown, { ...shown, hClearMin: "3,00" })).toBe(false);
+    expect(sameGatedText(shown, { ...shown, L: "" })).toBe(false);
   });
 });
 

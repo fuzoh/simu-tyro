@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { RegimeId, SweepStep, VerdictInput } from "@/lib/sim";
@@ -525,5 +525,69 @@ describe("« Garde min. admise » — the clearance row judges itself (2026-09-2
     expect(clearanceBreached(0.8, 0)).toBe(false);
     expect(clearanceBreached(0.8, -1)).toBe(false);
     expect(clearanceBreached(Number.POSITIVE_INFINITY, 1)).toBe(false);
+  });
+});
+
+describe("a scrub re-derives nothing — `vi.mock` on the engine barrel", () => {
+  /**
+   * React's `useMemo`, as far as the app root goes: recompute when any key moved under
+   * `Object.is`. Vitest renders no hook, so the chain `useTraverse` → `useRailForm`'s report →
+   * `useResults` is rebuilt here from the same calls and the same keys.
+   */
+  function memo<T>(): (compute: () => T, keys: readonly unknown[]) => T {
+    let held: { keys: readonly unknown[]; value: T } | null = null;
+    return (compute, keys) => {
+      if (held === null || keys.some((key, i) => !Object.is(key, held?.keys[i]))) {
+        held = { keys, value: compute() };
+      }
+      return held.value;
+    };
+  }
+
+  test("ten `x_D` patches run `evaluateVerdict` once; a garde edit runs it again", async () => {
+    vi.resetModules();
+    const spies: { evaluateVerdict?: ReturnType<typeof vi.fn> } = {};
+    vi.doMock("@/lib/sim", async () => {
+      const sim = await vi.importActual<typeof import("@/lib/sim")>("@/lib/sim");
+      spies.evaluateVerdict = vi.fn<typeof sim.evaluateVerdict>(sim.evaluateVerdict);
+      return { ...sim, evaluateVerdict: spies.evaluateVerdict };
+    });
+    const { deriveResults: derive } = await import("./results.ts");
+    const { evaluateGates } = await import("./gates.ts");
+    const { traverseInputs, traverseScenario } = await import("@/lib/scenario/traverse.ts");
+
+    let scenario: ScenarioDraft = { ...SHIPPED, regime: "en15567" };
+    // The scene's memo keys on `mp` and `hRider` alone, so neither patch below moves it.
+    const base = solvedTraverseOf(scenario);
+    const traverseMemo = memo<ReturnType<typeof traverseScenario>>();
+    const reportMemo = memo<ReturnType<typeof evaluateGates>>();
+    const resultsMemo = memo<Results | null>();
+    const render = () => {
+      const inputs = traverseInputs(scenario);
+      const traverse = traverseMemo(() => traverseScenario(inputs), Object.values(inputs));
+      const report = reportMemo(
+        () => evaluateGates({ scenario: traverse, trace: null }),
+        [traverse, null],
+      );
+      return resultsMemo(
+        () => derive({ scenario: traverse, trace: null, base, report }),
+        [traverse, null, base, report],
+      );
+    };
+
+    const first = render();
+    expect(first?.verdict).not.toBeNull();
+    for (let step = 1; step <= 10; step++) {
+      scenario = { ...scenario, rider: { ...scenario.rider, xD: step * 13.5 } };
+      expect(render()).toBe(first);
+    }
+    expect(spies.evaluateVerdict).toHaveBeenCalledTimes(1);
+
+    scenario = { ...scenario, rider: { ...scenario.rider, hClearMin: 3 } };
+    expect(render()).not.toBe(first);
+    expect(spies.evaluateVerdict).toHaveBeenCalledTimes(2);
+
+    vi.doUnmock("@/lib/sim");
+    vi.resetModules();
   });
 });

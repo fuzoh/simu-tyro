@@ -29,6 +29,7 @@
  *   from the one that was asked for.
  */
 
+import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 import type { Geometry, ScenarioDraft, TightnessDraft } from "@/lib/scenario/types.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
@@ -41,7 +42,7 @@ import type { Deduced, DeducedSolve } from "./deduced.ts";
 import type { FieldContext, FieldId } from "./fields.ts";
 
 import { deduceValues } from "./deduced.ts";
-import { displayField } from "./fields.ts";
+import { displayField, FIELDS } from "./fields.ts";
 import { isFieldActive } from "./gates.ts";
 
 /**
@@ -81,8 +82,19 @@ export type NumericFieldId = (typeof NUMERIC_FIELDS)[number];
 /** The form's value bag: one string per numeric field, `""` where the state holds no value. */
 export type RailValues = Record<NumericFieldId, string>;
 
+/** The numeric fields a gate reads: all but `x_D`, which sits in no gate. */
+export const GATED_FIELDS = NUMERIC_FIELDS.filter((id) => FIELDS[id].gate !== null);
+
+/**
+ * Do two value bags hold the same text in every gated field? A scrub writes `x_D`'s text on every
+ * frame, and tier one read off a bag compared this way keeps its identity through it.
+ */
+export function sameGatedText(a: RailValues, b: RailValues): boolean {
+  return GATED_FIELDS.every((id) => a[id] === b[id]);
+}
+
 /** Everything tier one needs beside a field's own text, gathered once from the Scenario. */
-export function fieldContext(scenario: ScenarioDraft, trace: Trace | null): FieldContext {
+export function fieldContext(scenario: TraverseScenario, trace: Trace | null): FieldContext {
   return {
     unit: scenario.unit,
     ropeClass: scenario.material.family === "textile" ? scenario.material.ropeClass : undefined,
