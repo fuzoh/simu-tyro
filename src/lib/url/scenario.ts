@@ -33,6 +33,7 @@ import type { SteelSpec, TerminationId, TextileSpec } from "@/lib/sim";
 import { tightnessDriver } from "@/lib/rail/values.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 import { clampX } from "@/lib/scenario/geometry.ts";
+import { TERMINATIONS, TEXTILE } from "@/lib/sim";
 
 import type {
   AcceptedSearch,
@@ -184,7 +185,10 @@ type CompletedSteel = { readonly fam: "ac" } & Pick<SearchValues, "d" | "r0" | "
   Partial<Pick<SearchValues, "mbf" | "ea" | "mu">> &
   Absent<"cls" | "mbl" | "k">;
 
-/** The textile keys, `mbl`/`mu`/`k` optional because a rope nobody typed is § 9's blanks. */
+/**
+ * The textile keys, `mbl`/`mu` optional because a rope nobody typed is § 9's blanks, and `k`
+ * because polyester ships it blank.
+ */
 type CompletedTextile = { readonly fam: "tx" } & Pick<SearchValues, "cls"> &
   Partial<Pick<SearchValues, "mbl" | "mu" | "k">> &
   Absent<"d" | "r0" | "cst" | "mbf" | "ea">;
@@ -206,7 +210,7 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
 /**
  * The keys whose **absence is meaning**, never completed. `reg` absent is « — choisir — »,
  * `mbf`/`ea`/`mu` absent is « non surchargée », which differs from « equal to the formula value »,
- * and `mbl`/`k` absent — with `mu`, under `fam=tx` — is § 9's rope nobody typed.
+ * and `mbl` absent — with `mu`, under `fam=tx` — is § 9's rope nobody typed.
  */
 const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>([
   "reg",
@@ -214,7 +218,6 @@ const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>([
   "ea",
   "mu",
   "mbl",
-  "k",
 ]);
 
 /** Membership, hoisted: the driver test runs once per key of every completed link. */
@@ -259,15 +262,18 @@ export type Completion = {
  *
  * 1. {@link NEVER_COMPLETED}: `reg`, the Overrides and the textile blanks. Under `fam=tx` **no rope
  *    is invented**: § 9 ships `MBL` and `μ` « vides et requis », because one made-up `MBL` decides
- *    the verdict, and those two blocking errors are the correct arrival state.
+ *    the verdict, and those two blocking errors are the correct arrival state. Polyester's `k`
+ *    stays blank too, because §13.2 publishes none.
  * 2. The **inactive** terrain source. `tr` present ⇒ imported: `L`/`h` are derived read-outs and
  *    are dropped rather than completed; `tr` absent ⇒ manual, and `sa`/`sb` never appear.
  * 3. The **inactive** family's keys, dropped the same way.
  *
- * Three keys complete from the link rather than from a constant. An imported link's `sa`
+ * Some keys complete from the link rather than from a constant. An imported link's `sa`
  * completes to {@link FILE_ORIGIN} and its `sb` to `sa` plus the shipped span. `x` completes to
  * half the *completed* span — 125,0 m for `?L=250&h=-40` rather than the constant 75,0 — because
  * it selects a **view**, and a viewpoint off the end of the span is worse than a moved viewpoint.
+ * `na`/`nb` complete to the decoded end's own `η`, so `?ta=huit` is judged on the knot's 0,60 and
+ * not on the shipped end's 0,90, and `k` completes to the decoded rope class's `TEXTILE.kDefault`.
  *
  * @param search an accepted bag. Only meaningful when `hasScenarioKey` is true: a bare `/`
  *   restores the Session and is never rewritten. A refused link never reaches here, because
@@ -305,15 +311,28 @@ export function completeFromDefaults(search: AcceptedSearch): Completion {
   return { search: out as CompletedSearch, completed };
 }
 
-/** What each absent key of this link completes to: the active family's bag, plus the three rules. */
+/** What each absent key of this link completes to: the active family's bag, plus the link rules. */
 function completionValues(search: AcceptedSearch, family: FamilyToken): AcceptedSearch {
+  const shipped = SHIPPED_BY_FAMILY[family];
   const firstRun = FIRST_RUN_SCENARIO.geometry;
   const sa = search.sa ?? FILE_ORIGIN;
   const terrain: CompletedTerrain =
     search.tr === undefined
       ? { L: search.L ?? firstRun.L, h: search.h ?? firstRun.h }
       : { tr: search.tr, sa, sb: search.sb ?? sa + firstRun.L };
-  return { ...SHIPPED_BY_FAMILY[family], ...terrain, x: spanOf(terrain) / 2 };
+  const lineFamily = family === "tx" ? "textile" : "steel";
+  const eta = (token: TerminationToken) =>
+    TERMINATIONS[terminationIdFromToken(token, lineFamily)].eta;
+  const cls = search.cls ?? shipped.cls;
+  const k = cls === undefined ? null : TEXTILE.kDefault[ROPE_CLASS_ID_BY_TOKEN[cls]];
+  return {
+    ...shipped,
+    ...terrain,
+    na: eta(search.ta ?? shipped.ta),
+    nb: eta(search.tb ?? shipped.tb),
+    ...(k === null ? {} : { k }),
+    x: spanOf(terrain) / 2,
+  };
 }
 
 /**
@@ -381,7 +400,7 @@ function steel(search: CompletedSteel): SteelSpec {
   return Object.keys(overrides).length === 0 ? spec : { ...spec, overrides };
 }
 
-/** The textile arm — a **draft**: `mbl`, `mu` and `k` absent are § 9's blanks, not zeros. */
+/** The textile arm — a **draft**: `mbl`, `mu` and polyester's `k` absent are § 9's blanks. */
 function textile(search: CompletedTextile): TextileDraft {
   return {
     family: "textile",
@@ -510,25 +529,27 @@ const FIRST_RUN_SEARCH: CompletedSearch = scenarioToSearch(FIRST_RUN_SCENARIO);
 
 /**
  * The textile keys a shipped default completes: the rope class and both ends, read from the
- * retained textile default because the first-run Scenario is steel. `mbl`, `mu` and `k` stay blank
- * on purpose.
+ * retained textile default because the first-run Scenario is steel. `mbl` and `mu` stay blank on
+ * purpose; `k` is completed in {@link completionValues} from the decoded class's
+ * `TEXTILE.kDefault`, and stays blank only for polyester.
  */
 const { spec: TEXTILE_SPEC, terminations: TEXTILE_ENDS } = FIRST_RUN_RETAINED_TEXTILE;
 
 /**
  * Each family's completion source. The textile bag overlays the steel first-run one, so every key
  * a textile link can lack — the class and the ends — comes from the textile default, and the steel
- * keys left beneath it are out of the textile configuration and never read.
+ * keys left beneath it are out of the textile configuration and never read. The `η` the steel bag
+ * carries is replaced in {@link completionValues}, which reads it off the end the link decodes to.
  */
-const SHIPPED_BY_FAMILY: Readonly<Record<FamilyToken, AcceptedSearch>> = {
+const SHIPPED_BY_FAMILY: Readonly<
+  Record<FamilyToken, AcceptedSearch & Pick<SearchValues, "ta" | "tb">>
+> = {
   ac: FIRST_RUN_SEARCH,
   tx: {
     ...FIRST_RUN_SEARCH,
     cls: ROPE_CLASS_TOKEN_BY_ID[TEXTILE_SPEC.ropeClass],
     ta: TERMINATION_TOKEN_BY_ID[TEXTILE_ENDS.A.id],
     tb: TERMINATION_TOKEN_BY_ID[TEXTILE_ENDS.B.id],
-    na: TEXTILE_ENDS.A.eta,
-    nb: TEXTILE_ENDS.B.eta,
   },
 };
 

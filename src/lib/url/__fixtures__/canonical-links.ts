@@ -319,15 +319,15 @@ export const DECODE_ONLY_LINKS: readonly DecodeOnlyFixture[] = [
       "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=0",
   },
   {
-    name: "textile with MBL, mu and k left blank",
+    name: "textile with MBL and mu left blank",
     source: MEASURED,
     covers: ["textile", "textile-blanks"],
     link:
-      "/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&fam=tx&cls=hmpe" +
+      "/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&fam=tx&cls=hmpe&k=22" +
       "&ta=oeil&tb=epissure&na=0.9&nb=0.85&mp=120&hr=2.1&gm=1&daf=1.2&x=75",
     scenario: {
       ...TEXTILE,
-      material: { family: "textile", ropeClass: "hmpe", MBL: null, mu: null, k: null },
+      material: { family: "textile", ropeClass: "hmpe", MBL: null, mu: null, k: 22 },
     },
     canonical: null,
   },

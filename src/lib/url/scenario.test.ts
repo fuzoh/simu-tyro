@@ -1,5 +1,5 @@
 import { defaultStringifySearch } from "@tanstack/react-router";
-import { describe, expect, it, test, vi } from "vitest";
+import { describe, expect, it, test } from "vitest";
 
 import type { Scenario } from "@/lib/scenario/types.ts";
 
@@ -177,10 +177,10 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
     for (const key of ["sa", "sb", "tr"] satisfies SearchKey[]) expect(key in search).toBe(false);
   });
 
-  test("`fam=tx` completes no steel key and invents no rope — `MBL`, `μ` and `k` stay blank", () => {
+  test("`fam=tx` completes no steel key and invents no rope — `MBL` and `μ` stay blank", () => {
     const { search } = complete("?L=250&fam=tx");
     expect(search.fam).toBe("tx");
-    for (const key of ["d", "r0", "cst", "mbl", "mu", "k"] satisfies SearchKey[]) {
+    for (const key of ["d", "r0", "cst", "mbl", "mu"] satisfies SearchKey[]) {
       expect(key in search).toBe(false);
     }
   });
@@ -205,36 +205,36 @@ describe("completion follows the active family and names every key it fills", ()
     expect(scenario.terminations).toEqual(FIRST_RUN_RETAINED_TEXTILE.terminations);
   });
 
-  test("a textile link's `na`/`nb` complete from the textile default's own η", async () => {
-    // Both shipped defaults carry η 0,90, so only an injected textile default can tell the sources
-    // apart.
-    vi.resetModules();
-    vi.doMock("@/lib/scenario/first-run.ts", async () => {
-      const firstRun = await vi.importActual<typeof import("@/lib/scenario/first-run.ts")>(
-        "@/lib/scenario/first-run.ts",
-      );
-      return {
-        ...firstRun,
-        FIRST_RUN_RETAINED_TEXTILE: {
-          ...firstRun.FIRST_RUN_RETAINED_TEXTILE,
-          terminations: {
-            A: { id: "oeil-cousu-epissure", eta: 0.8 },
-            B: { id: "oeil-cousu-epissure", eta: 0.75 },
-          },
-        },
-      };
-    });
-    try {
-      const codec = await import("./scenario.ts");
-      const schema = await import("./schema.ts");
-      const accepted = schema.validateSearch(parse("?fam=tx&L=250"));
-      if (accepted.refused !== undefined) throw new Error("?fam=tx&L=250 refused");
-      expect(codec.completeFromDefaults(accepted).search).toMatchObject({ na: 0.8, nb: 0.75 });
-      expect(complete("?fam=ac&L=250").search).toMatchObject({ na: 0.9, nb: 0.9 });
-    } finally {
-      vi.doUnmock("@/lib/scenario/first-run.ts");
-      vi.resetModules();
-    }
+  test("a missing `na`/`nb` takes the decoded end's own η, not the shipped end's 0,90", () => {
+    // §10.3: figure-eight 0,60–0,80, conservative 0,60; bowline 0,55–0,70, conservative 0,55.
+    const knots = complete("?use=tempo&fam=tx&cls=hmpe&ta=huit&tb=chaise");
+    expect(knots.search).toMatchObject({ na: 0.6, nb: 0.55 });
+    expect(knots.completed).toEqual(expect.arrayContaining(["na", "nb"]));
+    // §10.2: wedge socket 0,80 — under steel, and kept as given out of family.
+    expect(complete("?fam=ac&ta=coin").search.na).toBe(0.8);
+    expect(complete("?fam=ac&ta=huit").search.na).toBe(0.6);
+  });
+
+  test("a given `na` is kept beside a completed `nb`", () => {
+    expect(complete("?fam=tx&ta=huit&na=0.7&tb=huit").search).toMatchObject({ na: 0.7, nb: 0.6 });
+  });
+
+  test("a missing `k` takes the rope class's §13.2 default, and is named", () => {
+    const hmpe = complete("?fam=tx&cls=hmpe");
+    expect(hmpe.search.k).toBe(22);
+    expect(hmpe.completed).toContain("k");
+    expect(decode("?fam=tx&cls=pa").material).toMatchObject({ ropeClass: "pa-en1891a", k: 1.5 });
+    expect(complete("?fam=tx").search.k).toBe(22);
+  });
+
+  test("polyester's `k` stays blank — §13.2 publishes none", () => {
+    const { search, completed } = complete("?fam=tx&cls=pes");
+    expect("k" in search).toBe(false);
+    expect(completed).not.toContain("k");
+  });
+
+  test("a given `k` is kept", () => {
+    expect(complete("?fam=tx&cls=hmpe&k=30").search.k).toBe(30);
   });
 
   test("an unknown `cls` is dropped as unreadable and completed with the shipped class", () => {

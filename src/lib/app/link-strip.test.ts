@@ -115,6 +115,13 @@ describe("an unknown rope class is ignored and the default class is named, never
     expect(sentence).not.toContain("Cosse");
   });
 
+  test("a rope link with no `k` names the class's published stiffness and the knot's η", () => {
+    // §13.2: `k` 22 for HMPE; §10.3: figure-eight conservative 0,60, never the shipped 0,90.
+    const sentence = strip("?use=tempo&fam=tx&cls=hmpe&ta=huit")?.completed ?? "";
+    expect(sentence).toContain("raideur relative k 22,0");
+    expect(sentence).toContain("rendement de terminaison A 0,60");
+  });
+
   test("an imported link with no stations names the two it was given", () => {
     const query = `?tr=${TRACE_P1}`;
     expect(strip(query)?.completed).toContain("station A 0,0 m");
