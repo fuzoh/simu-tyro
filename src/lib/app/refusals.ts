@@ -37,6 +37,7 @@
  */
 
 import type { ForceUnit, ScenarioDraft, TightnessDraft } from "@/lib/scenario/types.ts";
+import type { EngineFailure } from "@/lib/scenario/unloaded.ts";
 import type { SolveError, SolveNote } from "@/lib/sim";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
@@ -58,16 +59,8 @@ export type EngineRefusal = {
   readonly diagnostic: boolean;
 };
 
-/**
- * Which half of the rider-free chain refused. The engine's error union is shared by both, so the
- * stage is what tells `resolveL0`'s bracket failure (« Cible inatteignable ») apart from
- * `solveSpan`'s own `no-convergence` (« Calcul impossible ») — ELECTIONS §0.2's « three states,
- * not the two a naive collapse gives ».
- */
-export type SolveStage = "L0" | "span";
-
-/** One engine refusal, with the stage that produced it. `@/lib/rail/deduced.ts` publishes it. */
-export type EngineFailure = { readonly stage: SolveStage; readonly error: SolveError };
+/** A stopped chain that carries an engine error — stage `L0` or `span`, never a gate's stage. */
+type EngineError = Extract<EngineFailure, { readonly error: SolveError }>;
 
 /** The one action a refusal offers, on the one surface that offers it. */
 export const DIAGNOSTIC_ACTION = "Copier le diagnostic";
@@ -95,14 +88,17 @@ export const REFUSAL_CAUSE: Record<RefusalId, string> = {
  *
  * @param unit the global force selector — a bound in tension mode is quoted in the unit the field
  *   the user is editing reads in, which is the whole of « in the driving field's own quantity ».
- * @returns `null` when the failure is **not** one of the three refusals: `invalid-input` on `L`,
- *   `h`, `w`, `EA` or `strength` is a statement about the span, and the three gates own it as a
- *   blocking error on an editable field. A refusal never doubles a field message.
+ * @returns `null` when the failure is **not** one of the three refusals: stages `geometry` and
+ *   `material` are « nothing to solve yet », and `invalid-input` on `L`, `h`, `w`, `EA` or
+ *   `strength` is a statement about the span — the three gates own both as a blocking error on an
+ *   editable field. A refusal never doubles a field message.
  */
 export function engineRefusal(
-  { stage, error }: EngineFailure,
+  failure: EngineFailure,
   { tightness, unit = "daN" }: { tightness: TightnessDraft; unit?: ForceUnit },
 ): EngineRefusal | null {
+  if (failure.error === null) return null;
+  const { stage, error } = failure;
   if (error.kind === "invalid-input") {
     // §5.4's floor, in whichever quantity `resolveL0` re-emitted it. Every other field is tier
     // one's or a gate's, and this module says nothing about it.
@@ -183,7 +179,7 @@ function target(tightness: TightnessDraft, unit: ForceUnit): string {
  * trace.
  */
 export type DiagnosticInput = {
-  readonly failure: EngineFailure;
+  readonly failure: EngineError;
   /** The instant, ISO-8601. **A parameter**, so the payload is a pure function with no clock. */
   readonly at: string;
   /** The build identifier the header carries. */
@@ -250,7 +246,7 @@ export function diagnosticPayload(input: DiagnosticInput): string {
 }
 
 /** The kind and the numbers that kind carries. Three shapes, because the union has three arms. */
-function errorLines({ error }: EngineFailure, span: DiagnosticInput["span"]): readonly string[] {
+function errorLines({ error }: EngineError, span: DiagnosticInput["span"]): readonly string[] {
   if (error.kind === "no-convergence") {
     return [
       key("kind", "no-convergence"),

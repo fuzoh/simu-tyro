@@ -10,7 +10,7 @@
  * draft with blanks has no picture.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Scenario, ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { SweepResult, SweepStep } from "@/lib/sim";
@@ -19,6 +19,7 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { exaggeration, PLOT_ASPECT_BAND, PROFILE_ASPECT, VE_BAND } from "@/lib/layout/contract.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
+import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { CLEARANCE, evaluateClearance } from "@/lib/sim";
 
 import {
@@ -28,7 +29,6 @@ import {
   clampToSpan,
   placeRider,
   polylineAt,
-  sceneInputs,
   snapToStep,
   trajectoryRuns,
 } from "./scene.ts";
@@ -38,6 +38,17 @@ function scene(scenario: ScenarioDraft, trace: Trace | null = null) {
   const built = buildScene({ scenario, trace });
   if (built === null) throw new Error("expected a drawable scene");
   return built;
+}
+
+/** The input half, drawn on the placement the unloaded line carries — the app root's frame. */
+function frameOf(scenario: ScenarioDraft, trace: Trace | null = null) {
+  return buildSceneFrame(deriveUnloaded(unloadedInputs(scenario, trace)).span);
+}
+
+/** The scenario's half, composed as the app root composes it: unloaded line, frame, traverse. */
+function baseOf(scenario: ScenarioDraft, trace: Trace | null = null) {
+  const unloaded = deriveUnloaded(unloadedInputs(scenario, trace));
+  return buildSceneBase(buildSceneFrame(unloaded.span), unloaded, scenario.rider);
 }
 
 /** The scene's auto-fit at the elected plot aspect — `VE = 0,42 × (x span / z span)`. */
@@ -228,7 +239,7 @@ const ticket39Textile: ScenarioDraft = {
 describe("ticket 41 — the line's minimum against the garde under the passenger", () => {
   /** The solved half a rider is placed on — the `null` arm is « Aucun résultat », not these cases. */
   function solved(scenario: ScenarioDraft) {
-    const built = buildSceneBase(sceneInputs(scenario, null));
+    const built = baseOf(scenario);
     if (built === null) throw new Error("expected a solvable base");
     return built;
   }
@@ -551,10 +562,9 @@ describe("the frame outlives the solve — § 8's « les entrées se dessinent t
       ...firstRunDefaults(),
       material: FIRST_RUN_RETAINED_TEXTILE.spec,
     };
-    const inputs = sceneInputs(draft, null);
-    expect(buildSceneBase(inputs)).toBeNull();
+    expect(baseOf(draft)).toBeNull();
 
-    const frame = buildSceneFrame(inputs);
+    const frame = frameOf(draft);
     if (frame === null) throw new Error("expected a frame");
     expect(frame.L).toBe(150);
     expect(frame.h).toBe(-18);
@@ -572,8 +582,8 @@ describe("the frame outlives the solve — § 8's « les entrées se dessinent t
       ...firstRunDefaults(),
       tightness: { mode: "tension", H_target: 1e12 },
     };
-    expect(buildSceneBase(sceneInputs(draft, null))).toBeNull();
-    expect(buildSceneFrame(sceneInputs(draft, null))).not.toBeNull();
+    expect(baseOf(draft)).toBeNull();
+    expect(frameOf(draft)).not.toBeNull();
   });
 
   it("only l'exception géométrique loses the frame — L, h, and the stations", () => {
@@ -586,8 +596,8 @@ describe("the frame outlives the solve — § 8's « les entrées se dessinent t
       { source: "manual", L: 150, h: Number.NaN },
     ] as const) {
       const draft: ScenarioDraft = { ...firstRunDefaults(), geometry };
-      expect(buildSceneFrame(sceneInputs(draft, null))).toBeNull();
-      expect(buildSceneBase(sceneInputs(draft, null))).toBeNull();
+      expect(frameOf(draft)).toBeNull();
+      expect(baseOf(draft)).toBeNull();
     }
   });
 
@@ -596,17 +606,38 @@ describe("the frame outlives the solve — § 8's « les entrées se dessinent t
       ...firstRunDefaults(),
       geometry: { source: "trace", trace: "p1.stub", sa, sb },
     });
-    expect(buildSceneFrame(sceneInputs(imported(300, 300), trace))).toBeNull();
-    expect(buildSceneFrame(sceneInputs(imported(300, 100), trace))).toBeNull();
-    expect(buildSceneFrame(sceneInputs(imported(100, 300), null))).toBeNull();
-    expect(buildSceneFrame(sceneInputs(imported(100, 300), trace))).not.toBeNull();
+    expect(frameOf(imported(300, 300), trace)).toBeNull();
+    expect(frameOf(imported(300, 100), trace)).toBeNull();
+    expect(frameOf(imported(100, 300), null)).toBeNull();
+    expect(frameOf(imported(100, 300), trace)).not.toBeNull();
+  });
+
+  it("draws the frame on the unloaded line's placement: one terrain derivation", async () => {
+    vi.resetModules();
+    const spies: { deriveTerrain?: ReturnType<typeof vi.fn> } = {};
+    vi.doMock("@/lib/terrain/trace.ts", async () => {
+      const actual =
+        await vi.importActual<typeof import("@/lib/terrain/trace.ts")>("@/lib/terrain/trace.ts");
+      spies.deriveTerrain = vi.fn<typeof actual.deriveTerrain>(actual.deriveTerrain);
+      return { ...actual, deriveTerrain: spies.deriveTerrain };
+    });
+    const sceneModule = await import("./scene.ts");
+
+    const draft: ScenarioDraft = {
+      ...firstRunDefaults(),
+      geometry: { source: "trace", trace: "p1.stub", sa: 100, sb: 300 },
+    };
+    sceneModule.buildScene({ scenario: draft, trace });
+    expect(spies.deriveTerrain).toHaveBeenCalledTimes(1);
+    vi.doUnmock("@/lib/terrain/trace.ts");
+    vi.resetModules();
   });
 
   it("the solved half is built on the frame, and widens its z extent with the traverse", () => {
-    const inputs = sceneInputs(firstRunDefaults(), null);
-    const frame = buildSceneFrame(inputs);
+    const unloaded = deriveUnloaded(unloadedInputs(firstRunDefaults(), null));
+    const frame = buildSceneFrame(unloaded.span);
     if (frame === null) throw new Error("expected a frame");
-    const base = buildSceneBase(inputs, frame);
+    const base = buildSceneBase(frame, unloaded, firstRunDefaults().rider);
     if (base === null) throw new Error("expected a drawable base");
 
     // Same frame, field for field — the frame is not rebuilt with different numbers downstream.
@@ -624,9 +655,6 @@ describe("the frame outlives the solve — § 8's « les entrées se dessinent t
       expect(step.zD).toBeGreaterThanOrEqual(base.zExtent.min);
       expect(step.zD).toBeLessThanOrEqual(base.zExtent.max);
     }
-    // Passing the frame in changes nothing about the result: it is a shared computation, not an
-    // input the caller can disagree with.
-    expect(buildSceneBase(inputs)).toEqual(base);
   });
 });
 
@@ -635,14 +663,41 @@ describe("the split at x_D — § 7's « memo on the solve inputs »", () => {
     const a = firstRunDefaults();
     const b: Scenario = { ...a, rider: { ...a.rider, xD: 12.5 } };
     // The memo key first: `x_D` is a view parameter and appears nowhere in it.
-    expect(sceneInputs(b, null)).toEqual(sceneInputs(a, null));
-    expect(Object.keys(sceneInputs(a, null))).not.toContain("xD");
+    expect(unloadedInputs(b, null)).toEqual(unloadedInputs(a, null));
+    expect(Object.keys(unloadedInputs(a, null))).not.toContain("xD");
     // And therefore the expensive half — sweep + §11 — is the same scene for both.
-    expect(buildSceneBase(sceneInputs(b, null))).toEqual(buildSceneBase(sceneInputs(a, null)));
+    expect(baseOf(b)).toEqual(baseOf(a));
+  });
+
+  it("builds the base on the derived line: one `resolveL0`, one `solveSpan`", async () => {
+    vi.resetModules();
+    const spies: { resolveL0?: ReturnType<typeof vi.fn>; solveSpan?: ReturnType<typeof vi.fn> } =
+      {};
+    vi.doMock("@/lib/sim", async () => {
+      const sim = await vi.importActual<typeof import("@/lib/sim")>("@/lib/sim");
+      spies.resolveL0 = vi.fn<typeof sim.resolveL0>(sim.resolveL0);
+      spies.solveSpan = vi.fn<typeof sim.solveSpan>(sim.solveSpan);
+      return { ...sim, resolveL0: spies.resolveL0, solveSpan: spies.solveSpan };
+    });
+    const unloadedModule = await import("@/lib/scenario/unloaded.ts");
+    const sceneModule = await import("./scene.ts");
+
+    const draft = firstRunDefaults();
+    const unloaded = unloadedModule.deriveUnloaded(unloadedModule.unloadedInputs(draft, null));
+    const base = sceneModule.buildSceneBase(
+      sceneModule.buildSceneFrame(unloaded.span),
+      unloaded,
+      draft.rider,
+    );
+    expect(base).not.toBeNull();
+    expect(spies.resolveL0).toHaveBeenCalledTimes(1);
+    expect(spies.solveSpan).toHaveBeenCalledTimes(1);
+    vi.doUnmock("@/lib/sim");
+    vi.resetModules();
   });
 
   it("re-places the rider over one base, exactly as buildScene would have", () => {
-    const base = buildSceneBase(sceneInputs(firstRunDefaults(), null));
+    const base = baseOf(firstRunDefaults());
     if (base === null) throw new Error("expected a drawable base");
     // A typed position stays exact — the split changes no number, only what re-runs.
     const typed = placeRider(base, 99.7);
@@ -658,7 +713,7 @@ describe("the split at x_D — § 7's « memo on the solve inputs »", () => {
 
   it("carries h_rider on the base, since §11's third term is the scenario's, not the view's", () => {
     const scenario = firstRunDefaults();
-    const base = buildSceneBase(sceneInputs(scenario, null));
+    const base = baseOf(scenario);
     if (base === null) throw new Error("expected a drawable base");
     expect(base.hRider).toBe(scenario.rider.hRider);
     expect(placeRider(base, 75)?.envelope).toBe(scenario.rider.hRider);
@@ -666,7 +721,7 @@ describe("the split at x_D — § 7's « memo on the solve inputs »", () => {
 });
 
 describe("the load against the unloaded line, and its trajectory — the 2026-09-23 layers", () => {
-  const built = buildSceneBase(sceneInputs(firstRunDefaults(), null));
+  const built = baseOf(firstRunDefaults());
   if (built === null) throw new Error("expected a drawable base");
   const base = built;
 

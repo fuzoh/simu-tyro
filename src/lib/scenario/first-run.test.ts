@@ -95,7 +95,7 @@ function openingState(scenario: Scenario) {
 
   const vide = solveSpan(span);
   if (!vide.ok) throw new Error(`expected a solve, got ${JSON.stringify(vide.error)}`);
-  const sag = unloadedSag(vide.state, { L, h });
+  const sag = unloadedSag(vide.state, { L, h }).D;
 
   const traverse = sweep(span, P, RUN.sweepSteps);
 

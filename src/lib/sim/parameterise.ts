@@ -112,12 +112,20 @@ export const PARAMETERISE = {
  *
  * Clamped into `[0, L₀]` and floored at zero: a line taut enough that the vertex falls outside
  * the span has its lowest point *at* an anchor, where the drop below the chord is nil.
+ *
+ * @returns the flèche `D`, m, and the horizontal position `atX`, m, of the vertex it is read at —
+ *   the « (à x 74,8 m) » § 3 prints beside it. Both come off the same closed-form `s`, so the
+ *   position is exact rather than an argmax over samples.
  */
-export function unloadedSag(state: SpanState, span: { L: number; h: number }): number {
+export function unloadedSag(
+  state: SpanState,
+  span: { L: number; h: number },
+): { D: number; atX: number } {
   const vertex = ((state.H * span.h) / span.L - state.V0) / state.w;
   const s = Math.min(Math.max(vertex, 0), state.L0);
-  const drop = (span.h * xAt(state, s)) / span.L - zAt(state, s);
-  return drop > 0 ? drop : 0;
+  const atX = xAt(state, s);
+  const drop = (span.h * atX) / span.L - zAt(state, s);
+  return { D: drop > 0 ? drop : 0, atX };
 }
 
 /**
@@ -367,7 +375,7 @@ function prepare(
       : {
           field: "D_target",
           target,
-          read: (state) => unloadedSag(state, span),
+          read: (state) => unloadedSag(state, span).D,
           falling: false,
           boundKind: "min",
           seed: closedFormSeedL0(span, tensionForSag(span, target)),

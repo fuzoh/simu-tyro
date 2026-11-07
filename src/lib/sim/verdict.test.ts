@@ -79,7 +79,7 @@ function traverseOf(input: SpanInput, P: number, steps: number) {
     coverage: swept.coverage,
     grid: swept.grid,
     Tvide: { TA: vide.state.TA, TB: vide.state.TB },
-    sagRatio: unloadedSag(vide.state, input) / input.L,
+    sagRatio: unloadedSag(vide.state, input).D / input.L,
   };
 }
 

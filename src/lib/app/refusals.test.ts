@@ -323,6 +323,14 @@ describe("`[ Copier le diagnostic ]` — evidence, not UI copy", () => {
   });
 });
 
+describe("stages `geometry` and `material` are « nothing to solve yet », never a refusal", () => {
+  test("neither maps to a surface", () => {
+    const { tightness } = scenario();
+    expect(engineRefusal({ stage: "geometry", error: null }, { tightness })).toBeNull();
+    expect(engineRefusal({ stage: "material", error: null }, { tightness })).toBeNull();
+  });
+});
+
 describe("the injected chain — `vi.mock` on the collaborator, never a widened signature", () => {
   test("a `solveSpan` that will not converge reaches « Calcul impossible »", async () => {
     vi.resetModules();

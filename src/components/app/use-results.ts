@@ -2,7 +2,7 @@
  * The Rail's output half, computed once at the app root — « v1 build spec » § 6 (`Résultats`, the
  * criteria × ends grid) and § 7 (*Le bandeau*, rank 4).
  *
- * Same argument as {@link useSceneBase} and {@link useDeduced}: A10 kept this memo inside
+ * Same argument as {@link useScene} and {@link useDeduced}: A10 kept this memo inside
  * `RailOutputs` while the Rail was its only reader, and A11 gives it a second one — the **verdict
  * sentence is rank 4 of the banner**, and a banner that re-derived it would run `evaluateVerdict`
  * over 260 steps twice per parameter change *and* be able to disagree with the block 300 px below

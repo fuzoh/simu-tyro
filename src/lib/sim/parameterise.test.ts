@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import type { SolveError, SpanInput } from "./types.ts";
 
 import { CHORD_BOUND, CLEARANCE_VS_FLECHE, TOLERANCE, Z3, Z6 } from "./__fixtures__/theory-15.ts";
+import { sampleCable } from "./catenary.ts";
 import {
   PARAMETERISE,
   closedFormSeedL0,
@@ -156,7 +157,7 @@ describe("Z6 — L₀ from a target pretension (§7 mode 2)", () => {
   });
 
   test("the flèche at that L₀ is 5.1164 m", () => {
-    const D = unloadedSag(solvedAt(Z6_SPAN, L0), Z6_SPAN);
+    const D = unloadedSag(solvedAt(Z6_SPAN, L0), Z6_SPAN).D;
     expect(relativeError(D, Z6.out.D)).toBeLessThan(TOLERANCE.solvedScalar);
   });
 
@@ -207,7 +208,7 @@ describe("monotonicity across the bracket — what makes the bisection safe", ()
     for (let step = 1; step <= 40; step++) {
       const state = solvedAt(span, lower + ((upper - lower) * step) / 40);
       expect(state.H).toBeLessThan(previous.H);
-      expect(unloadedSag(state, span)).toBeGreaterThan(unloadedSag(previous, span));
+      expect(unloadedSag(state, span).D).toBeGreaterThan(unloadedSag(previous, span).D);
       previous = state;
     }
   });
@@ -235,7 +236,31 @@ describe("flèche à vide — §7 mode 3", () => {
     // Exact, not scanned: the deepest point is where the tangent is parallel to the chord, and on
     // the unloaded line `V(s)` is affine, so that `s` is closed-form.
     const state = solvedAt({ L: Z3.in.L, h: Z3.in.h, w: Z3.in.w, EA: Z3.in.EA }, Z3.in.L0);
-    expect(relativeError(unloadedSag(state, Z3.in), Z3.out.D)).toBeLessThan(TOLERANCE.solvedScalar);
+    expect(relativeError(unloadedSag(state, Z3.in).D, Z3.out.D)).toBeLessThan(
+      TOLERANCE.solvedScalar,
+    );
+  });
+
+  test("its vertex sits at mid-span on Z6's level line — §4.1's symmetry", () => {
+    // Level span: `V₀ = −w·L₀/2`, so the vertex is at `s = L₀/2` and, by symmetry, at `x = L/2`.
+    const { atX } = unloadedSag(solvedAt(Z6_SPAN, Z6.out.L0), Z6_SPAN);
+    expect(relativeError(atX, Z6.in.L / 2)).toBeLessThan(TOLERANCE.solvedScalar);
+  });
+
+  test("its vertex is Z3's deepest sample below the chord, to twice the spacing", () => {
+    const state = solvedAt({ L: Z3.in.L, h: Z3.in.h, w: Z3.in.w, EA: Z3.in.EA }, Z3.in.L0);
+    const n = 6000;
+    const samples = sampleCable(state, n);
+    let deepest = Number.NEGATIVE_INFINITY;
+    let scanned = Number.NaN;
+    for (let i = 0; i < samples.length; i += 2) {
+      const drop = (Z3.in.h * samples[i]) / Z3.in.L - samples[i + 1];
+      if (drop > deepest) {
+        deepest = drop;
+        scanned = samples[i];
+      }
+    }
+    expect(Math.abs(unloadedSag(state, Z3.in).atX - scanned)).toBeLessThan(2 * (Z3.in.L0 / n));
   });
 
   test("the two inverse modes agree on one line — Z6's flèche returns Z6's L₀", () => {
@@ -248,7 +273,7 @@ describe("flèche à vide — §7 mode 3", () => {
   test("the resolved L₀ reproduces the flèche asked for", () => {
     for (const D_target of [1.5, 5.1164, 12]) {
       const L0 = resolvedL0(resolveL0({ mode: "sag", D_target }, Z6_SPAN));
-      expect(relativeError(unloadedSag(solvedAt(Z6_SPAN, L0), Z6_SPAN), D_target)).toBeLessThan(
+      expect(relativeError(unloadedSag(solvedAt(Z6_SPAN, L0), Z6_SPAN).D, D_target)).toBeLessThan(
         TOLERANCE.solvedScalar,
       );
     }

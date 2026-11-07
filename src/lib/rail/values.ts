@@ -174,7 +174,7 @@ function heldValue(
  * and already sits on the field's display grid.
  *
  * @returns a new draft; the argument is never mutated, because the store's shallow patch merge is
- *   what keeps `sceneInputs` stable across a scrub.
+ *   what keeps `unloadedInputs` stable across a scrub.
  */
 export function applyField(
   scenario: ScenarioDraft,
