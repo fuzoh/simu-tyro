@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import type { ValidatedSearch } from "@/lib/url/schema.ts";
 
 import { initialAppState } from "@/lib/app/state.ts";
+import { TRACE_P1 } from "@/lib/url/__fixtures__/canonical-links.ts";
 
 import { linkStrip } from "./link-strip.ts";
 
@@ -105,6 +106,19 @@ describe("an unknown rope class is ignored and the default class is named, never
 
   test("a textile link with no `cls` at all names the completed class too", () => {
     expect(strip("?fam=tx&L=250")?.completed).toContain("classe de corde HMPE 12 torons");
+  });
+
+  test("a textile link with no ends names the textile ends it was given, not the steel cosse", () => {
+    const sentence = strip("?fam=tx&L=250")?.completed ?? "";
+    expect(sentence).toContain("terminaison A Œil cousu / épissuré");
+    expect(sentence).toContain("terminaison B Œil cousu / épissuré");
+    expect(sentence).not.toContain("Cosse");
+  });
+
+  test("an imported link with no stations names the two it was given", () => {
+    const query = `?tr=${TRACE_P1}`;
+    expect(strip(query)?.completed).toContain("station A 0,0 m");
+    expect(strip(query)?.completed).toContain("station B 150,0 m");
   });
 
   test("each token reads in the French of its domain value", () => {

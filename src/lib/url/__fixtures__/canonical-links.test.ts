@@ -14,7 +14,9 @@ function hasEncoding(fixture: DecodeOnlyFixture): fixture is Encodable {
 
 /** A link as the app reads it: the router's parse, the validator, completion, then the draft. */
 function decode(link: string) {
-  const completion = completeFromDefaults(validateSearch(parseLinkSearch(link.slice(2))));
+  const search = validateSearch(parseLinkSearch(link.slice(2)));
+  if (search.refused !== undefined) throw new Error(`${link} refused: ${search.refused.kind}`);
+  const completion = completeFromDefaults(search);
   return { completion, scenario: searchToScenario(completion.search) };
 }
 
