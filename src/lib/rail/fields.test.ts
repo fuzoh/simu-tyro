@@ -7,6 +7,7 @@ import type { FieldId } from "./fields.ts";
 import {
   checkField,
   commitField,
+  CONSTRUCTION_OPTIONS,
   displayField,
   emptyMessage,
   FIELD_ORDER,
@@ -16,6 +17,7 @@ import {
   parseDecimal,
   riderPositionEntry,
   REQUIRED_MESSAGE,
+  ROPE_CLASS_OPTIONS,
   warningFor,
 } from "./fields.ts";
 
@@ -328,5 +330,20 @@ describe("riderPositionEntry — the View Strip's `x` field", () => {
   test("a value outside the span lands on its end and says so", () => {
     expect(riderPositionEntry("400", 150)).toEqual({ xD: 150, clamped: true });
     expect(riderPositionEntry("-3", 150)).toEqual({ xD: 0, clamped: true });
+  });
+});
+
+describe("the option labels the Rail and the link strip share", () => {
+  test("`Classe de corde` and `Construction` keep the Rail's picker labels", () => {
+    // Read off the running app's two pickers, in order.
+    expect(ROPE_CLASS_OPTIONS).toEqual([
+      { value: "hmpe", label: "HMPE 12 torons" },
+      { value: "pa-en1891a", label: "Polyamide EN 1891 type A" },
+      { value: "polyester", label: "Polyester semi-statique" },
+    ]);
+    expect(CONSTRUCTION_OPTIONS).toEqual([
+      { value: "fibre-core", label: "6×19 âme textile" },
+      { value: "iwrc", label: "6×19 âme métallique" },
+    ]);
   });
 });

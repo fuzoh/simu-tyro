@@ -65,11 +65,12 @@ import type {
 } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
-import { formatQuantity, formatValue } from "@/lib/format/quantity.ts";
+import { formatAtX, formatQuantity, formatValue } from "@/lib/format/quantity.ts";
 import { amplifiedTension, evaluateVerdict, REGIMES, scanTensionEnvelope } from "@/lib/sim";
 
 import type { GateReport } from "./gates.ts";
 
+import { strengthSymbol } from "./fields.ts";
 import { evaluateGates } from "./gates.ts";
 
 /** § 6's thirteen reported values, by id. Four are headline; the other nine are detail rows. */
@@ -242,7 +243,7 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
   if (base === null || !gates.passed.solve) return null;
 
   const { unit } = scenario;
-  const strengthLabel = scenario.material.family === "steel" ? "MBF" : "MBL";
+  const strengthLabel = strengthSymbol(scenario.material.family);
   const { DAF } = scenario.rider;
   // A `DAF` the Verdict Gate has already refused may not be multiplied into a printed envelope: at
   // `daf=-1` — a value a link can carry — `T_vide + DAF·(T − T_vide)` reads *below* the standing
@@ -683,7 +684,7 @@ function coverageValue(base: SolvedTraverse): string {
  */
 function riderAt(base: SolvedTraverse, stepIndex: number): string | null {
   const step = base.traverse.steps[stepIndex];
-  return step === undefined ? null : `passager à x ${formatValue("extremumX", step.xD)} m`;
+  return step === undefined ? null : `passager ${formatAtX(step.xD)}`;
 }
 
 /** Joins a qualifier's two optional clauses without ever leaving a dangling comma. */

@@ -25,6 +25,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { flushSync } from "react-dom";
 
 import type { CollapseState } from "@/lib/layout/collapse.ts";
+import type { CellId } from "@/lib/rail/cells.ts";
 
 import { InfoTip } from "@/components/rail/controls.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -79,26 +80,8 @@ export const RAIL_SECTIONS = [
  * cannot read a TypeScript constant; `READ_OUT_SPANS` in `@/lib/layout/contract.ts` is its
  * arithmetic twin, and `cellRows()` lays the same row out without a DOM.
  */
-export const READ_OUT_CELLS = [
-  {
-    /**
-     * **« Garde min. ligne » and no longer « Garde min »** — ticket 41,
-     * [amendment M](../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md), which supersedes the
-     * label § 5 fixed in its two budget diagrams, its `pinned` and `compact` rows and its
-     * three-column wrap sketch. The cell prints `rider.worst.hClear`, which is §11's minimum **over
-     * the whole line** at the current rider position, and the row's own « à la position du passager »
-     * was being read as *under* the passenger rather than *for* that position. `ligne` is the scope
-     * the strip's caption and the profile's governing dimension line now name too, and it is what
-     * separates this cell from the Rail's « Garde min (traversée) » — `ligne` reduces over `x`,
-     * `traversée` over `x_P`.
-     *
-     * The label is also the record key and the React key. **Measured, because this row is the app's
-     * tightest budget:** the longest form « Garde min. ligne (à x 74,3 m) » renders on **one 16 px
-     * line** in the 44 px `pinned` row at 390 px with the value's box bottom flush to the row's, and
-     * the same in `compact` at 390 × 400 — so the rename spends none of § 5's height. Prose elsewhere
-     * that discusses « the Garde min cell » as a layout occupant means this one.
-     */
-    label: "Garde min. ligne",
+export const READ_OUT_CELLS: Record<CellId, { readonly basis: string; readonly pinned: string }> = {
+  clearance: {
     basis: "basis-[calc(2*var(--cell-basis))]",
     /**
      * The Pinned Safety Header's **one live cell**: it *is* the row there, at one touch height
@@ -108,15 +91,15 @@ export const READ_OUT_CELLS = [
      */
     pinned: "pinned:h-[var(--pinned-cell)] pinned:flex-1",
   },
-  { label: "T anc. A", basis: "basis-[var(--cell-basis)]", pinned: "pinned:hidden" },
-  { label: "T anc. B", basis: "basis-[var(--cell-basis)]", pinned: "pinned:hidden" },
-  { label: "Pente", basis: "basis-[var(--cell-basis)]", pinned: "pinned:hidden" },
-  { label: "Flèche", basis: "basis-[var(--cell-basis)]", pinned: "pinned:hidden" },
+  TA: { basis: "basis-[var(--cell-basis)]", pinned: "pinned:hidden" },
+  TB: { basis: "basis-[var(--cell-basis)]", pinned: "pinned:hidden" },
+  slope: { basis: "basis-[var(--cell-basis)]", pinned: "pinned:hidden" },
+  sag: { basis: "basis-[var(--cell-basis)]", pinned: "pinned:hidden" },
   /** The garde **under the passenger's feet** at `x_D` — `SceneRider.underRider`, ticket 41's. */
-  { label: "Garde passager", basis: "basis-[var(--cell-basis)]", pinned: "pinned:hidden" },
+  underRider: { basis: "basis-[var(--cell-basis)]", pinned: "pinned:hidden" },
   /** The load's drop below the unloaded line at `x_D` — `SceneRider.belowUnloaded`. */
-  { label: "Écart à vide", basis: "basis-[var(--cell-basis)]", pinned: "pinned:hidden" },
-] as const;
+  belowUnloaded: { basis: "basis-[var(--cell-basis)]", pinned: "pinned:hidden" },
+};
 
 /** § 7's one `<noscript>` line: under `ssr: false` the app is a Skeleton forever without JS. */
 export const NOSCRIPT_LINE = "Ce simulateur nécessite JavaScript pour fonctionner.";
