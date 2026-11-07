@@ -35,11 +35,12 @@ import type { AppState } from "@/lib/app/state.ts";
 import type { SessionStorage } from "@/lib/session/session.ts";
 
 import {
-  publishedSearch,
+  addressBarSearch,
   SESSION_WRITE_DEBOUNCE_MS,
   sessionOf,
   URL_WRITE_DEBOUNCE_MS,
 } from "@/lib/app/persist.ts";
+import { siteOrigin } from "@/lib/app/site.ts";
 import { writeSession } from "@/lib/session/session.ts";
 
 /**
@@ -83,8 +84,9 @@ export function usePersist({
     const timer = setTimeout(() => {
       // Built inside the timer, so a burst of keystrokes serialises once rather than once per
       // frame. A draft with § 9's textile blanks is not publishable and holds the address bar at
-      // the last complete Scenario, which is the same rule « Saisie en cours » applies.
-      const search = publishedSearch(scenario);
+      // the last complete Scenario, which is the same rule « Saisie en cours » applies. An
+      // oversize one writes a bare `/` (`addressBarSearch`), leaving the Trace to the Session.
+      const search = addressBarSearch(scenario, siteOrigin());
       if (search === null) return;
       // A **plain object**, never a function and never a spread of `useSearch()`: `applyNext` hands
       // a non-function updater to the location verbatim, so this bag replaces the whole search.

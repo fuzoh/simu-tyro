@@ -23,7 +23,8 @@
  * - **Oversize refuses rather than degrades.** A terrain-less link of an imported scenario is not a
  *   weaker link, it is a **different scenario** — the whole-or-nothing rule, applied on the write
  *   side. The budget is the **whole URL**, so the origin is a parameter here rather than a
- *   `window` read.
+ *   `window` read. Both link writers pass {@link publishable}; the address bar answers oversize
+ *   with a bare `/` (the Session carries the Trace) where the copy button refuses.
  * - **The Session is strictly larger than the link**: it carries the retained inactive Material
  *   Spec, the retained manual geometry, the cached Trace and the two layer toggles, none of which a
  *   link may ever hold. The Session is *your session*; the URL is *this line*.
@@ -69,6 +70,41 @@ export function completeScenario(draft: ScenarioDraft): Scenario | null {
 export function publishedSearch(draft: ScenarioDraft): ValidatedSearch | null {
   const scenario = completeScenario(draft);
   return scenario === null ? null : scenarioToSearch(scenario);
+}
+
+/** Why a draft has no link: § 9's blanks, or a Trace the whole-URL budget cannot carry. */
+export type Unpublishable = "incomplete" | "oversize";
+
+/**
+ * The one gate both link writers pass — « Copier le lien » and the address bar — and the only
+ * caller of {@link fitsLinkBudget}. The budget is on the **whole** href, origin and base path
+ * included, so `origin` is the one `siteOrigin()` returns.
+ */
+export function publishable(
+  draft: ScenarioDraft,
+  origin: string,
+):
+  | { readonly ok: true; readonly href: string; readonly search: ValidatedSearch }
+  | { readonly ok: false; readonly reason: Unpublishable } {
+  const search = publishedSearch(draft);
+  if (search === null) return { ok: false, reason: "incomplete" };
+  const href = `${origin}${canonicalLink(search)}`;
+  if (!fitsLinkBudget(href)) return { ok: false, reason: "oversize" };
+  return { ok: true, href, search };
+}
+
+/**
+ * What the address-bar writer puts in the search, or `null` to leave the address bar alone.
+ *
+ * An oversize draft writes a **bare `/`**, not the last publishable search: a link always wins over
+ * the Session on load, so the last search would reopen the pre-import span on reload, while a
+ * bare `/` means « restore the Session », which holds the Trace. Writing the oversize search
+ * instead is what made a reload refuse the user's own import.
+ */
+export function addressBarSearch(draft: ScenarioDraft, origin: string): ValidatedSearch | null {
+  const result = publishable(draft, origin);
+  if (result.ok) return result.search;
+  return result.reason === "oversize" ? {} : null;
 }
 
 /**
@@ -118,11 +154,9 @@ export function copyLink({
   trace: Trace | null;
   origin: string;
 }): CopyLink {
-  const search = publishedSearch(scenario);
-  if (search === null) return { ok: false, message: COPY_INCOMPLETE };
-
-  const href = `${origin}${canonicalLink(search)}`;
-  if (fitsLinkBudget(href)) return { ok: true, href };
+  const link = publishable(scenario, origin);
+  if (link.ok) return { ok: true, href: link.href };
+  if (link.reason === "incomplete") return { ok: false, message: COPY_INCOMPLETE };
 
   // Only a hand-authored CSV can get here — the geoportal export caps at 200 points, and the three
   // real traces cost 859–910 characters against a 2000 budget.
