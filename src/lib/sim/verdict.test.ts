@@ -24,7 +24,8 @@ import {
   evaluateVerdict,
   isFamilyAllowed,
   isRegimeAvailable,
-  regimeUnavailableReason,
+  lineWarnings,
+  regimeMismatch,
   scanTensionEnvelope,
 } from "./verdict.ts";
 
@@ -109,7 +110,6 @@ function firstRunInput(regime: RegimeId, patch: Partial<VerdictInput> = {}): Ver
     usage: "PERMANENTE",
     family: "steel",
     terminations: { A: "cosse-oeil-flamand", B: "cosse-oeil-flamand" },
-    sagRatio: firstRun.sagRatio,
     ...patch,
   };
 }
@@ -371,7 +371,6 @@ describe("« Marge faible » — a pass with nothing left over", () => {
       usage: "PERMANENTE",
       family: "steel",
       terminations: { A: "cosse-oeil-flamand", B: "cosse-oeil-flamand" },
-      sagRatio: t.sagRatio,
     });
   }
 
@@ -424,7 +423,6 @@ describe("the textile pair — one invented `MBL` decides the verdict", () => {
       usage: "TEMPORAIRE",
       family: "textile",
       terminations: { A: "epissure-longue-hmpe", B: "epissure-longue-hmpe" },
-      sagRatio: t.sagRatio,
     });
   }
 
@@ -515,44 +513,35 @@ describe("the refusals — a prohibition survives an ample margin", () => {
   });
 });
 
-describe("§ 10.1 — an unavailable entry shows its reason", () => {
-  test("a choosable régime has no reason to give, in every combination", () => {
+describe("`regimeMismatch` — which of a régime's requirements the line misses", () => {
+  test("only « Secours textile 10:1 » ever mismatches, and it names each clause it misses", () => {
+    expect(regimeMismatch("secours10", "steel", "TEMPORAIRE")).toEqual({
+      family: true,
+      usage: false,
+    });
+    expect(regimeMismatch("secours10", "textile", "PERMANENTE")).toEqual({
+      family: false,
+      usage: true,
+    });
+    // Steel under `PERMANENTE` misses both, and both are reported — not the first one tested.
+    expect(regimeMismatch("secours10", "steel", "PERMANENTE")).toEqual({
+      family: true,
+      usage: true,
+    });
+    expect(regimeMismatch("secours10", "textile", "TEMPORAIRE")).toBeNull();
     for (const regime of Object.keys(REGIMES) as RegimeId[]) {
+      if (regime === "secours10") continue;
       for (const family of ["steel", "textile"] as const) {
         for (const usage of ["PERMANENTE", "TEMPORAIRE"] as const) {
-          // The two are one predicate seen from both sides: a reason exists exactly where the
-          // entry is disabled, so the note can never contradict the `<option>` beside it.
-          expect({ regime, family, usage, reason: null }).toStrictEqual({
+          expect({
             regime,
             family,
             usage,
-            reason: isRegimeAvailable(regime, family, usage)
-              ? regimeUnavailableReason(regime, family, usage)
-              : null,
-          });
+            mismatch: regimeMismatch(regime, family, usage),
+          }).toEqual({ regime, family, usage, mismatch: null });
         }
       }
     }
-  });
-
-  test("the family clause names the requirement and what is active instead", () => {
-    expect(regimeUnavailableReason("secours10", "steel", "TEMPORAIRE")).toBe(
-      "Indisponible — ce régime suppose une corde textile ; la famille active est l'acier.",
-    );
-  });
-
-  test("the usage clause names the use class that blocks it", () => {
-    expect(regimeUnavailableReason("secours10", "textile", "PERMANENTE")).toBe(
-      "Indisponible — ce régime ne couvre pas un usage permanent.",
-    );
-  });
-
-  test("both clauses failing is **one** sentence, not two notes", () => {
-    // § 10.1 asks for one reason per row. Steel under `PERMANENTE` fails the family *and* the
-    // usage requirement, and the row still gets a single sentence.
-    expect(regimeUnavailableReason("secours10", "steel", "PERMANENTE")).toBe(
-      "Indisponible — ce régime suppose une corde textile et un usage temporaire.",
-    );
   });
 });
 
@@ -601,7 +590,7 @@ describe("`Indéterminé` suppresses the verdict rather than qualifying it", () 
   });
 });
 
-describe("the warning tier", () => {
+describe("the warning tier — `lineWarnings`, with no régime", () => {
   /** A taut line at §5.4's chord bound, where flèche/portée is at its attainable minimum. */
   function tautLine(L: number, L0: number) {
     const span: SpanInput = {
@@ -616,18 +605,11 @@ describe("the warning tier", () => {
     const t = traverseOf(span, TAUT_LINE_WARNINGS.in.P, 240);
     return {
       sagRatio: t.sagRatio,
-      verdict: evaluateVerdict({
-        steps: t.steps,
-        coverage: t.coverage,
-        Tvide: t.Tvide,
-        DAF: TAUT_LINE_WARNINGS.in.DAF,
-        regime: "en15567",
-        eta: { A: 0.9, B: 0.9 },
-        strength: TAUT_LINE_WARNINGS.in.MBF,
-        usage: "PERMANENTE",
+      warnings: lineWarnings({
         family: "steel",
-        terminations: { A: "cosse-oeil-flamand", B: "cosse-oeil-flamand" },
         sagRatio: t.sagRatio,
+        Tvide: t.Tvide,
+        strength: TAUT_LINE_WARNINGS.in.MBF,
       }),
     };
   }
@@ -644,57 +626,58 @@ describe("the warning tier", () => {
     expect(sagRatio).toBeLessThan(TAUT_LINE_WARNINGS.out.threshold);
   });
 
-  test("both warnings fire together, and neither is a duplicate of the other", () => {
+  test("both taut-line warnings fire together without a régime, and neither is a duplicate", () => {
     for (const [L, L0] of [
       [TAUT_LINE_WARNINGS.in.LShort, TAUT_LINE_WARNINGS.in.L0Short],
       [TAUT_LINE_WARNINGS.in.LLong, TAUT_LINE_WARNINGS.in.L0Long],
     ]) {
-      const { verdict } = tautLine(L, L0);
+      const { warnings } = tautLine(L, L0);
       // One qualifies `flèche / portée`; the other qualifies the `DAF` figure, whose 1,2 ceiling
       // was measured on a controlled step-off on a taut line. Removing either loses a statement.
-      expect(verdict.warnings).toContain("fleche-sur-portee-sous-3-pct");
-      expect(verdict.warnings).toContain("daf-hors-de-son-regime-de-mesure");
-      expect(verdict.warnings).toHaveLength(TAUT_LINE_WARNINGS.out.warningCount);
+      expect(warnings).toEqual([
+        "fleche-sur-portee-sous-3-pct",
+        "daf-hors-de-son-regime-de-mesure",
+      ]);
+      expect(warnings).toHaveLength(TAUT_LINE_WARNINGS.out.warningCount);
     }
   });
 
   test("the shipped line, at 4 % flèche, raises neither", () => {
-    const v = evaluateVerdict(firstRunInput("en15567"));
     expect(firstRun.sagRatio).toBeGreaterThan(VERDICT.sagRatioWarning);
-    expect(v.warnings).toEqual([]);
+    expect(
+      lineWarnings({
+        family: "steel",
+        sagRatio: firstRun.sagRatio,
+        Tvide: firstRun.Tvide,
+        strength: F.MBF,
+      }),
+    ).toEqual([]);
+  });
+
+  test("the threshold is strictly below 3 %, read as a fraction", () => {
+    const line = { family: "steel", Tvide: { TA: 1000, TB: 1000 }, strength: 10000 } as const;
+    expect(lineWarnings({ ...line, sagRatio: 0.03 })).toEqual([]);
+    expect(lineWarnings({ ...line, sagRatio: 0.0299 })).toHaveLength(2);
+    // A percent read-out passed unconverted — 2,99 for 2,99 % — would silence the warning.
+    expect(lineWarnings({ ...line, sagRatio: 2.99 })).toEqual([]);
   });
 
   test("§9.2's creep cap is textile-only and is about service life, not strength", () => {
-    const steps: SweepStep[] = [{ sD: 0, xD: 0, zD: 0, H: 0, V0: 0, TA: 4000, TB: 4000, theta: 0 }];
-    const base: VerdictInput = {
-      steps,
-      coverage: 1,
-      Tvide: { TA: 3100, TB: 3000 },
-      DAF: 1.2,
-      regime: "secours10",
-      eta: { A: 0.9, B: 0.9 },
-      strength: 10000,
-      usage: "TEMPORAIRE",
+    // 30 % of a 10 000 N `MBL` is 3000 N, read against the **greater** unloaded end.
+    const textile = {
       family: "textile",
-      terminations: { A: "epissure-longue-hmpe", B: "epissure-longue-hmpe" },
-    };
-    expect(evaluateVerdict(base).warnings).toEqual(["tension-permanente-sur-30-pct-mbl"]);
+      sagRatio: 0.04,
+      Tvide: { TA: 3100, TB: 3000 },
+      strength: 10000,
+    } as const;
+    expect(lineWarnings(textile)).toEqual(["tension-permanente-sur-30-pct-mbl"]);
+    expect(lineWarnings({ ...textile, Tvide: { TA: 2900, TB: 3100 } })).toEqual([
+      "tension-permanente-sur-30-pct-mbl",
+    ]);
     // Under the cap it is silent…
-    expect(evaluateVerdict({ ...base, Tvide: { TA: 2900, TB: 2900 } }).warnings).toEqual([]);
+    expect(lineWarnings({ ...textile, Tvide: { TA: 2900, TB: 2900 } })).toEqual([]);
     // …and on steel it never fires: §9.2's 30 % is a creep bound on family B.
-    const steel = evaluateVerdict({
-      ...base,
-      family: "steel",
-      regime: "en15567",
-      terminations: { A: "cosse-oeil-flamand", B: "cosse-oeil-flamand" },
-    });
-    expect(steel.warnings).toEqual([]);
-  });
-
-  test("an omitted `sagRatio` fires no sag warning — the two are the same condition", () => {
-    const v = evaluateVerdict(firstRunInput("en15567", { sagRatio: undefined }));
-    expect(v.warnings).toEqual([]);
-    expect(VERDICT.sagRatioWarning).toBe(0.03);
+    expect(lineWarnings({ ...textile, family: "steel" })).toEqual([]);
   });
 });
 

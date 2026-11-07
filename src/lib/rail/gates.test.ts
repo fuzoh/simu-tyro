@@ -14,6 +14,7 @@ import {
   evaluateGates,
   GATE_CONSEQUENCE,
   isFieldActive,
+  regimeUnavailableNote,
   saisieEnCours,
 } from "./gates.ts";
 
@@ -186,6 +187,49 @@ describe("the Verdict Gate's régime × famille rule", () => {
       trace: null,
     });
     expect(report.errors.filter((error) => error.field === "regime")).toEqual([]);
+  });
+});
+
+describe("§ 10.1 — the régime select's note shows the reason", () => {
+  test("steel under `TEMPORAIRE` names the family alone, and the gate agrees", () => {
+    expect(regimeUnavailableNote("secours10", "steel", "TEMPORAIRE")).toBe(
+      "Indisponible — ce régime suppose une corde textile ; la famille active est l'acier.",
+    );
+    const report = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.usage = "TEMPORAIRE";
+        draft.regime = "secours10";
+      }),
+      trace: null,
+    });
+    expect(report.errors.find((error) => error.field === "regime")?.message).toBe(
+      "⛔ Régime « Secours textile — 10:1 » indisponible avec un câble acier.",
+    );
+  });
+
+  test("textile under `PERMANENTE` names the use class that blocks it", () => {
+    expect(regimeUnavailableNote("secours10", "textile", "PERMANENTE")).toBe(
+      "Indisponible — ce régime ne couvre pas un usage permanent.",
+    );
+  });
+
+  test("both clauses failing is **one** sentence naming both, not two notes", () => {
+    expect(regimeUnavailableNote("secours10", "steel", "PERMANENTE")).toBe(
+      "Indisponible — ce régime suppose une corde textile et un usage temporaire.",
+    );
+  });
+
+  test("a choosable régime has no note, in every combination", () => {
+    // The note exists exactly where the gate would file the régime: one mismatch read, both
+    // surfaces worded from it.
+    for (const regime of ["en15567", "wsqld", "acct10", "ansi5"] as const) {
+      for (const family of ["steel", "textile"] as const) {
+        for (const usage of ["PERMANENTE", "TEMPORAIRE"] as const) {
+          expect(regimeUnavailableNote(regime, family, usage)).toBeNull();
+        }
+      }
+    }
+    expect(regimeUnavailableNote("secours10", "textile", "TEMPORAIRE")).toBeNull();
   });
 });
 

@@ -136,7 +136,6 @@ function openingState(scenario: Scenario) {
     usage: scenario.usage,
     terminations: { A: scenario.terminations.A.id, B: scenario.terminations.B.id },
     family: material.family,
-    sagRatio: sag / L,
   };
   const verdict = evaluateVerdict(verdictInput);
 

@@ -70,6 +70,7 @@ import {
   fieldSchema,
   warningFor,
 } from "@/lib/rail/fields.ts";
+import { regimeUnavailableNote } from "@/lib/rail/gates.ts";
 import { DEDUCED_HELP, FIELD_HELP, TIGHTNESS_HELP } from "@/lib/rail/help.ts";
 import { PROVENANCE_COPY, warningLadder } from "@/lib/rail/provenance.ts";
 import {
@@ -82,13 +83,7 @@ import {
   switchTightness,
 } from "@/lib/rail/values.ts";
 import { clearSession } from "@/lib/session/session.ts";
-import {
-  isFamilyAllowed,
-  isRegimeAvailable,
-  REGIMES,
-  regimeUnavailableReason,
-  TERMINATIONS,
-} from "@/lib/sim";
+import { isFamilyAllowed, isRegimeAvailable, REGIMES, TERMINATIONS } from "@/lib/sim";
 import { parseFailureMessage, parseProfileCsv, readFailure } from "@/lib/terrain/csv.ts";
 import { encodeP1 } from "@/lib/url/p1.ts";
 import { cn } from "@/lib/utils.ts";
@@ -318,7 +313,7 @@ export function RailInputs({
    */
   const regimeReason =
     Object.values(REGIMES)
-      .map((regime) => regimeUnavailableReason(regime.id, scenario.material.family, scenario.usage))
+      .map((regime) => regimeUnavailableNote(regime.id, scenario.material.family, scenario.usage))
       .find((reason) => reason !== null) ?? null;
 
   // Unmemoised on purpose: every field of it is rebuilt each render anyway, and every consumer is

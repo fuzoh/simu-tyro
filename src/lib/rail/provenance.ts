@@ -40,11 +40,11 @@
 
 import type { Deduced } from "@/lib/rail/deduced.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
-import type { RegimeId, TerminationId } from "@/lib/sim";
+import type { RegimeId, TerminationId, VerdictWarningId } from "@/lib/sim";
 
 import { equalAtDisplayPrecision, formatQuantity } from "@/lib/format/quantity.ts";
 import { FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
-import { REGIMES, TERMINATIONS, VERDICT } from "@/lib/sim";
+import { lineWarnings, REGIMES, TERMINATIONS } from "@/lib/sim";
 
 /**
  * The popover copy, one entry per provenance surface. §0.2's fine-grained tag and the
@@ -284,12 +284,13 @@ export type WarningTier =
   /** The banner, state `Refusé`. A `[REGULATOR]` prohibition, not advice. */
   | "verdict";
 
-/** Every rung of the ladder, including the two this module does not render. */
+/**
+ * Every rung of the ladder, including the two this module does not render. The three line warnings
+ * are the engine's own identifiers; `k-hors-bande` is the one rung this module scores itself.
+ */
 export type LadderId =
   | "k-hors-bande"
-  | "tension-permanente-sur-30-pct"
-  | "fleche-sur-portee-sous-3-pct"
-  | "daf-hors-de-son-regime-de-mesure"
+  | VerdictWarningId
   | "terrain-grossier"
   | "serre-cables-refuse";
 
@@ -308,7 +309,7 @@ export const WARNING_LADDER: Record<LadderId, { tier: WarningTier; owner: Ladder
   // and a zip line never enters that band, so an ⚠ here would be permanent and therefore mute.
   "k-hors-bande": { tier: "ambiant", owner: "rail-row" },
   // §9.2 — creep and service life, **not** strength. The strength claim is the verdict's.
-  "tension-permanente-sur-30-pct": { tier: "avertissement", owner: "rail-row" },
+  "tension-permanente-sur-30-pct-mbl": { tier: "avertissement", owner: "rail-row" },
   // §8.2 — below 3 % the line stiffens and the model starts mis-reporting the dynamic response.
   "fleche-sur-portee-sous-3-pct": { tier: "avertissement", owner: "rail-row" },
   // The same condition, said beside the figure it invalidates. **Not a duplicate.**
@@ -332,6 +333,25 @@ export type LadderWarning = {
   readonly text: string;
 };
 
+/** The row and the copy of each engine warning. The text carries no glyph: the renderer owns ⚠. */
+const LINE_WARNING_RUNGS: Record<VerdictWarningId, { row: LadderRow; text: string }> = {
+  "tension-permanente-sur-30-pct-mbl": {
+    row: "standingTension",
+    text: "tension permanente au-dessus de 30 % MBL — fluage et durée de vie (§9.2), pas résistance.",
+  },
+  "fleche-sur-portee-sous-3-pct": {
+    row: "sagRatio",
+    text: "flèche / portée sous 3 % — la ligne se raidit et le modèle rapporte mal la réponse dynamique (§8.2).",
+  },
+  // **Two places, one condition.** The DAF 1,2 ceiling was measured on a controlled step-off on a
+  // *taut* line, so a stiff line is outside the regime it was measured in. Removing either half
+  // hides half the finding.
+  "daf-hors-de-son-regime-de-mesure": {
+    row: "DAF",
+    text: "hors du régime où 1,2 a été mesuré : la ligne est trop raide (flèche / portée sous 3 %, §8.2).",
+  },
+};
+
 /**
  * The rungs the Rail's own rows carry, for this Scenario.
  *
@@ -339,15 +359,13 @@ export type LadderWarning = {
  * and neither is the verdict rung, which is a banner state rather than a row annotation.
  * {@link WARNING_LADDER} records all six so the ladder is readable in one place.
  *
- * These fire **with or without a régime**, which is why they are scored here rather than read off
- * `VerdictResult.warnings`: `evaluateVerdict` is not called at all on a régime-less screen, and
- * « flèche / portée 2,4 % » is true whatever the user has selected.
+ * These fire **with or without a régime**, which is why they come from the engine's régime-free
+ * `lineWarnings` rather than from `evaluateVerdict`: the verdict is not called at all on a
+ * régime-less screen, and « flèche / portée 2,4 % » is true whatever the user has selected.
  */
 export function warningLadder(scenario: ScenarioDraft, deduced: Deduced): readonly LadderWarning[] {
   const warnings: LadderWarning[] = [];
   const spec = scenario.material;
-  const textile = spec.family === "textile";
-  const strengthLabel = textile ? "MBL" : "MBF";
 
   if (spec.family === "textile" && spec.k !== null) {
     warnings.push({
@@ -358,34 +376,19 @@ export function warningLadder(scenario: ScenarioDraft, deduced: Deduced): readon
     });
   }
 
-  const solve = deduced.solve;
-  if (solve === null) return warnings;
+  const { solve } = deduced;
+  const { strength } = deduced.material;
+  if (solve === null || strength === null) return warnings;
 
-  if (textile && solve.standingTension > VERDICT.standingTensionCap * 100) {
-    warnings.push({
-      id: "tension-permanente-sur-30-pct",
-      tier: "avertissement",
-      row: "standingTension",
-      text: `tension permanente au-dessus de 30 % ${strengthLabel} — fluage et durée de vie (§9.2), pas résistance.`,
-    });
-  }
-
-  if (solve.sagRatio < VERDICT.sagRatioWarning * 100) {
-    warnings.push({
-      id: "fleche-sur-portee-sous-3-pct",
-      tier: "avertissement",
-      row: "sagRatio",
-      text: "flèche / portée sous 3 % — la ligne se raidit et le modèle rapporte mal la réponse dynamique (§8.2).",
-    });
-    // **Two places, one condition.** The clause the other warnings do not have: the DAF 1,2 ceiling
-    // was measured on a controlled step-off on a *taut* line, so a stiff line is outside the regime
-    // it was measured in. Removing either half hides half the finding.
-    warnings.push({
-      id: "daf-hors-de-son-regime-de-mesure",
-      tier: "avertissement",
-      row: "DAF",
-      text: "hors du régime où 1,2 a été mesuré : la ligne est trop raide (flèche / portée sous 3 %, §8.2).",
-    });
+  const fired = lineWarnings({
+    family: spec.family,
+    // The read-out is in percent; the engine takes the fraction.
+    sagRatio: solve.sagRatio / 100,
+    Tvide: solve.Tvide,
+    strength,
+  });
+  for (const id of fired) {
+    warnings.push({ id, tier: WARNING_LADDER[id].tier, ...LINE_WARNING_RUNGS[id] });
   }
 
   return warnings;
