@@ -51,9 +51,18 @@
  * and the numbers all go through § 3's one display-precision table.
  */
 
-import type { SceneBase } from "@/lib/chart/scene.ts";
+import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
-import type { CellState, VerdictCell, VerdictResult, VerdictState } from "@/lib/sim";
+import type {
+  CellState,
+  ClearanceResult,
+  DerivedMaterial,
+  SpanState,
+  SweepResult,
+  VerdictCell,
+  VerdictResult,
+  VerdictState,
+} from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { formatQuantity, formatValue } from "@/lib/format/quantity.ts";
@@ -185,16 +194,30 @@ export const REGIME_PROMPT: RegimePrompt = {
  */
 export const NO_REGIME_BANNER = "Choisissez un régime de sécurité pour obtenir un verdict.";
 
+/**
+ * The solved traverse {@link deriveResults} reports — the fields of the chart's `SceneBase` it
+ * reads, typed here so `lib/rail` does not depend on `lib/chart`.
+ */
+export type SolvedTraverse = {
+  readonly L: number;
+  readonly h: number;
+  /** The unloaded line — `T_vide` at both ends. */
+  readonly unloaded: SpanState;
+  readonly material: DerivedMaterial;
+  readonly traverse: SweepResult;
+  readonly clearance: ClearanceResult;
+};
+
 /** What {@link deriveResults} reads. The scene is already solved: this module never solves. */
 export type ResultsInput = {
-  readonly scenario: ScenarioDraft;
+  readonly scenario: TraverseScenario;
   /** The active profile, or `null` in manual mode — the Solve Gate's stations read it. */
   readonly trace: Trace | null;
   /**
    * The scenario's half of the scene — the sweep, the unloaded solve and §11, computed **once**
    * behind the `useSweep` seam and shared with the Chart Block. `null` is « Aucun résultat ».
    */
-  readonly base: SceneBase | null;
+  readonly base: SolvedTraverse | null;
   /**
    * The **standing** gate report, from the app root — the one the banner and the charts read, over
    * the Scenario **and** the text the form currently holds. Omitted, the gates are evaluated over
@@ -244,9 +267,6 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
           usage: scenario.usage,
           terminations: { A: scenario.terminations.A.id, B: scenario.terminations.B.id },
           family: scenario.material.family,
-          // **No `sagRatio`**: § 6's two taut-line warnings are scored beside the rows they qualify
-          // — `flèche / portée` and the `DAF` figure — and both must fire *without* a régime, so
-          // `./provenance.ts`'s ladder owns them. Passing it here would render each one twice.
         })
       : null;
 
@@ -595,7 +615,7 @@ type Envelope = {
  * as the static one and the scan needs one pass. At `DAF ≤ 0` — a value a link can carry — the two
  * orderings part, which is why `staticHeadline` is picked on `Tstatic` and never through `Tdaf`.
  */
-function envelopes(base: SceneBase, DAF: number): Envelope {
+function envelopes(base: SolvedTraverse, DAF: number): Envelope {
   const Tvide = { A: base.unloaded.TA, B: base.unloaded.TB };
   // §10.1's suspended denominator rides along on the same pass and is dropped here: § 9 never
   // prints it, and at a refused `DAF ≤ 0` it is a maximum of negatives with no meaning to print.
@@ -632,7 +652,7 @@ export function clearanceBreached(hMin: number, hClearMin: number): boolean {
  * « Flèche chargée max » — the deepest the loaded line hangs below the A–B chord over the
  * traverse, which is the rider's own node: the kink is the low point of a loaded catenary.
  */
-function loadedSag(base: SceneBase): number {
+function loadedSag(base: SolvedTraverse): number {
   let deepest = 0;
   for (const step of base.traverse.steps) {
     const drop = (base.h * step.xD) / base.L - step.zD;
@@ -646,7 +666,7 @@ function loadedSag(base: SceneBase): number {
  * uniform steps plus 10 geometric tail steps per end, so a fully solved traverse printed against
  * 240 would read 260/240.
  */
-function coverageValue(base: SceneBase): string {
+function coverageValue(base: SolvedTraverse): string {
   const solved = base.traverse.steps.length;
   return `${formatValue("coverage", solved)} / ${formatValue("coverage", base.traverse.grid.length)} pas`;
 }
@@ -661,7 +681,7 @@ function coverageValue(base: SceneBase): string {
  * @returns `null` where the traverse has no such step — **never a « — »**, which is spent on
  *   `Indéterminé`. An absent position simply drops the clause.
  */
-function riderAt(base: SceneBase, stepIndex: number): string | null {
+function riderAt(base: SolvedTraverse, stepIndex: number): string | null {
   const step = base.traverse.steps[stepIndex];
   return step === undefined ? null : `passager à x ${formatValue("extremumX", step.xD)} m`;
 }

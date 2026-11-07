@@ -9,14 +9,15 @@
  *   the axes coincide only at mid-span and diverge to 8 px at each end — 34 m at a 1500 m span,
  *   precisely at the anchors, which is where the drag handles go.
  * - **Two memos, split at `x_D`.** The scenario's half — material, `L₀`, the unloaded solve, the
- *   sweep, §11 — is keyed on `sceneInputs`, which **omits `x_D`**; the rider's exact solve is keyed
- *   on `x_D` alone. That is the seam § 7 called « the memo on the solve inputs behind `useSweep` »,
- *   and the reason a context store rather than subscription granularity is enough. Keying the whole
- *   derivation on the Scenario would miss it: a drag dispatches a new Scenario on every
- *   `pointermove`, so a 1 px move landing back on the same step would re-run the sweep.
- *   The first half **arrives as a prop**: A10's output half reports the same traverse, so the memo
- *   sits once at the app root (`useSceneBase`) rather than once per consumer. Only the rider's half
- *   is this file's, which is exactly the half a drag frame recomputes.
+ *   sweep, §11 — is keyed on `unloadedInputs`, `mp` and `hRider`, which **omit `x_D`**; the
+ *   rider's exact solve is keyed on `x_D` alone. That is the seam § 7 called « the memo on the
+ *   solve inputs behind `useSweep` », and the reason a context store rather than subscription
+ *   granularity is enough. Keying the whole derivation on the Scenario would miss it: a drag
+ *   dispatches a new Scenario on every `pointermove`, so a 1 px move landing back on the same step
+ *   would re-run the sweep. The first half **arrives as a prop**: A10's output half reports the
+ *   same traverse, so the memo sits once at the app root (`useUnloaded`, then `useScene`) rather
+ *   than once per consumer. Only the rider's half is this file's, which is exactly the half a drag
+ *   frame recomputes.
  * - **The `null` width renders the empty bands**, i.e. the Skeleton's own content, because the
  *   observer's seed is « not measured yet » rather than a guessed 900 px.
  * - **Pointer input snaps, typed input is exact.** Both paths land on the same one action, and the
@@ -299,8 +300,8 @@ export function ChartBlock({
       anchor === "A" ? "sa" : "sb",
       snapStation(state.trace, geometry.sa + metres),
     );
-    // Two keys rather than the whole draft: the store's shallow merge is what keeps `sceneInputs`
-    // stable for everything this drag does not touch.
+    // Two keys rather than the whole draft: the store's shallow merge is what keeps
+    // `unloadedInputs` stable for everything this drag does not touch.
     dispatch({
       type: "scénario/modifié",
       patch: { geometry: next.geometry, rider: next.rider },

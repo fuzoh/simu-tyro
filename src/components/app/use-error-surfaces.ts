@@ -27,6 +27,7 @@ import type { Deduced } from "@/lib/rail/deduced.ts";
 import type { FieldId } from "@/lib/rail/fields.ts";
 import type { GateReport, SaisieEnCours } from "@/lib/rail/gates.ts";
 import type { Results } from "@/lib/rail/results.ts";
+import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 
 import { banner, noResultCause, standingReport } from "@/lib/app/banner.ts";
 import { engineRefusal } from "@/lib/app/refusals.ts";
@@ -68,6 +69,7 @@ export function useErrorSurfaces({
   frame,
   report,
   solved,
+  traverse,
 }: {
   readonly deduced: Deduced;
   readonly focused: FieldId | null;
@@ -76,6 +78,8 @@ export function useErrorSurfaces({
   readonly report: GateReport;
   /** The raw solved half, from the app's one `useSweep` seam. */
   readonly solved: SceneBase | null;
+  /** The Scenario without `x_D`, from `useTraverse` — what the results key on. */
+  readonly traverse: TraverseScenario;
 }): ErrorSurfaces {
   const { scenario } = useAppState();
   const { failure } = deduced;
@@ -99,7 +103,7 @@ export function useErrorSurfaces({
 
   const shownFrame = removed.geometry ? null : frame;
   const shownSolved = removed.solve ? null : solved;
-  const results = useResults(shownSolved, standing);
+  const results = useResults(traverse, shownSolved, standing);
 
   return {
     occupant: banner({ report, refusal, saisie, verdict: results?.banner ?? null }),

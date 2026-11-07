@@ -53,7 +53,7 @@ export type UseClass = "PERMANENTE" | "TEMPORAIRE";
  * item 4 counted — and that census is the reason it stays inline.** The sites fall in two kinds
  * and neither wants a shared discriminant:
  *
- * - Those that **read an arm's fields** (`rail/deduced.ts`, `rail/values.ts`, `chart/scene.ts`,
+ * - Those that **read an arm's fields** (`scenario/geometry.ts`, `rail/values.ts`,
  *   `url/scenario.ts`, `app/state.ts` …) depend on the **narrowing** `source` gives: it is this
  *   union's discriminant, so `source === "manual"` is what makes `geometry.L` exist at all. A
  *   helper returning a string takes that away and buys nothing.

@@ -84,14 +84,18 @@ export { CLEARANCE, evaluateClearance } from "./clearance.ts";
 
 // —— parameterise.ts — §7's inverse modes, resolved above the solver ————————————————————————
 // `unloadedSag` is the app's, not only `resolveL0`'s: § 6 displays « flèche à vide » and §8.2's
-// sag-ratio warnings are scored on `VerdictInput.sagRatio`, which nothing else can compute.
+// sag-ratio warnings are scored on it through `lineWarnings`, and nothing else can compute it.
 export type { Result, SpanGeometry, TightnessSpec } from "./parameterise.ts";
 export { resolveL0, unloadedSag } from "./parameterise.ts";
 
 // —— verdict.ts — §10's regimes, `T_allow = η_t·MBF/k` and the §10.4 use-class gate ——————————
-// The two predicates are the pickers' availability rules. `allowableTension` stays withheld —
-// `VerdictCell.Tadm` already carries that number, and a second caller of the formula is a second
-// place §10 can drift.
+// The engine returns data and the app owns every sentence. The two predicates are the pickers'
+// availability rules, and `regimeMismatch` is the first one as data, so the app words a disabled
+// régime's reason without a second copy of `requires`. `lineWarnings` is § 6's warning tier as
+// identifiers, régime-free because it fires on a screen with no verdict.
+//
+// `allowableTension` stays withheld — `VerdictCell.Tadm` already carries that number, and a second
+// caller of the formula is a second place §10 can drift.
 //
 // `amplifiedTension` **is** exported, and the reason is A10's reduced row set: § 9 prints « T max
 // 928 daN » — the amplified envelope — **with no régime chosen**, and with no régime
@@ -110,11 +114,13 @@ export type {
   Criterion,
   CriterionBasis,
   EndEnvelope,
+  LineWarningInput,
   ObligationId,
   ProvenanceTag,
   RefusalId,
   Regime,
   RegimeId,
+  RegimeMismatch,
   TensionEnvelopeScan,
   Termination,
   TerminationId,
@@ -129,8 +135,9 @@ export {
   evaluateVerdict,
   isFamilyAllowed,
   isRegimeAvailable,
+  lineWarnings,
   REGIMES,
-  regimeUnavailableReason,
+  regimeMismatch,
   scanTensionEnvelope,
   TERMINATIONS,
   VERDICT,

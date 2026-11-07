@@ -5,11 +5,12 @@
  *
  * **Read-outs, never editable — and the split against `Résultats` is whether the rider is
  * involved.** Everything rider-free is a deduced value; everything traverse-dependent is a result
- * (A10). That is why this module runs the material chain, `resolveL0` and **one unloaded solve**
- * and stops there: no sweep, no §11 pass, no verdict. An earlier draft had a deduced-values block
- * *and* a results block both claiming the same read-outs, and the rider test is what separates
- * them — both §8.2's stiffening rule and §9.2's creep cap are about the **standing** line, so
- * `flèche / portée` and `tension permanente` belong here and not beside `T max`.
+ * (A10). That is why this module formats `deriveUnloaded`'s result — the material chain, `L₀` and
+ * **one unloaded solve**, run once and shared with the chart scene — and stops there: no sweep, no
+ * §11 pass, no verdict. An earlier draft had a deduced-values block *and* a results block both
+ * claiming the same read-outs, and the rider test is what separates them — both §8.2's stiffening
+ * rule and §9.2's creep cap are about the **standing** line, so `flèche / portée` and `tension
+ * permanente` belong here and not beside `T max`.
  *
  * Rules this module exists to keep:
  *
@@ -32,26 +33,15 @@
  *   — §5.4's chord bound included — and this module neither re-derives nor re-words it.
  */
 
-import type { EngineFailure } from "@/lib/app/refusals.ts";
+import type { PlacedSpan } from "@/lib/scenario/geometry.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
-import type { DerivedMaterial, SpanInput, SpanState, SteelValues } from "@/lib/sim";
+import type { EngineFailure, Unloaded } from "@/lib/scenario/unloaded.ts";
+import type { SteelValues } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { equalAtDisplayPrecision } from "@/lib/format/quantity.ts";
-import { engineTightness } from "@/lib/scenario/tightness.ts";
-import {
-  deriveSteel,
-  deriveTextile,
-  resolveL0,
-  resolveSteelValues,
-  sampleCable,
-  solveSpan,
-  STEEL,
-  steelFormula,
-  TEXTILE,
-  unloadedSag,
-} from "@/lib/sim";
-import { deriveSpan } from "@/lib/terrain/trace.ts";
+import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
+import { resolveSteelValues, STEEL, steelFormula, TEXTILE } from "@/lib/sim";
 
 /** Which of the three steel read-outs the user has typed over, and which of those have gone stale. */
 export type OverrideFlags = { readonly MBF: boolean; readonly EA: boolean; readonly mu: boolean };
@@ -104,6 +94,8 @@ export type DeducedSolve = {
   readonly sagRatio: number;
   /** `Tension permanente`, **percent of `MBF`** — §9.2's cap is 30 %, the useful regime under 7 %. */
   readonly standingTension: number;
+  /** The unloaded anchor tensions, N — what `lineWarnings` reads §9.2's cap against. */
+  readonly Tvide: { readonly TA: number; readonly TB: number };
 };
 
 /** Everything § 3's `Valeurs déduites` block reports, plus why a row is missing when one is. */
@@ -113,9 +105,11 @@ export type Deduced = {
   readonly span: DeducedSpan | null;
   readonly solve: DeducedSolve | null;
   /**
-   * The engine's own refusal, verbatim — `invalid-input{field:"L0"}` is §5.4's chord bound and is
-   * what A11 renders as « Tension impossible », with the bound already re-emitted in the driving
-   * quantity by `resolveL0`. Never re-derived here.
+   * Where the unloaded chain stopped, `null` when it solved. Stages `geometry` and `material` are
+   * « nothing to solve yet » and carry no error. Stages `L0` and `span` carry the engine's own
+   * refusal, verbatim — `invalid-input{field:"L0"}` is §5.4's chord bound and is what A11 renders
+   * as « Tension impossible », with the bound already re-emitted in the driving quantity by
+   * `resolveL0`. Never re-derived here.
    *
    * **The stage travels with it**, because `resolveL0` and `solveSpan` share one error union and
    * `no-convergence` out of the two is two different surfaces: a bracket failure is « Cible
@@ -126,89 +120,52 @@ export type Deduced = {
 };
 
 /**
- * The rider-free half of the chain a parameter change runs: derive the material, resolve `L₀`,
- * solve the unloaded line.
+ * The rider-free half of the chain, derived and formatted in one call — for a caller with no memo
+ * to share. The app derives the line once and calls {@link deducedFrom}.
  *
  * @param trace the active profile — read only in imported mode, where `L` and `h` derive from it.
  */
 export function deduceValues(scenario: ScenarioDraft, trace: Trace | null): Deduced {
-  const material = deducedMaterial(scenario);
-  const span = deducedSpan(scenario, trace);
-  const derived = solverInput(scenario);
+  return deducedFrom(scenario, deriveUnloaded(unloadedInputs(scenario, trace)));
+}
 
-  if (span === null || derived === null) {
-    return { material, span, solve: null, failure: null };
+/**
+ * § 3's read-outs over an already-derived unloaded line. **No solve runs here**: the material
+ * display reads the spec and the unit, every other row reads `unloaded`.
+ */
+export function deducedFrom(
+  scenario: Pick<ScenarioDraft, "material" | "unit">,
+  unloaded: Unloaded,
+): Deduced {
+  const material = deducedMaterial(scenario);
+  const span = deducedSpan(unloaded.span);
+  if (!unloaded.ok) {
+    // The stage and the error alone: the span is a read-out of its own.
+    const { ok: _ok, span: _span, ...failure } = unloaded;
+    return { material, span, solve: null, failure };
   }
 
-  const { L, h } = span;
-  const L0 = resolveL0(engineTightness(scenario.tightness, scenario.rider.mp), {
-    L,
-    h,
-    ...derived,
-  });
-  if (!L0.ok) return { material, span, solve: null, failure: { stage: "L0", error: L0.error } };
-
-  const input: SpanInput = {
-    L,
-    h,
-    L0: L0.value,
-    w: derived.w,
-    EA: derived.EA,
-    loads: [],
-    strength: derived.strength,
-  };
-  const solved = solveSpan(input);
-  if (!solved.ok)
-    return { material, span, solve: null, failure: { stage: "span", error: solved.error } };
-
-  const sag = unloadedSag(solved.state, { L, h });
+  const { L0, state, sag, sagAtX } = unloaded;
   return {
     material,
     span,
     solve: {
-      L0: L0.value,
-      H: solved.state.H,
+      L0,
+      H: state.H,
       sag,
-      sagAtX: sagPosition(solved.state, { L, h }),
-      sagRatio: (sag / L) * 100,
+      sagAtX,
+      sagRatio: (sag / unloaded.span.L) * 100,
       // The **greater unloaded anchor tension**, which is what §9.2's cap is read against — not
       // `H`, whose 2,79 % would flatter the shipped line by a tenth of a point.
-      standingTension: (Math.max(solved.state.TA, solved.state.TB) / derived.strength) * 100,
+      standingTension: (Math.max(state.TA, state.TB) / unloaded.material.strength) * 100,
+      Tvide: { TA: state.TA, TB: state.TB },
     },
     failure: null,
   };
 }
 
-/**
- * Samples of the unloaded line the sag position is scanned over. **The position is scanned, the
- * value is not**: `unloadedSag` is closed-form and owns « 6,00 m », while « (à x 74,8 m) » is an
- * argmax over samples — because the alternative is re-deriving §4.1's `x(s)` in the app, which is
- * the « physics in the UI » § 5 forbids. 2400 samples put a vertex within 0,06 m at 150 m, half a
- * step of the row's own 0,1 m grain, and this runs once per parameter change.
- */
-const SAG_SCAN = 2400;
-
-/**
- * Where the unloaded line hangs lowest below the A–B chord — the « (à x 74,8 m) » § 3 prints
- * beside « Flèche à vide ». Nothing downstream reads it: it is a read-out and not an input.
- */
-function sagPosition(state: SpanState, span: { L: number; h: number }): number {
-  const samples = sampleCable(state, SAG_SCAN);
-  let deepest = Number.NEGATIVE_INFINITY;
-  let atX = 0;
-  for (let i = 0; i < samples.length; i += 2) {
-    const x = samples[i];
-    const drop = (span.h * x) / span.L - samples[i + 1];
-    if (drop > deepest) {
-      deepest = drop;
-      atX = x;
-    }
-  }
-  return atX;
-}
-
 /** § 3's material read-outs, overrides and stale badges included. */
-function deducedMaterial(scenario: ScenarioDraft): DeducedMaterial {
+function deducedMaterial(scenario: Pick<ScenarioDraft, "material" | "unit">): DeducedMaterial {
   const spec = scenario.material;
   const none: OverrideFlags = { MBF: false, EA: false, mu: false };
 
@@ -258,27 +215,13 @@ function deducedMaterial(scenario: ScenarioDraft): DeducedMaterial {
 }
 
 /** The span, typed in manual mode and derived from the stations in imported mode. */
-function deducedSpan(scenario: ScenarioDraft, trace: Trace | null): DeducedSpan | null {
-  const { geometry } = scenario;
-  if (geometry.source === "manual") {
-    const { L, h } = geometry;
-    if (!Number.isFinite(L) || L <= 0 || !Number.isFinite(h)) return null;
-    return { L, h, chord: Math.hypot(L, h), bases: null };
-  }
-  if (trace === null || !(geometry.sb > geometry.sa)) return null;
-  const { L, h, zBaseA, zBaseB } = deriveSpan(
-    trace,
-    { station: geometry.sa, height: scenario.anchors.zA },
-    { station: geometry.sb, height: scenario.anchors.zB },
-  );
-  return { L, h, chord: Math.hypot(L, h), bases: { zBaseA, zBaseB } };
-}
-
-/** What the solver consumes, or `null` while a textile draft still has § 9's blanks. */
-function solverInput(scenario: ScenarioDraft): DerivedMaterial | null {
-  const spec = scenario.material;
-  if (spec.family === "steel") return deriveSteel(spec);
-  const { MBL, mu, k } = spec;
-  if (MBL === null || mu === null || k === null) return null;
-  return deriveTextile({ family: "textile", ropeClass: spec.ropeClass, MBL, mu, k });
+function deducedSpan(placed: PlacedSpan | null): DeducedSpan | null {
+  if (placed === null) return null;
+  const { L, h, onTrace } = placed;
+  return {
+    L,
+    h,
+    chord: Math.hypot(L, h),
+    bases: onTrace === null ? null : { zBaseA: onTrace.zBaseA, zBaseB: onTrace.zBaseB },
+  };
 }
