@@ -8,9 +8,8 @@
  * over 260 steps twice per parameter change *and* be able to disagree with the block 300 px below
  * it about which cell governs.
  *
- * **`rider.xD` is deliberately not a dependency**: everything reported here is a traverse
- * aggregate, so a scrub — which dispatches a fresh Scenario per frame — changes none of it. The
- * rest of the Scenario is listed field by field, which is what makes that safe.
+ * **`rider.xD` is deliberately not an input**: everything reported here is a traverse aggregate,
+ * so the memo keys on `useTraverse`'s Scenario without it, which a scrub leaves identical.
  */
 
 import { useMemo } from "react";
@@ -18,38 +17,26 @@ import { useMemo } from "react";
 import type { SceneBase } from "@/lib/chart/scene.ts";
 import type { GateReport } from "@/lib/rail/gates.ts";
 import type { Results } from "@/lib/rail/results.ts";
+import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 
 import { deriveResults } from "@/lib/rail/results.ts";
 
 import { useAppState } from "./store.tsx";
 
 /**
+ * @param traverse `useTraverse`'s Scenario without `x_D`.
  * @param report the **standing** gate report. It is threaded rather than re-derived because a
  *   committed-invalid value lives in the form and never reaches the Scenario: `deriveResults`
  *   evaluating its own gates would print a verdict under a banner announcing there is none.
  */
-export function useResults(base: SceneBase | null, report: GateReport): Results | null {
-  const { scenario, trace } = useAppState();
-
+export function useResults(
+  traverse: TraverseScenario,
+  base: SceneBase | null,
+  report: GateReport,
+): Results | null {
+  const { trace } = useAppState();
   return useMemo(
-    () => deriveResults({ scenario, trace, base, report }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      report,
-      scenario.unit,
-      scenario.usage,
-      scenario.regime,
-      scenario.geometry,
-      scenario.anchors,
-      scenario.tightness,
-      scenario.material,
-      scenario.terminations,
-      scenario.rider.mp,
-      scenario.rider.hRider,
-      scenario.rider.hClearMin,
-      scenario.rider.DAF,
-      trace,
-      base,
-    ],
+    () => deriveResults({ scenario: traverse, trace, base, report }),
+    [traverse, trace, base, report],
   );
 }

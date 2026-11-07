@@ -45,6 +45,7 @@
  *   than cascading a silent second repair.
  */
 
+import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { RegimeId } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
@@ -134,7 +135,7 @@ export type GateReport = {
 
 /** What the gates read. Everything else in the app is downstream of these three. */
 export type GateInput = {
-  readonly scenario: ScenarioDraft;
+  readonly scenario: TraverseScenario;
   /** The active profile, or `null` in manual mode — the stations' bound comes from it. */
   readonly trace: Trace | null;
   /**
@@ -221,7 +222,7 @@ function unavailabilityCause(regime: RegimeId, family: "steel" | "textile"): str
 }
 
 /** Manual or imported geometry — the mode half of every (grandeur × mode) row. */
-function geometryMode(scenario: ScenarioDraft): "manual" | "trace" {
+function geometryMode(scenario: TraverseScenario): "manual" | "trace" {
   return scenario.geometry.source;
 }
 
@@ -230,7 +231,7 @@ function geometryMode(scenario: ScenarioDraft): "manual" | "trace" {
  * driver does not render cannot be a culprit — a stale issue on `MBL` under `fam=ac` would block a
  * steel line on a rope nobody can see.
  */
-export function isFieldActive(id: FieldId, scenario: ScenarioDraft): boolean {
+export function isFieldActive(id: FieldId, scenario: TraverseScenario): boolean {
   const manual = scenario.geometry.source === "manual";
   const steel = scenario.material.family === "steel";
   switch (id) {
@@ -475,7 +476,7 @@ export function evaluateGates({ scenario, trace, issues = [] }: GateInput): Gate
 }
 
 /** The driving tightness field and its value — exactly one is state per mode, by construction. */
-function tightnessScalar(scenario: ScenarioDraft): readonly (readonly [FieldId, number])[] {
+function tightnessScalar(scenario: TraverseScenario): readonly (readonly [FieldId, number])[] {
   const { tightness } = scenario;
   if (tightness.mode === "sag") return [["D_target", tightness.D_target]];
   if (tightness.mode === "tension") return [["H_target", tightness.H_target]];
@@ -484,7 +485,7 @@ function tightnessScalar(scenario: ScenarioDraft): readonly (readonly [FieldId, 
 }
 
 /** The active Material Spec's own numbers, overrides included — they are their own culprits. */
-function materialScalars(scenario: ScenarioDraft): readonly (readonly [FieldId, number])[] {
+function materialScalars(scenario: TraverseScenario): readonly (readonly [FieldId, number])[] {
   const spec = scenario.material;
   if (spec.family === "steel") {
     const out: (readonly [FieldId, number])[] = [["d", spec.d]];
