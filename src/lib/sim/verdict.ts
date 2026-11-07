@@ -191,8 +191,9 @@ export type Termination = {
   readonly personProhibited: boolean;
   /**
    * A knot. §10.3 prohibits knots on HMPE — 0,25–0,50 describes a knot that *slips*, so there is
-   * no efficiency to multiply by. The picker **disables** the option with that reason rather than
-   * erroring: where no number exists there is nothing to compute with, hence nothing to judge.
+   * no efficiency to multiply by. The picker **disables** the option with that reason, and a knot
+   * on HMPE that arrives anyway blocks the Verdict Gate: where no number exists there is nothing
+   * to judge.
    */
   readonly knot: boolean;
 };
@@ -323,16 +324,11 @@ export const VERDICT = {
 /**
  * What the verdict needs, and nothing else — « v1 build spec » § 2, *The verdict entry point*.
  *
- * Two fields are **additions to § 2's code block**, for the same reason `SpanInput.strength` is
- * one: the obligation the spec states is unimplementable through the fields it lists.
- *
- * - **`family`** — §10.4's gate is a *family × usage* rule, and `strength` is `MBF` or `MBL`
- *   without saying which. Inferring the family from a termination id was rejected: it would make
- *   a use-class refusal depend on a hardware pick, so a textile rope with (impossible) steel
- *   terminations would walk through the gate.
- * - **`sagRatio`** — § 6's warning tier is scored here, beside the DAF figure the second warning
- *   qualifies. **Optional**: omitted, the two taut-line warnings simply do not fire, so every
- *   call site § 2 fixes still type-checks unchanged.
+ * **`family`** is an addition to § 2's code block, for the same reason `SpanInput.strength` is
+ * one: §10.4's gate is a *family × usage* rule, and `strength` is `MBF` or `MBL` without saying
+ * which. Inferring the family from a termination id was rejected: it would make a use-class refusal
+ * depend on a hardware pick, so a textile rope with (impossible) steel terminations would walk
+ * through the gate.
  */
 export type VerdictInput = {
   /** The solved traverse. The **failed** steps are absent — `coverage` is what reports them. */
@@ -355,8 +351,6 @@ export type VerdictInput = {
   terminations: { A: TerminationId; B: TerminationId };
   /** §10.4's other half: `PERMANENTE` ⇒ steel only. */
   family: "steel" | "textile";
-  /** Flèche à vide / portée, dimensionless — § 6's warning tier. Omitted ⇒ no sag warning. */
-  sagRatio?: number;
 };
 
 /** The three states a **cell** can hold. The other two verdict states are properties of the line. */
@@ -377,7 +371,9 @@ export type RefusalId =
   /** § 6 — « Secours textile 10:1 » presupposes family B under a temporary use class. */
   | "regime-indisponible-pour-cette-ligne";
 
-/** § 6's Avertissement tier, the two rows this module owns plus §9.2's creep cap. */
+/**
+ * § 6's Avertissement tier: §8.2's two taut-line rows and §9.2's creep cap — {@link lineWarnings}.
+ */
 export type VerdictWarningId =
   /** §8.2 — below 3 % the line stiffens and the model starts mis-reporting dynamics. */
   | "fleche-sur-portee-sous-3-pct"
@@ -448,67 +444,39 @@ export type VerdictResult = {
   } | null;
   /** What the régime demands and this app cannot evaluate — hence: never a claim of conformity. */
   obligations: readonly ObligationId[];
-  warnings: VerdictWarningId[];
 };
 
 /**
- * § 6's one availability rule. Only « Secours textile 10:1 » is ever unavailable — under steel or
- * under `PERMANENTE` — because it presupposes family B. A régime that is merely conservative for
- * the line is **not** unavailable, and the app has no authority to refuse it.
+ * Which of a régime's `requires` clauses the line misses — `null` where the régime is available.
+ * Both flags can be set at once (steel *and* `PERMANENTE`), so a caller wording the reason can name
+ * every cause rather than the first one it tests.
  */
+export type RegimeMismatch = { readonly family: boolean; readonly usage: boolean };
+
+/**
+ * § 6's one availability rule, as data. Only « Secours textile 10:1 » carries a requirement —
+ * family B under a temporary use class — and a régime that is merely conservative for the line is
+ * **not** unavailable: the app has no authority to refuse it. The sentences that explain a mismatch
+ * are the app's; this returns which clauses failed.
+ */
+export function regimeMismatch(
+  regime: RegimeId,
+  family: "steel" | "textile",
+  usage: "PERMANENTE" | "TEMPORAIRE",
+): RegimeMismatch | null {
+  const { requires } = REGIMES[regime];
+  if (requires === null) return null;
+  const mismatch = { family: requires.family !== family, usage: requires.usage !== usage };
+  return mismatch.family || mismatch.usage ? mismatch : null;
+}
+
+/** {@link regimeMismatch} as the pickers' predicate. */
 export function isRegimeAvailable(
   regime: RegimeId,
   family: "steel" | "textile",
   usage: "PERMANENTE" | "TEMPORAIRE",
 ): boolean {
-  const { requires } = REGIMES[regime];
-  return requires === null || (requires.family === family && requires.usage === usage);
-}
-
-/** What a régime's `requires` asks for, as the noun the reason sentence needs. */
-const FAMILY_REQUIRED = { steel: "un câble acier", textile: "une corde textile" } as const;
-const USAGE_REQUIRED = {
-  PERMANENTE: "un usage permanent",
-  TEMPORAIRE: "un usage temporaire",
-} as const;
-/** And what is currently selected, for the clause that names it. */
-const FAMILY_ACTIVE = { steel: "l'acier", textile: "le textile" } as const;
-
-/**
- * § 10.1 — « une entrée indisponible **montre sa raison** ». `null` where the entry is choosable,
- * so a caller renders the note only when there is something to say.
- *
- * **Derived from `requires`, never from the régime's identity.** {@link isRegimeAvailable} is one
- * predicate over that field; writing per-régime copy would put a second table beside the one that
- * decides, and the two would drift the first time a régime gained a requirement. Today only
- * « Secours textile — 10:1 » carries one.
- *
- * **Three forms, not two, because both clauses can fail at once** — steel *and* `PERMANENTE`. § 10.1
- * asks for one reason per row, so the pair is one sentence rather than two notes.
- *
- * The string is the whole answer: the option itself already reads « — indisponible » inside the
- * select, which says *that*; this says *why*, which is what § 10.1 actually requires and what the
- * shipped tree did not have.
- */
-export function regimeUnavailableReason(
-  regime: RegimeId,
-  family: "steel" | "textile",
-  usage: "PERMANENTE" | "TEMPORAIRE",
-): string | null {
-  const { requires } = REGIMES[regime];
-  if (requires === null) return null;
-  const wrongFamily = requires.family !== family;
-  const wrongUsage = requires.usage !== usage;
-  if (wrongFamily && wrongUsage) {
-    return `Indisponible — ce régime suppose ${FAMILY_REQUIRED[requires.family]} et ${USAGE_REQUIRED[requires.usage]}.`;
-  }
-  if (wrongFamily) {
-    return `Indisponible — ce régime suppose ${FAMILY_REQUIRED[requires.family]} ; la famille active est ${FAMILY_ACTIVE[family]}.`;
-  }
-  if (wrongUsage) {
-    return `Indisponible — ce régime ne couvre pas ${USAGE_REQUIRED[usage]}.`;
-  }
-  return null;
+  return regimeMismatch(regime, family, usage) === null;
 }
 
 /** §10.4, as the theory doc states it: permanent public attractions are steel only. */
@@ -527,6 +495,40 @@ export function allowableTension(eta: number, strength: number, k: number): numb
 /** §8.2's envelope for one end at one step: `T_vide + DAF·(T_chargé − T_vide)`. */
 export function amplifiedTension(Tvide: number, Tcharge: number, DAF: number): number {
   return Tvide + DAF * (Tcharge - Tvide);
+}
+
+/** What § 6's Avertissement tier reads: the standing line alone, with no régime and no rider. */
+export type LineWarningInput = {
+  readonly family: "steel" | "textile";
+  /** Flèche à vide / portée, dimensionless. */
+  readonly sagRatio: number;
+  /** **One** unloaded solve, per end, N. */
+  readonly Tvide: { readonly TA: number; readonly TB: number };
+  /** `MBF` (steel) or `MBL` (textile), N. */
+  readonly strength: number;
+};
+
+/**
+ * § 6's warning tier — §8.2's stiffening threshold and §9.2's textile creep cap, the one place each
+ * is compared. **Régime-free**: both are properties of the standing line, true whatever régime is
+ * selected and on a screen where none is, which is where {@link evaluateVerdict} is not called.
+ */
+export function lineWarnings(i: LineWarningInput): VerdictWarningId[] {
+  const warnings: VerdictWarningId[] = [];
+  if (i.sagRatio < VERDICT.sagRatioWarning) {
+    warnings.push("fleche-sur-portee-sous-3-pct");
+    // Not a duplicate of the line above: one qualifies `flèche / portée`, the other qualifies the
+    // `DAF` figure, whose 1,2 ceiling was measured on a controlled step-off on a *taut* line. A
+    // taut line therefore always shows both, across the whole feasible band — do not remove one.
+    warnings.push("daf-hors-de-son-regime-de-mesure");
+  }
+  if (
+    i.family === "textile" &&
+    Math.max(i.Tvide.TA, i.Tvide.TB) > VERDICT.standingTensionCap * i.strength
+  ) {
+    warnings.push("tension-permanente-sur-30-pct-mbl");
+  }
+  return warnings;
 }
 
 /**
@@ -664,14 +666,14 @@ function requirePositive(name: string, value: number): void {
  *
  * 1. **The two use-class refusals, then §10.2's prohibition.** All three survive any margin, so
  *    none of them may be reached *through* the numbers. The app normally catches the first two
- *    earlier still — §10.4's family gate and « Régime indisponible » are blocking errors with Fix
- *    Actions, above the verdict in the banner's precedence — but the engine refuses rather than
+ *    earlier still — §10.4's family gate and the régime-availability gate are blocking errors with
+ *    Fix Actions, above the verdict in the banner's precedence — but the engine refuses rather than
  *    trusting that, because the alternative is a computed pass on a prohibited line.
  * 2. **`coverage < 1` ⇒ `Indéterminé`**, suppressing the verdict and leaving the converged cells
  *    on screen.
  * 3. Otherwise the grid decides, and the banner names the governing cell.
  *
- * The envelopes, the grid and the warnings are computed in **every** case — a refusal still has a
+ * The envelopes and the grid are computed in **every** case — a refusal still has a
  * `T max` and a `FS effectif` to show, which is exactly § 6's point about a refusal surviving an
  * ample margin.
  *
@@ -783,21 +785,6 @@ export function evaluateVerdict(v: VerdictInput): VerdictResult {
     }
   }
 
-  const warnings: VerdictWarningId[] = [];
-  if (v.sagRatio !== undefined && v.sagRatio < VERDICT.sagRatioWarning) {
-    warnings.push("fleche-sur-portee-sous-3-pct");
-    // Not a duplicate of the line above: one qualifies `flèche / portée`, the other qualifies the
-    // `DAF` figure, whose 1,2 ceiling was measured on a controlled step-off on a *taut* line. A
-    // taut line therefore always shows both, across the whole feasible band — do not remove one.
-    warnings.push("daf-hors-de-son-regime-de-mesure");
-  }
-  if (
-    v.family === "textile" &&
-    Math.max(v.Tvide.TA, v.Tvide.TB) > VERDICT.standingTensionCap * strength
-  ) {
-    warnings.push("tension-permanente-sur-30-pct-mbl");
-  }
-
   const refusal: RefusalId | null = !isFamilyAllowed(v.family, v.usage)
     ? "textile-en-installation-permanente"
     : !isRegimeAvailable(v.regime, v.family, v.usage)
@@ -828,6 +815,5 @@ export function evaluateVerdict(v: VerdictInput): VerdictResult {
     reserve,
     suspendedLoad,
     obligations: regime.obligations,
-    warnings,
   };
 }

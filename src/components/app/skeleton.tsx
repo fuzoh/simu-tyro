@@ -27,6 +27,8 @@
  * to script. **A state nobody scripts there is a state nobody checks.**
  */
 
+import { CELL_IDS, CELL_LABEL } from "@/lib/rail/cells.ts";
+
 import {
   BannerSlot,
   NOSCRIPT_LINE,
@@ -62,8 +64,8 @@ export function Skeleton() {
           <StripBand />
           <ViewStripSlot />
           <ReadOutCells>
-            {READ_OUT_CELLS.map((cell) => (
-              <ReadOutCell className={cell.basis} key={cell.label} label={cell.label} />
+            {CELL_IDS.map((id) => (
+              <ReadOutCell className={READ_OUT_CELLS[id].basis} key={id} label={CELL_LABEL[id]} />
             ))}
           </ReadOutCells>
         </>

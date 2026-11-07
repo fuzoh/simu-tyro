@@ -1,13 +1,14 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
-import type { ScenarioDraft } from "@/lib/scenario/types.ts";
+import type { ForceUnit, ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
+import { initialAppState } from "@/lib/app/state.ts";
 import { formatQuantity, roundToDisplay } from "@/lib/format/quantity.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { steelFormula } from "@/lib/sim";
 
-import { deduceValues } from "./deduced.ts";
+import { deducedRows, deduceValues } from "./deduced.ts";
 
 /**
  * `Valeurs déduites` — « v1 build spec » § 3's read-out table and § 9's opening screen, region by
@@ -144,6 +145,69 @@ describe("the stale Override badge — derived on every load, at display precisi
   });
 });
 
+describe("the rider and unit fields the read-outs depend on — `mp` and `unit`", () => {
+  test("Rapport V resolves `L₀` against the passenger mass: mp 80 and 120 kg differ", () => {
+    const at = (mp: number) =>
+      deduceValues(
+        scenario((draft) => {
+          draft.tightness = { mode: "ratio", ratio: 0.2 };
+          draft.rider.mp = mp;
+        }),
+        null,
+      ).solve;
+    const light = at(80);
+    const heavy = at(120);
+    expect(light).not.toBeNull();
+    expect(heavy).not.toBeNull();
+    // [MEASURED] issue #30: H is 3924 N at 80 kg and 5886 N at 120 kg (proportional to mp).
+    expect(light?.H).toBeCloseTo(3924, 0);
+    expect(heavy?.H).toBeCloseTo(5886, 0);
+    expect(light?.L0).toBeCloseTo(151.25, 2);
+    expect(heavy?.L0).toBeCloseTo(151.06, 2);
+  });
+
+  test("the stale flag compares at the unit's precision: 90736 N is fresh in daN, stale in kgf", () => {
+    // Formula 90737,28 N reads 9074 daN and 9253 kgf; the override reads 9074 daN and 9252 kgf.
+    const at = (unit: ForceUnit) =>
+      deduceValues(
+        scenario((draft) => {
+          draft.unit = unit;
+          draft.material = {
+            family: "steel",
+            d: 12,
+            R0: 1770,
+            construction: "iwrc",
+            overrides: { MBF: 90736 },
+          };
+        }),
+        null,
+      ).material.stale.MBF;
+    expect(at("daN")).toBe(false);
+    expect(at("kgf")).toBe(true);
+  });
+});
+
+describe("`Tvide` — the unloaded anchor tensions the creep cap is read against", () => {
+  const tvide = (patch: (draft: ScenarioDraft) => void) => {
+    const solve = deduceValues(scenario(patch), null).solve;
+    if (solve === null) throw new Error("the shipped line solves");
+    return { ...solve.Tvide, H: solve.H };
+  };
+
+  test("a level span hangs symmetrically: TA equals TB", () => {
+    const { TA, TB } = tvide((draft) => {
+      draft.geometry = { source: "manual", L: 150, h: 0 };
+    });
+    expect(TA).toBeCloseTo(TB, 6);
+  });
+
+  test("the higher anchor carries more: A is 18 m above B on the shipped line, so TA > TB > H", () => {
+    const { TA, TB, H } = tvide(() => {});
+    expect(TA).toBeGreaterThan(TB);
+    expect(TB).toBeGreaterThan(H);
+  });
+});
+
 describe("textile — four inputs, exactly one derived value, and no override affordance", () => {
   const rope = (patch: Partial<{ MBL: number | null; mu: number | null; k: number | null }>) =>
     scenario((draft) => {
@@ -178,10 +242,62 @@ describe("textile — four inputs, exactly one derived value, and no override af
 
   test("a spec with blanks reaches no solve and reports no engine error", () => {
     // The engine is never handed an incomplete spec: that is what the Solve Gate is for, and an
-    // absent solve here is a gate's business, not a refusal to surface.
+    // absent solve here is a gate's business, not a refusal to surface — stage `material`, no
+    // error.
     const { solve, failure } = deduceValues(rope({}), null);
     expect(solve).toBeNull();
-    expect(failure).toBeNull();
+    expect(failure).toEqual({ stage: "material", error: null });
+  });
+});
+
+describe("an invalid span — stage `geometry`, and the material still reads", () => {
+  test("`L` −5 stops at `geometry` while every material row stays populated", () => {
+    const negative = scenario((draft) => {
+      draft.geometry = { source: "manual", L: -5, h: -18 };
+    });
+    const { material, span, solve, failure } = deduceValues(negative, null);
+    expect(failure).toEqual({ stage: "geometry", error: null });
+    expect(span).toBeNull();
+    expect(solve).toBeNull();
+    expect(formatQuantity("MBF", material.strength ?? NaN)).toBe("9074 daN");
+    expect(formatQuantity("EA", material.EA ?? NaN)).toBe("6,90 MN");
+    expect(formatQuantity("mu", material.mu ?? NaN)).toBe("0,5465 kg/m");
+    expect(formatQuantity("w", material.w ?? NaN)).toBe("0,536 daN/m");
+  });
+});
+
+describe("a formatter, not a second chain — `vi.mock` on the engine barrel", () => {
+  test("`deducedFrom` adds no solve and no sample scan to the one derivation", async () => {
+    vi.resetModules();
+    const spies: {
+      resolveL0?: ReturnType<typeof vi.fn>;
+      solveSpan?: ReturnType<typeof vi.fn>;
+      sampleCable?: ReturnType<typeof vi.fn>;
+    } = {};
+    vi.doMock("@/lib/sim", async () => {
+      const sim = await vi.importActual<typeof import("@/lib/sim")>("@/lib/sim");
+      spies.resolveL0 = vi.fn<typeof sim.resolveL0>(sim.resolveL0);
+      spies.solveSpan = vi.fn<typeof sim.solveSpan>(sim.solveSpan);
+      spies.sampleCable = vi.fn<typeof sim.sampleCable>(sim.sampleCable);
+      return {
+        ...sim,
+        resolveL0: spies.resolveL0,
+        solveSpan: spies.solveSpan,
+        sampleCable: spies.sampleCable,
+      };
+    });
+    const { deriveUnloaded, unloadedInputs } = await import("@/lib/scenario/unloaded.ts");
+    const { deducedFrom } = await import("./deduced.ts");
+
+    const draft = scenario();
+    const unloaded = deriveUnloaded(unloadedInputs(draft, null));
+    const { solve } = deducedFrom(draft, unloaded);
+    expect(formatQuantity("extremumX", solve?.sagAtX ?? NaN)).toBe("74,8 m");
+    expect(spies.resolveL0).toHaveBeenCalledTimes(1);
+    expect(spies.solveSpan).toHaveBeenCalledTimes(1);
+    expect(spies.sampleCable).not.toHaveBeenCalled();
+    vi.doUnmock("@/lib/sim");
+    vi.resetModules();
   });
 });
 
@@ -256,5 +372,86 @@ describe("the engine keeps every physical rule, and its refusal travels verbatim
     // The copy states a tension and never « soit L₀ ≥ 197,40 m »: a second equivalent invites the
     // user to type a length into a tension field.
     expect(failure?.error).toMatchObject({ kind: "invalid-input", field: "H_target" });
+  });
+});
+
+describe("`deducedRows` — the rows the Rail prints, decided outside the component", () => {
+  /** What a row shows: the label, the value and the ⚠ copy, without the ids the test would echo. */
+  const shown = (rows: ReturnType<typeof deducedRows>) =>
+    rows.map(({ label, value, warning }) => [label, value, warning]);
+
+  test("the opening screen's six read-only rows, as the Rail printed them before the move", () => {
+    // Read off the running app at `/` with an empty Session. `Flèche` drives, so its read-out is
+    // the field and not a row; the three steel Override rows are fields of their own.
+    const opening = scenario();
+    const rows = deducedRows(opening, deduceValues(opening, null), null);
+    expect(shown(rows)).toEqual([
+      ["Poids linéique", "0,536 daN/m", null],
+      ["Corde", "151,08 m", null],
+      ["Longueur non tendue", "151,64 m", null],
+      ["Prétension", "253,5 daN", null],
+      ["Flèche / portée", "4,00 %", null],
+      ["Tension permanente", "2,90 % MBF", null],
+    ]);
+    expect(rows.every((row) => row.group === "line")).toBe(true);
+  });
+
+  test("a textile line driven by tension: the flèche row, its x, the ⚠ and the MBL suffix", () => {
+    // Read off the running app at this link before the move, rows and ⚠ copy alike.
+    const query =
+      "?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&te=253.5&fam=tx&mu=0.07&cls=hmpe&mbl=2200" +
+      "&k=1.5&ta=epissure&tb=epissure&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=75";
+    const { scenario: textile } = initialAppState({ query, session: null });
+    expect(shown(deducedRows(textile, deduceValues(textile, null), null))).toEqual([
+      ["Charge de rupture", "2200 daN", null],
+      ["Raideur axiale", "0,03 MN", null],
+      ["Poids linéique", "0,069 daN/m", null],
+      ["Corde", "151,08 m", null],
+      ["Longueur non tendue", "140,23 m", null],
+      ["Flèche à vide", "0,71 m (à x 75,0 m)", null],
+      [
+        "Flèche / portée",
+        "0,47 %",
+        "flèche / portée sous 3 % — la ligne se raidit et le modèle rapporte mal la réponse dynamique (§8.2).",
+      ],
+      ["Tension permanente", "11,63 % MBL", null],
+    ]);
+  });
+
+  test("a length-driven line hides « Longueur non tendue » and shows the other two drivers", () => {
+    // Read off the running app at `?lo=151` before the move.
+    const { scenario: byLength } = initialAppState({ query: "?lo=151", session: null });
+    const rows = shown(deducedRows(byLength, deduceValues(byLength, null), null));
+    expect(rows.map(([label]) => label)).not.toContain("Longueur non tendue");
+    expect(rows).toContainEqual(["Prétension", "707,6 daN", null]);
+    expect(rows).toContainEqual(["Flèche à vide", "2,14 m (à x 74,9 m)", null]);
+  });
+
+  test("under a cause the five solve rows go, and `w` and `corde` stay", () => {
+    const opening = scenario();
+    const rows = deducedRows(
+      opening,
+      deduceValues(opening, null),
+      "Aucun résultat — portée invalide.",
+    );
+    expect(rows.map((row) => row.label)).toEqual(["Poids linéique", "Corde"]);
+  });
+
+  test("an imported profile puts `Portée`, `Dénivelé` and both base altitudes first", () => {
+    const imported = scenario((draft) => {
+      draft.geometry = { source: "trace", trace: "p1.x", sa: 56, sb: 224 };
+      draft.anchors = { zA: 4, zB: 2.5 };
+    });
+    const rows = deducedRows(imported, deduceValues(imported, TRACE), null);
+    // L = 224 − 56 = 168; z(56) = 530, so h = (500 + 2,5) − (530 + 4) = −31,5;
+    // corde = √(168² + 31,5²) = √29 216,25 = 170,928.
+    expect(shown(rows.filter((row) => row.group === "placement"))).toEqual([
+      ["Portée", "168,0 m", null],
+      ["Dénivelé", "-31,5 m", null],
+      ["Alt. base A", "530,0 m", null],
+      ["Alt. base B", "500,0 m", null],
+    ]);
+    expect(rows.slice(0, 4).every((row) => row.group === "placement")).toBe(true);
+    expect(rows.find((row) => row.label === "Corde")?.value).toBe("170,93 m");
   });
 });

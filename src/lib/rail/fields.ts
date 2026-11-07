@@ -41,10 +41,11 @@
 import * as v from "valibot";
 
 import type { QuantityId } from "@/lib/format/quantity.ts";
-import type { ForceUnit } from "@/lib/scenario/types.ts";
-import type { TextileSpec } from "@/lib/sim";
+import type { ForceUnit, TightnessDraft } from "@/lib/scenario/types.ts";
+import type { SteelSpec, TextileSpec } from "@/lib/sim";
 
 import { formatQuantity, formatValue, fromDisplay, roundToDisplay } from "@/lib/format/quantity.ts";
+import { clampX } from "@/lib/scenario/geometry.ts";
 
 /**
  * § 7's three gates. Declared here rather than in `./gates.ts` because every field names the gate
@@ -343,8 +344,8 @@ export const FIELDS = {
     label: "Terminaison A",
     errorLabel: "Terminaison A",
     quantity: null,
-    // Terminations are handled by **disabling with the reason**, never by an error: where §10.3
-    // publishes no defensible `η_t` there is no number to compute with, hence nothing to judge.
+    // No tier-one rule: the picker disables what the line cannot use, and an end that arrives
+    // anyway is a scenario-level Verdict error in `./gates.ts` (ADR-0001).
     rule: null,
     warning: null,
     gate: "verdict",
@@ -470,6 +471,20 @@ export const FIELDS = {
 export const FIELD_ORDER = Object.keys(FIELDS) as readonly FieldId[];
 
 /**
+ * The field each Tightness Driver edits — the one place a driver is mapped to its field, so the
+ * segmented control, the gates, the refusals and the link all agree on it.
+ */
+export const TIGHTNESS_FIELD = {
+  sag: "D_target",
+  tension: "H_target",
+  length: "L0",
+  ratio: "vRatio",
+} as const satisfies Record<TightnessDraft["mode"], FieldId>;
+
+/** A field a Tightness Driver edits. */
+export type TightnessFieldId = (typeof TIGHTNESS_FIELD)[TightnessDraft["mode"]];
+
+/**
  * The three fields of the `Passager` group land in **three different gates**, which is itself the
  * evidence the split was right. Asserted rather than commented, because a later « tidy » that
  * grouped the gate by rail section would silently undo § 7's central finding.
@@ -526,6 +541,21 @@ export function parseDecimal(raw: string): number | null {
 }
 
 /**
+ * What the View Strip's `x` field commits for the text in it: `null` when the text is not a number
+ * (the field reverts to the last committed position and says nothing), otherwise the position
+ * clamped into `[0, L]` and whether the clamp moved it.
+ */
+export function riderPositionEntry(
+  raw: string,
+  L: number,
+): { readonly xD: number; readonly clamped: boolean } | null {
+  const typed = parseDecimal(raw);
+  if (typed === null) return null;
+  const xD = clampX(typed, L);
+  return { xD, clamped: xD !== typed };
+}
+
+/**
  * The value as the message echoes it: at the field's own display precision, in its own unit, from
  * a value **in the field's display unit** (which is what the user typed).
  *
@@ -554,6 +584,45 @@ export function lowerFirst(label: string): string {
     return label;
   }
   return first.toLocaleLowerCase("fr") + label.slice(1);
+}
+
+/** The breaking strength's symbol: `MBF` for a steel cable, `MBL` for a textile rope. */
+export type StrengthSymbol = "MBF" | "MBL";
+
+/** What the strength a percentage or a formula is read against is called on this family. */
+export function strengthSymbol(family: "steel" | "textile"): StrengthSymbol {
+  return family === "steel" ? "MBF" : "MBL";
+}
+
+/**
+ * `Classe de corde`'s entries, in the Rail's order. The link strip prints them mid-sentence
+ * through {@link lowerFirst}, so « Polyamide » reads « polyamide » there and « HMPE » stays.
+ */
+export const ROPE_CLASS_LABEL = {
+  hmpe: "HMPE 12 torons",
+  "pa-en1891a": "Polyamide EN 1891 type A",
+  polyester: "Polyester semi-statique",
+} as const satisfies Record<TextileSpec["ropeClass"], string>;
+
+/** `Construction`'s core, which is all the link strip names; the Rail's picker prefixes the lay. */
+export const CONSTRUCTION_LABEL = {
+  "fibre-core": "âme textile",
+  iwrc: "âme métallique",
+} as const satisfies Record<SteelSpec["construction"], string>;
+
+/** One picker entry. */
+export type PickerOption<Id extends string> = { readonly value: Id; readonly label: string };
+
+export const ROPE_CLASS_OPTIONS = pickerOptions(ROPE_CLASS_LABEL);
+
+export const CONSTRUCTION_OPTIONS = pickerOptions(CONSTRUCTION_LABEL, "6×19 ");
+
+/** A label table as a picker's entries, in the table's order. */
+function pickerOptions<Id extends string>(
+  labels: Readonly<Record<Id, string>>,
+  prefix = "",
+): readonly PickerOption<Id>[] {
+  return (Object.keys(labels) as Id[]).map((value) => ({ value, label: prefix + labels[value] }));
 }
 
 /**

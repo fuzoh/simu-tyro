@@ -1,6 +1,9 @@
 import { describe, expect, test } from "vitest";
 
+import type { ValidatedSearch } from "@/lib/url/schema.ts";
+
 import { initialAppState } from "@/lib/app/state.ts";
+import { TRACE_P1 } from "@/lib/url/__fixtures__/canonical-links.ts";
 
 import { linkStrip } from "./link-strip.ts";
 
@@ -42,6 +45,20 @@ describe("§ 8's first sentence — each dropped key with its reason", () => {
   });
 });
 
+describe("§ 8's first sentence — the `vr` and `gm` keys are named like every other key", () => {
+  test("an unreadable `gm` names the minimum clearance", () => {
+    expect(strip("?L=250&gm=abc")?.ignored).toBe(
+      "Une partie du lien a été ignorée : « gm » n'était pas un nombre (garde min. admise ignorée).",
+    );
+  });
+
+  test("an unreadable `vr` names Rapport V", () => {
+    expect(strip("?L=250&vr=abc")?.ignored).toBe(
+      "Une partie du lien a été ignorée : « vr » n'était pas un nombre (rapport V cible ignoré).",
+    );
+  });
+});
+
 describe("§ 8's second sentence — the completion names the values", () => {
   test("it prints every number the recipient got, at display precision", () => {
     const sentence = strip("?L=250&h=-40")?.completed ?? "";
@@ -52,6 +69,10 @@ describe("§ 8's second sentence — the completion names the values", () => {
     // § 9's `x` is the one non-literal completion: `L/2` of the **completed** span.
     expect(sentence).toContain("position du passager 125,0 m");
     expect(sentence).toMatch(/\.$/);
+  });
+
+  test("the minimum clearance, a safety criterion, is named with its value", () => {
+    expect(strip("?L=250&h=-40")?.completed).toContain("garde min. admise 1,0 m");
   });
 
   test("a token-valued completion is French, never the wire token", () => {
@@ -70,6 +91,64 @@ describe("§ 8's second sentence — the completion names the values", () => {
     const sentence = strip("?L=250&h=-40")?.completed ?? "";
     expect(sentence).not.toContain("régime");
     expect(sentence).not.toContain("charge de rupture");
+  });
+});
+
+describe("an unknown rope class is ignored and the default class is named, never assumed", () => {
+  test("`cls=zzz` is reported as unreadable and the completed class is named", () => {
+    const result = strip("?fam=tx&cls=zzz&L=250");
+    expect(result?.ignored).toBe(
+      "Une partie du lien a été ignorée : « cls » n'était pas une valeur reconnue " +
+        "(classe de corde ignorée).",
+    );
+    expect(result?.completed).toContain("classe de corde HMPE 12 torons");
+  });
+
+  test("a textile link with no `cls` at all names the completed class too", () => {
+    expect(strip("?fam=tx&L=250")?.completed).toContain("classe de corde HMPE 12 torons");
+  });
+
+  test("a textile link with no ends names the textile ends it was given, not the steel cosse", () => {
+    const sentence = strip("?fam=tx&L=250")?.completed ?? "";
+    expect(sentence).toContain("terminaison A Œil cousu / épissuré");
+    expect(sentence).toContain("terminaison B Œil cousu / épissuré");
+    expect(sentence).not.toContain("Cosse");
+  });
+
+  test("a rope link with no `k` names the class's published stiffness and the knot's η", () => {
+    // §13.2: `k` 22 for HMPE; §10.3: figure-eight conservative 0,60, never the shipped 0,90.
+    const sentence = strip("?use=tempo&fam=tx&cls=hmpe&ta=huit")?.completed ?? "";
+    expect(sentence).toContain("raideur relative k 22,0");
+    expect(sentence).toContain("rendement de terminaison A 0,60");
+  });
+
+  test("an imported link with no stations names the two it was given", () => {
+    const query = `?tr=${TRACE_P1}`;
+    expect(strip(query)?.completed).toContain("station A 0,0 m");
+    expect(strip(query)?.completed).toContain("station B 150,0 m");
+  });
+
+  test("each token reads in the French of its domain value", () => {
+    const base = initialAppState({ query: "", session: null }).link;
+    const completedLabel = (rewrite: ValidatedSearch, key: "cls" | "cst") =>
+      linkStrip({ ...base, completed: [key], rewrite })?.completed;
+    expect(completedLabel({ cls: "hmpe" }, "cls")).toContain("classe de corde HMPE 12 torons");
+    expect(completedLabel({ cls: "pa" }, "cls")).toContain(
+      "classe de corde polyamide EN 1891 type A",
+    );
+    expect(completedLabel({ cls: "pes" }, "cls")).toContain(
+      "classe de corde polyester semi-statique",
+    );
+    expect(completedLabel({ cst: "tc" }, "cst")).toContain("construction âme textile");
+    expect(completedLabel({ cst: "iwrc" }, "cst")).toContain("construction âme métallique");
+  });
+});
+
+describe("a completed force is converted from the URL's daN into the screen's unit", () => {
+  test("`te=900` daN prints as 9,000 kN under the kN selector", () => {
+    const base = initialAppState({ query: "", session: null }).link;
+    const link = { ...base, completed: ["te" as const], rewrite: { te: 900 } };
+    expect(linkStrip(link, "kN")?.completed).toContain("prétension cible 9,000 kN");
   });
 });
 

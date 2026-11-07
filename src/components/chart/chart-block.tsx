@@ -9,14 +9,15 @@
  *   the axes coincide only at mid-span and diverge to 8 px at each end — 34 m at a 1500 m span,
  *   precisely at the anchors, which is where the drag handles go.
  * - **Two memos, split at `x_D`.** The scenario's half — material, `L₀`, the unloaded solve, the
- *   sweep, §11 — is keyed on `sceneInputs`, which **omits `x_D`**; the rider's exact solve is keyed
- *   on `x_D` alone. That is the seam § 7 called « the memo on the solve inputs behind `useSweep` »,
- *   and the reason a context store rather than subscription granularity is enough. Keying the whole
- *   derivation on the Scenario would miss it: a drag dispatches a new Scenario on every
- *   `pointermove`, so a 1 px move landing back on the same step would re-run the sweep.
- *   The first half **arrives as a prop**: A10's output half reports the same traverse, so the memo
- *   sits once at the app root (`useSceneBase`) rather than once per consumer. Only the rider's half
- *   is this file's, which is exactly the half a drag frame recomputes.
+ *   sweep, §11 — is keyed on `unloadedInputs`, `mp` and `hRider`, which **omit `x_D`**; the
+ *   rider's exact solve is keyed on `x_D` alone. That is the seam § 7 called « the memo on the
+ *   solve inputs behind `useSweep` », and the reason a context store rather than subscription
+ *   granularity is enough. Keying the whole derivation on the Scenario would miss it: a drag
+ *   dispatches a new Scenario on every `pointermove`, so a 1 px move landing back on the same step
+ *   would re-run the sweep. The first half **arrives as a prop**: A10's output half reports the
+ *   same traverse, so the memo sits once at the app root (`useUnloaded`, then `useScene`) rather
+ *   than once per consumer. Only the rider's half is this file's, which is exactly the half a drag
+ *   frame recomputes.
  * - **The `null` width renders the empty bands**, i.e. the Skeleton's own content, because the
  *   observer's seed is « not measured yet » rather than a guessed 900 px.
  * - **Pointer input snaps, typed input is exact.** Both paths land on the same one action, and the
@@ -45,7 +46,7 @@ import {
 } from "@/components/app/shell.tsx";
 import { useAppDispatch, useAppState } from "@/components/app/store.tsx";
 import { clampToSpan, placeRider, snapToStep } from "@/lib/chart/scene.ts";
-import { formatQuantity, formatValue, roundToDisplay } from "@/lib/format/quantity.ts";
+import { roundToDisplay } from "@/lib/format/quantity.ts";
 import {
   CELL_WRAP_PX,
   createSharedX,
@@ -60,9 +61,8 @@ import {
   stripOuterHeight,
   veBadgeLabel,
 } from "@/lib/layout/contract.ts";
-import { GATE_CONSEQUENCE } from "@/lib/rail/gates.ts";
+import { CELL_IDS, CELL_LABEL, readOutCells } from "@/lib/rail/cells.ts";
 import { CELL_HELP } from "@/lib/rail/help.ts";
-import { clearanceBreached } from "@/lib/rail/results.ts";
 import { applyField } from "@/lib/rail/values.ts";
 import { snapStation } from "@/lib/terrain/trace.ts";
 import { cn } from "@/lib/utils.ts";
@@ -84,19 +84,6 @@ const NO_SPAN_LINE = "Portée invalide — aucun tracé possible.";
  * three decisions at once.
  */
 const UNAVAILABLE = "—";
-
-/**
- * One read-out cell's content. `note` is the one cell a Clearance Gate breach replaces with a
- * clause instead of a number — set apart typographically, because a sentence in `text-lg` mono
- * would read as a value.
- */
-type ReadOutValue = {
-  readonly label: string;
-  readonly value: string;
-  readonly note: boolean;
-  /** Under « Garde min. admise » — the one cell that carries its own threshold (2026-09-23). */
-  readonly breach?: boolean;
-};
 
 export function ChartBlock({
   banner,
@@ -299,8 +286,8 @@ export function ChartBlock({
       anchor === "A" ? "sa" : "sb",
       snapStation(state.trace, geometry.sa + metres),
     );
-    // Two keys rather than the whole draft: the store's shallow merge is what keeps `sceneInputs`
-    // stable for everything this drag does not touch.
+    // Two keys rather than the whole draft: the store's shallow merge is what keeps
+    // `unloadedInputs` stable for everything this drag does not touch.
     dispatch({
       type: "scénario/modifié",
       patch: { geometry: next.geometry, rider: next.rider },
@@ -324,65 +311,10 @@ export function ChartBlock({
    * `Indéterminé`'s glyph, a different state, and not this one.
    */
   const replaced = rider === null && solved === null && cause !== undefined && cause !== null;
-  const values: Record<string, ReadOutValue> | null =
+  const values =
     rider === null
       ? null
-      : {
-          // `rider.worst.hClear` is §11's minimum **over the whole line** at this rider position,
-          // and the label says `ligne` for that reason — ticket 41. It is the same number the
-          // strip's curve carries, and it is **not** the garde under the passenger, which the
-          // profile dimensions at `x_D` and nothing prints.
-          "Garde min. ligne": clearance
-            ? {
-                label: rider.relabel
-                  ? `Garde min. ligne (à x ${formatValue("extremumX", rider.worst.atX)} m)`
-                  : "Garde min. ligne",
-                value: formatQuantity("clearance", rider.worst.hClear),
-                note: false,
-                breach: clearanceBreached(rider.worst.hClear, riderInput.hClearMin),
-              }
-            : // The one cell a Clearance Gate breach takes: it says **why** rather than printing a
-              // number computed from the refused anchor height, and rather than « — », which is
-              // `Indéterminé`'s glyph — *tenté, indisponible* — and not this state.
-              { label: "Garde min. ligne", value: GATE_CONSEQUENCE.clearance, note: true },
-          "T anc. A": {
-            label: "T anc. A",
-            value: formatQuantity("Tstatic", rider.step.TA, unit),
-            note: false,
-          },
-          "T anc. B": {
-            label: "T anc. B",
-            value: formatQuantity("Tstatic", rider.step.TB, unit),
-            note: false,
-          },
-          Pente: {
-            label: "Pente",
-            value: formatQuantity("localSlope", Math.tan(rider.step.theta) * 100),
-            note: false,
-          },
-          Flèche: {
-            label: "Flèche",
-            value: formatQuantity("loadedSag", rider.sagAtRider),
-            note: false,
-          },
-          // The garde **under the passenger's feet** — ticket 41's second quantity, which the profile
-          // dimensions at `x_D` and which this row now prints too. Judged by nothing, so never red:
-          // « Garde min. ligne » is the criterion. Refused with it under a Clearance Gate breach,
-          // because it is computed from the same anchor heights and envelope.
-          "Garde passager": clearance
-            ? {
-                label: "Garde passager",
-                value: formatQuantity("clearance", rider.underRider),
-                note: false,
-              }
-            : { label: "Garde passager", value: GATE_CONSEQUENCE.clearance, note: true },
-          // The cable alone — no ground, no envelope — so no gate touches it.
-          "Écart à vide": {
-            label: "Écart à vide",
-            value: formatQuantity("unloadedGap", rider.belowUnloaded),
-            note: false,
-          },
-        };
+      : readOutCells(rider, { clearance, hClearMin: riderInput.hClearMin, unit });
 
   return (
     <>
@@ -441,26 +373,21 @@ export function ChartBlock({
         />
       </ViewStripSlot>
       <ReadOutCells scope="à la position du passager">
-        {READ_OUT_CELLS.map((cell) => (
+        {CELL_IDS.map((id) => (
           <ReadOutCell
-            className={cn(cell.basis, cell.pinned)}
-            help={CELL_HELP[cell.label]}
-            key={cell.label}
+            className={cn(READ_OUT_CELLS[id].basis, READ_OUT_CELLS[id].pinned)}
+            help={CELL_HELP[id]}
+            key={id}
             // No label under the cause line: the row is **replaced** by it, and the box stays only
             // to hold the row's height — voir `ReadOutCell`'s own `label`.
-            label={replaced ? undefined : values === null ? cell.label : values[cell.label].label}
+            label={replaced ? undefined : values === null ? CELL_LABEL[id] : values[id].label}
           >
             {values !== null &&
-              (values[cell.label].note ? (
-                <span className="text-muted-foreground text-xs">{values[cell.label].value}</span>
+              (values[id].note ? (
+                <span className="text-muted-foreground text-xs">{values[id].value}</span>
               ) : (
-                <span
-                  className={cn(
-                    "font-mono text-lg",
-                    values[cell.label].breach === true && "text-destructive",
-                  )}
-                >
-                  {values[cell.label].value}
+                <span className={cn("font-mono text-lg", values[id].breach && "text-destructive")}>
+                  {values[id].value}
                 </span>
               ))}
             {/* **The one place « — » is legal**: the traverse solved, the rider sits in one of
@@ -536,14 +463,14 @@ function EmptyBands({
       )}
       <ViewStripSlot />
       <ReadOutCells>
-        {READ_OUT_CELLS.map((cell) => (
+        {CELL_IDS.map((id) => (
           <ReadOutCell
-            className={cn(cell.basis, cell.pinned)}
-            key={cell.label}
+            className={cn(READ_OUT_CELLS[id].basis, READ_OUT_CELLS[id].pinned)}
+            key={id}
             // The pre-measurement frame keeps its five labels — nothing was attempted, and that *is*
             // the Skeleton's own content. Under the geometric exception the cause line occupies the
             // row instead, so the labels go with it (ticket 31, **D2**).
-            label={cells === null ? cell.label : undefined}
+            label={cells === null ? CELL_LABEL[id] : undefined}
           />
         ))}
         {cells !== null && (

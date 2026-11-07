@@ -52,16 +52,11 @@ import {
   FIRST_RUN_SCENARIO,
   firstRunDefaults,
 } from "@/lib/scenario/first-run.ts";
-import { clampX, scenarioFromSearch } from "@/lib/scenario/from-search.ts";
-import { spanOfGeometry } from "@/lib/scenario/geometry.ts";
+import { clampX, spanOfGeometry } from "@/lib/scenario/geometry.ts";
 import { DEFAULT_LAYERS } from "@/lib/session/session.ts";
 import { decodeP1 } from "@/lib/url/p1.ts";
-import {
-  completeFromDefaults,
-  hasScenarioKey,
-  parseLinkSearch,
-  salvageSearch,
-} from "@/lib/url/schema.ts";
+import { completeFromDefaults, searchToScenario } from "@/lib/url/scenario.ts";
+import { hasScenarioKey, parseLinkSearch, salvageSearch } from "@/lib/url/schema.ts";
 
 /**
  * What the link did on arrival — the evidence the « clé ignorée » strip renders (A11) and the one
@@ -307,8 +302,8 @@ export function initialAppState(input: MountInput): AppState {
   }
 
   const { search: completedSearch, completed } = completeFromDefaults(search);
-  const scenario = scenarioFromSearch(completedSearch);
-  const xClamped = completedSearch.x !== undefined && completedSearch.x !== scenario.rider.xD;
+  const scenario = searchToScenario(completedSearch);
+  const xClamped = completedSearch.x !== scenario.rider.xD;
   // The address bar must hold exactly the state the app holds, so the clamp travels with it.
   const canonical: ValidatedSearch = xClamped
     ? { ...completedSearch, x: scenario.rider.xD }
@@ -334,7 +329,7 @@ export function initialAppState(input: MountInput): AppState {
 }
 
 /**
- * The Trace an arriving `tr` names. **Without this the link is half-applied**: `scenarioFromSearch`
+ * The Trace an arriving `tr` names. **Without this the link is half-applied**: `searchToScenario`
  * reads `tr` into `geometry.source === "trace"`, so a recipient with no Session of their own would
  * hold two stations, no profile to place them on and therefore no span at all — no `Portée`, no
  * `Dénivelé`, no ground and the identity line reading « (aucun tracé) ».

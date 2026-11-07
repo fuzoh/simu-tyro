@@ -161,6 +161,16 @@ describe("« Cible inatteignable » — the bracket failure, naming the target",
     );
   });
 
+  test("mode Rapport V names the ratio", () => {
+    const refusal = engineRefusal(
+      { stage: "L0", error: { kind: "no-convergence", attempts: 5, residual: 1e-3 } },
+      { tightness: { mode: "ratio", ratio: 0.46 } },
+    );
+    expect(refusal?.message).toBe(
+      "⛔ Cible inatteignable — aucune longueur non tendue ne donne ce rapport V (0,46).",
+    );
+  });
+
   test("the **same kind** out of `solveSpan` is « Calcul impossible », not this", () => {
     // ELECTIONS §0.2: `no-convergence` has two origins needing two surfaces, hence three states
     // and not the two a naive collapse gives. The stage is the whole of the distinction.
@@ -320,6 +330,14 @@ describe("`[ Copier le diagnostic ]` — evidence, not UI copy", () => {
     expect(bound).toContain("field       L0");
     expect(bound).toContain("bound       197.404");
     expect(bound).toContain("boundKind   min");
+  });
+});
+
+describe("stages `geometry` and `material` are « nothing to solve yet », never a refusal", () => {
+  test("neither maps to a surface", () => {
+    const { tightness } = scenario();
+    expect(engineRefusal({ stage: "geometry", error: null }, { tightness })).toBeNull();
+    expect(engineRefusal({ stage: "material", error: null }, { tightness })).toBeNull();
   });
 });
 

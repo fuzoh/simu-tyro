@@ -41,13 +41,13 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { createContext, use, useEffect, useRef, useState } from "react";
 
 import type { RailFormApi, RailFormState } from "@/components/app/use-rail-form.ts";
-import type { Deduced, DeducedSolve } from "@/lib/rail/deduced.ts";
+import type { Deduced, DeducedSolve, ReadOutRow } from "@/lib/rail/deduced.ts";
 import type { FieldContext, FieldId } from "@/lib/rail/fields.ts";
 import type { BlockingError, FixActionId } from "@/lib/rail/gates.ts";
 import type { LadderRow } from "@/lib/rail/provenance.ts";
 import type { NumericFieldId, RailValues } from "@/lib/rail/values.ts";
 import type { ForceUnit, UseClass } from "@/lib/scenario/types.ts";
-import type { RegimeId, TerminationId } from "@/lib/sim";
+import type { RegimeId, TerminationId, TextileSpec } from "@/lib/sim";
 import type { ParseFailure } from "@/lib/terrain/csv.ts";
 
 import { RailSection } from "@/components/app/shell.tsx";
@@ -61,41 +61,50 @@ import { Separator } from "@/components/ui/separator.tsx";
 import { COPY_INCOMPLETE, copyLink } from "@/lib/app/persist.ts";
 import { siteOrigin } from "@/lib/app/site.ts";
 import { DOC_PAGES } from "@/lib/docs/pages.ts";
-import { formatQuantity, formatValue } from "@/lib/format/quantity.ts";
+import { formatQuantity } from "@/lib/format/quantity.ts";
+import { deducedRows } from "@/lib/rail/deduced.ts";
 import {
   checkField,
   commitField,
+  CONSTRUCTION_OPTIONS,
   displayField,
   FIELDS,
   fieldSchema,
+  parseDecimal,
+  ROPE_CLASS_OPTIONS,
   warningFor,
 } from "@/lib/rail/fields.ts";
+import {
+  regimeUnavailableNote,
+  TEXTILE_UNAVAILABLE_REASON,
+  terminationOptions,
+} from "@/lib/rail/gates.ts";
 import { DEDUCED_HELP, FIELD_HELP, TIGHTNESS_HELP } from "@/lib/rail/help.ts";
 import { PROVENANCE_COPY, warningLadder } from "@/lib/rail/provenance.ts";
 import {
   applyField,
   applyGeometry,
+  applyRopeClass,
+  applyShippedTerminations,
   clearOverride,
   drivingField,
   fieldContext,
   spanLength,
   switchTightness,
+  TERMINATION_FIELD,
 } from "@/lib/rail/values.ts";
 import { clearSession } from "@/lib/session/session.ts";
-import {
-  isFamilyAllowed,
-  isRegimeAvailable,
-  REGIMES,
-  regimeUnavailableReason,
-  TERMINATIONS,
-} from "@/lib/sim";
+import { isFamilyAllowed, isRegimeAvailable, REGIMES, TERMINATIONS } from "@/lib/sim";
 import { parseFailureMessage, parseProfileCsv, readFailure } from "@/lib/terrain/csv.ts";
 import { encodeP1 } from "@/lib/url/p1.ts";
 import { cn } from "@/lib/utils.ts";
 
+import type { ClampEvent } from "./controls.tsx";
+
 import {
   Chip,
   Choice,
+  ClampNote,
   DisabledReason,
   FixButton,
   InfoTip,
@@ -113,23 +122,8 @@ import {
  */
 const PROVENANCE = PROVENANCE_COPY;
 
-/** §10.4, stated where the option is disabled — the rule is a fact worth teaching. */
-const TEXTILE_DISABLED_REASON =
-  "§10.4 : fluage, UV/abrasion et fusion par friction (HMPE ~144–152 °C) ⇒ acier seul en installation permanente.";
-
-/** §10.3, likewise: not forbidden — there is simply no efficiency to multiply by. */
-const KNOT_ON_HMPE_REASON =
-  "§10.3 : sur HMPE le nœud glisse (0,25–0,50). Aucun rendement défendable ⇒ épissure obligatoire.";
-
 /** The three numeric fields that change the span, and therefore what `x_D` is clamped against. */
 const SPAN_FIELDS = new Set<NumericFieldId>(["L", "sa", "sb"]);
-
-/** § 3's `Classe de corde` entries. It drives exactly two things: `k`'s default and this list. */
-const ROPE_CLASSES = [
-  { value: "hmpe", label: "HMPE 12 torons" },
-  { value: "pa-en1891a", label: "Polyamide EN 1891 type A" },
-  { value: "polyester", label: "Polyester semi-statique" },
-] as const;
 
 /** What a row needs of the screen around it. **The reason every row is a module-scope component.** */
 type RailRowContext = {
@@ -144,7 +138,7 @@ type RailRowContext = {
   readonly outlined: ReadonlySet<FieldId>;
   /** @returns the canonical value that **entered state**, or `null` when tier one refused. */
   readonly commit: (id: NumericFieldId, raw: string, settled: boolean) => number | null;
-  readonly runFix: (id: FixActionId) => void;
+  readonly runFix: (id: FixActionId, breach: BlockingError) => void;
   readonly setFocused: (id: FieldId | null) => void;
 };
 
@@ -158,8 +152,9 @@ function useRailRowContext(): RailRowContext {
 
 /**
  * `deduced` is the rider-free chain and `rail` the field state, **both from the app root** — one
- * `deduceValues` for the Rail's two halves, and one form for the Rail, the banner, the chart and
- * the write side, which is what makes « Saisie en cours » one fact rather than four opinions.
+ * `useUnloaded` line formatted once by `deducedFrom` for the Rail's two halves, and one form for
+ * the Rail, the banner, the chart and the write side, which is what makes « Saisie en cours » one
+ * fact rather than four opinions.
  */
 export function RailInputs({
   cause,
@@ -206,6 +201,7 @@ export function RailInputs({
   const ladder = warningLadder(scenario, deduced);
   const rung = (row: LadderRow): string | null =>
     ladder.find((warning) => warning.row === row)?.text ?? null;
+  const readOuts = deducedRows(scenario, deduced, cause);
   const context = fieldContext(scenario, trace);
 
   const breaches = new Map<FieldId, BlockingError>();
@@ -247,7 +243,7 @@ export function RailInputs({
     return id === "xD" ? next.rider.xD : value;
   }
 
-  function runFix(id: FixActionId) {
+  function runFix(id: FixActionId, breach: BlockingError) {
     switch (id) {
       case "passer-a-l-acier":
         dispatch({ type: "matériau/famille", family: "steel" });
@@ -268,7 +264,10 @@ export function RailInputs({
         const next = applyGeometry(scenario, { ...scenario.geometry, sa: sb, sb: sa });
         announceClamp(next, scenario.rider.xD);
         patch(next);
+        return;
       }
+      case "passer-a-la-terminaison-de-depart":
+        patch(applyShippedTerminations(scenario, breach));
     }
   }
 
@@ -317,7 +316,7 @@ export function RailInputs({
    */
   const regimeReason =
     Object.values(REGIMES)
-      .map((regime) => regimeUnavailableReason(regime.id, scenario.material.family, scenario.usage))
+      .map((regime) => regimeUnavailableNote(regime.id, scenario.material.family, scenario.usage))
       .find((reason) => reason !== null) ?? null;
 
   // Unmemoised on purpose: every field of it is rebuilt each render anyway, and every consumer is
@@ -411,7 +410,7 @@ export function RailInputs({
                           <FixButton
                             key={fix.id}
                             label={fix.label}
-                            onClick={() => runFix(fix.id)}
+                            onClick={() => runFix(fix.id, regimeBreach)}
                           />
                         ))}
                       </div>
@@ -481,7 +480,7 @@ export function RailInputs({
                       // **Visible but disabled, with the reason inline** — hiding it leaves a user
                       // who came to compare families with no explanation.
                       disabled: !isFamilyAllowed("textile", scenario.usage),
-                      reason: TEXTILE_DISABLED_REASON,
+                      reason: TEXTILE_UNAVAILABLE_REASON,
                     },
                   ]}
                   value={scenario.material.family}
@@ -498,7 +497,11 @@ export function RailInputs({
                 familyBreach !== undefined ? (
                   <div className="flex flex-wrap gap-1">
                     {familyBreach.fixes.map((fix) => (
-                      <FixButton key={fix.id} label={fix.label} onClick={() => runFix(fix.id)} />
+                      <FixButton
+                        key={fix.id}
+                        label={fix.label}
+                        onClick={() => runFix(fix.id, familyBreach)}
+                      />
                     ))}
                   </div>
                 ) : null
@@ -535,16 +538,10 @@ export function RailInputs({
                   control={
                     <Picker
                       id="rail-cst"
-                      onChange={(value) =>
-                        patch({
-                          ...scenario,
-                          material: { ...steelSpec, construction: value as "fibre-core" | "iwrc" },
-                        })
+                      onChange={(construction) =>
+                        patch({ ...scenario, material: { ...steelSpec, construction } })
                       }
-                      options={[
-                        { value: "fibre-core", label: "6×19 âme textile" },
-                        { value: "iwrc", label: "6×19 âme métallique" },
-                      ]}
+                      options={CONSTRUCTION_OPTIONS}
                       value={steelSpec.construction}
                     />
                   }
@@ -559,21 +556,8 @@ export function RailInputs({
                   control={
                     <Picker
                       id="rail-cls"
-                      onChange={(value) => {
-                        if (textileSpec === null) return;
-                        const ropeClass = value as (typeof ROPE_CLASSES)[number]["value"];
-                        patch({
-                          ...scenario,
-                          // `Classe de corde` drives exactly two things: the `k` default and the
-                          // termination whitelist. Polyester's default is **`null`, not a number**.
-                          material: {
-                            ...textileSpec,
-                            ropeClass,
-                            k: ropeClass === "polyester" ? null : ropeClass === "hmpe" ? 22 : 1.5,
-                          },
-                        });
-                      }}
-                      options={ROPE_CLASSES}
+                      onChange={(ropeClass) => patch(applyRopeClass(scenario, ropeClass))}
+                      options={ROPE_CLASS_OPTIONS}
                       value={textileSpec?.ropeClass ?? "hmpe"}
                     />
                   }
@@ -605,7 +589,7 @@ export function RailInputs({
                   },
                 })
               }
-              ropeClass={textileSpec?.ropeClass}
+              ropeClass={textileSpec?.ropeClass ?? null}
               selected={scenario.terminations.A.id}
             />
             <NumericRow id="etaA" label="Rendement η_A" />
@@ -621,7 +605,7 @@ export function RailInputs({
                   },
                 })
               }
-              ropeClass={textileSpec?.ropeClass}
+              ropeClass={textileSpec?.ropeClass ?? null}
               selected={scenario.terminations.B.id}
             />
             <NumericRow id="etaB" label="Rendement η_B" />
@@ -677,48 +661,24 @@ export function RailInputs({
               // `Flèche / portée`, and deleting either half hides half the finding.
               warning={rung("DAF")}
             />
-            <NumericRow hint="m" id="xD" note={<ClampNote event={clamped} />} />
+            <NumericRow
+              hint="m"
+              id="xD"
+              note={<ClampNote className="text-muted-foreground block text-xs" event={clamped} />}
+            />
           </Group>
         </div>
       </RailSection>
 
       <RailSection title="Valeurs déduites">
         <div className="mt-2">
-          {deduced.span !== null && scenario.geometry.source === "trace" && (
-            <>
-              <ReadOut
-                help={DEDUCED_HELP.L}
-                label="Portée"
-                value={formatQuantity("L", deduced.span.L)}
-              />
-              <ReadOut
-                help={DEDUCED_HELP.h}
-                label="Dénivelé"
-                value={formatQuantity("h", deduced.span.h)}
-              />
-              {/* § 4's anchor-placement block prints the two base altitudes **beside** `Portée` and
-                  `Dénivelé`: they are what says *where on the hill* the placement sits, and without
-                  them a station read-out is a number with no altitude behind it. One row each rather
-                  than the block's single « · »-joined line — the Rail is a 255 px column, and `·` is
-                  the sketch's layout, not its copy. */}
-              {deduced.span.bases !== null && (
-                <>
-                  <ReadOut
-                    help={DEDUCED_HELP.zBaseA}
-                    label="Alt. base A"
-                    value={formatQuantity("zBase", deduced.span.bases.zBaseA)}
-                  />
-                  <ReadOut
-                    help={DEDUCED_HELP.zBaseB}
-                    label="Alt. base B"
-                    value={formatQuantity("zBase", deduced.span.bases.zBaseB)}
-                  />
-                </>
-              )}
-            </>
-          )}
+          {readOuts
+            .filter((row) => row.group === "placement")
+            .map((row) => (
+              <DeducedReadOut key={row.id} row={row} />
+            ))}
 
-          {steelSpec !== null ? (
+          {steelSpec !== null && (
             <>
               <DerivedRow
                 chip={
@@ -765,88 +725,13 @@ export function RailInputs({
                 <NumericRow hint="kg/m" id="muOverride" label="Masse linéique" />
               </DerivedRow>
             </>
-          ) : (
-            deduced.material.strength !== null && (
-              <>
-                <ReadOut
-                  help={DEDUCED_HELP.MBL}
-                  label="Charge de rupture"
-                  value={formatQuantity("MBL", deduced.material.strength, unit)}
-                />
-                {deduced.material.EA !== null && (
-                  <ReadOut
-                    help={DEDUCED_HELP.EAtextile}
-                    label="Raideur axiale"
-                    value={formatQuantity("EA", deduced.material.EA)}
-                  />
-                )}
-              </>
-            )
           )}
 
-          {/* `corde` and `w` are the only two rows independent of a solve. */}
-          {deduced.material.w !== null && (
-            <ReadOut
-              help={DEDUCED_HELP.w}
-              label="Poids linéique"
-              value={formatQuantity("w", deduced.material.w, unit)}
-            />
-          )}
-          {deduced.span !== null && (
-            <ReadOut
-              help={DEDUCED_HELP.chord}
-              label="Corde"
-              value={formatQuantity("chord", deduced.span.chord)}
-            />
-          )}
-
-          {/* **The cause governs, not `deduced.solve`.** The rider-free chain is derived from the
-              Scenario, which cannot hold a committed-invalid « −5 » or an emptied `m_p` — so under
-              a Solve Gate breach it still resolves, and printing `L₀ 151,64 m` beside « aucun
-              résultat » is the stale number invariant 3 forbids. A refusal and a gate breach both
-              arrive here as the one sentence § 7 writes once. */}
-          {deduced.solve !== null && cause === null && (
-            <>
-              {driver !== "L0" && (
-                <ReadOut
-                  help={DEDUCED_HELP.L0}
-                  label="Longueur non tendue"
-                  value={formatQuantity("L0", deduced.solve.L0)}
-                />
-              )}
-              {driver !== "H_target" && (
-                <ReadOut
-                  help={DEDUCED_HELP.H}
-                  label="Prétension"
-                  value={formatQuantity("H_target", deduced.solve.H, unit)}
-                />
-              )}
-              {driver !== "D_target" && (
-                <ReadOut
-                  help={DEDUCED_HELP.sag}
-                  label="Flèche à vide"
-                  value={`${formatQuantity("sag", deduced.solve.sag)} (à x ${formatValue(
-                    "extremumX",
-                    deduced.solve.sagAtX,
-                  )} m)`}
-                />
-              )}
-              <ReadOut
-                help={DEDUCED_HELP.sagRatio}
-                label="Flèche / portée"
-                value={formatQuantity("sagRatio", deduced.solve.sagRatio)}
-                warning={rung("sagRatio")}
-              />
-              <ReadOut
-                help={DEDUCED_HELP.standingTension}
-                label="Tension permanente"
-                value={`${formatQuantity("standingTension", deduced.solve.standingTension)} ${
-                  scenario.material.family === "steel" ? "MBF" : "MBL"
-                }`}
-                warning={rung("standingTension")}
-              />
-            </>
-          )}
+          {readOuts
+            .filter((row) => row.group === "line")
+            .map((row) => (
+              <DeducedReadOut key={row.id} row={row} />
+            ))}
 
           {/* § 7's third echo. The cause sentence is written **once** and repeated in each
               suppressed region, because the Rail is one scrolling column and a rail reader may
@@ -857,6 +742,18 @@ export function RailInputs({
         </div>
       </RailSection>
     </RailRow.Provider>
+  );
+}
+
+/** One read-only `Valeurs déduites` row, decided whole by `deducedRows`. */
+function DeducedReadOut({ row }: { row: ReadOutRow }) {
+  return (
+    <ReadOut
+      help={DEDUCED_HELP[row.id]}
+      label={row.label}
+      value={row.value}
+      warning={row.warning}
+    />
   );
 }
 
@@ -886,7 +783,7 @@ function NumericRow({
     useRailRowContext();
   const breach = breaches.get(id);
   const value = text[id] ?? "";
-  const parsed = checkField(id, value, context) === null ? Number(value.replace(",", ".")) : NaN;
+  const parsed = checkField(id, value, context) === null ? (parseDecimal(value) ?? NaN) : NaN;
   return (
     <form.Field
       name={id}
@@ -932,7 +829,11 @@ function NumericRow({
               {breach !== undefined && breach.fixes.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {breach.fixes.map((fix) => (
-                    <FixButton key={fix.id} label={fix.label} onClick={() => runFix(fix.id)} />
+                    <FixButton
+                      key={fix.id}
+                      label={fix.label}
+                      onClick={() => runFix(fix.id, breach)}
+                    />
                   ))}
                 </div>
               )}
@@ -1203,7 +1104,11 @@ function FileControls({
   );
 }
 
-/** One termination picker. **A prohibition is a disabled option with its reason**, not an error. */
+/**
+ * One termination picker. A prohibition is a disabled option with its reason; an end that arrived
+ * anyway — link, Session, class switch — is the Verdict Gate's error, rendered here with its Fix
+ * Action.
+ */
 function TerminationRow({
   end,
   family,
@@ -1213,38 +1118,48 @@ function TerminationRow({
 }: {
   end: "A" | "B";
   family: "steel" | "textile";
-  /** `Classe de corde`'s second job: the knot whitelist. `undefined` on a steel line. */
-  ropeClass: string | undefined;
+  /** `Classe de corde`'s second job: the knot whitelist. `null` on a steel line. */
+  ropeClass: TextileSpec["ropeClass"] | null;
   selected: TerminationId;
   onPick: (id: TerminationId) => void;
 }) {
-  const options = Object.values(TERMINATIONS)
-    .filter((termination) => termination.family === family || termination.family === "both")
-    .map((termination) => ({
-      value: termination.id,
-      label: termination.label,
-      // §10.3's 0,25–0,50 describes a knot that *slips*: there is no efficiency to multiply by,
-      // hence no honest number to compute with. Serre-câbles étrier, by contrast, stays
-      // **selectable** — a defensible `η_t` exists and the Verdict refuses the rig.
-      disabled: termination.knot && ropeClass === "hmpe",
-    }));
-  // **One reason per row.** Both knots are disabled by the same §10.3 rule, and printing it twice
-  // says nothing the first copy did not.
-  const knotsDisabled = options.some((option) => option.disabled);
+  const { breaches, outlined, runFix } = useRailRowContext();
+  const id = TERMINATION_FIELD[end];
+  const breach = breaches.get(id);
+  const { options, reason } = terminationOptions(family, ropeClass, selected);
   return (
     <Row
       control={
         <Picker
-          id={`rail-t${end.toLowerCase()}`}
+          id={`rail-${id}`}
           onChange={(value) => onPick(value)}
           options={options}
           value={selected}
         />
       }
-      help={end === "A" ? FIELD_HELP.ta : FIELD_HELP.tb}
-      htmlFor={`rail-t${end.toLowerCase()}`}
+      help={FIELD_HELP[id]}
+      htmlFor={`rail-${id}`}
       label={`Terminaison ${end}`}
-      note={knotsDisabled ? <DisabledReason reason={KNOT_ON_HMPE_REASON} /> : null}
+      message={breach === undefined ? undefined : { text: breach.message, blocking: true }}
+      note={
+        reason === null && breach === undefined ? null : (
+          <>
+            {reason !== null && <DisabledReason reason={reason} />}
+            {breach !== undefined && (
+              <div className="flex flex-wrap gap-1">
+                {breach.fixes.map((fix) => (
+                  <FixButton
+                    key={fix.id}
+                    label={fix.label}
+                    onClick={() => runFix(fix.id, breach)}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )
+      }
+      outlined={outlined.has(id)}
     />
   );
 }
@@ -1293,50 +1208,6 @@ function DerivedRow({
         </div>
       )}
     </div>
-  );
-}
-
-/** How long § 3's clamp note stays up, ms — the same budget the View Strip's note uses. */
-const CLAMP_NOTE_MS = 4000;
-
-/**
- * One clamp that **happened**: the span it landed on, and a nonce so a second clamp against the
- * same span restarts the timer rather than passing unnoticed. `nonce: 0` is « none yet ».
- */
-type ClampEvent = { readonly L: number; readonly nonce: number };
-
-/**
- * `x_D`'s clamp **is not silent**, and this is the one place a clamp speaks.
- *
- * It renders an **event**, never a state: `x_D` is clamped on the way into the Scenario, so a note
- * conditioned on « the Scenario holds a position outside the span » would be a note that can only
- * fire where no clamp happened. The caller compares what was asked for against what landed and
- * raises {@link ClampEvent}; this component only decides how long it stays up.
- */
-function ClampNote({ event }: { event: ClampEvent }) {
-  // The note is derived: the latest event shows until its nonce is marked expired. The effect
-  // only owns the timer — it never sets state synchronously, so no cascading render.
-  const [expiredNonce, setExpiredNonce] = useState(0);
-  const shown = event.nonce !== 0 && event.nonce !== expiredNonce ? event : null;
-
-  useEffect(() => {
-    if (event.nonce === 0) return;
-    // Transient — it is a note about a move that just happened, not a state of the field.
-    const timer = setTimeout(() => setExpiredNonce(event.nonce), CLAMP_NOTE_MS);
-    return () => clearTimeout(timer);
-  }, [event]);
-
-  return (
-    <span aria-live="polite" className="text-muted-foreground block text-xs" role="status">
-      {shown === null ? (
-        ""
-      ) : (
-        <>
-          position ramenée à la portée :{" "}
-          <span className="font-mono">0 – {formatValue("x_D", shown.L)}</span> m
-        </>
-      )}
-    </span>
   );
 }
 

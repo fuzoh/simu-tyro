@@ -19,7 +19,7 @@ import {
 } from "@/lib/scenario/first-run.ts";
 import { DEFAULT_LAYERS, readSession, writeSession } from "@/lib/session/session.ts";
 import { encodeP1, URL_BUDGET_CHARS } from "@/lib/url/p1.ts";
-import { FIRST_RUN_LINK, scenarioToSearch } from "@/lib/url/schema.ts";
+import { FIRST_RUN_LINK, scenarioToSearch } from "@/lib/url/scenario.ts";
 
 import type { AppState } from "./state.ts";
 

@@ -3,22 +3,15 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
-  defaultStringifySearch,
 } from "@tanstack/react-router";
 import { describe, expect, test } from "vitest";
 
-import type { Scenario } from "@/lib/scenario/types.ts";
-
-import { FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
-
-import type { DroppedKey, LinkRefusal, RefusalKind, SearchKey, ValidatedSearch } from "./schema.ts";
+import type { DroppedKey, LinkRefusal, RefusalKind, ValidatedSearch } from "./schema.ts";
 
 import { encodeP1 } from "./p1.ts";
 import {
   CANONICAL_KEYS,
   canonicalLink,
-  completeFromDefaults,
-  FIRST_RUN_LINK,
   hasScenarioKey,
   isLinkRefusal,
   keepRefusalOutOfTheAddressBar,
@@ -26,7 +19,6 @@ import {
   REFUSAL_KINDS,
   reportDroppedKeys,
   salvageSearch,
-  scenarioToSearch,
   validateSearch,
 } from "./schema.ts";
 
@@ -38,8 +30,8 @@ import {
  *
  * Table-driven, one table per row of the salvage table, because the salvage table *is* the
  * contract: three refusal classes refuse the link whole — as a **returned marker**, amendment E,
- * never a throw — two salvage classes are ignored-and-named, an out-of-range value is applied
- * as-is, and recognised absent keys are completed.
+ * never a throw — two salvage classes are ignored-and-named, and an out-of-range value is applied
+ * as-is. Completion of recognised absent keys is gated in `./scenario.test.ts`.
  */
 
 /** The router's own parse of a query string — `defaultParseSearch`, i.e. what the route receives. */
@@ -199,14 +191,6 @@ describe("the three refusal classes come back as a marker, never as a throw", ()
     const once = validateSearch(parse("?fl=6&lo=151.64"));
     expect(validateSearch({ ...once })).toEqual(once);
     expect(validateSearch({ ...parse("?fl=6&lo=151.64"), ...once })).toEqual(once);
-  });
-
-  test("a refused bag is never completed from the defaults", () => {
-    // Completion is the one operation that would turn « refused whole » into a silent repair.
-    const { search, completed } = completeFromDefaults(validateSearch(parse("?v=3&L=250")));
-    expect(completed).toEqual([]);
-    expect(Object.keys(search)).toEqual(["refused"]);
-    expect(hasScenarioKey(search)).toBe(false);
   });
 
   test("`v` absent means v1 and never refuses", () => {
@@ -478,249 +462,11 @@ describe("an out-of-range but representable value is applied as-is", () => {
   });
 });
 
-describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
-  test("a bare partial link is completed literally, and `x` to L/2 of the completed span", () => {
-    const { search, completed } = completeFromDefaults(validateSearch(parse("?L=250&h=-40")));
-    expect(search).toEqual({
-      v: 1,
-      u: "daN",
-      use: "perm",
-      L: 250,
-      h: -40,
-      za: 12,
-      zb: 12,
-      fl: 6,
-      fam: "ac",
-      d: 12,
-      r0: 1770,
-      cst: "iwrc",
-      ta: "cosse",
-      tb: "cosse",
-      na: 0.9,
-      nb: 0.9,
-      mp: 120,
-      hr: 2.1,
-      gm: 1,
-      daf: 1.2,
-      x: 125,
-    });
-    expect(completed).toEqual([
-      "v",
-      "u",
-      "use",
-      "za",
-      "zb",
-      "fl",
-      "fam",
-      "d",
-      "r0",
-      "cst",
-      "ta",
-      "tb",
-      "na",
-      "nb",
-      "mp",
-      "hr",
-      "gm",
-      "daf",
-      "x",
-    ]);
-    // § 7's measurement: `fl` completes to 6,0 m literally and never to 4 % of the arriving span.
-    expect(search.fl).toBe(FIRST_RUN_SCENARIO.tightness.D_target);
-  });
-
-  test("`reg` is exempt — its absence is « — choisir — », never a value waiting to be filled", () => {
-    const { search, completed } = completeFromDefaults(validateSearch(parse("?L=250")));
-    expect("reg" in search).toBe(false);
-    expect(completed).not.toContain("reg");
-  });
-
-  test("`mbf` / `ea` / `mu` are exempt — their absence is « non surchargée »", () => {
-    const { search, completed } = completeFromDefaults(validateSearch(parse("?L=250&fam=ac")));
-    for (const key of ["mbf", "ea", "mu"] satisfies SearchKey[]) {
-      expect(key in search).toBe(false);
-      expect(completed).not.toContain(key);
-    }
-  });
-
-  test("a present key is never overwritten by its default", () => {
-    const { search, completed } = completeFromDefaults(validateSearch(parse("?za=4&zb=2.5&mp=95")));
-    expect(search.za).toBe(4);
-    expect(search.zb).toBe(2.5);
-    expect(search.mp).toBe(95);
-    expect(completed).not.toContain("za");
-    expect(completed).not.toContain("mp");
-  });
-
-  test("a driver that arrived is never joined by a completed one", () => {
-    const { search } = completeFromDefaults(validateSearch(parse("?L=250&lo=251.4")));
-    expect(search.lo).toBe(251.4);
-    expect("fl" in search).toBe(false);
-    expect("te" in search).toBe(false);
-  });
-
-  test("an imported link keeps `tr`/`sa`/`sb` and grows no `L`/`h`", () => {
-    const { search } = completeFromDefaults(validateSearch(parse(`?tr=${TRACE}&sa=10&sb=90`)));
-    expect(search.tr).toBe(TRACE);
-    expect(search.sa).toBe(10);
-    expect(search.sb).toBe(90);
-    expect("L" in search).toBe(false);
-    expect("h" in search).toBe(false);
-    // `L = sb − sa`, so `x` completes to 40,0 m — half of the *imported* span.
-    expect(search.x).toBe(40);
-  });
-
-  test("a manual link never grows `sa` / `sb`, and a `tr`-less link never grows `tr`", () => {
-    const { search } = completeFromDefaults(validateSearch(parse("?L=250")));
-    for (const key of ["sa", "sb", "tr"] satisfies SearchKey[]) expect(key in search).toBe(false);
-  });
-
-  test("`fam=tx` completes no steel key and invents no rope — `MBL` and `μ` stay blank", () => {
-    const { search } = completeFromDefaults(validateSearch(parse("?L=250&fam=tx")));
-    expect(search.fam).toBe("tx");
-    for (const key of ["d", "r0", "cst", "cls", "mbl", "mu", "k"] satisfies SearchKey[]) {
-      expect(key in search).toBe(false);
-    }
-  });
-
-  test("the completed bag is in canonical order", () => {
-    const { search } = completeFromDefaults(validateSearch(parse("?x=10&h=-40&L=250")));
-    const order = Object.keys(search);
-    expect(order).toEqual([...CANONICAL_KEYS].filter((key) => order.includes(key)));
-  });
-
+describe("a link with no scenario key restores the Session", () => {
   test("a bare `/` carries no scenario key, so nothing is completed and the Session wins", () => {
     expect(hasScenarioKey(validateSearch(parse("")))).toBe(false);
     // `v` alone is the schema version, not a scenario key: `/?v=1` still means « restore ».
     expect(hasScenarioKey(validateSearch(parse("?v=1")))).toBe(false);
     expect(hasScenarioKey(validateSearch(parse("?L=250")))).toBe(true);
-  });
-});
-
-describe("the first-run link", () => {
-  test("is § 9's shipped scenario, in canonical order", () => {
-    expect(FIRST_RUN_LINK).toBe(
-      "/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&fam=ac&d=12&r0=1770" +
-        "&cst=iwrc&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=75",
-    );
-  });
-
-  test("is 142 characters — `reg` absent, `mbf`/`ea`/`mu` absent", () => {
-    // § 7/§ 9/§ 11 quote **141**, counted off § 9's *printed* sketch, which spells `fl=6.0` and
-    // `x=75.0`. That sketch is not emittable: the spec keeps the router's default codecs, and
-    // `stringifySearchWith(JSON.stringify, JSON.parse)` renders the number 6 as `6` and the
-    // string `"6.0"` as `%226.0%22`. § 3 says the same thing from the other side — « padding is
-    // display-only: state holds a number whose value equals the displayed value, so the URL
-    // serialises `6` ». So 141 − 4 = **137**, measured against the installed router; the two
-    // absence meanings the count exists to lock are asserted below, unchanged. **142 since
-    // 2026-09-23**: `&gm=1` — « Garde min. admise » — is five more characters.
-    expect(FIRST_RUN_LINK).toHaveLength(142);
-    expect(FIRST_RUN_LINK).not.toContain("reg=");
-    expect(FIRST_RUN_LINK).not.toContain("mbf=");
-    expect(FIRST_RUN_LINK).not.toContain("ea=");
-    expect(FIRST_RUN_LINK).not.toContain("mu=");
-  });
-
-  test("round-trips: parsing it back yields the same bag, and re-emitting the same string", () => {
-    const search = validateSearch(parse(FIRST_RUN_LINK.slice(1)));
-    expect(search).toEqual(scenarioToSearch(FIRST_RUN_SCENARIO));
-    expect(canonicalLink(search)).toBe(FIRST_RUN_LINK);
-    expect(completeFromDefaults(search).completed).toEqual([]);
-  });
-});
-
-describe("scenarioToSearch — the write side", () => {
-  test("forces serialise in daN always, whatever `u` says", () => {
-    // Hand-editing `u=daN` → `u=kN` must not make the line 100× tighter.
-    const scenario: Scenario = {
-      ...structuredClone<Scenario>(FIRST_RUN_SCENARIO),
-      unit: "kN",
-      tightness: { mode: "tension", H_target: 2535 },
-      material: {
-        family: "steel",
-        d: 12,
-        R0: 1770,
-        construction: "iwrc",
-        overrides: { MBF: 90740, EA: 69000000, mu: 0.5465 },
-      },
-    };
-    const search = scenarioToSearch(scenario);
-    expect(search.u).toBe("kN");
-    expect(search.te).toBe(253.5);
-    expect(search.mbf).toBe(9074);
-    expect(search.ea).toBe(6900000);
-    expect(search.mu).toBe(0.5465);
-  });
-
-  test("a textile scenario emits the textile keys and no steel key", () => {
-    const scenario: Scenario = {
-      ...structuredClone<Scenario>(FIRST_RUN_SCENARIO),
-      usage: "TEMPORAIRE",
-      material: { family: "textile", ropeClass: "pa-en1891a", MBL: 300000, mu: 0.082, k: 1.5 },
-      terminations: {
-        A: { id: "oeil-cousu-epissure", eta: 0.9 },
-        B: { id: "epissure-longue-hmpe", eta: 0.85 },
-      },
-    };
-    const search = scenarioToSearch(scenario);
-    expect(search.fam).toBe("tx");
-    expect(search.cls).toBe("pa");
-    expect(search.mbl).toBe(30000);
-    expect(search.k).toBe(1.5);
-    expect(search.use).toBe("tempo");
-    // `epissure` serves both families — `fam` fixes which id it means, exactly as `mu` does.
-    expect(search.ta).toBe("oeil");
-    expect(search.tb).toBe("epissure");
-    for (const key of ["d", "r0", "cst", "mbf", "ea"] satisfies SearchKey[]) {
-      expect(key in search).toBe(false);
-    }
-  });
-
-  test("an imported scenario emits `tr`/`sa`/`sb` and no `L`/`h`", () => {
-    const scenario: Scenario = {
-      ...structuredClone<Scenario>(FIRST_RUN_SCENARIO),
-      geometry: { source: "trace", trace: TRACE, sa: 10, sb: 90 },
-    };
-    const search = scenarioToSearch(scenario);
-    expect(search.tr).toBe(TRACE);
-    expect(search.sa).toBe(10);
-    expect(search.sb).toBe(90);
-    expect("L" in search).toBe(false);
-    expect("h" in search).toBe(false);
-  });
-
-  test("`regime: null` emits no `reg` key at all", () => {
-    expect("reg" in scenarioToSearch(FIRST_RUN_SCENARIO)).toBe(false);
-    const chosen = scenarioToSearch({ ...FIRST_RUN_SCENARIO, regime: "en15567" });
-    expect(chosen.reg).toBe("en15567");
-  });
-
-  test("the emitted bag is in canonical order, in both families", () => {
-    // Regression, ticket 32: the textile branch inserted `mu` after `cls`/`mbl`, so the debounced
-    // address-bar write — which stringifies **this** bag's insertion order — put `mu` where
-    // `CANONICAL_KEYS` does not, and disagreed with `canonicalLink`'s string for the same Scenario.
-    const textile: Scenario = {
-      ...structuredClone<Scenario>(FIRST_RUN_SCENARIO),
-      material: { family: "textile", ropeClass: "hmpe", MBL: 300000, mu: 0.16, k: 22 },
-    };
-    const steel: Scenario = {
-      ...structuredClone<Scenario>(FIRST_RUN_SCENARIO),
-      material: {
-        family: "steel",
-        d: 12,
-        R0: 1770,
-        construction: "iwrc",
-        overrides: { MBF: 90740, EA: 69000000, mu: 0.5465 },
-      },
-    };
-    for (const scenario of [textile, steel, FIRST_RUN_SCENARIO]) {
-      const search = scenarioToSearch(scenario);
-      const emitted = Object.keys(search);
-      expect(emitted).toEqual([...CANONICAL_KEYS].filter((key) => emitted.includes(key)));
-      // The consequence, stated where a reader will look for it: « Copier le lien » builds its href
-      // with `canonicalLink`, the address bar gets this bag as-is, and § 7 requires the two strings
-      // to be identical (« two links to the same Scenario are then string-identical »).
-      expect(`/${defaultStringifySearch(search)}`).toBe(canonicalLink(search));
-    }
   });
 });

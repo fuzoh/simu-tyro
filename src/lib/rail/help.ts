@@ -19,6 +19,8 @@
  *   without help is a type error, not a silent hole.
  */
 
+import type { CellId } from "./cells.ts";
+import type { DeducedRowId } from "./deduced.ts";
 import type { FieldId } from "./fields.ts";
 import type { ResultGridRow, ResultRowId } from "./results.ts";
 
@@ -74,24 +76,8 @@ export const FIELD_HELP: Record<FieldId, string> = {
 export const TIGHTNESS_HELP =
   "Pilote de tension : exactement une des quatre grandeurs est saisie, les autres sont déduites. « Flèche » fixe la flèche à vide, « Tension » la prétension horizontale H, « Longueur » la longueur non tendue L₀, « Rapport V » le rapport P / H. Changer de pilote préremplit le nouveau champ avec la valeur déduite courante, à sa précision d'affichage, de sorte que la ligne ne bouge pas.";
 
-/** The rows of `Valeurs déduites`, by an id of this module's own. */
-export type DeducedHelpId =
-  | "L"
-  | "h"
-  | "zBaseA"
-  | "zBaseB"
-  | "MBL"
-  | "EAtextile"
-  | "w"
-  | "chord"
-  | "L0"
-  | "H"
-  | "sag"
-  | "sagRatio"
-  | "standingTension";
-
 /** Help for the read-only rows of `Valeurs déduites`. The three steel derived rows use {@link FIELD_HELP}. */
-export const DEDUCED_HELP: Record<DeducedHelpId, string> = {
+export const DEDUCED_HELP: Record<DeducedRowId, string> = {
   L: "Portée déduite du profil importé : L = station B − station A, en mètres. En mode tracé la portée n'est pas saisie mais dérivée des deux stations.",
   h: "Dénivelé déduit du profil importé : h = (z(sB) + hauteur B) − (z(sA) + hauteur A), en mètres. Négatif quand l'ancrage B est plus bas que A.",
   zBaseA:
@@ -151,20 +137,17 @@ export const GRID_HELP: Record<ResultGridRow["id"], string> = {
     "Obligation d'essai de charge à deux fois la charge de service, exigée par le régime mais non évaluable par un calcul : elle se constate sur site. Elle est affichée « non évalué » pour rappeler qu'un verdict favorable ne vaut pas conformité.",
 };
 
-/** Help for the five read-out cells under the charts, by their record key. */
-export const CELL_HELP: Record<string, string> = {
-  "Garde min. ligne":
+/** Help for the read-out cells under the charts. */
+export const CELL_HELP: Record<CellId, string> = {
+  clearance:
     "Garde au sol minimale sur toute la ligne pour la position affichée du passager : min sur x de z_câble(x, x_D) − z_sol(x) − h_rider (§11). Quand ce minimum n'est pas sous le passager, la cellule indique à quel x il se trouve. Passe en rouge sous « Garde min. admise ». Diffère de « Garde min (traversée) » de la barre latérale, qui prend aussi le minimum sur toutes les positions du passager.",
-  "T anc. A":
-    "Tension statique à l'ancrage A pour la position affichée du passager, sans majoration dynamique : résolue par l'équilibre de la chaînette chargée (§6.1). Le T max majoré de la barre latérale en est le pire cas sur la traversée, multiplié par le DAF.",
-  "T anc. B":
-    "Tension statique à l'ancrage B pour la position affichée du passager, sans majoration dynamique : résolue par l'équilibre de la chaînette chargée (§6.1).",
-  Pente:
+  TA: "Tension statique à l'ancrage A pour la position affichée du passager, sans majoration dynamique : résolue par l'équilibre de la chaînette chargée (§6.1). Le T max majoré de la barre latérale en est le pire cas sur la traversée, multiplié par le DAF.",
+  TB: "Tension statique à l'ancrage B pour la position affichée du passager, sans majoration dynamique : résolue par l'équilibre de la chaînette chargée (§6.1).",
+  slope:
     "Pente locale de la ligne au niveau du passager, en % : tan θ · 100, où θ est l'angle du câble au nœud du passager. Elle commande la composante motrice du poids et donc l'accélération du passager à cette position.",
-  Flèche:
-    "Flèche chargée à la position affichée : écart vertical entre la corde A–B et le nœud du passager, en mètres. C'est la flèche qui consomme la garde au sol à cet endroit ; son maximum sur la traversée est « Flèche chargée max » dans la barre latérale.",
-  "Garde passager":
+  sag: "Flèche chargée à la position affichée : écart vertical entre la corde A–B et le nœud du passager, en mètres. C'est la flèche qui consomme la garde au sol à cet endroit ; son maximum sur la traversée est « Flèche chargée max » dans la barre latérale.",
+  underRider:
     "Garde au sol sous les pieds du passager, à sa position : z_D − z_sol(x_D) − h_rider, en mètres. Informative : le critère reste « Garde min. ligne », le minimum sur toute la ligne, qui peut se trouver ailleurs qu'à l'aplomb du passager.",
-  "Écart à vide":
+  belowUnloaded:
     "Distance verticale entre la charge et la ligne à vide, à la position du passager : z_à vide(x_D) − z_D, en mètres. C'est de combien le poids du passager tire le câble vers le bas à cet endroit ; nul aux deux ancrages.",
 };

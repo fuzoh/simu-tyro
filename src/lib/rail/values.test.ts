@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, expectTypeOf, test } from "vitest";
 
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 
@@ -8,10 +8,14 @@ import { deduceValues } from "./deduced.ts";
 import { commitField } from "./fields.ts";
 import {
   applyField,
+  applyRopeClass,
+  applyShippedTerminations,
   clearOverride,
   drivingField,
+  FIELD_ACCESS,
   NUMERIC_FIELDS,
   railValues,
+  sameGatedText,
   switchTightness,
   withOverride,
 } from "./values.ts";
@@ -96,6 +100,19 @@ describe("railValues — the read direction of the force selector", () => {
     expect(values.sb).toBe("200,0");
     expect(values.L).toBe("");
     expect(values.h).toBe("");
+  });
+});
+
+describe("sameGatedText — the text tier one reads, through a scrub", () => {
+  const shown = railValues(scenario());
+
+  test("a bag that moved only `x_D` holds the same gated text", () => {
+    expect(sameGatedText(shown, { ...shown, xD: "12,5" })).toBe(true);
+  });
+
+  test("a bag that moved a gated field does not", () => {
+    expect(sameGatedText(shown, { ...shown, hClearMin: "3,00" })).toBe(false);
+    expect(sameGatedText(shown, { ...shown, L: "" })).toBe(false);
   });
 });
 
@@ -226,6 +243,54 @@ describe("applyField — one committed field, written back", () => {
   });
 });
 
+describe("FIELD_ACCESS — one lens per numeric field", () => {
+  test("the numeric fields are the rows of `FIELDS` with a precision row, in rail order", () => {
+    expect(NUMERIC_FIELDS).toEqual([
+      "L",
+      "h",
+      "zA",
+      "zB",
+      "sa",
+      "sb",
+      "d",
+      "mbfOverride",
+      "eaOverride",
+      "muOverride",
+      "MBL",
+      "muTextile",
+      "k",
+      "etaA",
+      "etaB",
+      "D_target",
+      "H_target",
+      "L0",
+      "vRatio",
+      "mp",
+      "hRider",
+      "hClearMin",
+      "DAF",
+      "xD",
+    ]);
+  });
+
+  test("`null` clears a field whose blank is state, and a required field has no blank", () => {
+    const overridden = withOverride(scenario(), "MBF", 80000);
+    const cleared = FIELD_ACCESS.mbfOverride.write(overridden, null);
+    if (cleared.material.family !== "steel") throw new Error("expected steel");
+    expect(cleared.material.overrides).toBeUndefined();
+
+    const rope = scenario((draft) => {
+      draft.usage = "TEMPORAIRE";
+      draft.material = { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 };
+    });
+    expect(FIELD_ACCESS.MBL.read(FIELD_ACCESS.MBL.write(rope, null))).toBeNull();
+
+    expectTypeOf(FIELD_ACCESS.MBL.write).parameter(1).toEqualTypeOf<number | null>();
+    expectTypeOf(FIELD_ACCESS.L.write).parameter(1).toEqualTypeOf<number>();
+    expectTypeOf(FIELD_ACCESS.vRatio.write).parameter(1).toEqualTypeOf<number>();
+  });
+});
+
 describe("Override — steel only, per value, and « Recalculer » drops the key", () => {
   test("typing into a derived field flips it to « valeur saisie »", () => {
     const overridden = withOverride(scenario(), "MBF", 80000);
@@ -329,5 +394,79 @@ describe("the Tightness Spec — one editable field, prefilled from its own read
 
   test("switching to the mode already active is a no-op", () => {
     expect(switchTightness(first, "sag", deduced)).toBe(first);
+  });
+});
+
+describe("applyRopeClass — `Classe de corde` sets `k` and keeps the ends", () => {
+  /** A PA rope tied with a figure-eight at A and a bowline at B, both §10.3 knots. */
+  const knotted = scenario((draft) => {
+    draft.usage = "TEMPORAIRE";
+    draft.material = { family: "textile", ropeClass: "pa-en1891a", MBL: 3e5, mu: 0.08, k: 1.5 };
+    draft.terminations = {
+      A: { id: "noeud-de-huit", eta: 0.6 },
+      B: { id: "noeud-de-chaise", eta: 0.55 },
+    };
+  });
+
+  test("HMPE ships §13.2's `k` 22, and the knots stay as given for the gate to raise", () => {
+    const next = applyRopeClass(knotted, "hmpe");
+    expect(next.material).toEqual({
+      family: "textile",
+      ropeClass: "hmpe",
+      MBL: 3e5,
+      mu: 0.08,
+      k: 22,
+    });
+    expect(next.terminations).toEqual({
+      A: { id: "noeud-de-huit", eta: 0.6 },
+      B: { id: "noeud-de-chaise", eta: 0.55 },
+    });
+  });
+
+  test("polyester's `k` is blank, not a number nobody published", () => {
+    expect(applyRopeClass(knotted, "polyester").material).toMatchObject({ k: null });
+  });
+
+  test("PA's `k` is §13.2's 1,5", () => {
+    expect(applyRopeClass(applyRopeClass(knotted, "hmpe"), "pa-en1891a").material).toMatchObject({
+      k: 1.5,
+    });
+  });
+
+  test("a steel line has no rope class to change", () => {
+    const steel = scenario();
+    expect(applyRopeClass(steel, "hmpe")).toBe(steel);
+  });
+});
+
+describe("applyShippedTerminations — the termination Fix Action's effect", () => {
+  test("only the ends the error names take the family's shipped end", () => {
+    const line = scenario((draft) => {
+      draft.terminations = {
+        A: { id: "noeud-de-huit", eta: 0.6 },
+        B: { id: "manchon-a-coin", eta: 0.8 },
+      };
+    });
+    expect(applyShippedTerminations(line, { field: "ta", alsoOutlined: [] }).terminations).toEqual({
+      A: { id: "cosse-oeil-flamand", eta: 0.9 },
+      B: { id: "manchon-a-coin", eta: 0.8 },
+    });
+  });
+
+  test("on a rope both ends take « Œil cousu / épissuré » at η 0,90", () => {
+    const rope = scenario((draft) => {
+      draft.usage = "TEMPORAIRE";
+      draft.material = { family: "textile", ropeClass: "hmpe", MBL: 3e5, mu: 0.08, k: 22 };
+      draft.terminations = {
+        A: { id: "noeud-de-huit", eta: 0.6 },
+        B: { id: "noeud-de-chaise", eta: 0.55 },
+      };
+    });
+    expect(
+      applyShippedTerminations(rope, { field: "ta", alsoOutlined: ["tb"] }).terminations,
+    ).toEqual({
+      A: { id: "oeil-cousu-epissure", eta: 0.9 },
+      B: { id: "oeil-cousu-epissure", eta: 0.9 },
+    });
   });
 });

@@ -15,10 +15,10 @@
  * textile `MBL` is « Aucun résultat », where terrain, both anchors and the span markers still draw,
  * while an invalid `L` is the *exception géométrique* that collapses both plots.
  *
- * **`x_D` is deliberately not a dependency.** {@link sceneInputs} omits it, which is what makes a
- * drag cheap: `placeRider` is the only half a `pointermove` re-runs, and it stays in the Chart
- * Block where the rider lives. Keying this on the whole Scenario would undo that — a scrub
- * dispatches a new Scenario on every frame.
+ * **`x_D` is deliberately not a dependency.** The unloaded line, `mp` and `hRider` omit it, which
+ * is what makes a drag cheap: `placeRider` is the only half a `pointermove` re-runs, and it stays
+ * in the Chart Block where the rider lives. Keying this on the whole Scenario would undo that — a
+ * scrub dispatches a new Scenario on every frame.
  *
  * `status` never reports `"computing"` in v1 and there is no worker: measured, not felt (p95
  * 1,30 ms against an 8 ms criterion). The seam survives anyway because stale-while-recomputing is
@@ -28,6 +28,7 @@
 import { useMemo } from "react";
 
 import type { SceneBase, SceneFrame } from "@/lib/chart/scene.ts";
+import type { Unloaded } from "@/lib/scenario/unloaded.ts";
 
 import { buildSceneBase, buildSceneFrame } from "@/lib/chart/scene.ts";
 
@@ -50,43 +51,31 @@ export type Scene = {
 };
 
 /**
- * The scene, in its two tiers: the placement, then the material chain, `L₀`, the unloaded solve,
- * the sweep and §11 over it.
+ * The scene, in its two tiers: the placement, then the sweep and §11 over the unloaded line.
  *
- * The frame is memoised on its own inputs, which are a strict subset of the solve's: a blank `MBL`
- * or an unreachable pretension re-runs the solve and leaves the drawn terrain, the towers and the
- * shared domain untouched — which is what makes § 8's « les entrées se dessinent toujours »
- * structural rather than a branch in the view.
+ * The frame is memoised on the placed span alone, which `useUnloaded` memoises on the geometry,
+ * the anchors and the trace: a blank `MBL` or an unreachable pretension re-runs the solve over the
+ * same placement and leaves the drawn terrain, the towers and the shared domain untouched — which
+ * is what makes § 8's « les entrées se dessinent toujours » structural rather than a branch in the
+ * view.
  *
  * **Which** failure produced a `null` is the error surfaces' business (A11); every consumer here
  * only needs to know how much picture it has.
+ *
+ * @param unloaded `useUnloaded`'s line — derived once at the app root and shared with
+ *   `useDeduced`, so the `L₀` bisection does not run twice per edit.
  */
-export function useScene(): Scene {
-  const { scenario, trace } = useAppState();
-  const { anchors, geometry, material, rider, tightness } = scenario;
+export function useScene(unloaded: Unloaded): Scene {
+  const { mp, hRider } = useAppState().scenario.rider;
 
   // Every dependency survives a scrub untouched: `scénario/modifié` merges its patch shallowly, so
-  // a rider patch leaves `geometry`, `anchors`, `material` and `tightness` identical.
-  const frame = useMemo(
-    () => buildSceneFrame({ anchors, geometry, trace }),
-    [anchors, geometry, trace],
-  );
+  // a rider patch leaves the placement and the unloaded line identical.
+  const placed = unloaded.span;
+  const frame = useMemo(() => buildSceneFrame(placed), [placed]);
 
   const solved = useMemo(
-    () =>
-      buildSceneBase(
-        {
-          anchors,
-          geometry,
-          hRider: rider.hRider,
-          material,
-          mp: rider.mp,
-          tightness,
-          trace,
-        },
-        frame,
-      ),
-    [anchors, geometry, material, tightness, rider.mp, rider.hRider, trace, frame],
+    () => buildSceneBase(frame, unloaded, { mp, hRider }),
+    [frame, unloaded, mp, hRider],
   );
 
   return { frame, solved };

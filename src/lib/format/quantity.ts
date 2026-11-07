@@ -50,7 +50,7 @@
  * (`d`), **kilograms**, **kg/m**, **newtons** and **N/m** for every force (including `EA`),
  * **percent** for the percent rows, and plain numbers for the dimensionless ones. `daN` is a
  * *display* unit here exactly like `kN` and `kgf` — and it is the URL's, where
- * `src/lib/url/schema.ts` divides by ten on the write side: the one N → daN conversion in the
+ * `src/lib/url/scenario.ts` divides by ten on the write side: the one N → daN conversion in the
  * codebase.
  */
 
@@ -387,6 +387,14 @@ export function formatQuantity(id: QuantityId, value: number, unit: ForceUnit = 
   const label = unitLabel(id, unit);
   const shown = formatValue(id, value, unit);
   return label === "" ? shown : `${shown} ${label}`;
+}
+
+/**
+ * « à x 74,8 m » — where along the span an extremum or the rider sits. The flèche à vide, the
+ * read-out cell's garde and the Rail's « passager à x » all name a position this way.
+ */
+export function formatAtX(x: number): string {
+  return `à x ${formatQuantity("extremumX", x)}`;
 }
 
 /**

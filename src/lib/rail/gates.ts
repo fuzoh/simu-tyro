@@ -45,16 +45,29 @@
  *   than cascading a silent second repair.
  */
 
+import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
-import type { RegimeId } from "@/lib/sim";
+import type { RegimeId, RegimeMismatch, TerminationId, TextileSpec } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
-import { isFamilyAllowed, isRegimeAvailable, REGIMES } from "@/lib/sim";
+import { isFamilyAllowed, REGIMES, regimeMismatch, TERMINATIONS } from "@/lib/sim";
 
+import type { Deduced } from "./deduced.ts";
 import type { FieldId, FieldIssue, FieldIssueKind, GateId } from "./fields.ts";
 
 import { checkField, displayField, emptyMessage, FIELD_ORDER, FIELDS, gateOf } from "./fields.ts";
+import {
+  FIELD_ACCESS,
+  fieldContext,
+  GATED_FIELDS,
+  heldValue,
+  isGatedField,
+  isNumericField,
+  isOverrideField,
+  SHIPPED_TERMINATIONS,
+  TERMINATION_FIELD,
+} from "./values.ts";
 
 export type { GateId } from "./fields.ts";
 
@@ -73,19 +86,22 @@ export const GATE_CONSEQUENCE: Record<GateId, string> = {
 const GATE_RANK: Record<GateId, number> = { solve: 0, clearance: 1, verdict: 2 };
 
 /**
- * § 7's four Fix Actions. **Their labels describe the effect of pressing them** (invariant 2):
- * a *message* states a property of the world, and a verb naming the effect is accurate whether the
- * state was entered or arrived on the first frame of a link.
+ * § 7's four Fix Actions, and the fifth ADR-0001 admits for an end the line cannot use. **Their
+ * labels describe the effect of pressing them** (invariant 2): a *message* states a property of
+ * the world, and a verb naming the effect is accurate whether the state was entered or arrived on
+ * the first frame of a link.
  */
 export type FixActionId =
   | "inverser-a-b"
   | "passer-a-l-acier"
   | "passer-en-usage-temporaire"
-  | "choisir-un-autre-regime";
+  | "choisir-un-autre-regime"
+  | "passer-a-la-terminaison-de-depart";
 
 export type FixAction = { readonly id: FixActionId; readonly label: string };
 
-const FIX: Record<FixActionId, FixAction> = {
+/** The fifth names the end it sets, which depends on the family, so it is built at the gate. */
+const FIX: Record<Exclude<FixActionId, "passer-a-la-terminaison-de-depart">, FixAction> = {
   "inverser-a-b": { id: "inverser-a-b", label: "Inverser A et B" },
   "passer-a-l-acier": { id: "passer-a-l-acier", label: "Passer à l'acier" },
   "passer-en-usage-temporaire": {
@@ -134,7 +150,7 @@ export type GateReport = {
 
 /** What the gates read. Everything else in the app is downstream of these three. */
 export type GateInput = {
-  readonly scenario: ScenarioDraft;
+  readonly scenario: TraverseScenario;
   /** The active profile, or `null` in manual mode — the stations' bound comes from it. */
   readonly trace: Trace | null;
   /**
@@ -202,26 +218,127 @@ export function culprits(grandeur: Grandeur, mode: CulpritMode): readonly FieldI
 
 /**
  * The cause clause of § 8's « Régime × famille / usage » message row, for a régime that
- * {@link isRegimeAvailable} has just rejected.
+ * {@link regimeMismatch} has just rejected.
  *
- * § 10.1 disables a régime on **two independent conditions** — « seul *Secours textile 10:1* est
- * désactivé — sous acier, **ou** sous `PERMANENTE` » — so the clause names the **mismatch**, never
- * the state the Scenario happens to hold. Under `textile` + `PERMANENTE` the rope is this régime's
- * own *precondition*: naming it would send the user to repair the one part already right, and the
- * family breach § 10.4 files alongside it already names the rope. **Family first when both miss**,
- * which keeps § 8's shipped steel string verbatim. `requires.usage` is `TEMPORAIRE` for every
- * régime that constrains it, so a use-class miss can only ever be `PERMANENTE`.
+ * § 10.1 disables a régime on **two independent conditions** — « sous acier, **ou** sous
+ * `PERMANENTE` » — so the clause names each **mismatch**, never the state the Scenario happens to
+ * hold. Under `textile` + `PERMANENTE` the rope is this régime's own *precondition*: naming it
+ * would send the user to repair the one part already right. Steel under `PERMANENTE` misses both,
+ * and the clause names both, family first. `requires.usage` is `TEMPORAIRE` for every régime that
+ * constrains it, so a use-class miss can only ever be `PERMANENTE`.
  */
-function unavailabilityCause(regime: RegimeId, family: "steel" | "textile"): string {
+function unavailabilityCause(mismatch: RegimeMismatch, family: "steel" | "textile"): string {
+  const causes: string[] = [];
+  if (mismatch.family)
+    causes.push(family === "steel" ? "avec un câble acier" : "avec une corde textile");
+  if (mismatch.usage) causes.push("en installation permanente");
+  return causes.join(" et ");
+}
+
+/** What a régime's `requires` asks for, as the noun the select note needs. */
+const FAMILY_REQUIRED = { steel: "un câble acier", textile: "une corde textile" } as const;
+const USAGE_REQUIRED = {
+  PERMANENTE: "un usage permanent",
+  TEMPORAIRE: "un usage temporaire",
+} as const;
+/** And what is currently selected, for the clause that names it. */
+const FAMILY_ACTIVE = { steel: "l'acier", textile: "le textile" } as const;
+
+/**
+ * § 10.1 — « une entrée indisponible **montre sa raison** »: the régime select's note, `null` where
+ * the entry is choosable. The option itself already reads « — indisponible », which says *that*;
+ * this says *why*.
+ *
+ * **Three forms, because both clauses can fail at once** — steel *and* `PERMANENTE`. § 10.1 asks
+ * for one reason per row, so the pair is one sentence rather than two notes.
+ */
+export function regimeUnavailableNote(
+  regime: RegimeId,
+  family: "steel" | "textile",
+  usage: "PERMANENTE" | "TEMPORAIRE",
+): string | null {
+  const mismatch = regimeMismatch(regime, family, usage);
   const { requires } = REGIMES[regime];
-  if (requires !== null && requires.family !== family) {
-    return family === "steel" ? "avec un câble acier" : "avec une corde textile";
+  if (mismatch === null || requires === null) return null;
+  if (mismatch.family && mismatch.usage) {
+    return `Indisponible — ce régime suppose ${FAMILY_REQUIRED[requires.family]} et ${USAGE_REQUIRED[requires.usage]}.`;
   }
-  return "en installation permanente";
+  if (mismatch.family) {
+    return `Indisponible — ce régime suppose ${FAMILY_REQUIRED[requires.family]} ; la famille active est ${FAMILY_ACTIVE[family]}.`;
+  }
+  return `Indisponible — ce régime ne couvre pas ${USAGE_REQUIRED[usage]}.`;
+}
+
+/** §10.4, stated where `Corde textile` is disabled — the rule is a fact worth teaching. */
+export const TEXTILE_UNAVAILABLE_REASON =
+  "§10.4 : fluage, UV/abrasion et fusion par friction (HMPE ~144–152 °C) ⇒ acier seul en installation permanente.";
+
+/** §10.3, likewise: not forbidden — there is simply no efficiency to multiply by. */
+const KNOT_ON_HMPE_REASON =
+  "§10.3 : sur HMPE le nœud glisse (0,25–0,50). Aucun rendement défendable ⇒ épissure obligatoire.";
+
+type Family = ScenarioDraft["material"]["family"];
+
+/** Why the line cannot use an end — `null` when it can. */
+type TerminationFault = "other-family" | "knot-on-hmpe";
+
+function terminationFault(
+  id: TerminationId,
+  family: Family,
+  ropeClass: TextileSpec["ropeClass"] | null,
+): TerminationFault | null {
+  const termination = TERMINATIONS[id];
+  if (termination.family !== "both" && termination.family !== family) return "other-family";
+  // §10.3's 0,25–0,50 describes a knot that *slips*: there is no efficiency to multiply by.
+  if (termination.knot && ropeClass === "hmpe") return "knot-on-hmpe";
+  return null;
+}
+
+/** One entry of a termination picker. */
+export type TerminationOption = {
+  readonly value: TerminationId;
+  readonly label: string;
+  readonly disabled: boolean;
+};
+
+/**
+ * A termination picker's entries: the active family's ends plus « Attelage sans tension », with
+ * §10.3's knots disabled on HMPE. Serre-câbles étrier stays **selectable** — a defensible `η_t`
+ * exists and the Verdict refuses the rig.
+ *
+ * @param selected the end the line holds. One of the other family is still listed, last and
+ *   disabled: a native select left without its option would show the first entry instead, beside
+ *   the Verdict Gate's error about a different one, and that error is its reason.
+ * @returns the entries and the row's one reason, `null` when no knot is disabled. Both knots are
+ *   disabled by the same rule, and printing it twice says nothing the first copy did not.
+ */
+export function terminationOptions(
+  family: Family,
+  ropeClass: TextileSpec["ropeClass"] | null,
+  selected: TerminationId,
+): { readonly options: readonly TerminationOption[]; readonly reason: string | null } {
+  const options = Object.values(TERMINATIONS).flatMap((termination) => {
+    const fault = terminationFault(termination.id, family, ropeClass);
+    if (fault === "other-family") return [];
+    return [{ value: termination.id, label: termination.label, disabled: fault !== null }];
+  });
+  const reason = options.some((option) => option.disabled) ? KNOT_ON_HMPE_REASON : null;
+  if (options.some((option) => option.value === selected)) return { options, reason };
+  const held = { value: selected, label: TERMINATIONS[selected].label, disabled: true };
+  return { options: [...options, held], reason };
+}
+
+function terminationFaultMessage(fault: TerminationFault, family: Family): string {
+  if (fault === "knot-on-hmpe") {
+    return "⛔ Nœud impossible sur HMPE — il y glisse, sans rendement défendable (§10.3).";
+  }
+  return family === "steel"
+    ? "⛔ Terminaison de corde textile impossible sur un câble acier (§10.2)."
+    : "⛔ Terminaison de câble acier impossible sur une corde textile (§10.3).";
 }
 
 /** Manual or imported geometry — the mode half of every (grandeur × mode) row. */
-function geometryMode(scenario: ScenarioDraft): "manual" | "trace" {
+function geometryMode(scenario: TraverseScenario): "manual" | "trace" {
   return scenario.geometry.source;
 }
 
@@ -229,44 +346,16 @@ function geometryMode(scenario: ScenarioDraft): "manual" | "trace" {
  * Is this control on screen for this Scenario? A field the current mode, family or tightness
  * driver does not render cannot be a culprit — a stale issue on `MBL` under `fam=ac` would block a
  * steel line on a rope nobody can see.
+ *
+ * A gated numeric field is on screen where its lens reads anything at all. The pickers have no
+ * lens, so the two steel pickers and the rope class keep their family rule here.
  */
-export function isFieldActive(id: FieldId, scenario: ScenarioDraft): boolean {
-  const manual = scenario.geometry.source === "manual";
+export function isFieldActive(id: FieldId, scenario: TraverseScenario): boolean {
+  if (isGatedField(id)) return FIELD_ACCESS[id].read(scenario) !== undefined;
   const steel = scenario.material.family === "steel";
-  switch (id) {
-    case "L":
-    case "h":
-      return manual;
-    case "sa":
-    case "sb":
-      return !manual;
-    case "d":
-    case "R0":
-    case "cst":
-      return steel;
-    // The three derived rows are editable at all times on a steel line — typing into one is what
-    // creates the override. A *scenario-level* check still only runs on an override that exists,
-    // because `materialScalars` only lists the keys the spec actually holds.
-    case "mbfOverride":
-    case "eaOverride":
-    case "muOverride":
-      return steel;
-    case "cls":
-    case "MBL":
-    case "muTextile":
-    case "k":
-      return !steel;
-    case "D_target":
-      return scenario.tightness.mode === "sag";
-    case "H_target":
-      return scenario.tightness.mode === "tension";
-    case "L0":
-      return scenario.tightness.mode === "length";
-    case "vRatio":
-      return scenario.tightness.mode === "ratio";
-    default:
-      return true;
-  }
+  if (id === "R0" || id === "cst") return steel;
+  if (id === "cls") return !steel;
+  return true;
 }
 
 /**
@@ -325,136 +414,101 @@ export function evaluateGates({ scenario, trace, issues = [] }: GateInput): Gate
   // grid and leaves § 8's rank-4 neutral prompt as the banner's occupant. Filing it as an error
   // would put rank 1 in the slot instead and make that prompt unreachable.
   const noRegime = scenario.regime === null;
-  if (
-    scenario.regime !== null &&
-    !isRegimeAvailable(scenario.regime, scenario.material.family, scenario.usage)
-  ) {
+  const mismatch =
+    scenario.regime === null
+      ? null
+      : regimeMismatch(scenario.regime, scenario.material.family, scenario.usage);
+  if (scenario.regime !== null && mismatch !== null) {
     push({
       gate: "verdict",
       kind: "invalid",
       field: "regime",
       alsoOutlined: [],
-      // The cause clause names the **blocking condition**, not the family — see
-      // {@link unavailabilityCause}: reading the family alone blamed the rope this régime requires.
       message: `⛔ Régime « ${REGIMES[scenario.regime].label} » indisponible ${unavailabilityCause(
-        scenario.regime,
+        mismatch,
         scenario.material.family,
       )}.`,
       fixes: [FIX["choisir-un-autre-regime"]],
     });
   }
 
-  // ── The textile blanks the *state* can hold ────────────────────────────────────────────────
-  // **No rope ships**: one invented `MBL` decides the verdict (100 kN ⇒ FS 11,94 « dans les
-  // limites »; 60 kN ⇒ 7,63 « hors limites » on the same line). Flipping to `Corde textile` under
-  // `TEMPORAIRE` therefore lands on two blank required fields — which is **not** « Saisie en
-  // cours »: a field the user never filled is not mid-edit, so it blocks and keeps no stale
-  // picture. Polyester adds a third, and its message carries the reason rather than the hole.
-  if (scenario.material.family === "textile") {
-    const spec = scenario.material;
-    const blanks: readonly [FieldId, number | null][] = [
-      ["MBL", spec.MBL],
-      ["muTextile", spec.mu],
-      ["k", spec.k],
-    ];
-    for (const [field, value] of blanks) {
-      if (value !== null) continue;
-      push({
-        gate: "solve",
-        kind: "empty",
-        field,
-        alsoOutlined: [],
-        message: emptyMessage(field, { ropeClass: spec.ropeClass }),
-        fixes: [],
-      });
-    }
+  // ── The ends the line cannot use ───────────────────────────────────────────────────────────
+  // The picker never offers them, but a link, a Session or a class switch can carry one, and
+  // ADR-0001 keeps it as given. One error per cause, so a single press repairs every end it names
+  // and an end with another cause keeps its own message.
+  const family = scenario.material.family;
+  const ropeClass = scenario.material.family === "textile" ? scenario.material.ropeClass : null;
+  for (const fault of ["other-family", "knot-on-hmpe"] as const) {
+    const ends = (["A", "B"] as const).filter(
+      (end) => terminationFault(scenario.terminations[end].id, family, ropeClass) === fault,
+    );
+    if (ends.length === 0) continue;
+    const [first, ...rest] = ends;
+    const { id } = SHIPPED_TERMINATIONS[family][first];
+    push({
+      gate: "verdict",
+      kind: "invalid",
+      field: TERMINATION_FIELD[first],
+      alsoOutlined: rest.map((end) => TERMINATION_FIELD[end]),
+      message: terminationFaultMessage(fault, family),
+      fixes: [
+        {
+          id: "passer-a-la-terminaison-de-depart",
+          label: `Passer à « ${TERMINATIONS[id].label} »`,
+        },
+      ],
+    });
   }
 
-  // ── Imported placement — the hard checks that must run on **derived** values ────────────────
-  if (scenario.geometry.source === "trace") {
-    const { sa, sb } = scenario.geometry;
-    const extent =
-      trace === null ? undefined : { min: trace.d[0], max: trace.d[trace.d.length - 1] };
-
-    for (const [field, station] of [
-      ["sa", sa],
-      ["sb", sb],
-    ] as const) {
-      const issue = checkField(field, displayField(field, station, scenario.unit), { extent });
-      if (issue !== null) {
+  // ── Every number the Scenario holds, as a link can carry it ────────────────────────────────
+  // `?L=-5` restores state faithfully, including invalid state, and must light up here on the first
+  // frame even though nobody has typed into the field yet.
+  const context = fieldContext(scenario, trace);
+  for (const field of GATED_FIELDS) {
+    const value = FIELD_ACCESS[field].read(scenario);
+    if (value === undefined) continue;
+    if (value === null) {
+      // An unset Override is « non surchargée »: it shows the formula and judges nothing. The other
+      // blanks are the textile ones the *state* can hold. **No rope ships**: one invented `MBL`
+      // decides the verdict (100 kN ⇒ FS 11,94 « dans les limites »; 60 kN ⇒ 7,63 « hors limites »
+      // on the same line). Flipping to `Corde textile` under `TEMPORAIRE` therefore lands on two
+      // blank required fields — which is **not** « Saisie en cours »: a field the user never
+      // filled is not mid-edit, so it blocks and keeps no stale picture. Polyester adds a third,
+      // and its message carries the reason rather than the hole.
+      if (!isOverrideField(field)) {
         push({
           gate: "solve",
-          kind: issue.kind,
+          kind: "empty",
           field,
           alsoOutlined: [],
-          message: issue.message,
+          message: emptyMessage(field, context),
           fixes: [],
         });
       }
+      continue;
     }
-
-    // `L = d_B − d_A` is a **read-out** here, so `L > 0` is attributed back to the stations. Not
-    // a silent auto-swap: normalising to `A = min(station)` would **flip the sign of `h`**, the
-    // silent model reinterpretation the §10.4 family gate already ruled out.
-    if (!(sb > sa)) {
-      const [first, ...rest] = culprits("L", "importé");
-      push({
-        gate: "solve",
-        kind: "invalid",
-        field: first,
-        alsoOutlined: rest,
-        message: "⛔ Portée nulle ou négative — l'ancrage B est avant l'ancrage A.",
-        fixes: [FIX["inverser-a-b"]],
-      });
-    }
-  } else {
-    // Manual mode types `L` and `h` directly, so § 3's hard ranges are field rules and tier one has
-    // already run them on the text. What is left is the value a **link** can carry: `?L=-5`
-    // restores state faithfully, including invalid state, and must light up here on the first frame
-    // even though nobody has typed into the field yet.
-    const { L, h } = scenario.geometry;
-    for (const [field, value] of [
-      ["L", L],
-      ["h", h],
-    ] as const) {
-      const issue = checkField(field, displayField(field, value, scenario.unit), {});
-      if (issue !== null) {
-        push({
-          gate: "solve",
-          kind: issue.kind,
-          field,
-          alsoOutlined: [],
-          message: issue.message,
-          fixes: [],
-        });
-      }
-    }
-  }
-
-  // ── The remaining scenario-borne numbers a link can carry out of range ─────────────────────
-  const scalars: readonly (readonly [FieldId, number])[] = [
-    ["zA", scenario.anchors.zA],
-    ["zB", scenario.anchors.zB],
-    ["mp", scenario.rider.mp],
-    ["hRider", scenario.rider.hRider],
-    ["hClearMin", scenario.rider.hClearMin],
-    ["DAF", scenario.rider.DAF],
-    ["etaA", scenario.terminations.A.eta],
-    ["etaB", scenario.terminations.B.eta],
-    ...tightnessScalar(scenario),
-    ...materialScalars(scenario),
-  ];
-  for (const [field, value] of scalars) {
-    if (!isFieldActive(field, scenario)) continue;
     // Canonical → the text the field shows, so a message echoes « −10,0 daN » and not the raw
     // newtons: § 7's template quotes the value **in the field's own quantity and unit**.
-    const issue = checkField(field, displayField(field, value, scenario.unit), {
-      unit: scenario.unit,
-    });
+    const issue = checkField(field, displayField(field, value, scenario.unit), context);
     if (issue === null) continue;
     const gate = gateOf(field, mode);
     if (gate === null) continue;
     push({ gate, kind: issue.kind, field, alsoOutlined: [], message: issue.message, fixes: [] });
+  }
+
+  // `L = d_B − d_A` is a **read-out** in imported mode, so `L > 0` is attributed back to the
+  // stations. Not a silent auto-swap: normalising to `A = min(station)` would **flip the sign of
+  // `h`**, the silent model reinterpretation the §10.4 family gate already ruled out.
+  if (scenario.geometry.source === "trace" && !(scenario.geometry.sb > scenario.geometry.sa)) {
+    const [first, ...rest] = culprits("L", "importé");
+    push({
+      gate: "solve",
+      kind: "invalid",
+      field: first,
+      alsoOutlined: rest,
+      message: "⛔ Portée nulle ou négative — l'ancrage B est avant l'ancrage A.",
+      fixes: [FIX["inverser-a-b"]],
+    });
   }
 
   errors.sort(
@@ -472,33 +526,6 @@ export function evaluateGates({ scenario, trace, issues = [] }: GateInput): Gate
   const worst = errors.length === 0 ? null : errors[0].gate;
 
   return { errors, passed, worst, noRegime };
-}
-
-/** The driving tightness field and its value — exactly one is state per mode, by construction. */
-function tightnessScalar(scenario: ScenarioDraft): readonly (readonly [FieldId, number])[] {
-  const { tightness } = scenario;
-  if (tightness.mode === "sag") return [["D_target", tightness.D_target]];
-  if (tightness.mode === "tension") return [["H_target", tightness.H_target]];
-  if (tightness.mode === "ratio") return [["vRatio", tightness.ratio]];
-  return [["L0", tightness.L0]];
-}
-
-/** The active Material Spec's own numbers, overrides included — they are their own culprits. */
-function materialScalars(scenario: ScenarioDraft): readonly (readonly [FieldId, number])[] {
-  const spec = scenario.material;
-  if (spec.family === "steel") {
-    const out: (readonly [FieldId, number])[] = [["d", spec.d]];
-    const { MBF, EA, mu } = spec.overrides ?? {};
-    if (MBF !== undefined) out.push(["mbfOverride", MBF]);
-    if (EA !== undefined) out.push(["eaOverride", EA]);
-    if (mu !== undefined) out.push(["muOverride", mu]);
-    return out;
-  }
-  const out: (readonly [FieldId, number])[] = [];
-  if (spec.MBL !== null) out.push(["MBL", spec.MBL]);
-  if (spec.mu !== null) out.push(["muTextile", spec.mu]);
-  if (spec.k !== null) out.push(["k", spec.k]);
-  return out;
 }
 
 /**
@@ -562,65 +589,17 @@ export function saisieEnCours(
   };
 }
 
-/** The last committed value of a field, formatted for {@link saisieEnCours}'s sentence. */
-export function committedValue(scenario: ScenarioDraft, field: FieldId): string | null {
-  const { quantity } = FIELDS[field];
-  if (quantity === null) return null;
-  const value = scalarOf(scenario, field);
-  return value === null ? null : formatQuantity(quantity, value, scenario.unit);
-}
-
-/** Every scalar the Scenario holds, by field. `null` where the field is not a number in state. */
-function scalarOf(scenario: ScenarioDraft, field: FieldId): number | null {
-  const { geometry, anchors, rider, tightness, terminations, material } = scenario;
-  switch (field) {
-    case "L":
-      return geometry.source === "manual" ? geometry.L : null;
-    case "h":
-      return geometry.source === "manual" ? geometry.h : null;
-    case "sa":
-      return geometry.source === "trace" ? geometry.sa : null;
-    case "sb":
-      return geometry.source === "trace" ? geometry.sb : null;
-    case "zA":
-      return anchors.zA;
-    case "zB":
-      return anchors.zB;
-    case "mp":
-      return rider.mp;
-    case "hRider":
-      return rider.hRider;
-    case "hClearMin":
-      return rider.hClearMin;
-    case "DAF":
-      return rider.DAF;
-    case "xD":
-      return rider.xD;
-    case "etaA":
-      return terminations.A.eta;
-    case "etaB":
-      return terminations.B.eta;
-    case "D_target":
-      return tightness.mode === "sag" ? tightness.D_target : null;
-    case "H_target":
-      return tightness.mode === "tension" ? tightness.H_target : null;
-    case "L0":
-      return tightness.mode === "length" ? tightness.L0 : null;
-    case "d":
-      return material.family === "steel" ? material.d : null;
-    case "MBL":
-      return material.family === "textile" ? material.MBL : null;
-    case "muTextile":
-      return material.family === "textile" ? material.mu : null;
-    case "k":
-      return material.family === "textile" ? material.k : null;
-    case "mbfOverride":
-      return material.family === "steel" ? (material.overrides?.MBF ?? null) : null;
-    case "eaOverride":
-      return material.family === "steel" ? (material.overrides?.EA ?? null) : null;
-    case "muOverride":
-      return material.family === "steel" ? (material.overrides?.mu ?? null) : null;
-    default:
-      return null;
-  }
+/**
+ * The last committed value of a field, formatted for {@link saisieEnCours}'s sentence — what the
+ * Rail shows for it, so an unset Override names its formula value.
+ */
+export function committedValue(
+  scenario: ScenarioDraft,
+  field: FieldId,
+  deduced: Deduced,
+): string | null {
+  if (!isNumericField(field)) return null;
+  const value = heldValue(scenario, field, deduced);
+  if (value === null || value === undefined) return null;
+  return formatQuantity(FIELDS[field].quantity, value, scenario.unit);
 }

@@ -262,7 +262,7 @@ describe("the three-tier warning ladder", () => {
       tightness: { mode: "sag", D_target: 2 },
     };
     const ladder = warningLadder(scenario, deduceValues(scenario, null));
-    const creep = ladder.find((rung) => rung.id === "tension-permanente-sur-30-pct");
+    const creep = ladder.find((rung) => rung.id === "tension-permanente-sur-30-pct-mbl");
     expect(creep?.row).toBe("standingTension");
     expect(creep?.text).toContain("fluage");
     expect(creep?.text).toContain("§9.2");
@@ -272,7 +272,7 @@ describe("the three-tier warning ladder", () => {
     const steel: ScenarioDraft = { ...SHIPPED, tightness: { mode: "sag", D_target: 2 } };
     expect(
       warningLadder(steel, deduceValues(steel, null)).some(
-        (rung) => rung.id === "tension-permanente-sur-30-pct",
+        (rung) => rung.id === "tension-permanente-sur-30-pct-mbl",
       ),
     ).toBe(false);
   });

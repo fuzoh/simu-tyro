@@ -33,17 +33,20 @@
  *   `src/styles.css`, `keepCaret` below, and amendment H.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
+import type { ClampEvent } from "@/components/rail/controls.tsx";
 import type { PeekMode } from "@/lib/layout/contract.ts";
 import type { LayerToggles } from "@/lib/session/session.ts";
 
+import { ClampNote } from "@/components/rail/controls.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { Toggle } from "@/components/ui/toggle.tsx";
 import { formatValue } from "@/lib/format/quantity.ts";
 import { keepCaret } from "@/lib/layout/collapse.ts";
+import { riderPositionEntry } from "@/lib/rail/fields.ts";
 import { cn } from "@/lib/utils.ts";
 
 /**
@@ -86,9 +89,6 @@ function Abbr({
  */
 const PRESSED =
   "text-muted-foreground aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:text-background aria-pressed:hover:bg-foreground/85";
-
-/** How long § 3's clamp note stays up, ms. Long enough to read one line, short enough to be a note. */
-const CLAMP_NOTE_MS = 4000;
 
 /**
  * The peek control's two labels, per mode — § 5's « ×1 vraie échelle », and the **decision 4**
@@ -297,7 +297,7 @@ export function ViewStrip({
  *
  * **The note here covers this field's own path**, because a clamp speaks where it was asked for:
  * the Scenario is clamped on the way in — by `applyField`, by the reducer's terrain actions and by
- * `scenarioFromSearch` — so a note keyed on « state holds a position outside the span » could only
+ * `searchToScenario` — so a note keyed on « state holds a position outside the span » could only
  * ever fire where nothing moved. The other two paths are announced by the Rail's own
  * « Position du passager », which is where the geometry that shortened the span was typed.
  */
@@ -314,23 +314,15 @@ function PositionField({
 }) {
   const shown = formatValue("x_D", xD);
   const [draft, setDraft] = useState<string | null>(null);
-  // A nonce rather than a boolean: a second clamp while the first note is up restarts its timer.
-  const [clamped, setClamped] = useState(0);
-
-  // Transient — it is a note about a move that just happened, not a state of the field.
-  useEffect(() => {
-    if (clamped === 0) return;
-    const timer = setTimeout(() => setClamped(0), CLAMP_NOTE_MS);
-    return () => clearTimeout(timer);
-  }, [clamped]);
+  const [clamped, setClamped] = useState<ClampEvent>({ L: 0, nonce: 0 });
 
   function commit(raw: string) {
     setDraft(null);
-    const parsed = Number(raw.trim().replace(",", "."));
+    const entry = riderPositionEntry(raw, L);
     // An unreadable entry is not a clamp: the field reverts to the last value and says nothing.
-    if (!Number.isFinite(parsed)) return;
-    if (parsed < 0 || parsed > L) setClamped((nonce) => nonce + 1);
-    onX(parsed);
+    if (entry === null) return;
+    if (entry.clamped) setClamped((previous) => ({ L, nonce: previous.nonce + 1 }));
+    onX(entry.xD);
   }
 
   return (
@@ -353,13 +345,10 @@ function PositionField({
     >
       {/* Mounted at all times so the live region can speak; absolute so the View Strip keeps its
           44 px, the tightest budget in the app. */}
-      <span
-        aria-live="polite"
+      <ClampNote
         className="text-muted-foreground bg-background pointer-events-none absolute -top-5 right-0 px-2.5"
-        role="status"
-      >
-        {clamped === 0 ? "" : `position ramenée à la portée : 0 – ${formatValue("x_D", L)} m`}
-      </span>
+        event={clamped}
+      />
       <span className="text-muted-foreground">x</span>
       <Input
         // **16 px, locked** — § 7.1 and amendment G decision 5: below it iOS Safari auto-zooms the

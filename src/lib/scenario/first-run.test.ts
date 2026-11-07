@@ -95,7 +95,7 @@ function openingState(scenario: Scenario) {
 
   const vide = solveSpan(span);
   if (!vide.ok) throw new Error(`expected a solve, got ${JSON.stringify(vide.error)}`);
-  const sag = unloadedSag(vide.state, { L, h });
+  const sag = unloadedSag(vide.state, { L, h }).D;
 
   const traverse = sweep(span, P, RUN.sweepSteps);
 
@@ -136,7 +136,6 @@ function openingState(scenario: Scenario) {
     usage: scenario.usage,
     terminations: { A: scenario.terminations.A.id, B: scenario.terminations.B.id },
     family: material.family,
-    sagRatio: sag / L,
   };
   const verdict = evaluateVerdict(verdictInput);
 
