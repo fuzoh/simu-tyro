@@ -1,16 +1,9 @@
 import { describe, expect, test } from "vitest";
 
-import { scenarioFromSearch } from "@/lib/scenario/from-search.ts";
-
 import type { DecodeOnlyFixture } from "./canonical-links.ts";
 
-import {
-  canonicalLink,
-  completeFromDefaults,
-  parseLinkSearch,
-  scenarioToSearch,
-  validateSearch,
-} from "../schema.ts";
+import { completeFromDefaults, scenarioToSearch, searchToScenario } from "../scenario.ts";
+import { canonicalLink, parseLinkSearch, validateSearch } from "../schema.ts";
 import { BRANCHES, CANONICAL_LINKS, DECODE_ONLY_LINKS } from "./canonical-links.ts";
 
 type Encodable = Extract<DecodeOnlyFixture, { canonical: string }>;
@@ -22,7 +15,7 @@ function hasEncoding(fixture: DecodeOnlyFixture): fixture is Encodable {
 /** A link as the app reads it: the router's parse, the validator, completion, then the draft. */
 function decode(link: string) {
   const completion = completeFromDefaults(validateSearch(parseLinkSearch(link.slice(2))));
-  return { completion, scenario: scenarioFromSearch(completion.search) };
+  return { completion, scenario: searchToScenario(completion.search) };
 }
 
 describe("golden canonical links", () => {

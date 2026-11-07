@@ -4,7 +4,8 @@ import type { FieldId } from "@/lib/rail/fields.ts";
 
 import { FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 import { DEFAULT_LAYERS, SESSION_KEY, writeSession } from "@/lib/session/session.ts";
-import { CANONICAL_KEYS, scenarioToSearch } from "@/lib/url/schema.ts";
+import { scenarioToSearch } from "@/lib/url/scenario.ts";
+import { CANONICAL_KEYS } from "@/lib/url/schema.ts";
 
 import type { CollapseFocus, CollapseInputs, CollapseState, ViewportFit } from "./collapse.ts";
 
