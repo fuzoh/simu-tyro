@@ -47,7 +47,7 @@ import type { BlockingError, FixActionId } from "@/lib/rail/gates.ts";
 import type { LadderRow } from "@/lib/rail/provenance.ts";
 import type { NumericFieldId, RailValues } from "@/lib/rail/values.ts";
 import type { ForceUnit, UseClass } from "@/lib/scenario/types.ts";
-import type { RegimeId, TerminationId } from "@/lib/sim";
+import type { RegimeId, TerminationId, TextileSpec } from "@/lib/sim";
 import type { ParseFailure } from "@/lib/terrain/csv.ts";
 
 import { RailSection } from "@/components/app/shell.tsx";
@@ -70,17 +70,24 @@ import {
   fieldSchema,
   warningFor,
 } from "@/lib/rail/fields.ts";
-import { regimeUnavailableNote } from "@/lib/rail/gates.ts";
+import {
+  regimeUnavailableNote,
+  TEXTILE_UNAVAILABLE_REASON,
+  terminationOptions,
+} from "@/lib/rail/gates.ts";
 import { DEDUCED_HELP, FIELD_HELP, TIGHTNESS_HELP } from "@/lib/rail/help.ts";
 import { PROVENANCE_COPY, warningLadder } from "@/lib/rail/provenance.ts";
 import {
   applyField,
   applyGeometry,
+  applyRopeClass,
+  applyShippedTerminations,
   clearOverride,
   drivingField,
   fieldContext,
   spanLength,
   switchTightness,
+  TERMINATION_FIELD,
 } from "@/lib/rail/values.ts";
 import { clearSession } from "@/lib/session/session.ts";
 import { isFamilyAllowed, isRegimeAvailable, REGIMES, TERMINATIONS } from "@/lib/sim";
@@ -108,14 +115,6 @@ import {
  */
 const PROVENANCE = PROVENANCE_COPY;
 
-/** §10.4, stated where the option is disabled — the rule is a fact worth teaching. */
-const TEXTILE_DISABLED_REASON =
-  "§10.4 : fluage, UV/abrasion et fusion par friction (HMPE ~144–152 °C) ⇒ acier seul en installation permanente.";
-
-/** §10.3, likewise: not forbidden — there is simply no efficiency to multiply by. */
-const KNOT_ON_HMPE_REASON =
-  "§10.3 : sur HMPE le nœud glisse (0,25–0,50). Aucun rendement défendable ⇒ épissure obligatoire.";
-
 /** The three numeric fields that change the span, and therefore what `x_D` is clamped against. */
 const SPAN_FIELDS = new Set<NumericFieldId>(["L", "sa", "sb"]);
 
@@ -139,7 +138,7 @@ type RailRowContext = {
   readonly outlined: ReadonlySet<FieldId>;
   /** @returns the canonical value that **entered state**, or `null` when tier one refused. */
   readonly commit: (id: NumericFieldId, raw: string, settled: boolean) => number | null;
-  readonly runFix: (id: FixActionId) => void;
+  readonly runFix: (id: FixActionId, breach: BlockingError) => void;
   readonly setFocused: (id: FieldId | null) => void;
 };
 
@@ -243,7 +242,7 @@ export function RailInputs({
     return id === "xD" ? next.rider.xD : value;
   }
 
-  function runFix(id: FixActionId) {
+  function runFix(id: FixActionId, breach: BlockingError) {
     switch (id) {
       case "passer-a-l-acier":
         dispatch({ type: "matériau/famille", family: "steel" });
@@ -264,7 +263,10 @@ export function RailInputs({
         const next = applyGeometry(scenario, { ...scenario.geometry, sa: sb, sb: sa });
         announceClamp(next, scenario.rider.xD);
         patch(next);
+        return;
       }
+      case "passer-a-la-terminaison-de-depart":
+        patch(applyShippedTerminations(scenario, breach));
     }
   }
 
@@ -407,7 +409,7 @@ export function RailInputs({
                           <FixButton
                             key={fix.id}
                             label={fix.label}
-                            onClick={() => runFix(fix.id)}
+                            onClick={() => runFix(fix.id, regimeBreach)}
                           />
                         ))}
                       </div>
@@ -477,7 +479,7 @@ export function RailInputs({
                       // **Visible but disabled, with the reason inline** — hiding it leaves a user
                       // who came to compare families with no explanation.
                       disabled: !isFamilyAllowed("textile", scenario.usage),
-                      reason: TEXTILE_DISABLED_REASON,
+                      reason: TEXTILE_UNAVAILABLE_REASON,
                     },
                   ]}
                   value={scenario.material.family}
@@ -494,7 +496,11 @@ export function RailInputs({
                 familyBreach !== undefined ? (
                   <div className="flex flex-wrap gap-1">
                     {familyBreach.fixes.map((fix) => (
-                      <FixButton key={fix.id} label={fix.label} onClick={() => runFix(fix.id)} />
+                      <FixButton
+                        key={fix.id}
+                        label={fix.label}
+                        onClick={() => runFix(fix.id, familyBreach)}
+                      />
                     ))}
                   </div>
                 ) : null
@@ -555,20 +561,11 @@ export function RailInputs({
                   control={
                     <Picker
                       id="rail-cls"
-                      onChange={(value) => {
-                        if (textileSpec === null) return;
-                        const ropeClass = value as (typeof ROPE_CLASSES)[number]["value"];
-                        patch({
-                          ...scenario,
-                          // `Classe de corde` drives exactly two things: the `k` default and the
-                          // termination whitelist. Polyester's default is **`null`, not a number**.
-                          material: {
-                            ...textileSpec,
-                            ropeClass,
-                            k: ropeClass === "polyester" ? null : ropeClass === "hmpe" ? 22 : 1.5,
-                          },
-                        });
-                      }}
+                      onChange={(value) =>
+                        patch(
+                          applyRopeClass(scenario, value as (typeof ROPE_CLASSES)[number]["value"]),
+                        )
+                      }
                       options={ROPE_CLASSES}
                       value={textileSpec?.ropeClass ?? "hmpe"}
                     />
@@ -601,7 +598,7 @@ export function RailInputs({
                   },
                 })
               }
-              ropeClass={textileSpec?.ropeClass}
+              ropeClass={textileSpec?.ropeClass ?? null}
               selected={scenario.terminations.A.id}
             />
             <NumericRow id="etaA" label="Rendement η_A" />
@@ -617,7 +614,7 @@ export function RailInputs({
                   },
                 })
               }
-              ropeClass={textileSpec?.ropeClass}
+              ropeClass={textileSpec?.ropeClass ?? null}
               selected={scenario.terminations.B.id}
             />
             <NumericRow id="etaB" label="Rendement η_B" />
@@ -928,7 +925,11 @@ function NumericRow({
               {breach !== undefined && breach.fixes.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {breach.fixes.map((fix) => (
-                    <FixButton key={fix.id} label={fix.label} onClick={() => runFix(fix.id)} />
+                    <FixButton
+                      key={fix.id}
+                      label={fix.label}
+                      onClick={() => runFix(fix.id, breach)}
+                    />
                   ))}
                 </div>
               )}
@@ -1199,7 +1200,11 @@ function FileControls({
   );
 }
 
-/** One termination picker. **A prohibition is a disabled option with its reason**, not an error. */
+/**
+ * One termination picker. A prohibition is a disabled option with its reason; an end that arrived
+ * anyway — link, Session, class switch — is the Verdict Gate's error, rendered here with its Fix
+ * Action.
+ */
 function TerminationRow({
   end,
   family,
@@ -1209,38 +1214,48 @@ function TerminationRow({
 }: {
   end: "A" | "B";
   family: "steel" | "textile";
-  /** `Classe de corde`'s second job: the knot whitelist. `undefined` on a steel line. */
-  ropeClass: string | undefined;
+  /** `Classe de corde`'s second job: the knot whitelist. `null` on a steel line. */
+  ropeClass: TextileSpec["ropeClass"] | null;
   selected: TerminationId;
   onPick: (id: TerminationId) => void;
 }) {
-  const options = Object.values(TERMINATIONS)
-    .filter((termination) => termination.family === family || termination.family === "both")
-    .map((termination) => ({
-      value: termination.id,
-      label: termination.label,
-      // §10.3's 0,25–0,50 describes a knot that *slips*: there is no efficiency to multiply by,
-      // hence no honest number to compute with. Serre-câbles étrier, by contrast, stays
-      // **selectable** — a defensible `η_t` exists and the Verdict refuses the rig.
-      disabled: termination.knot && ropeClass === "hmpe",
-    }));
-  // **One reason per row.** Both knots are disabled by the same §10.3 rule, and printing it twice
-  // says nothing the first copy did not.
-  const knotsDisabled = options.some((option) => option.disabled);
+  const { breaches, outlined, runFix } = useRailRowContext();
+  const id = TERMINATION_FIELD[end];
+  const breach = breaches.get(id);
+  const { options, reason } = terminationOptions(family, ropeClass, selected);
   return (
     <Row
       control={
         <Picker
-          id={`rail-t${end.toLowerCase()}`}
+          id={`rail-${id}`}
           onChange={(value) => onPick(value)}
           options={options}
           value={selected}
         />
       }
-      help={end === "A" ? FIELD_HELP.ta : FIELD_HELP.tb}
-      htmlFor={`rail-t${end.toLowerCase()}`}
+      help={FIELD_HELP[id]}
+      htmlFor={`rail-${id}`}
       label={`Terminaison ${end}`}
-      note={knotsDisabled ? <DisabledReason reason={KNOT_ON_HMPE_REASON} /> : null}
+      message={breach === undefined ? undefined : { text: breach.message, blocking: true }}
+      note={
+        reason === null && breach === undefined ? null : (
+          <>
+            {reason !== null && <DisabledReason reason={reason} />}
+            {breach !== undefined && (
+              <div className="flex flex-wrap gap-1">
+                {breach.fixes.map((fix) => (
+                  <FixButton
+                    key={fix.id}
+                    label={fix.label}
+                    onClick={() => runFix(fix.id, breach)}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )
+      }
+      outlined={outlined.has(id)}
     />
   );
 }

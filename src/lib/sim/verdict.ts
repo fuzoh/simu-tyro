@@ -191,8 +191,9 @@ export type Termination = {
   readonly personProhibited: boolean;
   /**
    * A knot. §10.3 prohibits knots on HMPE — 0,25–0,50 describes a knot that *slips*, so there is
-   * no efficiency to multiply by. The picker **disables** the option with that reason rather than
-   * erroring: where no number exists there is nothing to compute with, hence nothing to judge.
+   * no efficiency to multiply by. The picker **disables** the option with that reason, and a knot
+   * on HMPE that arrives anyway blocks the Verdict Gate: where no number exists there is nothing
+   * to judge.
    */
   readonly knot: boolean;
 };

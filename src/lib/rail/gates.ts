@@ -47,11 +47,11 @@
 
 import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
-import type { RegimeId, RegimeMismatch } from "@/lib/sim";
+import type { RegimeId, RegimeMismatch, TerminationId, TextileSpec } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
-import { isFamilyAllowed, REGIMES, regimeMismatch } from "@/lib/sim";
+import { isFamilyAllowed, REGIMES, regimeMismatch, TERMINATIONS } from "@/lib/sim";
 
 import type { Deduced } from "./deduced.ts";
 import type { FieldId, FieldIssue, FieldIssueKind, GateId } from "./fields.ts";
@@ -65,6 +65,8 @@ import {
   isGatedField,
   isNumericField,
   isOverrideField,
+  SHIPPED_TERMINATIONS,
+  TERMINATION_FIELD,
 } from "./values.ts";
 
 export type { GateId } from "./fields.ts";
@@ -84,19 +86,22 @@ export const GATE_CONSEQUENCE: Record<GateId, string> = {
 const GATE_RANK: Record<GateId, number> = { solve: 0, clearance: 1, verdict: 2 };
 
 /**
- * § 7's four Fix Actions. **Their labels describe the effect of pressing them** (invariant 2):
- * a *message* states a property of the world, and a verb naming the effect is accurate whether the
- * state was entered or arrived on the first frame of a link.
+ * § 7's four Fix Actions, and the fifth ADR-0001 admits for an end the line cannot use. **Their
+ * labels describe the effect of pressing them** (invariant 2): a *message* states a property of
+ * the world, and a verb naming the effect is accurate whether the state was entered or arrived on
+ * the first frame of a link.
  */
 export type FixActionId =
   | "inverser-a-b"
   | "passer-a-l-acier"
   | "passer-en-usage-temporaire"
-  | "choisir-un-autre-regime";
+  | "choisir-un-autre-regime"
+  | "passer-a-la-terminaison-de-depart";
 
 export type FixAction = { readonly id: FixActionId; readonly label: string };
 
-const FIX: Record<FixActionId, FixAction> = {
+/** The fifth names the end it sets, which depends on the family, so it is built at the gate. */
+const FIX: Record<Exclude<FixActionId, "passer-a-la-terminaison-de-depart">, FixAction> = {
   "inverser-a-b": { id: "inverser-a-b", label: "Inverser A et B" },
   "passer-a-l-acier": { id: "passer-a-l-acier", label: "Passer à l'acier" },
   "passer-en-usage-temporaire": {
@@ -264,6 +269,74 @@ export function regimeUnavailableNote(
   return `Indisponible — ce régime ne couvre pas ${USAGE_REQUIRED[usage]}.`;
 }
 
+/** §10.4, stated where `Corde textile` is disabled — the rule is a fact worth teaching. */
+export const TEXTILE_UNAVAILABLE_REASON =
+  "§10.4 : fluage, UV/abrasion et fusion par friction (HMPE ~144–152 °C) ⇒ acier seul en installation permanente.";
+
+/** §10.3, likewise: not forbidden — there is simply no efficiency to multiply by. */
+const KNOT_ON_HMPE_REASON =
+  "§10.3 : sur HMPE le nœud glisse (0,25–0,50). Aucun rendement défendable ⇒ épissure obligatoire.";
+
+type Family = ScenarioDraft["material"]["family"];
+
+/** Why the line cannot use an end — `null` when it can. */
+type TerminationFault = "other-family" | "knot-on-hmpe";
+
+function terminationFault(
+  id: TerminationId,
+  family: Family,
+  ropeClass: TextileSpec["ropeClass"] | null,
+): TerminationFault | null {
+  const termination = TERMINATIONS[id];
+  if (termination.family !== "both" && termination.family !== family) return "other-family";
+  // §10.3's 0,25–0,50 describes a knot that *slips*: there is no efficiency to multiply by.
+  if (termination.knot && ropeClass === "hmpe") return "knot-on-hmpe";
+  return null;
+}
+
+/** One entry of a termination picker. */
+export type TerminationOption = {
+  readonly value: TerminationId;
+  readonly label: string;
+  readonly disabled: boolean;
+};
+
+/**
+ * A termination picker's entries: the active family's ends plus « Attelage sans tension », with
+ * §10.3's knots disabled on HMPE. Serre-câbles étrier stays **selectable** — a defensible `η_t`
+ * exists and the Verdict refuses the rig.
+ *
+ * @param selected the end the line holds. One of the other family is still listed, last and
+ *   disabled: a native select left without its option would show the first entry instead, beside
+ *   the Verdict Gate's error about a different one, and that error is its reason.
+ * @returns the entries and the row's one reason, `null` when no knot is disabled. Both knots are
+ *   disabled by the same rule, and printing it twice says nothing the first copy did not.
+ */
+export function terminationOptions(
+  family: Family,
+  ropeClass: TextileSpec["ropeClass"] | null,
+  selected: TerminationId,
+): { readonly options: readonly TerminationOption[]; readonly reason: string | null } {
+  const options = Object.values(TERMINATIONS).flatMap((termination) => {
+    const fault = terminationFault(termination.id, family, ropeClass);
+    if (fault === "other-family") return [];
+    return [{ value: termination.id, label: termination.label, disabled: fault !== null }];
+  });
+  const reason = options.some((option) => option.disabled) ? KNOT_ON_HMPE_REASON : null;
+  if (options.some((option) => option.value === selected)) return { options, reason };
+  const held = { value: selected, label: TERMINATIONS[selected].label, disabled: true };
+  return { options: [...options, held], reason };
+}
+
+function terminationFaultMessage(fault: TerminationFault, family: Family): string {
+  if (fault === "knot-on-hmpe") {
+    return "⛔ Nœud impossible sur HMPE — il y glisse, sans rendement défendable (§10.3).";
+  }
+  return family === "steel"
+    ? "⛔ Terminaison de corde textile impossible sur un câble acier (§10.2)."
+    : "⛔ Terminaison de câble acier impossible sur une corde textile (§10.3).";
+}
+
 /** Manual or imported geometry — the mode half of every (grandeur × mode) row. */
 function geometryMode(scenario: TraverseScenario): "manual" | "trace" {
   return scenario.geometry.source;
@@ -356,6 +429,34 @@ export function evaluateGates({ scenario, trace, issues = [] }: GateInput): Gate
         scenario.material.family,
       )}.`,
       fixes: [FIX["choisir-un-autre-regime"]],
+    });
+  }
+
+  // ── The ends the line cannot use ───────────────────────────────────────────────────────────
+  // The picker never offers them, but a link, a Session or a class switch can carry one, and
+  // ADR-0001 keeps it as given. One error per cause, so a single press repairs every end it names
+  // and an end with another cause keeps its own message.
+  const family = scenario.material.family;
+  const ropeClass = scenario.material.family === "textile" ? scenario.material.ropeClass : null;
+  for (const fault of ["other-family", "knot-on-hmpe"] as const) {
+    const ends = (["A", "B"] as const).filter(
+      (end) => terminationFault(scenario.terminations[end].id, family, ropeClass) === fault,
+    );
+    if (ends.length === 0) continue;
+    const [first, ...rest] = ends;
+    const { id } = SHIPPED_TERMINATIONS[family][first];
+    push({
+      gate: "verdict",
+      kind: "invalid",
+      field: TERMINATION_FIELD[first],
+      alsoOutlined: rest.map((end) => TERMINATION_FIELD[end]),
+      message: terminationFaultMessage(fault, family),
+      fixes: [
+        {
+          id: "passer-a-la-terminaison-de-depart",
+          label: `Passer à « ${TERMINATIONS[id].label} »`,
+        },
+      ],
     });
   }
 
