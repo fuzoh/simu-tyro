@@ -4,6 +4,7 @@ import type { EngineRefusal } from "@/lib/app/refusals.ts";
 import type { GateReport, SaisieEnCours } from "@/lib/rail/gates.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 
+import { deduceValues } from "@/lib/rail/deduced.ts";
 import { committedValue, evaluateGates, saisieEnCours } from "@/lib/rail/gates.ts";
 import { NO_REGIME_BANNER } from "@/lib/rail/results.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
@@ -127,7 +128,11 @@ describe("rank 3 — « Saisie en cours », and it has to be reachable", () => {
     trace: null,
     issues: [{ field: "D_target", kind: "empty", message: "valeur requise" }],
   });
-  const saisie = saisieEnCours(report, "D_target", committedValue(state, "D_target"));
+  const saisie = saisieEnCours(
+    report,
+    "D_target",
+    committedValue(state, "D_target", deduceValues(state, null)),
+  );
 
   test("the mid-edit field is **not** an error, so rank 1 cannot pre-empt rank 3", () => {
     // « Firing rule: a required field is empty *and holds focus*. Mid-edit, not an error. » Filed
@@ -291,7 +296,11 @@ describe("« Aucun résultat » — one cause, written once", () => {
       trace: null,
       issues: [{ field: "D_target", kind: "empty", message: "valeur requise" }],
     });
-    const saisie = saisieEnCours(report, "D_target", committedValue(state, "D_target"));
+    const saisie = saisieEnCours(
+      report,
+      "D_target",
+      committedValue(state, "D_target", deduceValues(state, null)),
+    );
     expect(noResultCause({ report, refusal: null, saisie })).toBeNull();
   });
 
