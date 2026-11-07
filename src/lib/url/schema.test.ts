@@ -30,8 +30,8 @@ import {
  *
  * Table-driven, one table per row of the salvage table, because the salvage table *is* the
  * contract: three refusal classes refuse the link whole — as a **returned marker**, amendment E,
- * never a throw — two salvage classes are ignored-and-named, an out-of-range value is applied
- * as-is, and recognised absent keys are completed.
+ * never a throw — two salvage classes are ignored-and-named, and an out-of-range value is applied
+ * as-is. Completion of recognised absent keys is gated in `./scenario.test.ts`.
  */
 
 /** The router's own parse of a query string — `defaultParseSearch`, i.e. what the route receives. */

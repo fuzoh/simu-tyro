@@ -266,7 +266,7 @@ const KEY_SCHEMAS = {
   hr: FINITE, // Enveloppe passager, m.
   gm: FINITE, // Garde min. admise, m (2026-09-23).
   daf: FINITE, // Coefficient dynamique.
-  x: FINITE, // Position du passager, m — clamped to `[0, L]` by the store, **never here**.
+  x: FINITE, // Position du passager, m — clamped to the span by `searchToScenario`, **never here**.
   // `tr` is validated **structurally** by the codec, not by valibot: sentinel, base64url alphabet,
   // varint walk, declared `n` against bytes consumed, character budget. A structural failure is a
   // refusal, not a salvage, so it is handled in {@link refuse} rather than here.

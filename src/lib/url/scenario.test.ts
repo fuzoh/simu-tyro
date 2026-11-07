@@ -1,9 +1,13 @@
 import { defaultStringifySearch } from "@tanstack/react-router";
-import { describe, expect, it, test } from "vitest";
+import { describe, expect, it, test, vi } from "vitest";
 
 import type { Scenario } from "@/lib/scenario/types.ts";
 
-import { FIRST_RUN_SCENARIO, firstRunDefaults } from "@/lib/scenario/first-run.ts";
+import {
+  FIRST_RUN_RETAINED_TEXTILE,
+  FIRST_RUN_SCENARIO,
+  firstRunDefaults,
+} from "@/lib/scenario/first-run.ts";
 
 import type { SearchKey } from "./schema.ts";
 
@@ -43,6 +47,26 @@ const TRACE = encodeP1({
   z: Float64Array.from([0, -4, -9]),
   dev: null,
 });
+
+/** The keys every completed link carries, whatever its family and terrain source. */
+const ALWAYS_COMPLETED = [
+  "v",
+  "u",
+  "use",
+  "za",
+  "zb",
+  "fl",
+  "fam",
+  "ta",
+  "tb",
+  "na",
+  "nb",
+  "mp",
+  "hr",
+  "gm",
+  "daf",
+  "x",
+] satisfies SearchKey[];
 
 /** A query as the app completes it: the router's parse, the validator, then completion. */
 function complete(query: string) {
@@ -159,7 +183,6 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
     for (const key of ["d", "r0", "cst", "mbl", "mu", "k"] satisfies SearchKey[]) {
       expect(key in search).toBe(false);
     }
-    expect(search.cls).toBe("hmpe");
   });
 
   test("the completed bag is in canonical order", () => {
@@ -170,15 +193,57 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
 });
 
 describe("completion follows the active family and names every key it fills", () => {
-  test("`?fam=tx&L=250` completes both ends from the textile default, and names them", () => {
-    // § 9's retained textile ends: « Œil cousu / épissuré », η 0,90 — never the steel cosse.
+  test("`?fam=tx&L=250` completes the class and both ends from the textile default, and names them", () => {
+    // § 9's retained textile: classe HMPE, ends « Œil cousu / épissuré » — never the steel cosse.
     const { search, completed } = complete("?fam=tx&L=250");
-    expect(search).toMatchObject({ ta: "oeil", tb: "oeil", na: 0.9, nb: 0.9 });
-    expect(completed).toEqual(expect.arrayContaining(["ta", "tb", "na", "nb"]));
-    expect(searchToScenario(search).terminations).toEqual({
-      A: { id: "oeil-cousu-epissure", eta: 0.9 },
-      B: { id: "oeil-cousu-epissure", eta: 0.9 },
+    expect(search).toMatchObject({ cls: "hmpe", ta: "oeil", tb: "oeil" });
+    expect(completed).toEqual(expect.arrayContaining(["cls", "ta", "tb", "na", "nb"]));
+    const scenario = searchToScenario(search);
+    expect(scenario.material).toMatchObject({
+      ropeClass: FIRST_RUN_RETAINED_TEXTILE.spec.ropeClass,
     });
+    expect(scenario.terminations).toEqual(FIRST_RUN_RETAINED_TEXTILE.terminations);
+  });
+
+  test("a textile link's `na`/`nb` complete from the textile default's own η", async () => {
+    // Both shipped defaults carry η 0,90, so only an injected textile default can tell the sources
+    // apart.
+    vi.resetModules();
+    vi.doMock("@/lib/scenario/first-run.ts", async () => {
+      const firstRun = await vi.importActual<typeof import("@/lib/scenario/first-run.ts")>(
+        "@/lib/scenario/first-run.ts",
+      );
+      return {
+        ...firstRun,
+        FIRST_RUN_RETAINED_TEXTILE: {
+          ...firstRun.FIRST_RUN_RETAINED_TEXTILE,
+          terminations: {
+            A: { id: "oeil-cousu-epissure", eta: 0.8 },
+            B: { id: "oeil-cousu-epissure", eta: 0.75 },
+          },
+        },
+      };
+    });
+    try {
+      const codec = await import("./scenario.ts");
+      const schema = await import("./schema.ts");
+      const accepted = schema.validateSearch(parse("?fam=tx&L=250"));
+      if (accepted.refused !== undefined) throw new Error("?fam=tx&L=250 refused");
+      expect(codec.completeFromDefaults(accepted).search).toMatchObject({ na: 0.8, nb: 0.75 });
+      expect(complete("?fam=ac&L=250").search).toMatchObject({ na: 0.9, nb: 0.9 });
+    } finally {
+      vi.doUnmock("@/lib/scenario/first-run.ts");
+      vi.resetModules();
+    }
+  });
+
+  test("an unknown `cls` is dropped as unreadable and completed with the shipped class", () => {
+    expect(salvageSearch(parse("?fam=tx&cls=zzz&L=250")).dropped).toEqual([
+      { key: "cls", reason: "valeur-non-représentable" },
+    ]);
+    const { search, completed } = complete("?fam=tx&cls=zzz&L=250");
+    expect(search.cls).toBe("hmpe");
+    expect(completed).toContain("cls");
   });
 
   test("`?fam=tx&ta=cosse&L=250` keeps the steel cosse as given and completes only the other end", () => {
@@ -203,6 +268,23 @@ describe("completion follows the active family and names every key it fills", ()
       sb: 150,
     });
   });
+
+  test.each([
+    { config: "steel, manual", query: "?fam=ac", keys: ["L", "h", "d", "r0", "cst"] },
+    {
+      config: "steel, imported",
+      query: `?fam=ac&tr=${TRACE}`,
+      keys: ["tr", "sa", "sb", "d", "r0", "cst"],
+    },
+    { config: "textile, manual", query: "?fam=tx", keys: ["L", "h", "cls"] },
+    { config: "textile, imported", query: `?fam=tx&tr=${TRACE}`, keys: ["tr", "sa", "sb", "cls"] },
+  ] satisfies { config: string; query: string; keys: SearchKey[] }[])(
+    "a $config link completes every key its configuration needs",
+    ({ query, keys }) => {
+      const required = [...ALWAYS_COMPLETED, ...keys];
+      expect(Object.keys(complete(query).search)).toEqual(expect.arrayContaining(required));
+    },
+  );
 
   test.each([
     { path: "manual, `L` given", query: "?L=250", x: 125 },
@@ -234,21 +316,6 @@ describe("the token tables", () => {
   test("a force crosses between newtons and daN once, in both directions", () => {
     expect(daNFromNewtons(52_000)).toBe(5200);
     expect(newtonsFromDaN(5200)).toBe(52_000);
-  });
-
-  test("a textile link with no `cls` is completed with the shipped class and says so", () => {
-    const { search, completed } = complete("?fam=tx&L=250");
-    expect(search.cls).toBe("hmpe");
-    expect(completed).toContain("cls");
-  });
-
-  test("an unknown `cls` is dropped as unreadable, never mapped to a class", () => {
-    expect(salvageSearch(parse("?fam=tx&cls=zzz&L=250")).dropped).toEqual([
-      { key: "cls", reason: "valeur-non-représentable" },
-    ]);
-    const { search, completed } = complete("?fam=tx&cls=zzz&L=250");
-    expect(search.cls).toBe("hmpe");
-    expect(completed).toContain("cls");
   });
 });
 
