@@ -26,7 +26,6 @@ import {
   buildScene,
   buildSceneBase,
   buildSceneFrame,
-  clampToSpan,
   placeRider,
   polylineAt,
   snapToStep,
@@ -802,13 +801,6 @@ describe("the two pointer helpers", () => {
     expect(snapToStep(first.traverse, 1e6)).toBe(
       first.traverse.steps[first.traverse.steps.length - 1].xD,
     );
-  });
-
-  it("x_D clamps on every path, because it selects a view", () => {
-    expect(clampToSpan(-3, 150)).toBe(0);
-    expect(clampToSpan(1000, 150)).toBe(150);
-    expect(clampToSpan(74.8, 150)).toBe(74.8);
-    expect(clampToSpan(Number.NaN, 150)).toBe(0);
   });
 });
 

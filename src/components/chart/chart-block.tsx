@@ -45,7 +45,7 @@ import {
   ViewStripSlot,
 } from "@/components/app/shell.tsx";
 import { useAppDispatch, useAppState } from "@/components/app/store.tsx";
-import { clampToSpan, placeRider, snapToStep } from "@/lib/chart/scene.ts";
+import { placeRider, snapToStep } from "@/lib/chart/scene.ts";
 import { roundToDisplay } from "@/lib/format/quantity.ts";
 import {
   CELL_WRAP_PX,
@@ -64,6 +64,7 @@ import {
 import { CELL_IDS, CELL_LABEL, readOutCells } from "@/lib/rail/cells.ts";
 import { CELL_HELP } from "@/lib/rail/help.ts";
 import { applyField } from "@/lib/rail/values.ts";
+import { clampX } from "@/lib/scenario/geometry.ts";
 import { snapStation } from "@/lib/terrain/trace.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -265,7 +266,7 @@ export function ChartBlock({
       moveRider(roundToDisplay("x_D", metres));
       return;
     }
-    const snapped = snapToStep(scene.traverse, clampToSpan(metres, scene.L));
+    const snapped = snapToStep(scene.traverse, clampX(metres, scene.L));
     if (snapped !== null) moveRider(roundToDisplay("x_D", snapped));
   }
 
@@ -299,7 +300,7 @@ export function ChartBlock({
     if (frame === null || inert) return;
     dispatch({
       type: "scénario/modifié",
-      patch: { rider: { ...riderInput, xD: clampToSpan(metres, frame.L) } },
+      patch: { rider: { ...riderInput, xD: clampX(metres, frame.L) } },
     });
   }
 
@@ -369,7 +370,7 @@ export function ChartBlock({
           onX={moveRider}
           peek={ve.peek}
           peeking={held}
-          xD={rider === null ? clampToSpan(riderInput.xD, frame.L) : rider.step.xD}
+          xD={rider === null ? clampX(riderInput.xD, frame.L) : rider.step.xD}
         />
       </ViewStripSlot>
       <ReadOutCells scope="à la position du passager">

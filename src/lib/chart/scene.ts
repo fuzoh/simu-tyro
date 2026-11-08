@@ -50,7 +50,6 @@
  *   *drawn* ground spans the whole shared domain, holding the ends exactly as `zGroundAt` does.
  */
 
-import type { PlacedSpan } from "@/lib/scenario/geometry.ts";
 import type { SweepRider } from "@/lib/scenario/traverse.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { Unloaded } from "@/lib/scenario/unloaded.ts";
@@ -66,6 +65,7 @@ import type {
 import type { AnchorPlacement, Trace } from "@/lib/terrain/trace.ts";
 
 import { xDomain } from "@/lib/layout/contract.ts";
+import { clampX, type PlacedSpan } from "@/lib/scenario/geometry.ts";
 import { sweepRider } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import {
@@ -360,12 +360,6 @@ export function snapToStep(traverse: SweepResult, x: number): number | null {
   return best;
 }
 
-/** `x_D` clamps on **every** path — geometry change, link arrival, typed input. It selects a view. */
-export function clampToSpan(x: number, L: number): number {
-  if (!Number.isFinite(x)) return 0;
-  return x < 0 ? 0 : x > L ? L : x;
-}
-
 /** What only the picture needs on top of the placement: the drawn ground and the trace's extent. */
 function drawnGround({ L, terrain, onTrace }: PlacedSpan): {
   ground: Polyline;
@@ -430,7 +424,7 @@ function drawnTrace(
  */
 export function placeRider(base: SceneBase, requestedXD: number): SceneRider | null {
   const { span, P, terrain, hRider, L, h, unloadedCable } = base;
-  const xD = clampToSpan(requestedXD, L);
+  const xD = clampX(requestedXD, L);
   // §6.1 case 2 — outer bisection on `s_P`, inner 2×2 Newton, measured ≈40 µs. Snapping 99,7 to
   // 101,2 and rewriting the field would discard user input silently for the sake of one code path.
   const exact = solveAtHorizontalPosition(span, P, xD);
