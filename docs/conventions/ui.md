@@ -187,9 +187,20 @@ it. The numbers are `THREE_COLUMN_PX`, `RAIL_WIDTH` (left), `RIGHT_COLUMN_WIDTH`
 `SHELL_MAX_PX` in `src/lib/layout/contract.ts`; the classes spell them as `min-[1024px]:` and
 `w-72`, and `contract.test.ts` holds the two together.
 
-- **Left** — the Rail Header and `Paramètres`. **Middle** — the Chart Block. **Right** — `Valeurs
+- **Left** — the Rail Header and `Paramètres`. **Middle** — the Chart Block, then Statique's vue
+  de dessus (`TopMap`, the same component and the same gestures — #104). **Right** — `Valeurs
   déduites`, `Résultats`, `Provenance`, `Ce que cet outil ne calcule pas`. Both side columns are
-  288 px and each scrolls on its own.
+  288 px, and all three scroll on their own.
+- **The middle column scrolls, block first** — the way Statique's right column does. Holding the
+  block still over a residual scroller was rejected: at 1024 × 768 it leaves the map 116 px. The
+  column reserves its scrollbar gutter (`scrollbar-gutter: stable`), so a scrollbar that comes and
+  goes cannot move the width every band is a function of; on a platform with classic scrollbars the
+  measured column is that gutter narrower than `chartColumnWidth()`.
+- **The vue de dessus is three columns only.** Below 1024 its box is `display: none`, and the map
+  is not started there at all — `threeColumns()` in `contract.ts`, the same B2, decides what to
+  *mount*, never a size: a MapLibre map started in a box with no size holds a WebGL context for
+  nothing and has no box to fit its camera to. The Position and Vent fields stay in `Paramètres`,
+  in clear at every width, and read the same Scenario the map and the rose write.
 - **Why 1024.** A stacked block is sized from the *whole* viewport width and owes `MIN_RAIL` under
   it, so stacking costs the chart its profile on any screen that is not tall: at 1024 × 768 it is a
   782 px block against 612 px left, and Avancé opens on « Garde min. ligne » alone (measured at the

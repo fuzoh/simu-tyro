@@ -10,7 +10,8 @@
  *
  * - the Rail's five section headings in order — `Paramètres` in the left column, the other four in
  *   the right — plus the app's name as static text — no field rows, no group frames;
- * - both chart frames at the spine's proportions, from the same CSS the live app uses;
+ * - both chart frames at the spine's proportions, from the same CSS the live app uses, and from
+ *   three columns the vue de dessus's empty frame under them (#104);
  * - the read-out cells' **labels, never their values, and never a « — »** — « — » is spent on
  *   `Indéterminé` (attempted, unavailable), and a dash in a clearance cell before anything was
  *   attempted is a number-shaped thing with no provenance;
@@ -27,6 +28,7 @@
  * to script. **A state nobody scripts there is a state nobody checks.**
  */
 
+import { TopViewFrame } from "@/components/statique/top-view.tsx";
 import { CELL_IDS, CELL_LABEL } from "@/lib/rail/cells.ts";
 
 import {
@@ -74,6 +76,7 @@ export function Skeleton() {
           </ReadOutCells>
         </>
       }
+      views={<TopViewFrame />}
     />
   );
 }

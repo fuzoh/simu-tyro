@@ -109,15 +109,6 @@ function fromField(id: FieldId, genre: "m" | "f", daN?: true): KeyRow {
     : { label: errorLabel, source, genre, quantity, daN };
 }
 
-/** A key with no field, named from the registry. */
-function fromTerm(term: LabelId, genre: "m" | "f", quantity: QuantityId, daN?: true): KeyRow {
-  const label = heading(term, "exact");
-  const source = { term };
-  return daN === undefined
-    ? { label, source, genre, quantity }
-    : { label, source, genre, quantity, daN };
-}
-
 /** Does a Page of this register leave the key's quantity unnamed — set on Avancé alone? */
 function hiddenOn(row: KeyRow, register: Register): boolean {
   if (register === "exact" || row.source === null) return false;
@@ -174,12 +165,11 @@ const KEYS: Record<StripKey, KeyRow> = {
   daf: fromField("DAF", "f"),
   ws: fromField("windSpeed", "f"),
   wd: fromField("windDirection", "f"),
-  // The ride's constants have no Rail field yet (#89): their rows name them from the registry.
-  cda: fromTerm("dragArea", "f", "CdA"),
-  f0: fromTerm("trolleyConstantFriction", "m", "F0", true),
-  kv: fromTerm("trolleySpeedFriction", "m", "kv"),
-  mur: fromTerm("trolleyFrictionRatio", "m", "trolleyMu"),
-  rho: fromTerm("airDensity", "f", "rho"),
+  cda: fromField("CdA", "f"),
+  f0: fromField("F0", "m", true),
+  kv: fromField("kv", "m"),
+  mur: fromField("trolleyMu", "m"),
+  rho: fromField("rho", "f"),
   x: fromField("xD", "f"),
   lata: fromField("latA", "f"),
   lona: fromField("lonA", "f"),

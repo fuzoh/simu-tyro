@@ -48,7 +48,8 @@ et de la météo de [#67](https://github.com/fuzoh/simu-tyro/issues/67).
   partage 50/50 et le cas où la ligne du bas porte tout. Le moteur est donc cohérent en ordre de
   grandeur ; le partage 50/50 n'est pas validé, la ligne du bas a porté plus de la moitié.
 - **Perte de pose : un ordre de grandeur, observé une fois.** 0,1 à 0,15 kN par passage, environ
-  0,35 kN entre 16:04 et 16:57 sans retension. Rien n'en est calculé ni affiché dans l'application.
+  0,35 kN entre 16:04 et 16:57 sans retension. Rien n'en est calculé ; la Page Avancé le cite
+  tel quel, en texte, sous « Pourquoi on retend » ([#104](https://github.com/fuzoh/simu-tyro/issues/104)).
 - **L'arrêt vers 60 % n'est pas un fait de vent.** Le repos statique du passager sans vent est à
   55–57 % de la ligne : l'essai ne teste rien du modèle de vent. Le vent ressenti (de face, à
   droite) et la bise mesurée à La Frétaz (nord-est, droite-arrière) sont consignés sans arbitrage.

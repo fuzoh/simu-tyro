@@ -166,14 +166,25 @@ export const RIGHT_COLUMN_WIDTH = 288;
 export const SHELL_MAX_PX = 1728;
 
 /**
+ * Does Avancé stand on three columns at this viewport width? The `min-[1024px]:` classes decide the
+ * layout; this is the same threshold for what the CSS cannot decide — whether to **start** an
+ * occupant only the middle column shows, the vue de dessus (#104), rather than leave it running in
+ * a `display: none` box. It sizes nothing.
+ */
+export function threeColumns(viewportWidth: number): boolean {
+  return viewportWidth >= THREE_COLUMN_PX;
+}
+
+/**
  * **The chart column's inline size at a viewport width** — the middle column from
  * {@link THREE_COLUMN_PX}, the whole shell below it. The shell measures its own column with a
  * `ResizeObserver`; this is the same number from the contract's constants, for the budgets and
- * tests that have no DOM. It ignores the two hairline pixels of the shell's border past the cap.
+ * tests that have no DOM. It ignores the two hairline pixels of the shell's border past the cap,
+ * and the middle column's scrollbar gutter, which is the platform's (0 where scrollbars overlay).
  */
 export function chartColumnWidth(viewportWidth: number): number {
   const shell = Math.min(viewportWidth, SHELL_MAX_PX);
-  return viewportWidth < THREE_COLUMN_PX ? shell : shell - RAIL_WIDTH - RIGHT_COLUMN_WIDTH;
+  return threeColumns(viewportWidth) ? shell - RAIL_WIDTH - RIGHT_COLUMN_WIDTH : shell;
 }
 
 /**

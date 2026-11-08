@@ -54,7 +54,7 @@ import type { LabelId, Register } from "@/lib/vocabulary/labels.ts";
 
 import { formatQuantity, formatValue, fromDisplay, roundToDisplay } from "@/lib/format/quantity.ts";
 import { clampX } from "@/lib/scenario/geometry.ts";
-import { REGIMES } from "@/lib/sim";
+import { DYNAMICS, REGIMES } from "@/lib/sim";
 import { heading, isHiddenTerm, label } from "@/lib/vocabulary/labels.ts";
 
 /**
@@ -102,6 +102,11 @@ export type FieldId =
   | "xD"
   | "windSpeed"
   | "windDirection"
+  | "CdA"
+  | "F0"
+  | "kv"
+  | "trolleyMu"
+  | "rho"
   | "latA"
   | "lonA"
   | "latB"
@@ -155,6 +160,9 @@ export type FieldSpec = {
 const POSITIVE_LENGTH = "une longueur strictement positive est requise";
 const POSITIVE_HEIGHT = "une hauteur strictement positive est requise";
 const POSITIVE_VALUE = "une valeur strictement positive est requise";
+
+/** « un frottement négatif n'existe pas » — the three trolley constants share it. */
+const NO_NEGATIVE_FRICTION = "un frottement négatif n'existe pas";
 
 /** A per-anchor field's label: the registry's heading, then which anchor. */
 function withEnd(id: LabelId, end: "A" | "B"): string {
@@ -542,8 +550,8 @@ export const FIELDS = {
     warning: null,
     gate: null,
   },
-  // The two Vent fields sit in no gate: nothing reads them yet (#87), so a bad one must not take
-  // the statics or the Verdict down. Tier one still refuses the text, which stays as typed.
+  // The two Vent fields sit in no gate: only the ride (#89) and the Banane read them, so a bad one
+  // must not take the statics or the Verdict down. Tier one still refuses the text, as typed.
   windSpeed: {
     id: "windSpeed",
     label: heading("windSpeed", "exact"),
@@ -559,6 +567,60 @@ export const FIELDS = {
     errorLabel: heading("windDirection", "exact"),
     quantity: "windDirection",
     rule: { kind: "finite" },
+    warning: null,
+    gate: null,
+  },
+  // The ride's constants (#89, #104): §12.2's, every one editable and labelled. They sit in no
+  // gate — only the passager's ride reads them, never the statics or the Verdict.
+  CdA: {
+    id: "CdA",
+    label: heading("dragArea", "exact"),
+    errorLabel: heading("dragArea", "exact"),
+    quantity: "CdA",
+    rule: { kind: "non-negative", sentence: "une surface négative n'existe pas" },
+    warning: {
+      kind: "band",
+      min: DYNAMICS.CdABand.min,
+      max: DYNAMICS.CdABand.max,
+      copy: `surface hors de la plage du champ (${formatValue("CdA", DYNAMICS.CdABand.min)} – ${formatValue("CdA", DYNAMICS.CdABand.max)} m²) [CONVENTION]`,
+    },
+    gate: null,
+  },
+  F0: {
+    id: "F0",
+    label: heading("trolleyConstantFriction", "exact"),
+    errorLabel: heading("trolleyConstantFriction", "exact"),
+    quantity: "F0",
+    rule: { kind: "non-negative", sentence: NO_NEGATIVE_FRICTION },
+    warning: null,
+    gate: null,
+  },
+  kv: {
+    id: "kv",
+    label: heading("trolleySpeedFriction", "exact"),
+    errorLabel: heading("trolleySpeedFriction", "exact"),
+    quantity: "kv",
+    rule: { kind: "non-negative", sentence: NO_NEGATIVE_FRICTION },
+    warning: null,
+    gate: null,
+  },
+  trolleyMu: {
+    id: "trolleyMu",
+    label: heading("trolleyFrictionRatio", "exact"),
+    errorLabel: heading("trolleyFrictionRatio", "exact"),
+    quantity: "trolleyMu",
+    rule: { kind: "non-negative", sentence: NO_NEGATIVE_FRICTION },
+    warning: null,
+    gate: null,
+  },
+  // Blank is §12.2's « lu » half: the ISA density at the profil's mean altitude, or 1,225.
+  rho: {
+    id: "rho",
+    label: heading("airDensity", "exact"),
+    errorLabel: heading("airDensity", "exact"),
+    quantity: "rho",
+    rule: { kind: "non-negative", sentence: "une masse volumique négative n'existe pas" },
+    optional: true,
     warning: null,
     gate: null,
   },
@@ -597,6 +659,11 @@ const TERRAIN_TERM = {
   H_target: "horizontalTension",
   vRatio: "vRatio",
   DAF: "startMultiplier",
+  CdA: "dragArea",
+  F0: "trolleyConstantFriction",
+  kv: "trolleySpeedFriction",
+  trolleyMu: "trolleyFrictionRatio",
+  rho: "airDensity",
 } as const satisfies Partial<Record<FieldId, LabelId>>;
 
 /** How a terrain message names a field only Avancé shows. */
@@ -628,8 +695,11 @@ function terrainName(id: FieldId, exact: string): string {
   return isHiddenTerm(term) ? AVANCE_SETTING : heading(term, "terrain");
 }
 
-/** The fields whose blank is « absent »: the textile diameter and the four coordinates. */
-export type OptionalFieldId = "dTextile" | "latA" | "lonA" | "latB" | "lonB";
+/**
+ * The fields whose blank is « absent »: the textile diameter, the air density read rather than
+ * typed, and the four coordinates.
+ */
+export type OptionalFieldId = "dTextile" | "rho" | "latA" | "lonA" | "latB" | "lonB";
 
 /** Whether a blank is « absent » for this field (read off {@link FieldSpec.optional}). */
 export function isOptionalField(id: FieldId): id is OptionalFieldId {

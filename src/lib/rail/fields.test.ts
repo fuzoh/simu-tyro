@@ -195,6 +195,50 @@ describe("§ 7's message table — committed invalid, ⛔ and blocking", () => {
   });
 });
 
+describe("the ride's constants (#104) — §12.2's, in no gate", () => {
+  test("they sit in no gate: only the passager's ride reads them", () => {
+    for (const id of ["CdA", "F0", "kv", "trolleyMu", "rho"] as const) {
+      expect(gateOf(id, "manual")).toBeNull();
+      expect(gateOf(id, "trace")).toBeNull();
+    }
+  });
+
+  test("zero is a value, a negative one is refused, and ρ alone may be blank", () => {
+    expect(checkField("CdA", "0")).toBeNull();
+    expect(checkField("CdA", "-0,1")?.message).toBe(
+      // § 7's template, as the anchor heights' rows above read it.
+      "⛔ Surface de traînée C_dA — une surface négative n'existe pas. Valeur : −0,10 m².",
+    );
+    expect(checkField("F0", "-1")?.kind).toBe("invalid");
+    expect(checkField("kv", "-1")?.kind).toBe("invalid");
+    expect(checkField("trolleyMu", "-1")?.kind).toBe("invalid");
+    expect(checkField("rho", "-1")?.kind).toBe("invalid");
+    expect(checkField("rho", "")).toBeNull();
+    expect(checkField("CdA", "")?.kind).toBe("empty");
+  });
+
+  test("`C_dA` outside 0,30 – 0,60 m² is warned: the band is the field's own, a convention", () => {
+    expect(warningFor("CdA", 0.45)).toBeNull();
+    expect(warningFor("CdA", 0.3)).toBeNull();
+    expect(warningFor("CdA", 0.6)).toBeNull();
+    expect(warningFor("CdA", 0.2)).toBe(
+      "surface hors de la plage du champ (0,30 – 0,60 m²) [CONVENTION]",
+    );
+    expect(warningFor("CdA", 0.8)).toContain("[CONVENTION]");
+  });
+
+  test("their labels are the registry's, and a terrain Page never names them", () => {
+    expect(FIELDS.CdA.label).toBe("Surface de traînée C_dA");
+    expect(FIELDS.F0.label).toBe("Frottement constant de la poulie F₀");
+    expect(FIELDS.kv.label).toBe("Frottement de la poulie proportionnel à la vitesse k_v");
+    expect(FIELDS.trolleyMu.label).toBe("Frottement de la poulie μ");
+    expect(FIELDS.rho.label).toBe("Masse volumique de l'air ρ");
+    for (const id of ["CdA", "F0", "kv", "trolleyMu", "rho"] as const) {
+      expect(fieldLabel(id, "terrain")).toBe(AVANCE_SETTING);
+    }
+  });
+});
+
 describe("§ 3's warning column — non-blocking, and it never withholds a number", () => {
   test("`L ∉ [50, 2000]`", () => {
     expect(warningFor("L", 150)).toBeNull();

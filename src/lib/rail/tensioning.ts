@@ -14,9 +14,9 @@
  *   diameter all have no limit and raise nothing: no figure was published for them.
  */
 
-import type { ScenarioDraft, TensioningDevice } from "@/lib/scenario/types.ts";
+import type { ForceUnit, ScenarioDraft, TensioningDevice } from "@/lib/scenario/types.ts";
 
-import { KGF } from "@/lib/format/quantity.ts";
+import { formatQuantity, KGF } from "@/lib/format/quantity.ts";
 import { label } from "@/lib/vocabulary/labels.ts";
 
 import type { DeducedSolve } from "./deduced.ts";
@@ -63,6 +63,29 @@ export function tensionLimit(
       (entry) => diameter >= entry.diameter.from && diameter <= entry.diameter.to,
     ) ?? null
   );
+}
+
+/**
+ * The limite de tension as Avancé prints it: the force Petzl's kilograms are read as, in the
+ * selected unit, beside the prétension it is compared with — and, for its provenance chip, the
+ * figure as published and where — or `null` where none is published.
+ */
+export function limitReading(
+  scenario: Pick<ScenarioDraft, "material" | "tensioningDevice">,
+  unit: ForceUnit,
+): { readonly value: string; readonly provenance: string } | null {
+  const { material, tensioningDevice } = scenario;
+  const limit = tensionLimit(
+    tensioningDevice,
+    material.family === "textile" ? material.d : undefined,
+  );
+  if (limit === null) return null;
+  return {
+    value: formatQuantity("T_target", limit.kg * KGF, unit),
+    provenance:
+      `Charge d'utilisation publiée : ${limit.kg} kg pour une corde de ` +
+      `${diameterBand(limit.diameter)} — ${limit.source}.`,
+  };
 }
 
 /**

@@ -10,7 +10,9 @@ import {
   GEOADMIN_HELP,
   GRID_HELP,
   LV95_HELP,
+  QUASI_STATIC_HELP,
   RESULT_HELP,
+  TENSION_LIMIT_HELP,
   TIGHTNESS_HELP,
 } from "./help.ts";
 import { NOT_COMPUTED_LINES, PROVENANCE_COPY } from "./provenance.ts";
@@ -24,6 +26,8 @@ function copyByKey(): Record<string, string> {
   entries.push(["TIGHTNESS_HELP", TIGHTNESS_HELP]);
   entries.push(["LV95_HELP", LV95_HELP]);
   entries.push(["GEOADMIN_HELP", GEOADMIN_HELP]);
+  entries.push(["TENSION_LIMIT_HELP", TENSION_LIMIT_HELP]);
+  entries.push(["QUASI_STATIC_HELP", QUASI_STATIC_HELP]);
   NOT_COMPUTED_LINES.forEach((line, index) => entries.push([`NOT_COMPUTED_LINES[${index}]`, line]));
   for (const field of Object.values(FIELDS)) {
     entries.push([`FIELDS.${field.id}.label`, field.label]);

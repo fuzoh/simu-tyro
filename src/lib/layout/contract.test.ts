@@ -51,6 +51,7 @@ import {
   STRIP,
   STRIP_POLICY_BAND,
   THREE_COLUMN_PX,
+  threeColumns,
   stripOuterHeight,
   VE_BAND,
   veBadgeLabel,
@@ -523,6 +524,33 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     // from `CELL_WRAP_PX + 576`.
     expect(chartColumnWidth(THREE_COLUMN_PX)).toBeLessThan(CELL_WRAP_PX);
     expect(chartColumnWidth(CELL_WRAP_PX + RAIL_WIDTH + RIGHT_COLUMN_WIDTH)).toBe(CELL_WRAP_PX);
+  });
+
+  it("the vue de dessus starts on the same side of the switch the classes show it on (#104)", () => {
+    expect(threeColumns(THREE_COLUMN_PX - 1)).toBe(false);
+    expect(threeColumns(THREE_COLUMN_PX)).toBe(true);
+    const root = fileURLToPath(new URL("../../..", import.meta.url));
+    const shell = readFileSync(join(root, "src/components/app/shell.tsx"), "utf8");
+    // The views' box: `display: none` until B2, and the same B2 the predicate reads.
+    expect(shell).toContain(`hidden border-t px-3 py-3 min-[${THREE_COLUMN_PX}px]:block`);
+  });
+
+  it("the middle column's views are Statique's own component, so no view is Avancé's alone", () => {
+    // #12: « la colonne du milieu reprend les vues et gestes de Statique … Aucune vue propre ».
+    // The gestures themselves are pure view models (`@/lib/map/`), and the Rail reading what they
+    // write is `@/lib/rail/values.test.ts`'s; what is source is that both Pages stand the very same
+    // component, with the same two inputs, and that Avancé's own files draw no map of their own.
+    const root = fileURLToPath(new URL("../../..", import.meta.url));
+    const read = (path: string) => readFileSync(join(root, path), "utf8");
+    const pages = ["src/components/app/app.tsx", "src/components/statique/statique.tsx"];
+    for (const page of pages) {
+      expect(read(page)).toContain('import { TopMap } from "@/components/map/top-map.tsx";');
+      expect(read(page)).toContain("<TopMap frame={frame} solved={solved} />");
+    }
+    const avance = readdirSync(join(root, "src/components/app")).map((name) =>
+      read(`src/components/app/${name}`),
+    );
+    expect(avance.some((source) => /maplibre|cesium/i.test(source))).toBe(false);
   });
 
   it("below the switch the columns stack, and the chart column is the whole viewport", () => {
@@ -1256,12 +1284,13 @@ describe("§ 5 — the two mechanisms the layout may not use", () => {
       padding: tokens.has("pb-[var(--kb,0px)]"),
       scrollPadding: tokens.has("scroll-pb-[var(--kb,0px)]"),
     }).toStrictEqual({ padding: true, scrollPadding: true });
-    // From B2 up the wrapper is `display: contents` and each column is its own scroller, so each
-    // spends the same pair on itself.
+    // From B2 up the wrapper is `display: contents` and each of the three columns is its own
+    // scroller — the middle one since its views stand under the block (#104) — so each spends the
+    // same pair on itself.
     const wide = `min-[${THREE_COLUMN_PX}px]:`;
     expect(tokens.has(`${wide}contents`)).toBe(true);
     for (const token of ["pb-[var(--kb,0px)]", "scroll-pb-[var(--kb,0px)]", "overflow-y-auto"]) {
-      expect(shell.split(`${wide}${token}`).length - 1).toBe(2);
+      expect(shell.split(`${wide}${token}`).length - 1).toBe(3);
     }
     // And no second scroll mechanism was added to pay for it: piece 3 is still one centring call
     // with `behavior` left at `auto`, and the Rail's own scroll is still nobody's to set.

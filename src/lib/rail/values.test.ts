@@ -3,6 +3,15 @@ import { describe, expect, expectTypeOf, test } from "vitest";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
+import { appReducer, initialAppState } from "@/lib/app/state.ts";
+import { drawnPositions, IDLE, stepGesture } from "@/lib/map/gesture.ts";
+import {
+  handleOffset,
+  LEVEL_REFERENCE,
+  ROSE_RADIUS_PX,
+  roseReference,
+  windFromOffset,
+} from "@/lib/map/wind-rose.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { traverseInputs } from "@/lib/scenario/traverse.ts";
 
@@ -261,7 +270,7 @@ describe("applyField — one committed field, written back", () => {
     // The four coordinates are written as pairs, by `applyPosition`, which is tested below.
     for (const id of NUMERIC_FIELDS.filter((field) => !isPositionField(field))) {
       const base = id === "L" || id === "h" ? steel : complete;
-      const host = id.endsWith("Override") || id === "d" ? steel : base;
+      const host = id.endsWith("Override") || id === "d" || id === "trolleyMu" ? steel : base;
       const after = applyField(host, id, 7, null);
       const before = railValues(host, deduceValues(host, null))[id];
       expect(railValues(after, deduceValues(after, null))[id]).not.toBe(before);
@@ -298,6 +307,11 @@ describe("FIELD_ACCESS — one lens per numeric field", () => {
       "xD",
       "windSpeed",
       "windDirection",
+      "CdA",
+      "F0",
+      "kv",
+      "trolleyMu",
+      "rho",
       "latA",
       "lonA",
       "latB",
@@ -788,5 +802,150 @@ describe("the driver a Page offers alone takes the line over (#91)", () => {
     expect(commitPageText({ ...input, raw: "90", takeOver }).write).toEqual(
       commitText({ ...input, raw: "90" }).next,
     );
+  });
+});
+
+describe("the ride's constants (#104) — one trolley law per family, and ρ read unless typed", () => {
+  const steel = scenario();
+  const rope = scenario((draft) => {
+    draft.usage = "TEMPORAIRE";
+    draft.material = { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 };
+  });
+  const commit = (on: ScenarioDraft, id: "F0" | "kv" | "trolleyMu" | "CdA" | "rho", raw: string) =>
+    commitText({
+      scenario: on,
+      trace: null,
+      id,
+      raw,
+      settled: true,
+      text: railValues(on),
+      context: fieldContext(on),
+    });
+
+  test("the fields show §12.2's defaults: the SSF fit on a corde, the constant μ on a câble", () => {
+    // 15 N is 1,5 daN; `ρ` ships blank, read rather than typed.
+    expect(railValues(rope)).toMatchObject({
+      CdA: "0,45",
+      F0: "1,5",
+      kv: "1,50",
+      trolleyMu: "",
+      rho: "",
+    });
+    expect(railValues(steel)).toMatchObject({
+      CdA: "0,45",
+      F0: "",
+      kv: "",
+      trolleyMu: "0,015",
+      rho: "",
+    });
+  });
+
+  test("typing a constant writes the ride's constants and nothing else", () => {
+    const typed = commit(rope, "F0", "2").next;
+    // 2 daN is 20 N, the canonical newtons.
+    expect(typed?.dynamics).toEqual({ ...rope.dynamics, F0: 20 });
+    expect({ ...typed, dynamics: rope.dynamics }).toEqual(rope);
+    expect(commit(steel, "trolleyMu", "0,02").next?.dynamics.mu).toBe(0.02);
+    expect(commit(rope, "CdA", "0,6").next?.dynamics.CdA).toBe(0.6);
+  });
+
+  test("the other family's constants stay as they were, unshown", () => {
+    const onSteel = commit(steel, "trolleyMu", "0,02").next;
+    expect(onSteel?.dynamics.F0).toBe(steel.dynamics.F0);
+    expect(onSteel?.dynamics.kv).toBe(steel.dynamics.kv);
+  });
+
+  test("a typed ρ replaces the read one, and emptying the field goes back to it", () => {
+    const typed = commit(rope, "rho", "1,1").next;
+    expect(typed?.dynamics.rho).toBe(1.1);
+    if (typed === null) throw new Error("1,1 reads");
+    const emptied = commit(typed, "rho", "").next;
+    expect(emptied?.dynamics.rho).toBeNull();
+    expect(railValues(typed).rho).toBe("1,100");
+  });
+
+  test("a negative constant is refused and leaves the Scenario alone", () => {
+    for (const id of ["CdA", "F0", "kv", "rho"] as const) {
+      expect(commit(rope, id, "-1").next).toBeNull();
+    }
+    expect(commit(steel, "trolleyMu", "-0,1").next).toBeNull();
+  });
+
+  test("the constants are in no gate: an edit never reaches the text the gates read", () => {
+    const shown = railValues(rope);
+    expect(sameGatedText(shown, { ...shown, CdA: "-1", F0: "x", kv: "", rho: "abc" })).toBe(true);
+  });
+});
+
+describe("the vue de dessus and the rose write what the Position and Vent fields show (#104)", () => {
+  // Avancé's middle column is Statique's `TopMap`: these are the steps it takes, and the Rail's
+  // fields read the one Scenario they land in — in clear, both ways.
+  const blank = initialAppState({ query: "", session: null });
+
+  test("a click places A, a drag moves it, and the fields read the grained Position", () => {
+    const click = stepGesture(IDLE, blank.scenario.positions, {
+      type: "click",
+      at: { lat: 46.851234567, lon: 6.601234567 },
+    });
+    const placed = click.actions.reduce(appReducer, blank);
+    expect(railValues(placed.scenario)).toMatchObject({
+      latA: "46,851235",
+      lonA: "6,601235",
+      latB: "",
+      lonB: "",
+    });
+
+    let gesture = click.gesture;
+    let state = placed;
+    const shownAfter: string[] = [];
+    for (const event of [
+      { type: "drag-start", anchor: "A", at: { lat: 46.851235, lon: 6.601235 } },
+      { type: "drag-move", at: { lat: 46.86, lon: 6.61 } },
+      { type: "drag-end", at: { lat: 46.8612345, lon: 6.6112345 } },
+    ] as const) {
+      const step = stepGesture(gesture, state.scenario.positions, event);
+      gesture = step.gesture;
+      state = step.actions.reduce(appReducer, state);
+      shownAfter.push(railValues(state.scenario).latA);
+    }
+    // Nothing reaches the store during the drag: the field moves at the release, once.
+    expect(shownAfter).toEqual(["46,851235", "46,851235", "46,861235"]);
+    expect(railValues(state.scenario)).toMatchObject({ latA: "46,861235", lonA: "6,611235" });
+  });
+
+  test("a typed Position is the one the map draws", () => {
+    const text = { ...railValues(blank.scenario), latA: "46,85", lonA: "6,6" };
+    const typed = applyPosition(blank.scenario, "A", text, fieldContext(blank.scenario));
+    expect(drawnPositions(IDLE, typed.positions).A).toEqual({ lat: 46.85, lon: 6.6 });
+  });
+
+  test("the rose's handle writes the two Vent fields, and typed ones place the handle", () => {
+    // Half the rose's radius toward the line's own heading, A → B due east without Positions: a
+    // 30 km/h head wind, 0°. A full radius due north is 60 km/h from the left, 270°.
+    for (const [offset, shown] of [
+      [
+        { x: ROSE_RADIUS_PX / 2, y: 0 },
+        { windSpeed: "30", windDirection: "0" },
+      ],
+      [
+        { x: 0, y: -ROSE_RADIUS_PX },
+        { windSpeed: "60", windDirection: "270" },
+      ],
+    ] as const) {
+      const wind = windFromOffset(
+        offset,
+        roseReference(blank.scenario.positions),
+        blank.scenario.wind,
+      );
+      const next = appReducer(blank, { type: "scénario/modifié", patch: { wind } });
+      expect(railValues(next.scenario)).toMatchObject(shown);
+    }
+    const typed = applyField(blank.scenario, "windSpeed", 60, null);
+    const handle = handleOffset(
+      applyField(typed, "windDirection", 270, null).wind,
+      LEVEL_REFERENCE,
+    );
+    expect(handle.x).toBeCloseTo(0, 9);
+    expect(handle.y).toBeCloseTo(-ROSE_RADIUS_PX, 9);
   });
 });

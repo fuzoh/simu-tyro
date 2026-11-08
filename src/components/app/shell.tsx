@@ -52,6 +52,7 @@ import {
   STRIP,
   VIEW_STRIP,
 } from "@/lib/layout/contract.ts";
+import { SECTION } from "@/lib/statique/copy.ts";
 import { cn } from "@/lib/utils.ts";
 
 /** The Rail Header's static text — the navigation bar names Pages, not the app. */
@@ -206,6 +207,7 @@ export function Shell({
   chartRef,
   strip,
   tight = false,
+  views,
 }: {
   /** The Skeleton sets it. No `aria-live` region and no spinner — see {@link Skeleton}. */
   busy?: boolean;
@@ -240,6 +242,12 @@ export function Shell({
   /** The right column: the Rail's four reporting sections. Empty for a surface that has none. */
   right?: ReactNode;
   chart: ReactNode;
+  /**
+   * The middle column's views under the Chart Block, three columns only (#104): Statique's vue de
+   * dessus, never one of Avancé's own. Below B2 there is no middle column — the block stands over
+   * the Rail — and the box is `display: none`. The Skeleton passes the empty frame.
+   */
+  views?: ReactNode;
   /**
    * § 8's « clé ignorée » strip — **full width, above rail and charts**, and never the banner slot:
    * it is about the link and not the line. The Skeleton passes nothing, which is correct: it is
@@ -364,9 +372,15 @@ export function Shell({
             range `[gutter, width − gutter]`, so that one object aligns both charts. Padding the
             column instead would inset the SVGs *and* the scale, spending 48 px a side — and it
             would inset the read-out cells, which § 5 spans across the **full column width**
-            because aligning them to the plot would imply a correspondence that does not exist. */}
+            because aligning them to the plot would imply a correspondence that does not exist.
+
+            **From B2 up the column scrolls**, the block first and the views under it (#104), the
+            way Statique's right column does: a block held still over a residual scroller would
+            leave the map 116 px at 1024 × 768. The gutter is reserved so a scrollbar that comes
+            and goes cannot move the width every band is a function of. It spends the `--kb` pair
+            like the two side columns. */}
         <div
-          className="@container min-w-0 flex-none overflow-hidden min-[1024px]:min-h-0 min-[1024px]:flex-1"
+          className="@container min-w-0 flex-none overflow-hidden min-[1024px]:min-h-0 min-[1024px]:flex-1 min-[1024px]:scroll-pb-[var(--kb,0px)] min-[1024px]:[scrollbar-gutter:stable] min-[1024px]:overflow-y-auto min-[1024px]:pb-[var(--kb,0px)]"
           ref={chartRef}
         >
           {/* § 5's `compact` row, and the **one** place the band stack stops being a stack: under a
@@ -377,6 +391,14 @@ export function Shell({
           <div className="compact:h-[var(--pinned-cell)] compact:flex-row compact:items-center flex flex-col">
             {chart}
           </div>
+          {views !== undefined && (
+            <section
+              aria-label={SECTION.topView}
+              className="border-border hidden border-t px-3 py-3 min-[1024px]:block"
+            >
+              {views}
+            </section>
+          )}
         </div>
       </div>
     </div>

@@ -86,7 +86,9 @@ export function readDynamics(
     rider,
     wind,
     dynamics,
-  }: Pick<ScenarioDraft, "material" | "rider" | "wind" | "dynamics">,
+  }: Pick<ScenarioDraft, "material" | "wind" | "dynamics"> & {
+    readonly rider: Pick<ScenarioDraft["rider"], "mp">;
+  },
   unloaded: RiddenLine,
   { traverse }: Pick<RiderSweep, "traverse">,
   profile: Trace | null,
@@ -134,7 +136,7 @@ function trolleyOf(
 }
 
 /** The `ρ` a ride uses: the typed one, else §12.2's ISA at the profil's mean altitude, else 1,225. */
-function airDensityOf(typed: number | null, profile: Trace | null): DynamicsReading["rho"] {
+export function airDensityOf(typed: number | null, profile: Trace | null): DynamicsReading["rho"] {
   if (typed !== null) return { value: typed, source: "typed" };
   if (profile !== null) return { value: airDensity(meanAltitude(profile)), source: "profile" };
   return { value: DYNAMICS.rhoSeaLevel, source: "sea-level" };

@@ -12,7 +12,9 @@ import {
   DEDUCED_HELP,
   FIELD_HELP,
   GRID_HELP,
+  QUASI_STATIC_HELP,
   RESULT_HELP,
+  TENSION_LIMIT_HELP,
   TIGHTNESS_HELP,
 } from "@/lib/rail/help.ts";
 import {
@@ -84,6 +86,8 @@ describe("the help and provenance copy against docs/simulation-theory.md", () =>
   const paragraphs: string[] = [
     ...Object.values(FIELD_HELP),
     TIGHTNESS_HELP,
+    TENSION_LIMIT_HELP,
+    QUASI_STATIC_HELP,
     ...Object.values(DEDUCED_HELP),
     ...Object.values(RESULT_HELP),
     ...Object.values(GRID_HELP),

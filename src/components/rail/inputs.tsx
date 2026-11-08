@@ -46,6 +46,7 @@ import type { BlockingError, FixActionId } from "@/lib/rail/gates.ts";
 import type { PresetProvenance } from "@/lib/rail/presets.ts";
 import type { LadderRow } from "@/lib/rail/provenance.ts";
 import type { DriverTakeOver, NumericFieldId, RailValues } from "@/lib/rail/values.ts";
+import type { DynamicsReading } from "@/lib/scenario/dynamics.ts";
 import type { ForceUnit, ScenarioDraft, UseClass } from "@/lib/scenario/types.ts";
 import type { TerminationId, TextileSpec } from "@/lib/sim";
 import type { ParseFailure } from "@/lib/terrain/csv.ts";
@@ -65,6 +66,14 @@ import { siteOrigin } from "@/lib/app/site.ts";
 import { DOC_PAGES } from "@/lib/docs/pages.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { deducedRows } from "@/lib/rail/deduced.ts";
+import {
+  airDensityShown,
+  DYNAMICS_HEADING,
+  QUASI_STATIC_LABEL,
+  quasiStaticRow,
+  STEEL_TROLLEY_NOTE,
+  trolleyMuChip,
+} from "@/lib/rail/dynamics.ts";
 import {
   CARRYING_LINES_OPTIONS,
   checkField,
@@ -95,6 +104,8 @@ import {
   GEOADMIN_HELP,
   LV95_HELP,
   PRESET_HELP,
+  QUASI_STATIC_HELP,
+  TENSION_LIMIT_HELP,
   TIGHTNESS_HELP,
 } from "@/lib/rail/help.ts";
 import {
@@ -104,7 +115,8 @@ import {
   presetProvenance,
 } from "@/lib/rail/presets.ts";
 import { PROVENANCE_COPY, warningLadder } from "@/lib/rail/provenance.ts";
-import { MAESTRO_ROPE_ONLY, PASS_TO_PULLEY } from "@/lib/rail/tensioning.ts";
+import { RETENSION } from "@/lib/rail/retension.ts";
+import { limitReading, MAESTRO_ROPE_ONLY, PASS_TO_PULLEY } from "@/lib/rail/tensioning.ts";
 import {
   applyRopeClass,
   applyShippedTerminations,
@@ -120,6 +132,7 @@ import {
   switchTightness,
   TERMINATION_FIELD,
 } from "@/lib/rail/values.ts";
+import { airDensityOf } from "@/lib/scenario/dynamics.ts";
 import { clearSession } from "@/lib/session/session.ts";
 import { isFamilyAllowed, isRegimeAvailable, REGIMES, TERMINATIONS } from "@/lib/sim";
 import { parseFailureMessage, parseProfileCsv, readFailure } from "@/lib/terrain/csv.ts";
@@ -304,6 +317,7 @@ export function useLastGoodSolve(deduced: Deduced): RefObject<DeducedSolve | nul
 export function RailInputs({
   cause,
   deduced,
+  dynamics,
   rail,
   children,
 }: {
@@ -313,6 +327,11 @@ export function RailInputs({
    */
   cause: string | null;
   deduced: Deduced;
+  /**
+   * The passager's two rides, read off the same solved traverse the charts draw — `null` without
+   * one. The Rail reads §12.1's check off it, beside the constants the rides ran on.
+   */
+  dynamics: DynamicsReading | null;
   rail: RailFormState;
   /**
    * Where the two sections go. `Paramètres` and `Valeurs déduites` share one field-row context —
@@ -375,6 +394,13 @@ export function RailInputs({
   const textileSpec = scenario.material.family === "textile" ? scenario.material : null;
   const provenance = textileSpec === null ? {} : presetProvenance(textileSpec);
   const driver = drivingField(scenario);
+  const limit = limitReading(scenario, unit);
+  // The imported profil sets `ρ` only while it is the line's ground, as on Dynamique.
+  const rho = airDensityShown(
+    airDensityOf(scenario.dynamics.rho, scenario.geometry.source === "trace" ? trace : null),
+  );
+  const quasiStatic = quasiStaticRow(dynamics);
+  const muChip = trolleyMuChip(scenario.dynamics.mu);
 
   const parameters = (
     <RailSection title="Paramètres">
@@ -509,6 +535,15 @@ export function RailInputs({
 
         <Group title="Tension de la ligne">
           <TensioningDeviceRow warning={rung("tensioningDevice")} />
+          {/* What the prétension is read against. Its ⚠ is the prétension's own row's. */}
+          {limit !== null && (
+            <ReadOut
+              chip={<Chip detail={limit.provenance} label="Petzl" tone="neutral" />}
+              help={TENSION_LIMIT_HELP}
+              label={heading("tensionLimit", "exact")}
+              value={limit.value}
+            />
+          )}
           {/* Where the prétension is read — whatever drives, since its read-out reads there too. */}
           <TensioningSideRow />
           {/* Exactly one field is editable; the other four appear under `Valeurs déduites`.
@@ -548,6 +583,7 @@ export function RailInputs({
               }
             />
           )}
+          <RetensionNote />
         </Group>
 
         <Group title="Passager">
@@ -571,10 +607,63 @@ export function RailInputs({
           />
         </Group>
 
-        {/* The Vent (#87): descriptive for now — no statics, clearance or Verdict reads it. */}
+        {/* The Vent (#87): no statics, clearance or Verdict reads it — the ride (#89) and the
+              Banane do. The rose writes the same two fields from the vue de dessus. */}
         <Group title={heading("wind", "exact")}>
           <NumericRow hint="km/h" id="windSpeed" />
           <NumericRow hint="°" id="windDirection" />
+        </Group>
+
+        {/* §12.2's constants, each editable and labelled, none silent (#89, #104). Only the
+              passager's ride reads them; the trolley's law is the line's family's. */}
+        <Group title={DYNAMICS_HEADING}>
+          <NumericRow
+            chip={<Chip detail={PROVENANCE.CdA} label="§12.2" tone="neutral" />}
+            hint="m²"
+            id="CdA"
+          />
+          {textileSpec !== null ? (
+            <>
+              <NumericRow
+                chip={<Chip detail={PROVENANCE.trolleyFriction} label="§12.2" tone="neutral" />}
+                hint={unit}
+                id="F0"
+              />
+              <NumericRow
+                chip={<Chip detail={PROVENANCE.trolleyFriction} label="§12.2" tone="neutral" />}
+                hint="kg/s"
+                id="kv"
+              />
+            </>
+          ) : (
+            <NumericRow
+              chip={
+                <Chip
+                  detail={PROVENANCE.trolleyMu}
+                  label={muChip}
+                  tone={muChip === "non confirmé" ? "warning" : "neutral"}
+                />
+              }
+              id="trolleyMu"
+              // The **ambient** tier, like `k`: it is said on every câble, so it carries no ⚠.
+              note={<AmbientNote text={STEEL_TROLLEY_NOTE} />}
+            />
+          )}
+          <NumericRow
+            chip={<Chip detail={PROVENANCE.rho} label="§12.2" tone="neutral" />}
+            hint="kg/m³"
+            id="rho"
+            idle={rho.idle}
+            note={<AmbientNote text={rho.note} />}
+          />
+          {quasiStatic !== null && (
+            <ReadOut
+              help={QUASI_STATIC_HELP}
+              label={QUASI_STATIC_LABEL}
+              value={quasiStatic.value}
+              warning={quasiStatic.warning}
+            />
+          )}
         </Group>
 
         {/* The Positions (#90): typed in WGS84, read in LV95. The statics never read them; the
@@ -693,6 +782,20 @@ export function RailInputs({
     <RailRow.Provider value={row}>
       {children({ parameters, deduced: deducedSection })}
     </RailRow.Provider>
+  );
+}
+
+/**
+ * « Pourquoi on retend » (#104): the trial's loss of prétension, quoted where the Mise en tension is
+ * set — and nothing computed from it.
+ */
+function RetensionNote() {
+  return (
+    <div className="border-border mt-2 flex flex-col gap-1 border-t pt-2">
+      <h4 className="text-xs font-semibold">{RETENSION.title}</h4>
+      <p className="text-muted-foreground text-xs">{RETENSION.text}</p>
+      <p className="text-muted-foreground text-xs">{RETENSION.source}</p>
+    </div>
   );
 }
 

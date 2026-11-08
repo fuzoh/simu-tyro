@@ -16,6 +16,7 @@ import { deriveResults } from "./results.ts";
 import {
   demandedPretension,
   deviceOnCableWarning,
+  limitReading,
   overLimitWarning,
   PASS_TO_PULLEY,
   tensionLimit,
@@ -82,6 +83,32 @@ function rope(
 }
 
 const MAESTRO_S_250_KG = 250 * KGF;
+
+describe("the limite de tension as Avancé reads it (#104)", () => {
+  test("the force Petzl's kilograms are read as, in the selected unit", () => {
+    // 250 kg · 9,80665 = 2451,66 N is 245,2 daN; 150 kg is 1471,00 N, 1,471 kN at its precision.
+    expect(limitReading(rope("maestro-s", 11, 1000), "daN")?.value).toBe("245,2 daN");
+    expect(limitReading(rope("maestro-s", 10, 1000), "kN")?.value).toBe("1,471 kN");
+    expect(limitReading(rope("maestro-l", 13, 1000), "daN")?.value).toBe("274,6 daN");
+  });
+
+  test("its provenance is the figure as published, the diameters it holds for, and the source", () => {
+    expect(limitReading(rope("maestro-s", 11, 1000), "daN")?.provenance).toBe(
+      "Charge d'utilisation publiée : 250 kg pour une corde de 10,5 à 11,5 mm — notice Petzl, rapport #64.",
+    );
+  });
+
+  test("nothing where no figure is published: a mouflage, a blank or unlisted diameter, a câble", () => {
+    for (const scenario of [
+      rope("pulley", 11, 1000),
+      rope("maestro-s", undefined, 1000),
+      rope("maestro-s", 12, 1000),
+      { ...firstRunDefaults(), tensioningDevice: "maestro-s" } as ScenarioDraft,
+    ]) {
+      expect(limitReading(scenario, "daN")).toBeNull();
+    }
+  });
+});
 
 describe("the over-limit warning", () => {
   test("fires above the limit, naming the figure and its provenance", () => {

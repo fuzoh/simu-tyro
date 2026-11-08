@@ -380,7 +380,8 @@ export function Segmented<T extends string>({
  * disclosure. Keyboard users get the same on focus: the badge is in the tab order and the popover
  * is shown under `group-focus-within`, so nothing is hover-only. Since ticket 41's simplification
  * the « non confirmé » chips live in the `Provenance` section, and a field row carries one only for
- * a preset's deduced `k`.
+ * a preset's deduced `k` and for the câble's trolley `μ` (#104), which feeds no Verdict and so is
+ * in no aggregate.
  */
 export function Chip({
   label,

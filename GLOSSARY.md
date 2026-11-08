@@ -332,9 +332,10 @@ _Avoid_: app bar, toolbar, navbar, page header, chrome
 
 **Chart Block**:
 The banner slot, profile chart, clearance strip, View Strip and five read-out cells as
-one co-visible unit sharing a single x scale and a single gutter constant. On Avancé it is
-the middle column between the Rail's two. It reflows and collapses as a whole; no member is
-ever hidden or occluded on its own.
+one co-visible unit sharing a single x scale and a single gutter constant. On Avancé it heads
+the middle column between the Rail's two, with Statique's vue de dessus under it — never a view
+of Avancé's own. It reflows and collapses as a whole; no member is ever hidden or occluded on
+its own.
 _Avoid_: chart area, main pane, canvas
 
 **View Strip**:

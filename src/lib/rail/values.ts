@@ -155,8 +155,8 @@ export function isPositionField(id: FieldId): id is PositionFieldId {
   return positionEnd(id) !== null;
 }
 
-/** The fields whose blank is state: § 9's textile blanks and the three Overrides. */
-type NullableFieldId = OverrideFieldId | "MBL" | "muTextile" | "dTextile" | "k";
+/** The fields whose blank is state: § 9's textile blanks, the three Overrides and `ρ`. */
+type NullableFieldId = OverrideFieldId | "MBL" | "muTextile" | "dTextile" | "k" | "rho";
 
 /**
  * What each lens reads. A Tightness Driver's reads the driver alone, so a refusal holding only the
@@ -304,6 +304,28 @@ export const FIELD_ACCESS: FieldAccess = {
     read: ({ wind }) => wind.directionDeg,
     write: (s, directionDeg) => ({ ...s, wind: { ...s.wind, directionDeg } }),
   },
+  CdA: {
+    read: ({ dynamics }) => dynamics.CdA,
+    write: (s, CdA) => ({ ...s, dynamics: { ...s.dynamics, CdA } }),
+  },
+  // One trolley law per family (§12.2): the SSF fit on a corde, the constant `μ` on a câble. The
+  // other family's constants stay in the Scenario, unshown, as the link carries them.
+  F0: {
+    read: ({ material, dynamics }) => (material.family === "textile" ? dynamics.F0 : undefined),
+    write: (s, F0) => ({ ...s, dynamics: { ...s.dynamics, F0 } }),
+  },
+  kv: {
+    read: ({ material, dynamics }) => (material.family === "textile" ? dynamics.kv : undefined),
+    write: (s, kv) => ({ ...s, dynamics: { ...s.dynamics, kv } }),
+  },
+  trolleyMu: {
+    read: ({ material, dynamics }) => (material.family === "steel" ? dynamics.mu : undefined),
+    write: (s, mu) => ({ ...s, dynamics: { ...s.dynamics, mu } }),
+  },
+  rho: {
+    read: ({ dynamics }) => dynamics.rho,
+    write: (s, rho) => ({ ...s, dynamics: { ...s.dynamics, rho } }),
+  },
   latA: coordinateRead("A", "lat"),
   lonA: coordinateRead("A", "lon"),
   latB: coordinateRead("B", "lat"),
@@ -448,7 +470,7 @@ export function commitText({
   }
   // An optional field emptied is « absent »: the one blank that is written, not refused.
   if (isOptionalField(id) && raw.trim() === "") {
-    return { next: FIELD_ACCESS.dTextile.write(scenario, null), value: null, asked: null };
+    return { next: FIELD_ACCESS[id].write(scenario, null), value: null, asked: null };
   }
   const value = commitField(id, raw, context);
   if (value === null) return { next: null, value: null, asked: null };

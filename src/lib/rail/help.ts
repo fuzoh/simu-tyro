@@ -79,9 +79,15 @@ export const FIELD_HELP: Record<FieldId, string> = {
   DAF: "Majoration au départ, notée DAF dans les formules (§8.2). Elle majore l'écart de tension dû au passager : T max majoré = T à vide + DAF · (T chargé − T à vide). C'est ce T majoré que divise le facteur de sécurité. 1,2 est le plafond mesuré pour un départ contrôlé sur ligne tendue [FIELD:SSF] ; sous 3 % de flèche / portée, la ligne sort du régime où il a été mesuré. Elle ne touche pas la garde au sol.",
   xD: "Position du passager x_D le long de la portée, en mètres depuis l'ancrage A. Elle sélectionne une vue : les cinq cellules de lecture (garde, tensions, pente, flèche) sont calculées pour le passager à cette position, et le profil la dessine. Elle est ramenée dans [0, L] à chaque changement de portée et n'entre dans aucun agrégat « traversée ».",
   windSpeed:
-    "Vitesse du vent, en km/h (0 ou plus). 0 est l'absence de vent, et c'est ce que lit un lien qui n'en porte pas. Information descriptive pour l'instant : elle ne change ni la statique, ni la garde au sol, ni le verdict. Elle servira à la dynamique du passager, qui en projette la composante le long de la ligne.",
+    "Vitesse du vent, en km/h (0 ou plus). 0 est l'absence de vent, et c'est ce que lit un lien qui n'en porte pas. Elle ne change ni la statique, ni la garde au sol, ni le verdict. La dynamique du passager en projette la composante le long de la ligne (§12.2) : c'est le second point d'arrêt, avec le vent saisi. La composante de travers ne fait que dessiner la Banane, qui n'est pas une distance.",
   windDirection:
     "Direction du vent : d'où il vient, relativement au sens de parcours A → B, en degrés dans le sens horaire vu de dessus. 0° est un vent de face, 90° un vent de la droite, 180° un vent dans le dos, 270° un vent de la gauche. Elle est relative à la ligne, pas au nord : le scénario reste le même sans carte. Sans effet tant que la vitesse est nulle.",
+  CdA: "Surface de traînée C_dA du passager, en m² : la traînée vaut ½ · ρ · C_dA · v_rel · |v_rel|, v_rel étant la vitesse du passager par rapport à l'air (§12.2). 0,45 m² est l'ajustement de la SSF sur sa ligne instrumentée de 1109 m [FIELD:SSF] : une campagne, un spéléologue en harnais sur corde textile, pas un passager assis ni un câble. La plage 0,30–0,60 m² du champ n'est pas sur la page SSF : elle est [CONVENTION]. Elle ne change que la dynamique du passager, jamais la statique ni le verdict.",
+  F0: "Frottement constant de la poulie F₀, sur corde : le terme fixe de F = F₀ + k_v · v, opposé au mouvement (§12.2). 15 N est l'ajustement mesuré par la SSF sur textile [FIELD:SSF], indépendant du poids du passager ; la page SSF ne nomme aucune poulie. Une seule poulie est comptée, quel que soit le nombre de Brins porteurs. Il ne change que la dynamique du passager.",
+  kv: "Frottement de la poulie proportionnel à la vitesse k_v, sur corde, en kg/s : le terme k_v · v de F = F₀ + k_v · v, v en m/s (§12.2). 1,5 kg/s est l'ajustement mesuré par la SSF sur textile [FIELD:SSF]. Il ne change que la dynamique du passager.",
+  trolleyMu:
+    "Frottement de la poulie μ, sur câble : F = μ · N, avec N = m · g · cos θ (§12.2). Aucune source ouverte ne sépare l'acier du textile : le câble ne reprend pas l'ajustement SSF et prend le repli à μ constant de la plage 0,015–0,02, à son extrémité basse. Cette plage n'a pas de source primaire ouverte : 0,015 est [CONVENTION], non confirmé. Il ne change que la dynamique du passager.",
+  rho: "Masse volumique de l'air ρ, en kg/m³, dans la traînée ½ · ρ · C_dA · v_rel · |v_rel| (§12.2). Laissée vide, elle est lue : atmosphère type (ISA) à l'altitude moyenne du profil importé, ρ = p / (R_s · T), ou 1,225 kg/m³ au niveau de la mer sans profil. Une valeur saisie la remplace ; vider le champ revient à la valeur lue. Elle ne change que la dynamique du passager.",
   latA: positionHelp("la latitude", "A"),
   lonA: positionHelp("la longitude", "A"),
   latB: positionHelp("la latitude", "B"),
@@ -116,6 +122,14 @@ export const GEOADMIN_HELP =
 /** Help for the pilot control of `Tension de la ligne` — a segmented control, not a field. */
 export const TIGHTNESS_HELP =
   "Pilote de tension : exactement une des cinq grandeurs est saisie, les quatre autres sont déduites. « Flèche » fixe la flèche à vide, « Prétension » la tension à l'ancrage de la Mise en tension, « H » la tension horizontale, « Longueur » la longueur non tendue L₀, « Rapport V » le rapport P / H. Changer de pilote préremplit le nouveau champ avec la valeur déduite courante, à sa précision d'affichage, de sorte que la ligne ne bouge pas.";
+
+/** Help for the limite de tension read beside the Mise en tension (#86, #104). */
+export const TENSION_LIMIT_HELP =
+  "Limite de tension du dispositif : la charge d'utilisation que Petzl publie pour ce Maestro et le diamètre de corde saisi (Maestro S : 150 kg à 10 mm, 250 kg de 10,5 à 11,5 mm ; Maestro L : 280 kg de 12,5 à 13 mm), lue comme une force : 1 kg pèse 9,80665 N. La prétension demandée, par ligne, y est comparée, et un avertissement s'affiche sur la prétension au-dessus. Ce n'est pas le seuil de glissement, et le glissement n'est pas un fusible. Un mouflage, un diamètre vide ou hors des plages publiées n'ont pas de limite : rien ne s'affiche.";
+
+/** Help for §12.1's check, read beside the ride's constants. */
+export const QUASI_STATIC_HELP =
+  "Critère de validité quasi statique (§12.1) : la vitesse du passager v rapportée à la vitesse des ondes transversales c = √(T / μ) de la ligne au droit de la poulie, μ étant son poids linéique en kg/m. C'est le plus grand v/c des deux descentes, sans vent puis avec le vent saisi, et l'endroit où il est atteint. Le seuil 0,2 est le plus prudent de [R1] (0,2) et [R2] (0,3) : au-dessus, la flèche est en retard sur le passager, des ondes parcourent la ligne, et la trajectoire figée sur laquelle roule la dynamique décrit mal la traversée ; un avertissement s'affiche. Estimation, hors verdict.";
 
 /** Help for the read-only rows of `Valeurs déduites`. The three steel derived rows use {@link FIELD_HELP}. */
 export const DEDUCED_HELP: Record<DeducedRowId, string> = {
