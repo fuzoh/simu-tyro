@@ -87,6 +87,7 @@ export function ChartBlock({
   inert = false,
   onPositionFocus,
   onReveal,
+  readOnly = false,
   register = "exact",
   revealGrantable = true,
   solved,
@@ -129,6 +130,11 @@ export function ChartBlock({
   onPositionFocus: (focused: boolean) => void;
   /** « Afficher le profil » — the pinned header's one control. */
   onReveal: () => void;
+  /**
+   * The Page Terrain (#101): the passager stays where the link put it — no scrub on either plot,
+   * and its position is read in the View Strip rather than typed.
+   */
+  readOnly?: boolean;
   /**
    * The Page's vocabulary (#61): which read-out cells the row carries and what they are called. A
    * simplified Page prints the terrain set, without help — the help is Avancé's exact prose.
@@ -316,7 +322,7 @@ export function ChartBlock({
           clearance={clearance}
           frame={frame}
           layers={state.layers}
-          onScrub={scrub}
+          onScrub={readOnly ? undefined : scrub}
           plot={{ top: PROFILE_CHROME.badge, height: plotHeight }}
           register={register}
           scene={scene}
@@ -330,7 +336,7 @@ export function ChartBlock({
           clearance={clearance}
           frame={frame}
           height={stripOuterHeight(wInner)}
-          onScrub={scrub}
+          onScrub={readOnly ? undefined : scrub}
           scene={scene}
           wide={wide}
           x={x}
@@ -343,7 +349,7 @@ export function ChartBlock({
           onLayers={(layers) => dispatch({ type: "calques/basculés", layers })}
           onPeek={setPeeking}
           onPositionFocus={onPositionFocus}
-          onX={moveRider}
+          onX={readOnly ? undefined : moveRider}
           peek={ve.peek}
           peeking={held}
           xD={rider === null ? clampX(riderInput.xD, frame.L) : rider.step.xD}

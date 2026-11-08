@@ -29,11 +29,15 @@
  *   ruler and places no anchor; the Vue 3D has no Mesure.
  * - **One gesture machine for both views** (#97): an anchor dragged in the Vue 3D is sent to the
  *   same `send` as a marker, so its release is the same new line, recomputed by the same rule.
+ * - **On the Page Terrain the map writes nothing** (#101): no click places an anchor, no anchor is
+ *   taken in either view, the rose has no handle and no Fond or Couche pentes is offered — the Fond
+ *   is the one the Session holds. The Mesure stays, being the map's own; the coupe stands under the
+ *   map, and the switch flips the two together between « 2D » and « 3D ».
  */
 
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { GeoJSONSource } from "maplibre-gl";
-import type { RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 
 import { Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl } from "maplibre-gl";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
@@ -52,10 +56,16 @@ import type { Fetch } from "@/lib/terrain/geoadmin.ts";
 
 import { useAppDispatch, useAppState } from "@/components/app/store.tsx";
 import { useHover } from "@/components/chart/use-hover.ts";
-import { plainDrawing, TOP_VIEW_BOX, TopViewFrame } from "@/components/statique/top-view.tsx";
+import {
+  MapOverCoupe,
+  plainDrawing,
+  TOP_VIEW_BOX,
+  TopViewFrame,
+} from "@/components/statique/top-view.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.tsx";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { Toggle } from "@/components/ui/toggle.tsx";
 import { coupeLines, coupeReading } from "@/lib/chart/hover.ts";
 import { placeRider } from "@/lib/chart/scene.ts";
@@ -70,6 +80,7 @@ import {
   measureHint,
   measureLines,
   VUE_3D_BLOCKED,
+  VUE_3D_BLOCKED_READ_ONLY,
   windReading,
 } from "@/lib/map/copy.ts";
 import { FONDS } from "@/lib/map/display.ts";
@@ -93,6 +104,7 @@ import {
 import { drapedAttribution, vue3dPlacement, vue3dScene } from "@/lib/map/vue-3d.ts";
 import { LEVEL_REFERENCE, roseReference } from "@/lib/map/wind-rose.ts";
 import { geoadminNotice, loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
+import { cn } from "@/lib/utils.ts";
 
 import type { Vue3d } from "./vue-3d-renderer.ts";
 
@@ -112,14 +124,24 @@ const FIT = { padding: 48, maxZoom: 16 } as const;
 /**
  * @param frame the coupe's input half and `solved` its solved half, as the Page's gates leave them:
  *   the Vue 3D draws the same line the coupe does, or none.
+ * @param readOnly the Page Terrain's visualisation (#101), whose `coupe` stands under the map in 2D.
  */
-export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: SceneBase | null }) {
+export function TopMap({
+  frame,
+  solved,
+  readOnly,
+}: {
+  frame: SceneFrame | null;
+  solved: SceneBase | null;
+  readOnly?: { readonly coupe: ReactNode };
+}) {
   const { scenario, map: display, trace } = useAppState();
   const dispatch = useAppDispatch();
   const { positions } = scenario;
+  const locked = readOnly !== undefined;
   const { gesture, send } = useMapGesture(positions);
   const drawn = drawnPositions(gesture, positions);
-  const target = clickTarget(gesture, positions);
+  const target = locked ? null : clickTarget(gesture, positions);
   const [failed, setFailed] = useState(false);
   const [health, setHealth] = useState<FondHealth>(() => freshHealth(display.fond));
 
@@ -137,8 +159,11 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
   const measuring = measure.active && !shows3d && plain === null;
   const { click: measureClick } = measure;
   const clicked = useCallback(
-    (at: Position) => (measuring ? measureClick(at) : send({ type: "click", at })),
-    [measuring, measureClick, send],
+    (at: Position) => {
+      if (measuring) measureClick(at);
+      else if (!locked) send({ type: "click", at });
+    },
+    [measuring, measureClick, send, locked],
   );
   // The plain drawing orients itself by the LV95 domain, so the rose reads the line as it is drawn.
   const reference =
@@ -201,7 +226,9 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
           ? null
           : clickHint(target, positions);
 
-  return (
+  const blockedWhy = locked ? VUE_3D_BLOCKED_READ_ONLY : VUE_3D_BLOCKED;
+
+  const view = (
     <TopViewFrame
       caption={
         <>
@@ -210,7 +237,7 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
               {anchorReading(anchor, drawn)}
             </span>
           ))}
-          {!shows3d && <span>{windReading(scenario.wind, reference)}</span>}
+          {!shows3d && <span>{windReading(scenario.wind, reference, !locked)}</span>}
           <span>{gestureLine}</span>
           {!shows3d && unavailable && (
             <span>{[MAP_COPY.unavailable, plain?.unoriented].filter(Boolean).join(" · ")}</span>
@@ -219,7 +246,7 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
           {placement.ok ? (
             lost3d && <span>{MAP_COPY.vue3dUnavailable}</span>
           ) : (
-            <span>{VUE_3D_BLOCKED[placement.block]}</span>
+            <span>{blockedWhy[placement.block]}</span>
           )}
         </>
       }
@@ -227,6 +254,7 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
         <MapControls
           blocked={placement.ok ? null : placement.block}
           display={display}
+          locked={locked}
           onDisplay={(next) => dispatch({ type: "carte/affichée", map: next })}
           // Pressing the switch again tries the Vue 3D again, whatever stopped it last time.
           onView={(view) => {
@@ -244,7 +272,8 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
             ) : (
               <Vue3dHost
                 display={display}
-                idle={gesture.kind === "idle"}
+                // A view that never idles takes no anchor: the Page Terrain only looks at the line.
+                idle={!locked && gesture.kind === "idle"}
                 onGesture={send}
                 onUnavailable={lose3d}
                 renderer={renderer}
@@ -261,6 +290,7 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
                   display={display}
                   drawn={drawn}
                   gesture={gesture}
+                  locked={locked}
                   onClick={clicked}
                   onFailed={() => setFailed(true)}
                   onHealth={setHealth}
@@ -276,21 +306,22 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
                   target={target}
                 />
                 <div className="pointer-events-none absolute top-2 left-2 flex gap-1">
-                  {(["A", "B"] as const).map((anchor) => (
-                    <Toggle
-                      className="bg-background pointer-events-auto"
-                      disabled={gesture.kind !== "idle" || measuring}
-                      key={anchor}
-                      onPressedChange={() => send({ type: "arm", anchor })}
-                      pressed={gesture.kind === "idle" && gesture.armed === anchor}
-                      size="sm"
-                      variant="outline"
-                    >
-                      {anchor === "A" ? MAP_COPY.placeA : MAP_COPY.placeB}
-                    </Toggle>
-                  ))}
+                  {!locked &&
+                    (["A", "B"] as const).map((anchor) => (
+                      <Toggle
+                        className="bg-background pointer-events-auto"
+                        disabled={gesture.kind !== "idle" || measuring}
+                        key={anchor}
+                        onPressedChange={() => send({ type: "arm", anchor })}
+                        pressed={gesture.kind === "idle" && gesture.armed === anchor}
+                        size="sm"
+                        variant="outline"
+                      >
+                        {anchor === "A" ? MAP_COPY.placeA : MAP_COPY.placeB}
+                      </Toggle>
+                    ))}
                   <Toggle
-                    className="bg-background pointer-events-auto"
+                    className="bg-background touch-44 pointer-events-auto"
                     disabled={!measuring && gesture.kind !== "idle"}
                     onPressedChange={() => {
                       // An armed « Placer » would silently resume once the Mesure is quit.
@@ -315,7 +346,11 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
             )}
             <WindRose
               hostRef={rose}
-              onWind={(next) => dispatch({ type: "scénario/modifié", patch: { wind: next } })}
+              onWind={
+                locked
+                  ? undefined
+                  : (next) => dispatch({ type: "scénario/modifié", patch: { wind: next } })
+              }
               reference={reference}
               wind={scenario.wind}
             />
@@ -327,6 +362,11 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
         )
       }
     />
+  );
+  return readOnly === undefined ? (
+    view
+  ) : (
+    <MapOverCoupe coupe={shows3d ? null : readOnly.coupe} map={view} />
   );
 }
 
@@ -516,6 +556,7 @@ function useVue3dScene(
 function MapControls({
   display,
   blocked,
+  locked,
   shows3d,
   onDisplay,
   onView,
@@ -523,10 +564,37 @@ function MapControls({
   display: MapDisplay;
   /** Why the Vue 3D cannot stand, `null` when it can. */
   blocked: Vue3dBlock | null;
+  /** The Page Terrain: the « 2D » / « 3D » pair alone, every target 44 px. */
+  locked: boolean;
   shows3d: boolean;
   onDisplay: (display: MapDisplay) => void;
   onView: (view: MapDisplay["view"]) => void;
 }) {
+  if (locked) {
+    return (
+      // A disabled item takes no hover, so the reason's title is on the pair.
+      <span title={blocked === null ? undefined : VUE_3D_BLOCKED_READ_ONLY[blocked]}>
+        <ToggleGroup
+          aria-label={MAP_COPY.views}
+          className="gap-1"
+          // Pressing the view already shown would leave none pressed: it stays.
+          onValueChange={([view]) => {
+            if (view === "2d" || view === "3d") onView(view);
+          }}
+          size="sm"
+          value={[shows3d ? "3d" : "2d"]}
+          variant="outline"
+        >
+          <ToggleGroupItem className="touch-44" value="2d">
+            {MAP_COPY.view2d}
+          </ToggleGroupItem>
+          <ToggleGroupItem className="touch-44" disabled={blocked !== null} value="3d">
+            {MAP_COPY.view3d}
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </span>
+    );
+  }
   return (
     <>
       <NativeSelect
@@ -609,6 +677,7 @@ function MapCanvas({
   display,
   drawn,
   gesture,
+  locked,
   target,
   across,
   measure,
@@ -624,6 +693,8 @@ function MapCanvas({
   display: MapDisplay;
   drawn: Positions;
   gesture: MapGesture;
+  /** The Page Terrain: no anchor is taken, and no zoom button under the 44 px floor is drawn. */
+  locked: boolean;
   target: Anchor | null;
   /** The Mesure's points, drawn above the line. */
   measure: MeasurePoints;
@@ -698,7 +769,8 @@ function MapCanvas({
       return;
     }
     created.touchZoomRotate.disableRotation();
-    created.addControl(new NavigationControl({ showCompass: false }), "top-right");
+    // MapLibre's buttons are 29 px; on the Page Terrain, read on a phone, a pinch does their work.
+    if (!locked) created.addControl(new NavigationControl({ showCompass: false }), "top-right");
     created.on("move", placeRose);
     created.on("move", () => moved.current());
     created.on("resize", placeRose);
@@ -771,7 +843,7 @@ function MapCanvas({
 
   // The drawing follows the gesture: the line source and the two markers, nothing in the store.
   const idle = gesture.kind === "idle";
-  const draggable = idle && !measuring;
+  const draggable = idle && !measuring && !locked;
   useEffect(() => {
     line.current = drawn;
     const live = map.current;
@@ -786,7 +858,7 @@ function MapCanvas({
         continue;
       }
       if (marker === null) {
-        markers.current[anchor] = anchorMarker(anchor, position, send).addTo(live);
+        markers.current[anchor] = anchorMarker(anchor, position, send, !locked).addTo(live);
       } else {
         marker.setLngLat([position.lon, position.lat]);
       }
@@ -803,7 +875,7 @@ function MapCanvas({
       if (view.bounds !== undefined) live.fitBounds(view.bounds, FIT);
       else live.jumpTo(view);
     }
-  }, [drawn, idle, send, placeRose]);
+  }, [drawn, idle, send, placeRose, locked]);
 
   // The Mesure takes the click that lands on an anchor, so A–B can be measured from A to B, and an
   // anchor stays where it is while it is on. After the effect above, which creates the markers.
@@ -856,15 +928,29 @@ function placeRoseHost(live: MapLibreMap, host: HTMLElement, { A, B }: Positions
   host.style.top = at === null ? "" : `${at.y}px`;
 }
 
-/** One anchor's marker: a lettered disc the map moves under the pointer while it is dragged. */
-function anchorMarker(anchor: Anchor, position: Position, send: (event: MapEvent) => void): Marker {
+/**
+ * One anchor's marker: a lettered disc the map moves under the pointer while it is dragged.
+ *
+ * @param movable it may be dragged at all — never on the Page Terrain, so it offers no grab there.
+ */
+function anchorMarker(
+  anchor: Anchor,
+  position: Position,
+  send: (event: MapEvent) => void,
+  movable: boolean,
+): Marker {
   const element = document.createElement("div");
-  element.className =
-    "bg-background text-foreground border-foreground grid size-7 cursor-grab place-items-center rounded-full border-2 text-xs font-bold shadow";
+  element.className = cn(
+    "bg-background text-foreground border-foreground grid size-7 place-items-center rounded-full border-2 text-xs font-bold shadow",
+    movable && "cursor-grab",
+  );
   element.textContent = anchor;
   // A press on a marker is not a click on the map: an armed « Placer » must not land on it.
   element.addEventListener("click", (event) => event.stopPropagation());
-  const marker = new Marker({ element, draggable: true }).setLngLat([position.lon, position.lat]);
+  const marker = new Marker({ element, draggable: movable }).setLngLat([
+    position.lon,
+    position.lat,
+  ]);
   const at = (): Position => {
     const { lat, lng } = marker.getLngLat();
     return { lat, lon: lng };

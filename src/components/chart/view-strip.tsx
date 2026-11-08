@@ -195,7 +195,8 @@ export function ViewStrip({
   /** The drawn position, m — already clamped into `[0, L]` by the scene. */
   xD: number;
   L: number;
-  onX: (metres: number) => void;
+  /** Absent on the Page Terrain (#101): the position is read there, never typed. */
+  onX?: (metres: number) => void;
 }) {
   return (
     <>
@@ -256,8 +257,35 @@ export function ViewStrip({
         <Abbr full={PEEK_LABEL[peek].full} narrow="short" short={PEEK_LABEL[peek].short} />
       </Toggle>
 
-      <PositionField L={L} onFocusChange={onPositionFocus} onX={onX} xD={xD} />
+      {onX === undefined ? (
+        <PositionReading L={L} xD={xD} />
+      ) : (
+        <PositionField L={L} onFocusChange={onPositionFocus} onX={onX} xD={xD} />
+      )}
     </>
+  );
+}
+
+/** The position as {@link PositionField} prints it, with no field: `x 74,8 m · 50 %`. */
+function PositionReading({ xD, L }: { xD: number; L: number }) {
+  return (
+    <span className="flex items-center gap-1 whitespace-nowrap">
+      <span className="text-muted-foreground">x</span>
+      <span className="font-mono text-base">{formatValue("x_D", xD)}</span>
+      <span className="text-muted-foreground">m</span>
+      <Share L={L} xD={xD} />
+    </span>
+  );
+}
+
+/** The position's share of the span, the secondary both forms of it carry. */
+function Share({ xD, L }: { xD: number; L: number }) {
+  // The unit and the separator are prose and stay sans; the percentage is a computed quantity
+  // and is mono, like every other number the engine produced.
+  return (
+    <span className="text-muted-foreground/70">
+      · <span className="font-mono">{L > 0 ? Math.round((xD / L) * 100) : 0}</span> %
+    </span>
   );
 }
 
@@ -355,11 +383,7 @@ function PositionField({
         value={draft ?? shown}
       />
       <span className="text-muted-foreground">m</span>
-      {/* The unit and the separator are prose and stay sans; the percentage is a computed quantity
-          and is mono, like every other number the engine produced. */}
-      <span className="text-muted-foreground/70">
-        · <span className="font-mono">{L > 0 ? Math.round((xD / L) * 100) : 0}</span> %
-      </span>
+      <Share L={L} xD={xD} />
     </Label>
   );
 }

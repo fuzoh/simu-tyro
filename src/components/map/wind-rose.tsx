@@ -12,6 +12,7 @@
  *   the gesture, and the address bar's own debounce writes the link once it stops.
  * - **The host is a point.** Its parent places it — at the line's midpoint on the map, at the middle
  *   of the box without one — and everything the rose draws is relative to it.
+ * - **Without `onWind` there is no handle** (#101): the Page Terrain shows the Vent and sets none.
  */
 
 import type { PointerEvent, RefObject } from "react";
@@ -44,7 +45,7 @@ export function WindRose({
   hostRef: RefObject<HTMLDivElement | null>;
   wind: Wind;
   reference: RoseReference;
-  onWind: (wind: Wind) => void;
+  onWind?: (wind: Wind) => void;
 }) {
   // Where the pointer took the handle, so it does not jump to the pointer's centre.
   const grab = useRef<RoseOffset | null>(null);
@@ -78,7 +79,7 @@ export function WindRose({
       reference,
       wind,
     );
-    if (next.speedKmh !== wind.speedKmh || next.directionDeg !== wind.directionDeg) onWind(next);
+    if (next.speedKmh !== wind.speedKmh || next.directionDeg !== wind.directionDeg) onWind?.(next);
   }
 
   function release() {
@@ -152,26 +153,28 @@ export function WindRose({
           ))}
         </>
       )}
-      <div
-        className={cn(
-          "pointer-events-auto absolute grid touch-none place-items-center",
-          dragging ? "cursor-grabbing" : "cursor-grab",
-        )}
-        onLostPointerCapture={release}
-        onPointerCancel={release}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={release}
-        style={{
-          width: HANDLE_PX,
-          height: HANDLE_PX,
-          left: handle.x - HANDLE_PX / 2,
-          top: handle.y - HANDLE_PX / 2,
-        }}
-        title={MAP_COPY.roseHandle}
-      >
-        <span className="bg-background border-foreground size-7 rounded-full border-2 shadow" />
-      </div>
+      {onWind !== undefined && (
+        <div
+          className={cn(
+            "pointer-events-auto absolute grid touch-none place-items-center",
+            dragging ? "cursor-grabbing" : "cursor-grab",
+          )}
+          onLostPointerCapture={release}
+          onPointerCancel={release}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={release}
+          style={{
+            width: HANDLE_PX,
+            height: HANDLE_PX,
+            left: handle.x - HANDLE_PX / 2,
+            top: handle.y - HANDLE_PX / 2,
+          }}
+          title={MAP_COPY.roseHandle}
+        >
+          <span className="bg-background border-foreground size-7 rounded-full border-2 shadow" />
+        </div>
+      )}
     </div>
   );
 }

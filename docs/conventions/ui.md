@@ -127,6 +127,10 @@ one grep.
 **No `amber-*` literal anywhere in `src/`.** **One** warning role, not two: § 7's precedence ladder
 is a semantic ordering, and `destructive` covers both text and chip with a single token.
 
+A Verdict's colour is a `Tone` (`src/lib/app/tone.ts`, `VERDICT_TONE`) before it is a class, so a
+view model carries it and its test reads it; `TONE_CLASS` in `src/components/app/banner.tsx` is
+the one place a Tone becomes a token.
+
 ### Every control comes from `src/components/ui/`
 
 No hand-rolled `<button>`, `<input>`, `<select>` or `<label>` outside it. Three registry choices

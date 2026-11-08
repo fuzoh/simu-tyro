@@ -159,7 +159,8 @@ export function ClearanceStrip({
   height: number;
   /** Chart-column width ≥ B1: the caption shortens at the same threshold, so no new breakpoint. */
   wide: boolean;
-  onScrub: (metres: number) => void;
+  /** Absent on the Page Terrain (#101): the strip is read, and its caption asks for no drag. */
+  onScrub?: (metres: number) => void;
 }) {
   const points = scene === null || !clearance ? [] : withZeroCrossings(samples(frame, scene));
   // The y domain is sized on the curve, plus the envelope's **negative** side only — that fill must
@@ -205,7 +206,7 @@ export function ClearanceStrip({
 
   function scrub(event: ReactPointerEvent<SVGSVGElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
-    onScrub(x.toMetres(event.clientX, rect.left));
+    onScrub?.(x.toMetres(event.clientX, rect.left));
   }
 
   return (
@@ -213,22 +214,27 @@ export function ClearanceStrip({
       aria-label="Garde au sol sous le passager selon sa position"
       className="block h-full w-full touch-pan-y select-none"
       height={height}
-      onPointerDown={(event) => {
-        event.currentTarget.setPointerCapture(event.pointerId);
-        scrub(event);
-      }}
-      onPointerMove={(event) => {
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) scrub(event);
-      }}
+      onPointerDown={
+        onScrub &&
+        ((event) => {
+          event.currentTarget.setPointerCapture(event.pointerId);
+          scrub(event);
+        })
+      }
+      onPointerMove={
+        onScrub &&
+        ((event) => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) scrub(event);
+        })
+      }
       role="img"
       width={x.width}
     >
       <text className="fill-muted-foreground text-[10px]" x={x.gutter} y={12}>
         {/* The caption names the quantity's scope — « sous le passager » — because the previous
             curve was the line's envelope and was read as this one (ticket 41). */}
-        {wide
-          ? "Garde sous le passager (m) selon sa position — glisser pour déplacer"
-          : "Garde sous le passager (m) — glisser"}
+        {wide ? "Garde sous le passager (m) selon sa position" : "Garde sous le passager (m)"}
+        {onScrub !== undefined && (wide ? " — glisser pour déplacer" : " — glisser")}
       </text>
 
       {/* Zero is the threshold this whole chart exists to show a crossing of, so it is drawn in

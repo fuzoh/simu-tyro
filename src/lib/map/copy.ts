@@ -40,12 +40,18 @@ export const MAP_COPY = {
   /** The rose's handle, which has no label of its own: a hover says what it does. */
   roseHandle: "Glissez pour régler la direction et la force du vent",
   roseCalm: "Pas de vent. Glissez la poignée de la rose pour en régler la direction et la force.",
+  /** The same calm on a rose that has no handle (#101). */
+  calm: "Pas de vent.",
   /** Where the line is drawn level the reading says why it gives no azimuth. */
   roseNorthUnknown: "nord inconnu",
   /** The ambient note under a drawn Banane (#96): a shape, never a distance. */
   bananeNote: "Banane : allure, pas une distance.",
   /** The switch that puts the Vue 3D in the vue de dessus's place (#95). */
   view3d: "3D",
+  /** Its other half on the Page Terrain (#101), where it flips the map and the coupe together. */
+  view2d: "2D",
+  /** That pair's accessible name. */
+  views: "Visualisation",
   /** The Vue 3D's accessible name. */
   vue3dTitle: `Vue 3D de la ${label("anchorLine", "terrain")}`,
   vue3dLoading: "Chargement de la Vue 3D…",
@@ -143,6 +149,12 @@ export const VUE_3D_BLOCKED = {
     "Vue 3D : il faut le profil entre A et B — replacez A ou B sur la carte, ou importez un profil.",
 } as const satisfies Record<Vue3dBlock, string>;
 
+/** The same, under a map that places nothing (#101): it says where the line is set instead. */
+export const VUE_3D_BLOCKED_READ_ONLY = {
+  positions: "Vue 3D : A et B se placent sur la carte de la Page Statique.",
+  profil: "Vue 3D : il faut le profil entre A et B — il se charge sur la Page Statique.",
+} as const satisfies Record<Vue3dBlock, string>;
+
 /** The eight points of the compass, with the preposition they take. */
 const COMPASS = [
   "de nord",
@@ -173,9 +185,11 @@ export function describeRelative(relativeDeg: number): string {
 /**
  * The line under the map that says what the rose says: the true azimuth when the Positions give
  * one, and in every case the direction relative to the line — the number the field holds.
+ *
+ * @param handle the rose has a handle to set the wind with — not on the Page Terrain (#101).
  */
-export function windReading(wind: Wind, reference: RoseReference): string {
-  if (wind.speedKmh === 0) return MAP_COPY.roseCalm;
+export function windReading(wind: Wind, reference: RoseReference, handle = true): string {
+  if (wind.speedKmh === 0) return handle ? MAP_COPY.roseCalm : MAP_COPY.calm;
   const relative = Math.round(((wind.directionDeg % 360) + 360) % 360) % 360;
   const speed = formatQuantity("windSpeed", wind.speedKmh);
   const side = `${describeRelative(relative)}, ${relative}° par rapport à la ligne A → B`;
@@ -211,6 +225,7 @@ export function mapLabelTable(): readonly string[] {
     ...Object.values(FOND_LABEL),
     ...Object.values(MAP_COPY),
     ...Object.values(VUE_3D_BLOCKED),
+    ...Object.values(VUE_3D_BLOCKED_READ_ONLY),
     ...Object.values(MEASURE_COPY),
     BANANE_HELP,
     ...[0, 90, 180, 270, 45, 108].map(describeRelative),

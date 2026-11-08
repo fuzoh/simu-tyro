@@ -151,24 +151,32 @@ export function StatiqueSkeleton() {
           <TileFrame label={OUTPUT_LABEL.verdict} wide />
         </OutputGrid>
       }
-      section={
-        <>
-          <BannerSlot />
-          <ProfileBand />
-          <StripBand />
-          <ViewStripSlot />
-          <ReadOutCells>
-            {cellsOf("terrain").map((id) => (
-              <ReadOutCell
-                className={READ_OUT_CELLS[id].basis}
-                key={id}
-                label={cellLabel(id, "terrain")}
-              />
-            ))}
-          </ReadOutCells>
-        </>
-      }
+      section={<CoupeBands />}
       topView={<TopViewFrame />}
     />
+  );
+}
+
+/**
+ * The coupe as a terrain Page's Skeleton reserves it — Statique's and Terrain's: the Chart Block's
+ * empty bands, with the terrain cells' labels.
+ */
+export function CoupeBands() {
+  return (
+    <>
+      <BannerSlot />
+      <ProfileBand />
+      <StripBand />
+      <ViewStripSlot />
+      <ReadOutCells>
+        {cellsOf("terrain").map((id) => (
+          <ReadOutCell
+            className={READ_OUT_CELLS[id].basis}
+            key={id}
+            label={cellLabel(id, "terrain")}
+          />
+        ))}
+      </ReadOutCells>
+    </>
   );
 }

@@ -102,8 +102,11 @@ export function Profile({
   register: Register;
   /** Chart-column width ≥ B1 — the same threshold the read-out row wraps at, no new breakpoint. */
   wide: boolean;
-  /** A pointer landed at this many metres; the caller snaps it to a sweep step. */
-  onScrub: (metres: number) => void;
+  /**
+   * A pointer landed at this many metres; the caller snaps it to a sweep step. Absent on the Page
+   * Terrain (#101), where the passager stays where the link put it: the coupe is read, not moved.
+   */
+  onScrub?: (metres: number) => void;
 }) {
   const { ground, L, h } = frame;
   const rider = scene?.rider ?? null;
@@ -125,7 +128,7 @@ export function Profile({
     // edge, and a grab circle's bounding box is not the chart.
     const rect = event.currentTarget.ownerSVGElement?.getBoundingClientRect();
     if (rect === undefined) return;
-    onScrub(x.toMetres(event.clientX, rect.left));
+    onScrub?.(x.toMetres(event.clientX, rect.left));
   }
 
   // A mouse reads the coupe wherever it is; a finger, once held still. A press still moves the rider.
@@ -142,18 +145,21 @@ export function Profile({
           clearance,
         });
   const hover = bind(metresOn(x));
-  const drag = {
-    ...hover,
-    onPointerDown(event: ReactPointerEvent<SVGElement>) {
-      event.currentTarget.setPointerCapture(event.pointerId);
-      scrub(event);
-      hover.onPointerDown(event);
-    },
-    onPointerMove(event: ReactPointerEvent<SVGElement>) {
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) scrub(event);
-      hover.onPointerMove(event);
-    },
-  };
+  const drag =
+    onScrub === undefined
+      ? hover
+      : {
+          ...hover,
+          onPointerDown(event: ReactPointerEvent<SVGElement>) {
+            event.currentTarget.setPointerCapture(event.pointerId);
+            scrub(event);
+            hover.onPointerDown(event);
+          },
+          onPointerMove(event: ReactPointerEvent<SVGElement>) {
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) scrub(event);
+            hover.onPointerMove(event);
+          },
+        };
 
   /**
    * One clearance dimension's endpoints — « **from the drawn ground at `atX`, up by the value** ».
@@ -465,7 +471,7 @@ export function Profile({
       {/* The rider's own grab target, on top: `r = 11` with a transparent **stroke**, 36 px on a
           fine pointer and 44 px under `@media (pointer: coarse)`. Stroke width rather than the
           SVG2 geometry property `r`, whose CSS support is uneven — one media query, no JS branch. */}
-      {rider !== null && (
+      {rider !== null && onScrub !== undefined && (
         <circle
           className="chart-grab cursor-grab"
           {...drag}

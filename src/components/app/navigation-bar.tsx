@@ -6,6 +6,7 @@
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
 
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { BookOpenIcon } from "lucide-react";
 import { use, useState } from "react";
 
 import type { NavigationPath } from "@/lib/app/pages.ts";
@@ -50,7 +51,7 @@ function SkeletonNavigation() {
           className="inline-flex h-7 items-center border border-transparent px-2.5 text-xs font-medium"
           key={entry.path}
         >
-          {entry.label}
+          <EntryLabel entry={entry} />
         </span>
       ))}
     </NavigationBar>
@@ -72,12 +73,29 @@ function LiveNavigation() {
           )}
           exact={entry.path === "/"}
           key={entry.path}
+          // The name the icon stands for, on hover.
+          title={entry.path === "/docs" ? entry.label : undefined}
           to={entry.path}
         >
-          {entry.label}
+          <EntryLabel entry={entry} />
         </PageLink>
       ))}
     </NavigationBar>
+  );
+}
+
+/**
+ * An entry's name. Five do not fit a 390 px phone, so below `sm` the one entry that is not an app
+ * Page — the documentation — gives way to its icon, its name kept for assistive technology and the
+ * link's `title`. The bar paints it so before hydration too, so nothing reflows.
+ */
+function EntryLabel({ entry }: { entry: (typeof NAVIGATION)[number] }) {
+  if (entry.path !== "/docs") return entry.label;
+  return (
+    <>
+      <BookOpenIcon aria-hidden className="size-4 sm:hidden" />
+      <span className="max-sm:sr-only">{entry.label}</span>
+    </>
   );
 }
 
@@ -100,6 +118,7 @@ export function PageLink({
   exact = false,
   id,
   className,
+  title,
   children,
 }: {
   to: NavigationPath;
@@ -107,6 +126,7 @@ export function PageLink({
   exact?: boolean;
   id?: string;
   className?: string;
+  title?: string;
   children: ReactNode;
 }) {
   const search = useLocation({ select: (location) => location.search });
@@ -130,6 +150,7 @@ export function PageLink({
       id={id}
       onClick={onClick}
       search={search}
+      title={title}
       to={to}
     >
       {children}

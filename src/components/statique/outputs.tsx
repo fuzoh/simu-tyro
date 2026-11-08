@@ -12,8 +12,9 @@ import type { ReactNode } from "react";
 
 import type { StatiqueOutput, StatiqueOutputs, StatiqueVerdict } from "@/lib/statique/outputs.ts";
 
-import { VERDICT_TONE } from "@/components/app/banner.tsx";
+import { TONE_CLASS } from "@/components/app/banner.tsx";
 import { HelpText } from "@/components/docs/help-text.tsx";
+import { VERDICT_TONE } from "@/lib/app/tone.ts";
 import { OUTPUT_LABEL } from "@/lib/statique/copy.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -125,7 +126,7 @@ function VerdictTile({ verdict }: { verdict: StatiqueVerdict }) {
       />
     );
   }
-  const tone = VERDICT_TONE[verdict.state];
+  const tone = TONE_CLASS[VERDICT_TONE[verdict.state]];
   return (
     <TileFrame
       label={OUTPUT_LABEL.verdict}

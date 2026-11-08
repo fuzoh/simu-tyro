@@ -83,6 +83,13 @@ describe("the wind's reading", () => {
   test("says there is no wind, and what to do about it", () => {
     expect(windReading({ speedKmh: 0, directionDeg: 0 }, trial)).toMatch(/^Pas de vent\./);
   });
+
+  test("on a rose with no handle, says there is no wind and asks for no gesture (#101)", () => {
+    expect(windReading({ speedKmh: 0, directionDeg: 0 }, trial, false)).toBe("Pas de vent.");
+    expect(windReading({ speedKmh: 25, directionDeg: 108 }, trial, false)).toBe(
+      windReading({ speedKmh: 25, directionDeg: 108 }, trial),
+    );
+  });
 });
 
 describe("the Banane's words", () => {

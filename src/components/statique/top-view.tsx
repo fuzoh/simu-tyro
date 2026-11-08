@@ -152,3 +152,17 @@ export function TopViewFrame({
     </div>
   );
 }
+
+/**
+ * The Page Terrain's visualisation (#101), shared by the live map and the Skeleton: the vue de
+ * dessus's frame in from the edges, then the coupe edge to edge — its gutter is inside its SVGs —
+ * and nothing in the coupe's place while the Vue 3D stands alone.
+ */
+export function MapOverCoupe({ map, coupe }: { map: ReactNode; coupe: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="px-3">{map}</div>
+      {coupe}
+    </div>
+  );
+}

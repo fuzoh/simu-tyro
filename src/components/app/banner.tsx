@@ -21,12 +21,13 @@
  */
 
 import type { BannerOccupant } from "@/lib/app/banner.ts";
+import type { Tone } from "@/lib/app/tone.ts";
 import type { FieldId } from "@/lib/rail/fields.ts";
-import type { VerdictState } from "@/lib/sim";
 
 import { Button } from "@/components/ui/button.tsx";
 import { JUMP_LABEL } from "@/lib/app/banner.ts";
 import { DIAGNOSTIC_ACTION } from "@/lib/app/refusals.ts";
+import { VERDICT_TONE } from "@/lib/app/tone.ts";
 import { CENTRE_IN_RAIL } from "@/lib/layout/collapse.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -52,15 +53,12 @@ export function jumpToField(field: FieldId): void {
   target.focus();
 }
 
-/** The verdict's five states, as the two tints the rest of the app already uses for them. */
-export const VERDICT_TONE: Record<VerdictState, string> = {
-  "dans-les-limites": "text-foreground",
-  "marge-faible": "text-warning",
-  "hors-limites": "text-destructive",
-  "refuse-usage-interdit": "text-destructive",
-  // *Attempted and unavailable* is not a failure of the line: it reads plainly, like the coverage
-  // figure it quotes.
-  indetermine: "text-muted-foreground",
+/** Each tone as the token it is drawn in — the one table from `@/lib/app/tone.ts` to a class. */
+export const TONE_CLASS: Readonly<Record<Tone, string>> = {
+  plain: "text-foreground",
+  warning: "text-warning",
+  destructive: "text-destructive",
+  muted: "text-muted-foreground",
 };
 
 export function Banner({
@@ -98,7 +96,9 @@ export function Banner({
         "compact:flex-nowrap compact:py-0 flex h-full flex-wrap items-center gap-x-3 gap-y-1 py-1 text-xs",
         blocking && "text-destructive",
         occupant.rank === 3 && "text-muted-foreground",
-        occupant.rank === 4 && occupant.kind === "verdict" && VERDICT_TONE[occupant.state],
+        occupant.rank === 4 &&
+          occupant.kind === "verdict" &&
+          TONE_CLASS[VERDICT_TONE[occupant.state]],
         occupant.rank === 4 && occupant.kind === "no-regime" && "text-muted-foreground",
       )}
       // Blocking states announce themselves; a verdict and a mid-edit mark are read, not alerted.
