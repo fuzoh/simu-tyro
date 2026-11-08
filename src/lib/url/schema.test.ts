@@ -135,7 +135,7 @@ describe("the three refusal classes come back as a marker, never as a throw", ()
       kind: "deux-directeurs",
     },
     {
-      name: "all three tightness drivers",
+      name: "three tightness drivers at once",
       query: "?fl=6&te=253.5&lo=151.64",
       kind: "deux-directeurs",
     },

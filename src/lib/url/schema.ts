@@ -49,9 +49,9 @@
  * - **`tr` is validated structurally and kept verbatim.** {@link validateP1} allocates no arrays;
  *   the real decode is a memoised derivation inside the client-only subtree and never enters the
  *   validated search object, because arrays in it would be stringified back into the address bar.
- * - **The tightness driver is encoded by which key is *present*** — `fl` / `te` / `lo`. Two present
- *   keys « are not a bad value but two contradictory models of the same line », so presence is
- *   counted on the **raw** bag, before per-key validation, and the link refuses whole.
+ * - **The tightness driver is encoded by which key is *present*** — `fl` / `te` / `lo` / `vr`. Two
+ *   present keys « are not a bad value but two contradictory models of the same line », so presence
+ *   is counted on the **raw** bag, before per-key validation, and the link refuses whole.
  * - **Forces are daN in the URL, always**, whatever `u` says. `u` is display-only, so hand-editing
  *   `u=daN` → `u=kN` must not make the line 100× tighter. The engine holds newtons; `./scenario.ts`
  *   is the one place the ÷10 happens, in both directions.
