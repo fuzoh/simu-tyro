@@ -514,6 +514,28 @@ describe("a storage that throws is « no session », never a crash", () => {
   });
 });
 
+describe("a textile spec carrying its diameter", () => {
+  test("`d` survives a write and a read", () => {
+    const scenario: Scenario = {
+      ...firstRunDefaults(),
+      usage: "TEMPORAIRE",
+      regime: "secours10",
+      material: {
+        family: "textile",
+        ropeClass: "pa-en1891a",
+        MBL: 31_000,
+        mu: 0.073,
+        k: 1.27,
+        d: 11,
+      },
+      terminations: structuredClone(FIRST_RUN_RETAINED_TEXTILE.terminations),
+    };
+    const storage = memoryStorage();
+    writeSession(storage, { ...bareSession(), scenario });
+    expect(readSession(storage)?.scenario.material).toEqual(scenario.material);
+  });
+});
+
 describe("ADR-0001 — a restored Session is kept as given, and the gates judge it", () => {
   test("a knot on HMPE comes back unchanged and blocks the verdict on Terminaison A", () => {
     const knotted: Scenario = {

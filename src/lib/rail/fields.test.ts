@@ -75,6 +75,14 @@ describe("§ 7's message table — the empty state, neutral and lowercase", () =
   });
 });
 
+describe("the optional textile diameter", () => {
+  test("blank is absent, not « valeur requise »; a non-positive value is still refused", () => {
+    expect(checkField("dTextile", "")).toBeNull();
+    expect(checkField("dTextile", "11")).toBeNull();
+    expect(checkField("dTextile", "0")?.kind).toBe("invalid");
+  });
+});
+
 describe("§ 7's message table — committed invalid, ⛔ and blocking", () => {
   /** `⛔ <Champ> — <la règle, énoncée>. Valeur : <v>.` — the template is fixed. */
   const ROWS: readonly [FieldId, string, string][] = [
@@ -129,7 +137,7 @@ describe("§ 7's message table — committed invalid, ⛔ and blocking", () => {
     [
       "k",
       "0",
-      "⛔ Raideur relative k — une valeur strictement positive est requise. Valeur : 0,0.",
+      "⛔ Raideur relative k — une valeur strictement positive est requise. Valeur : 0,00.",
     ],
   ];
 

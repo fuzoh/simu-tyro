@@ -246,6 +246,7 @@ const TEXTILE_SPEC = v.object({
   MBL: FINITE,
   mu: FINITE,
   k: FINITE,
+  d: v.optional(FINITE),
 });
 
 /**
@@ -258,6 +259,7 @@ const TEXTILE_DRAFT = v.object({
   MBL: v.nullable(FINITE),
   mu: v.nullable(FINITE),
   k: v.nullable(FINITE),
+  d: v.optional(FINITE),
 });
 
 /** The **active** Material Spec: whichever family is driving the line, complete. */

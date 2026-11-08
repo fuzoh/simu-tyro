@@ -75,6 +75,7 @@ export type FieldId =
   | "cls"
   | "MBL"
   | "muTextile"
+  | "dTextile"
   | "k"
   | "ta"
   | "tb"
@@ -129,6 +130,8 @@ export type FieldSpec = {
   readonly quantity: QuantityId | null;
   /** Tier one. `null` for a select that ships with a value and cannot be emptied. */
   readonly rule: HardRule | null;
+  /** Blank is a legitimate value — « absent », not « vide et requis » — so no empty state. */
+  readonly optional?: true;
   /** § 3's warning column — non-blocking, and never a reason to withhold a number. */
   readonly warning: WarningRule | null;
   /** Which of § 7's three gates this field's failure breaches. `null` for `x_D`, which is in none. */
@@ -334,6 +337,18 @@ export const FIELDS = {
     warning: null,
     gate: "solve",
   },
+  dTextile: {
+    id: "dTextile",
+    label: heading("diameter", "exact"),
+    errorLabel: heading("diameter", "exact"),
+    quantity: "d",
+    rule: { kind: "positive", sentence: "un diamètre strictement positif est requis" },
+    optional: true,
+    warning: null,
+    // Solve although no formula reads `d`: a zero or negative diameter from a link is a malformed
+    // spec, and the link carries `d` onward for the tensioning use.
+    gate: "solve",
+  },
   k: {
     id: "k",
     label: heading("relativeStiffness", "exact"),
@@ -475,6 +490,11 @@ export const FIELDS = {
 } as const satisfies Record<FieldId, FieldSpec>;
 
 /** Rail order — what « the first culpable field in table order » means. */
+/** Whether a blank is « absent » for this field (read off {@link FieldSpec.optional}). */
+export function isOptionalField(id: FieldId): id is "dTextile" {
+  return (FIELDS[id] as FieldSpec).optional === true;
+}
+
 export const FIELD_ORDER = Object.keys(FIELDS) as readonly FieldId[];
 
 /**
@@ -670,10 +690,11 @@ export function checkField(
   raw: string,
   context: FieldContext = {},
 ): FieldIssue | null {
-  const spec = FIELDS[id];
+  const spec: FieldSpec = FIELDS[id];
   if (spec.rule === null) return null;
 
   if (raw.trim() === "") {
+    if (spec.optional === true) return null;
     return { field: id, kind: "empty", message: emptyMessage(id, context) };
   }
 

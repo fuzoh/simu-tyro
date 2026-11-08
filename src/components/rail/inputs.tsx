@@ -44,6 +44,7 @@ import type { RailFormApi, RailFormState } from "@/components/app/use-rail-form.
 import type { Deduced, DeducedSolve, ReadOutRow } from "@/lib/rail/deduced.ts";
 import type { FieldContext, FieldId } from "@/lib/rail/fields.ts";
 import type { BlockingError, FixActionId } from "@/lib/rail/gates.ts";
+import type { PresetProvenance } from "@/lib/rail/presets.ts";
 import type { LadderRow } from "@/lib/rail/provenance.ts";
 import type { NumericFieldId, RailValues } from "@/lib/rail/values.ts";
 import type { ForceUnit, UseClass } from "@/lib/scenario/types.ts";
@@ -69,6 +70,7 @@ import {
   CONSTRUCTION_OPTIONS,
   displayField,
   FIELDS,
+  isOptionalField,
   fieldSchema,
   parseDecimal,
   ROPE_CLASS_OPTIONS,
@@ -79,7 +81,13 @@ import {
   TEXTILE_UNAVAILABLE_REASON,
   terminationOptions,
 } from "@/lib/rail/gates.ts";
-import { DEDUCED_HELP, FIELD_HELP, TIGHTNESS_HELP } from "@/lib/rail/help.ts";
+import { DEDUCED_HELP, FIELD_HELP, PRESET_HELP, TIGHTNESS_HELP } from "@/lib/rail/help.ts";
+import {
+  MATERIAL_PRESETS,
+  PRESET_LABEL,
+  applyMaterialPreset,
+  presetProvenance,
+} from "@/lib/rail/presets.ts";
 import { PROVENANCE_COPY, warningLadder } from "@/lib/rail/provenance.ts";
 import {
   applyField,
@@ -88,6 +96,7 @@ import {
   applyShippedTerminations,
   clearOverride,
   drivingField,
+  FIELD_ACCESS,
   fieldContext,
   spanLength,
   switchTightness,
@@ -226,6 +235,11 @@ export function RailInputs({
    */
   function commit(id: NumericFieldId, raw: string, settled: boolean): number | null {
     if (checkField(id, raw, context) !== null) return null;
+    // An optional field emptied is « absent »: the one blank that is written, not refused.
+    if (isOptionalField(id) && raw.trim() === "") {
+      patch(FIELD_ACCESS.dTextile.write(scenario, null));
+      return null;
+    }
     const value = commitField(id, raw, context);
     if (value === null) return null;
     const applied = applyField(scenario, id, value);
@@ -304,6 +318,7 @@ export function RailInputs({
   // Rail is nothing but callbacks.
   const steelSpec = scenario.material.family === "steel" ? scenario.material : null;
   const textileSpec = scenario.material.family === "textile" ? scenario.material : null;
+  const provenance = textileSpec === null ? {} : presetProvenance(textileSpec);
   const driver = drivingField(scenario);
   const familyBreach = breaches.get("family");
   const regimeBreach = breaches.get("regime");
@@ -561,6 +576,22 @@ export function RailInputs({
               <>
                 <Row
                   control={
+                    // An **action**, not a selection: the Scenario holds the values, never the
+                    // preset's name, so the select returns to « — choisir — » after filling.
+                    <Picker
+                      id="rail-preset"
+                      onChange={(id) => patch(applyMaterialPreset(scenario, id))}
+                      options={MATERIAL_PRESETS.map(({ id, label }) => ({ value: id, label }))}
+                      value=""
+                    />
+                  }
+                  help={PRESET_HELP}
+                  htmlFor="rail-preset"
+                  label={PRESET_LABEL}
+                />
+                <Row
+                  chip={presetChip(provenance.cls)}
+                  control={
                     <Picker
                       id="rail-cls"
                       onChange={(ropeClass) => patch(applyRopeClass(scenario, ropeClass))}
@@ -572,9 +603,11 @@ export function RailInputs({
                   htmlFor="rail-cls"
                   label={FIELDS.cls.label}
                 />
-                <NumericRow hint={unit} id="MBL" />
-                <NumericRow hint="kg/m" id="muTextile" />
+                <NumericRow chip={presetChip(provenance.MBL)} hint={unit} id="MBL" />
+                <NumericRow chip={presetChip(provenance.muTextile)} hint="kg/m" id="muTextile" />
+                <NumericRow chip={presetChip(provenance.dTextile)} hint="mm" id="dTextile" />
                 <NumericRow
+                  chip={presetChip(provenance.k)}
                   id="k"
                   // The **ambient** tier: plain status text, **no ⚠**. It fires on every textile
                   // line — a tyrolienne never enters §13.2's 10–30 % MBL band — so an alarm here
@@ -1198,7 +1231,7 @@ function DerivedRow({
   formula: number | null;
   quantity: "MBF" | "EA" | "mu";
   unit: ForceUnit;
-  /** A neutral provenance chip. The « non confirmé » ones live in `Provenance` alone. */
+  /** A preset provenance chip: the sheet's neutral ones, and the preset `k`'s « non confirmé ». */
   chip?: ReactNode;
   onRecalculate: () => void;
   children: ReactNode;
@@ -1220,6 +1253,12 @@ function DerivedRow({
       )}
     </div>
   );
+}
+
+/** A preset's provenance as the chip its row carries; nothing where the row has none. */
+function presetChip(provenance: PresetProvenance | undefined): ReactNode {
+  if (provenance === undefined) return undefined;
+  return <Chip detail={provenance.detail} label={provenance.label} tone={provenance.tone} />;
 }
 
 /**

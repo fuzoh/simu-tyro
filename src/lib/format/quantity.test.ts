@@ -69,7 +69,7 @@ const ROWS: ReadonlyArray<{ id: QuantityId; value: number; expected: string }> =
   { id: "L0", value: 151.644, expected: "151,64 m" },
   { id: "vRatio", value: 0.8175, expected: "0,82" },
   { id: "d", value: 12, expected: "12,0 mm" },
-  { id: "k", value: 22, expected: "22,0" },
+  { id: "k", value: 22, expected: "22,00" },
   // « vide, requis » on first run — a datasheet figure, always whole in daN.
   { id: "MBL", value: 60_000, expected: "6000 daN" },
   { id: "mu", value: 0.5465, expected: "0,5465 kg/m" },

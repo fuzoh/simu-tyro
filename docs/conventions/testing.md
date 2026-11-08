@@ -58,6 +58,9 @@ Decided in the wayfinder ticket _Engine API, execution model and module layout_.
 
   Treating the two alike invites someone to tighten the wrong one and to trust the wrong one.
 
+  A datasheet figure takes `[DATASHEET]` (`simulation-theory.md` §0.2); arithmetic done on one
+  keeps that tag and says so in `source` (`src/lib/rail/__fixtures__/courant-bandit.ts`).
+
 - **The prototype's `check.ts` is a coverage checklist, not a value source.** Four assertions it
   never made are new work, so a green `check.ts` is not coverage: `F1`'s three partials with
   `∂z/∂H = ∂x/∂V₀` as an equality; the finite-difference agreement; `Z6` entirely; and `Z5`'s

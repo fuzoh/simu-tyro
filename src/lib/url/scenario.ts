@@ -189,12 +189,12 @@ type CompletedSteel = { readonly fam: "ac" } & Pick<SearchValues, "d" | "r0" | "
   Absent<"cls" | "mbl" | "k">;
 
 /**
- * The textile keys, `mbl`/`mu` optional because a rope nobody typed is § 9's blanks, and `k`
- * because polyester ships it blank.
+ * The textile keys, `mbl`/`mu` optional because a rope nobody typed is § 9's blanks, `k`
+ * because polyester ships it blank, and `d` because a diameter nobody typed is simply absent.
  */
 type CompletedTextile = { readonly fam: "tx" } & Pick<SearchValues, "cls"> &
-  Partial<Pick<SearchValues, "mbl" | "mu" | "k">> &
-  Absent<"d" | "r0" | "cst" | "mbf" | "ea">;
+  Partial<Pick<SearchValues, "mbl" | "mu" | "k" | "d">> &
+  Absent<"r0" | "cst" | "mbf" | "ea">;
 
 /**
  * A bag {@link completeFromDefaults} returned: every key the active configuration needs is present,
@@ -379,7 +379,7 @@ function decodedEnds(tr: string): TraceEnds | null {
 /**
  * Is this key part of the **active** configuration? § 7's one governing rule: « the URL carries the
  * active configuration and never a retained alternate », so an imported link has `tr`/`sa`/`sb` and
- * no `L`/`h`, a steel link has no `cls`/`mbl`/`k`, and a textile link has no `d`/`r0`/`cst`.
+ * no `L`/`h`, a steel link has no `cls`/`mbl`/`k`, and a textile link has no `r0`/`cst`.
  *
  * Out-of-scope keys leave the canonical bag **without** a strip line: the strip's two kinds are an
  * unknown key and an unrepresentable value, and a redundant `L` beside a `tr` is neither — with a
@@ -394,7 +394,6 @@ function inActiveConfiguration(key: SearchKey, imported: boolean, family: Family
     case "sb":
     case "tr":
       return imported;
-    case "d":
     case "r0":
     case "cst":
     case "mbf":
@@ -405,7 +404,8 @@ function inActiveConfiguration(key: SearchKey, imported: boolean, family: Family
     case "k":
       return family === "tx";
     default:
-      // `mu` is deliberately not scoped: it is the same physical quantity in both families.
+      // `mu` and `d` are deliberately not scoped: the same physical quantities in both families.
+      // `d` is completed for steel only — {@link SHIPPED_BY_FAMILY} ships none for textile.
       return true;
   }
 }
@@ -449,6 +449,7 @@ function textile(search: CompletedTextile): TextileDraft {
     MBL: search.mbl === undefined ? null : newtonsFromDaN(search.mbl),
     mu: search.mu ?? null,
     k: search.k ?? null,
+    ...(search.d === undefined ? {} : { d: search.d }),
   };
 }
 
@@ -540,6 +541,7 @@ export function scenarioToSearch(scenario: Scenario): CompletedSearch {
     // *is* the emitted query string, and {@link canonicalLink} re-inserts in `CANONICAL_KEYS`
     // order — emitting `mu` last here made « Copier le lien » and the address bar disagree as
     // strings for a textile line, which is exactly the diffability § 7 buys with a canonical order.
+    if (material.d !== undefined) out.d = material.d;
     out.mu = material.mu;
     out.cls = ROPE_CLASS_TOKEN_BY_ID[material.ropeClass];
     out.mbl = daNFromNewtons(material.MBL);
@@ -588,6 +590,7 @@ const SHIPPED_BY_FAMILY: Readonly<
   ac: FIRST_RUN_SEARCH,
   tx: {
     ...FIRST_RUN_SEARCH,
+    d: undefined,
     cls: ROPE_CLASS_TOKEN_BY_ID[TEXTILE_SPEC.ropeClass],
     ta: TERMINATION_TOKEN_BY_ID[TEXTILE_ENDS.A.id],
     tb: TERMINATION_TOKEN_BY_ID[TEXTILE_ENDS.B.id],

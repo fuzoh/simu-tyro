@@ -39,6 +39,7 @@ export const BRANCHES = [
   "x-at-span-end",
   "x-clamped",
   "textile-blanks",
+  "textile-diameter",
 ] as const;
 
 export type Branch = (typeof BRANCHES)[number];
@@ -46,7 +47,7 @@ export type Branch = (typeof BRANCHES)[number];
 /** A Scenario and the one link that encodes it — asserted in both directions. */
 export type CanonicalLinkFixture = {
   name: string;
-  source: typeof MEASURED;
+  source: typeof MEASURED | typeof MEASURED_83;
   covers: readonly Branch[];
   scenario: Scenario;
   link: string;
@@ -60,12 +61,13 @@ export type CanonicalLinkFixture = {
  */
 export type DecodeOnlyFixture = {
   name: string;
-  source: typeof MEASURED;
+  source: typeof MEASURED | typeof MEASURED_83;
   covers: readonly Branch[];
   link: string;
 } & ({ scenario: Scenario; canonical: string } | { scenario: ScenarioDraft; canonical: null });
 
 const MEASURED = "[MEASURED] issue #34, codec as of 2026-11-07";
+const MEASURED_83 = "[MEASURED] issue #83, codec as of 2026-11-08";
 
 /** Three stations `(0,0) (50,-4) (100,-9)`, as `encodeP1` writes them. */
 export const TRACE_P1 = "p1.AwCQTpBOAJ8G5wcA";
@@ -258,6 +260,29 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
     link:
       "/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&fam=tx&mu=0.16&cls=hmpe&mbl=30000&k=22" +
       "&ta=oeil&tb=epissure&na=0.9&nb=0.85&mp=120&hr=2.1&gm=1&daf=1.2&x=75",
+  },
+  {
+    name: "textile Courant Bandit 11 mm preset: diameter rides on the `d` key",
+    source: MEASURED_83,
+    covers: ["textile", "textile-diameter"],
+    scenario: {
+      ...TEXTILE,
+      material: {
+        family: "textile",
+        ropeClass: "pa-en1891a",
+        MBL: 31000,
+        mu: 0.073,
+        k: 1.27,
+        d: 11,
+      },
+      terminations: {
+        A: { id: "noeud-de-huit", eta: 0.6 },
+        B: { id: "noeud-de-chaise", eta: 0.65 },
+      },
+    },
+    link:
+      "/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&fam=tx&d=11&mu=0.073&cls=pa&mbl=3100&k=1.27" +
+      "&ta=huit&tb=chaise&na=0.6&nb=0.65&mp=120&hr=2.1&gm=1&daf=1.2&x=75",
   },
   {
     name: "textile polyamide: huit and chaise",

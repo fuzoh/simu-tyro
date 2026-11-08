@@ -50,6 +50,7 @@ import { heading, label } from "@/lib/vocabulary/labels.ts";
 import type { StrengthSymbol } from "./fields.ts";
 
 import { strengthSymbol } from "./fields.ts";
+import { presetProvenance } from "./presets.ts";
 
 /**
  * The popover copy, one entry per provenance surface. §0.2's fine-grained tag and the
@@ -195,12 +196,16 @@ export function provenanceAggregate(scenario: ScenarioDraft, deduced?: Deduced):
     }
   } else {
     const spec = scenario.material;
+    // The preset's `k` is a deduction with its own note; the aggregate carries it so the field
+    // chip and this entry cannot disagree about what backs the value.
+    const deduction = presetProvenance(spec).k;
+    const presetNote = deduction?.tone === "warning" ? `\n${deduction.detail}` : "";
     entries.push({
       id: "EAtextile",
       label: "Raideur axiale EA",
       value: reading("EA", deduced?.material.EA),
       chip: "non confirmé",
-      detail: PROVENANCE_COPY.EAtextile,
+      detail: PROVENANCE_COPY.EAtextile + presetNote,
       pinned: false,
     });
     entries.push({
@@ -208,7 +213,7 @@ export function provenanceAggregate(scenario: ScenarioDraft, deduced?: Deduced):
       label: "Raideur relative k",
       value: reading("k", spec.k),
       chip: "non confirmé",
-      detail: PROVENANCE_COPY.k,
+      detail: PROVENANCE_COPY.k + presetNote,
       pinned: false,
     });
   }

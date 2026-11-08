@@ -156,6 +156,8 @@ export type TextileDraft = {
   mu: number | null;
   /** `EA = k·MBL`. Shipped for HMPE (`[DATASHEET]` 22); **absent, not zero**, for polyester. */
   k: number | null;
+  /** Nominal diameter, mm — optional, so **absent** rather than blank-and-required. */
+  d?: number;
 };
 
 /**

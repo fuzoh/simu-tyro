@@ -51,6 +51,8 @@ export const FIELD_HELP: Record<FieldId, string> = {
   MBL: "Charge de rupture minimale MBL de la corde, en force, à lire sur la fiche fabricant — aucune corde n'est fournie par défaut, car une MBL inventée déciderait seule du verdict. C'est le numérateur de T adm = η · MBL / k et de FS = η · MBL / T max majoré, et le dénominateur de la tension à vide en % MBL.",
   muTextile:
     "Masse linéique μ de la corde, en kg/m, à lire sur la fiche fabricant. Le poids linéique w = μ · g est la charge répartie qui forme la chaînette à vide et entre dans les tensions aux ancrages.",
+  dTextile:
+    "Diamètre nominal de la corde, en millimètres, à lire sur la fiche fabricant. Facultatif : aucune formule du modèle ne le lit, il est porté par le lien pour la mise en tension.",
   k: "Raideur relative k = EA / MBL de la corde (sans unité). La raideur axiale déduite vaut EA = k · MBL. §13.2 publie k pour une charge de travail de 10 – 30 % MBL, alors qu'une tyrolienne travaille bien en dessous (≈ 0,6 % au repos, ≈ 6,3 % chargée) : la valeur est donc « non confirmée » par nature.",
   ta: "Type de terminaison à l'ancrage A. Chaque terminaison porte un rendement η par défaut (§10.2 acier, §10.3 textile), pris à l'extrémité conservatrice de sa plage, que le champ « Rendement η » ci-dessous reprend et laisse modifier. « Serre-câbles étrier » reste sélectionnable mais est interdit par le verdict sur une ligne portant des passagers ; « Attelage sans tension » (η = 1) désigne une extrémité attelée sans mise en tension de l'attache, qui n'affaiblit pas la ligne.",
   tb: "Type de terminaison à l'ancrage B. Même règle qu'en A : le rendement η par défaut est celui de §10.2/§10.3 à son extrémité conservatrice, repris dans le champ « Rendement η » et modifiable. Les deux extrémités sont jugées séparément dans la grille critères × extrémités.",
@@ -151,3 +153,7 @@ export const CELL_HELP: Record<CellId, string> = {
   belowUnloaded:
     "Distance verticale entre la charge et la ligne à vide, à la position du passager : z_à vide(x_D) − z_D, en mètres. C'est de combien le poids du passager tire le câble vers le bas à cet endroit ; nul aux deux ancrages.",
 };
+
+/** Help for the « Préréglage » row of the textile spec. */
+export const PRESET_HELP =
+  "Remplit la classe, la charge de rupture, la masse linéique, le diamètre et la raideur k de la corde avec les valeurs d'une fiche technique. Les champs restent modifiables : une valeur modifiée passe en « valeur utilisateur ». Le préréglage n'est pas enregistré, seules ses valeurs le sont.";

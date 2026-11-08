@@ -249,7 +249,7 @@ const KEY_SCHEMAS = {
   // « Rapport V » `P / H`, dimensionless. Presence selects the driver, like the three above.
   vr: FINITE,
   fam: v.picklist(FAMILY_TOKENS),
-  d: FINITE, // Diamètre nominal, mm — acier.
+  d: FINITE, // Diamètre nominal, mm — acier (requis) *or* textile (optionnel); `fam` fixes which.
   r0: v.picklist(GRADES),
   cst: v.picklist(CONSTRUCTION_TOKENS),
   mbf: FINITE, // `MBF` surchargée, **daN** — acier. Absent = non surchargée.

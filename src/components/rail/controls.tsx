@@ -368,8 +368,8 @@ export function Segmented<T extends string>({
  * **The popover opens on hover, not on click** — decision of 2026-09-23, replacing the `<details>`
  * disclosure. Keyboard users get the same on focus: the badge is in the tab order and the popover
  * is shown under `group-focus-within`, so nothing is hover-only. Since ticket 41's simplification
- * the « non confirmé » chips live in the `Provenance` section alone, so the field rows carry no
- * warning chips at all.
+ * the « non confirmé » chips live in the `Provenance` section, and a field row carries one only for
+ * a preset's deduced `k`.
  */
 export function Chip({
   label,

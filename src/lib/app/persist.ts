@@ -67,7 +67,18 @@ export function completeScenario(draft: ScenarioDraft): Scenario | null {
   if (material.family === "steel") return { ...draft, material };
   const { MBL, mu, k } = material;
   if (MBL === null || mu === null || k === null) return null;
-  return { ...draft, material: { family: "textile", ropeClass: material.ropeClass, MBL, mu, k } };
+  const { d } = material;
+  return {
+    ...draft,
+    material: {
+      family: "textile",
+      ropeClass: material.ropeClass,
+      MBL,
+      mu,
+      k,
+      ...(d === undefined ? {} : { d }),
+    },
+  };
 }
 
 /** The canonical bag the app publishes, or `null` when there is nothing publishable yet. */

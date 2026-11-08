@@ -57,7 +57,15 @@ import { label } from "@/lib/vocabulary/labels.ts";
 import type { Deduced } from "./deduced.ts";
 import type { FieldId, FieldIssue, FieldIssueKind, GateId } from "./fields.ts";
 
-import { checkField, displayField, emptyMessage, FIELD_ORDER, FIELDS, gateOf } from "./fields.ts";
+import {
+  checkField,
+  displayField,
+  emptyMessage,
+  FIELD_ORDER,
+  FIELDS,
+  gateOf,
+  isOptionalField,
+} from "./fields.ts";
 import {
   FIELD_ACCESS,
   fieldContext,
@@ -476,7 +484,8 @@ export function evaluateGates({ scenario, trace, issues = [] }: GateInput): Gate
       // blank required fields — which is **not** « Saisie en cours »: a field the user never
       // filled is not mid-edit, so it blocks and keeps no stale picture. Polyester adds a third,
       // and its message carries the reason rather than the hole.
-      if (!isOverrideField(field)) {
+      // An optional field's blank is « absent » (the textile diameter) and judges nothing either.
+      if (!isOverrideField(field) && !isOptionalField(field)) {
         push({
           gate: "solve",
           kind: "empty",

@@ -82,7 +82,7 @@ describe("railValues — the read direction of the force selector", () => {
     const values = railValues(rope);
     expect(values.MBL).toBe("");
     expect(values.muTextile).toBe("");
-    expect(values.k).toBe("22,0");
+    expect(values.k).toBe("22,00");
   });
 
   test("imported mode shows `L` and `h` as read-outs of the derived span", () => {
@@ -261,6 +261,7 @@ describe("FIELD_ACCESS — one lens per numeric field", () => {
       "muOverride",
       "MBL",
       "muTextile",
+      "dTextile",
       "k",
       "etaA",
       "etaB",
@@ -291,6 +292,31 @@ describe("FIELD_ACCESS — one lens per numeric field", () => {
     expectTypeOf(FIELD_ACCESS.MBL.write).parameter(1).toEqualTypeOf<number | null>();
     expectTypeOf(FIELD_ACCESS.L.write).parameter(1).toEqualTypeOf<number>();
     expectTypeOf(FIELD_ACCESS.vRatio.write).parameter(1).toEqualTypeOf<number>();
+  });
+
+  describe("the optional textile diameter", () => {
+    const rope = scenario((draft) => {
+      draft.usage = "TEMPORAIRE";
+      draft.material = { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 };
+    });
+
+    test("reads null while absent, and undefined on a steel spec", () => {
+      expect(FIELD_ACCESS.dTextile.read(rope)).toBeNull();
+      expect(FIELD_ACCESS.dTextile.read(scenario())).toBeUndefined();
+    });
+
+    test("writing a number sets `d`, and writing null drops the key", () => {
+      const withD = FIELD_ACCESS.dTextile.write(rope, 11);
+      expect(FIELD_ACCESS.dTextile.read(withD)).toBe(11);
+      const cleared = FIELD_ACCESS.dTextile.write(withD, null);
+      expect("d" in cleared.material).toBe(false);
+      expect(FIELD_ACCESS.dTextile.read(cleared)).toBeNull();
+    });
+
+    test("a write on a steel spec changes nothing", () => {
+      const steel = scenario();
+      expect(FIELD_ACCESS.dTextile.write(steel, 11)).toBe(steel);
+    });
   });
 });
 

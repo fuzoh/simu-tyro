@@ -121,7 +121,7 @@ export function isOverrideField(id: FieldId): id is OverrideFieldId {
 }
 
 /** The fields whose blank is state: § 9's textile blanks and the three Overrides. */
-type NullableFieldId = OverrideFieldId | "MBL" | "muTextile" | "k";
+type NullableFieldId = OverrideFieldId | "MBL" | "muTextile" | "dTextile" | "k";
 
 /**
  * What each lens reads. A Tightness Driver's reads the driver alone, so a refusal holding only the
@@ -193,6 +193,15 @@ export const FIELD_ACCESS: FieldAccess = {
     read: ({ material }) => (material.family === "textile" ? material.mu : undefined),
     write: (s, mu) =>
       s.material.family === "textile" ? { ...s, material: { ...s.material, mu } } : s,
+  },
+  // Optional: `null` removes the key, so a blank diameter is « absent » on the wire and in the draft.
+  dTextile: {
+    read: ({ material }) => (material.family === "textile" ? (material.d ?? null) : undefined),
+    write: (s, d) => {
+      if (s.material.family !== "textile") return s;
+      const { d: _dropped, ...rest } = s.material;
+      return { ...s, material: d === null ? rest : { ...rest, d } };
+    },
   },
   k: {
     read: ({ material }) => (material.family === "textile" ? material.k : undefined),

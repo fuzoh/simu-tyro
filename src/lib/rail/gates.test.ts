@@ -100,6 +100,30 @@ describe("the first screen — verdict-less, and it still computes", () => {
   });
 });
 
+describe("the optional textile diameter", () => {
+  const rope = (d?: number) =>
+    scenario((draft) => {
+      draft.usage = "TEMPORAIRE";
+      draft.regime = "secours10";
+      draft.material = { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 };
+      if (d !== undefined) draft.material.d = d;
+      draft.terminations = structuredClone(FIRST_RUN_RETAINED_TEXTILE.terminations);
+    });
+
+  test("an absent `d` pushes no `empty` error", () => {
+    const { errors } = evaluateGates({ scenario: rope(), trace: null });
+    expect(errors.filter((error) => error.field === "dTextile")).toEqual([]);
+  });
+
+  test("`d: 0` from a link is an `invalid` Solve breach", () => {
+    const { errors } = evaluateGates({ scenario: rope(0), trace: null });
+    expect(errors.find((error) => error.field === "dTextile")).toMatchObject({
+      gate: "solve",
+      kind: "invalid",
+    });
+  });
+});
+
 describe("§10.4 — the use-class gate, family first, two Fix Actions", () => {
   const textileUnderPermanente = scenario((draft) => {
     onRope(draft, { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 });

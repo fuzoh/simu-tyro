@@ -241,6 +241,11 @@ export type MaterialSpec =
       mu: number;
       /** Stiffness factor, `EA = k·MBL`. */
       k: number;
+      /**
+       * Nominal diameter, mm — **absent** when nobody typed one. Informational: no formula reads it,
+       * the tensioning work that needs it does.
+       */
+      d?: number;
     };
 
 /** What the solver consumes, whichever family produced it. Units: N/m, N, N. */

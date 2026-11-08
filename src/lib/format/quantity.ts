@@ -162,8 +162,13 @@ export const QUANTITIES = {
   vRatio: { unit: "", decimals: 2 },
   /** `Diamètre nominal` `d`, mm — `MBF ∝ d²`, so rounding 12,7 → 13 inflates `MBF` by 4,8 %. */
   d: { unit: "mm", decimals: 1 },
-  /** `Raideur relative` `k` — the two published defaults (22 and 1,5) must show as they are. */
-  k: { unit: "", decimals: 1 },
+  /**
+   * `Raideur relative` `k` — the two published defaults (22 and 1,5) must show as they are, and the
+   * Courant Bandit 11 mm preset's deduced 1,27 must too: one decimal would show it as 1,3, a 2 %
+   * move of `EA` the state does not hold. Departs from the v1 spec's one-decimal table (« 22,0 / 1,5 »),
+   * deliberately (issue #83).
+   */
+  k: { unit: "", decimals: 2 },
   /** `Charge de rupture` `MBL`, daN — typed off a datasheet, always whole in daN. */
   MBL: { unit: "force", decimals: 0 },
   /** `Masse linéique` `μ`, kg/m — steel's `μ` is deduced to 4 decimals and enters `w` linearly. */
