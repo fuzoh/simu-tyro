@@ -65,7 +65,7 @@ function solvedTraverseOf(scenario: ScenarioDraft): SolvedTraverse {
 
 function resultsOf(patch: Partial<ScenarioDraft> = {}): Results {
   const scenario: ScenarioDraft = { ...SHIPPED, ...patch };
-  const results = deriveResults({ scenario, trace: null, base: solvedTraverseOf(scenario) });
+  const results = deriveResults({ scenario, base: solvedTraverseOf(scenario) });
   if (results === null) throw new Error("expected the shipped line to report results");
   return results;
 }
@@ -492,7 +492,6 @@ describe("what suppresses what — three gates, three different consequences", (
         usage: "TEMPORAIRE",
         material: { family: "textile", ropeClass: "hmpe", MBL: null, mu: null, k: 22 },
       },
-      trace: null,
       base: null,
     });
     expect(results).toBeNull();
@@ -597,7 +596,7 @@ describe("two Brins porteurs — values per line, the pair, and the « cas défa
   test("the « cas défavorable » changes neither the Verdict's state nor its cells", () => {
     const base = solvedTraverseOf({ ...SHIPPED, ...PAIR });
     const scenario: ScenarioDraft = { ...SHIPPED, ...PAIR };
-    const without = deriveResults({ scenario, trace: null, base: { ...base, soleCarrier: null } });
+    const without = deriveResults({ scenario, base: { ...base, soleCarrier: null } });
     expect(pair.verdict).toEqual(without?.verdict);
     expect(pair.grid).toEqual(without?.grid);
     expect(pair.banner).toEqual(without?.banner);
@@ -668,12 +667,9 @@ describe("a scrub re-derives nothing — `vi.mock` on the engine barrel", () => 
     const render = () => {
       const inputs = traverseInputs(scenario);
       const traverse = traverseMemo(() => traverseScenario(inputs), Object.values(inputs));
-      const report = reportMemo(
-        () => evaluateGates({ scenario: traverse, trace: null }),
-        [traverse, null],
-      );
+      const report = reportMemo(() => evaluateGates({ scenario: traverse }), [traverse, null]);
       return resultsMemo(
-        () => derive({ scenario: traverse, trace: null, base, report }),
+        () => derive({ scenario: traverse, base, report }),
         [traverse, null, base, report],
       );
     };

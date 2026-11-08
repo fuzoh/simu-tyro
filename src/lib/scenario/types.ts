@@ -46,9 +46,9 @@ export type UseClass = "PERMANENTE" | "TEMPORAIRE";
 
 /**
  * § 7's one governing rule made a union: « the URL carries the active configuration and never a
- * retained alternate », so an imported line has `tr`/`sa`/`sb` and **no** `L`/`h`, and a manual
- * line has `L`/`h` and **no** `tr`. In imported mode `L` and `h` are *derived read-outs*, which
- * is why they are absent from that arm rather than optional in one flat shape.
+ * retained alternate », so an imported line has `tr` and **no** `L`/`h`, and a manual line has
+ * `L`/`h` and **no** `tr`. In imported mode `L` and `h` are *derived read-outs* of the whole profil,
+ * which is why they are absent from that arm rather than optional in one flat shape.
  *
  * **`source` is read across the app — around 28 sites in eleven modules, not the four ticket 38
  * item 4 counted — and that census is the reason it stays inline.** The sites fall in two kinds
@@ -70,11 +70,11 @@ export type Geometry =
   /** Manual geometry: the ground is the straight line between the two anchor bases. */
   | { source: "manual"; L: number; h: number }
   /**
-   * An imported profile. `trace` is § 7's `tr` value **verbatim** (`p1.<base64url>`) — decoding
-   * is a memoised client derivation, never part of the state object; `sa` / `sb` are the anchor
-   * stations in file coordinates, and `L = sb − sa`.
+   * An imported profile, taken whole: anchor A over its first sample, B over its last (#88).
+   * `trace` is § 7's `tr` value **verbatim** (`p1.<base64url>`) — decoding is a memoised client
+   * derivation, never part of the state object.
    */
-  | { source: "trace"; trace: string; sa: number; sb: number };
+  | { source: "trace"; trace: string };
 
 /** § 7's `za` / `zb` — each anchor's height above its own base, m. */
 export type AnchorHeights = { zA: number; zB: number };

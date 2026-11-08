@@ -34,7 +34,7 @@ const REFUSAL: EngineRefusal = {
 };
 
 /** The shipped screen: no error, no refusal, no régime — the one rank-4b state § 9 opens on. */
-const FIRST_RUN: GateReport = evaluateGates({ scenario: scenario(), trace: null });
+const FIRST_RUN: GateReport = evaluateGates({ scenario: scenario() });
 
 /** A Verdict Gate breach that is a real error: `daf=-1` is a value a link can carry. */
 const BAD_DAF: GateReport = evaluateGates({
@@ -42,7 +42,6 @@ const BAD_DAF: GateReport = evaluateGates({
     draft.regime = "en15567";
     draft.rider.DAF = -1;
   }),
-  trace: null,
 });
 
 /** A Solve Gate breach: `?L=-5` restores faithfully, including invalid state. */
@@ -51,7 +50,6 @@ const BAD_SPAN: GateReport = evaluateGates({
     draft.regime = "en15567";
     draft.geometry = { source: "manual", L: -5, h: -18 };
   }),
-  trace: null,
 });
 
 describe("rank 1 — blocking errors, count and jump link only", () => {
@@ -125,7 +123,6 @@ describe("rank 3 — « Saisie en cours », and it has to be reachable", () => {
   });
   const report = evaluateGates({
     scenario: state,
-    trace: null,
     issues: [{ field: "D_target", kind: "empty", message: "valeur requise" }],
   });
   const saisie = saisieEnCours(
@@ -154,7 +151,6 @@ describe("rank 3 — « Saisie en cours », and it has to be reachable", () => {
         draft.regime = "en15567";
         draft.rider.mp = -1;
       }),
-      trace: null,
       issues: [{ field: "D_target", kind: "empty", message: "valeur requise" }],
     });
     const midEdit = saisieEnCours(withInvalid, "D_target", "6,00 m");
@@ -185,7 +181,6 @@ describe("rank 4 — the verdict, or the no-régime prompt", () => {
           scenario: scenario((draft) => {
             draft.regime = "en15567";
           }),
-          trace: null,
         }),
         refusal: null,
         saisie: null,
@@ -218,7 +213,6 @@ describe("rank 4 — the verdict, or the no-régime prompt", () => {
       scenario: scenario((draft) => {
         draft.regime = "en15567";
       }),
-      trace: null,
     });
     expect(banner({ report: chosen, refusal: null, saisie: null, verdict: null })).toBeNull();
   });
@@ -275,7 +269,6 @@ describe("« Aucun résultat » — one cause, written once", () => {
         draft.usage = "TEMPORAIRE";
         draft.material = { family: "textile", ropeClass: "hmpe", MBL: null, mu: null, k: 22 };
       }),
-      trace: null,
     });
     expect(noResultCause({ report: blanks, refusal: null })).toBe(
       "Aucun résultat — charge de rupture : valeur requise.",
@@ -293,7 +286,6 @@ describe("« Aucun résultat » — one cause, written once", () => {
     const state = scenario();
     const report = evaluateGates({
       scenario: state,
-      trace: null,
       issues: [{ field: "D_target", kind: "empty", message: "valeur requise" }],
     });
     const saisie = saisieEnCours(

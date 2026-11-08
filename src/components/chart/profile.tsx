@@ -39,7 +39,6 @@ import type { LayerToggles } from "@/lib/session/session.ts";
 
 import { polylineAt } from "@/lib/chart/scene.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
-import { anchorTarget } from "@/lib/layout/contract.ts";
 import { cn } from "@/lib/utils.ts";
 
 /** A path through a `(xs, zs)` polyline, in SVG user units. `null` for an empty polyline. */
@@ -67,7 +66,6 @@ export function Profile({
   layers,
   wide,
   onScrub,
-  onStation,
 }: {
   /**
    * May the clearance layers be drawn? A Clearance Gate breach removes **the garde and its curve
@@ -98,15 +96,6 @@ export function Profile({
   wide: boolean;
   /** A pointer landed at this many metres; the caller snaps it to a sweep step. */
   onScrub: (metres: number) => void;
-  /**
-   * § 4's **two draggable Station handles**, in the Handle Lane. `undefined` is manual mode, where
-   * the same bracket is the non-interactive span marker — that is the one thing that makes these two
-   * targets inert, and it is why the callback rather than a `mode` flag is the switch.
-   *
-   * The position is in the **span frame**, like `onScrub`'s: the caller holds `s_A` and is the one
-   * that can turn it into a station, snap it to a terrain sample and clamp it to the trace.
-   */
-  onStation?: (anchor: "A" | "B", metres: number) => void;
 }) {
   const { ground, L, h } = frame;
   const rider = scene?.rider ?? null;
@@ -167,29 +156,6 @@ export function Profile({
     const base = polylineAt(ground, atX);
     const at = x.x(atX);
     return { x1: at, x2: at, y1: z.y(base), y2: z.y(base + hClear) };
-  }
-
-  /**
-   * One Station handle's drag. **The press only takes the pointer** — unlike the rider's, which
-   * moves on `pointerdown`: a 44 px target is up to 22 px wide of the anchor it holds, which is 26 m
-   * at a 1500 m span, so a tap that jumped the station there would move an anchor nobody dragged.
-   */
-  function dragStation(anchor: "A" | "B") {
-    function move(event: ReactPointerEvent<SVGElement>) {
-      // The SVG's own box, for the same reason `scrub` reads it: the inverse is defined against the
-      // chart's left edge, and a 44 px target's box is not the chart.
-      const rect = event.currentTarget.ownerSVGElement?.getBoundingClientRect();
-      if (rect === undefined) return;
-      onStation?.(anchor, x.toMetres(event.clientX, rect.left));
-    }
-    return {
-      onPointerDown(event: ReactPointerEvent<SVGElement>) {
-        event.currentTarget.setPointerCapture(event.pointerId);
-      },
-      onPointerMove(event: ReactPointerEvent<SVGElement>) {
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) move(event);
-      },
-    };
   }
 
   return (
@@ -418,8 +384,8 @@ export function Profile({
       ))}
 
       {/* The Handle Lane — 24 px reserved in **both** modes, so the profile's height never changes
-          on import. In manual mode it draws the span bracket, non-interactive, with ticks at 0 and
-          L; on import the same bracket's ends become the draggable Station handles. */}
+          on import. It draws the span bracket, non-interactive, with ticks at 0 and L: the anchors
+          are the profil's two ends and are not moved along it (#88). */}
       <g className="stroke-muted-foreground fill-muted-foreground">
         <line x1={x.x(0)} x2={x.x(L)} y1={laneTop + 12} y2={laneTop + 12} />
         {[0, L].map((at) => (
@@ -433,37 +399,6 @@ export function Profile({
         </text>
       </g>
 
-      {/* § 5's anchor targets — **44 × 48, spanning the lane plus the label band, entirely below the
-          plot area**. The collision they retire is structural rather than a sizing accident: the
-          anchors are pinned at the domain edges, so at 390 px a 44 px target covers the first and
-          last 12 % of the span and the rider glyph overlaps one whenever `x_D` comes within ~46 m of
-          an anchor at `L = 1000`. You cannot size your way out of two targets that are always at
-          `x = 0` and `x = L` — putting them in a lane of their own makes confusing one with the
-          rider *geometrically* impossible.
-
-          They are `pointer-events-none` **in manual mode only**, because there § 5's bracket is the
-          non-interactive span marker. In imported mode they are § 4's « deux poignées », which the
-          section states in the same breath as the four fields and which it explicitly rejects doing
-          without: pointer input snaps to a terrain sample, a typed station stays exact. */}
-      {[0, L].map((at) => {
-        const anchor = at === 0 ? "A" : "B";
-        return (
-          <rect
-            className={cn(
-              "fill-transparent",
-              onStation === undefined ? "pointer-events-none" : "cursor-grab",
-            )}
-            data-anchor={anchor}
-            key={at}
-            {...(onStation === undefined ? {} : dragStation(anchor))}
-            {...anchorTarget(x.x(at), laneTop)}
-          />
-        );
-      })}
-
-      {/* The tick labels are furniture, and two of them sit **inside** the anchor targets' 48 px —
-          the lane's 24 px plus this band's. Left hit-testable they would punch a hole in a target
-          § 5 sized on purpose. */}
       <g className="fill-muted-foreground pointer-events-none text-[10px]">
         {xTicks(L, wide).map((tick, index, all) => (
           <text
@@ -478,8 +413,7 @@ export function Profile({
       </g>
 
       {/* The plot area is the pointer surface — a drag in x moves the rider, and a drag in y
-          scrolls the page (`pan-y`) rather than doing nothing. The **handle lane is excluded**,
-          because its two anchor targets are the Stations', not the rider's. */}
+          scrolls the page (`pan-y`) rather than doing nothing. */}
       <rect
         className="fill-transparent"
         {...drag}

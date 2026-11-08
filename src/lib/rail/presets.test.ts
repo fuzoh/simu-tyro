@@ -69,6 +69,7 @@ describe("Courant Bandit 11 mm preset", () => {
       applyMaterialPreset(textileDraft, "courant-bandit-11"),
       "MBL",
       30_000,
+      null,
     );
     if (edited.material.family !== "textile") throw new Error("expected a textile spec");
     const chips = presetProvenance(edited.material);
@@ -78,9 +79,10 @@ describe("Courant Bandit 11 mm preset", () => {
 
   test("two edited fields leave the others with their sheet chip and k still unconfirmed", () => {
     const edited = applyField(
-      applyField(applyMaterialPreset(textileDraft, "courant-bandit-11"), "MBL", 30_000),
+      applyField(applyMaterialPreset(textileDraft, "courant-bandit-11"), "MBL", 30_000, null),
       "muTextile",
       0.07,
+      null,
     );
     if (edited.material.family !== "textile") throw new Error("expected a textile spec");
     const chips = presetProvenance(edited.material);
@@ -92,7 +94,12 @@ describe("Courant Bandit 11 mm preset", () => {
   });
 
   test("k edited to the class's shipped default reads « valeur utilisateur »", () => {
-    const edited = applyField(applyMaterialPreset(textileDraft, "courant-bandit-11"), "k", 1.5);
+    const edited = applyField(
+      applyMaterialPreset(textileDraft, "courant-bandit-11"),
+      "k",
+      1.5,
+      null,
+    );
     if (edited.material.family !== "textile") throw new Error("expected a textile spec");
     expect(presetProvenance(edited.material).k?.label).toBe("valeur utilisateur");
   });

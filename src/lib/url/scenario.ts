@@ -32,13 +32,12 @@ import type {
   TightnessDraft,
 } from "@/lib/scenario/types.ts";
 import type { SteelSpec, TerminationId, TextileSpec } from "@/lib/sim";
-import type { TraceEnds } from "@/lib/terrain/trace.ts";
 
 import { tightnessDriver } from "@/lib/rail/values.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 import { clampX } from "@/lib/scenario/geometry.ts";
 import { TERMINATIONS, TEXTILE } from "@/lib/sim";
-import { traceEnds } from "@/lib/terrain/trace.ts";
+import { traceExtent } from "@/lib/terrain/trace.ts";
 
 import type {
   AcceptedSearch,
@@ -205,10 +204,10 @@ export function terminationIdFromToken(
 
 type Absent<K extends SearchKey> = { readonly [P in K]?: never };
 
-/** The terrain keys of a completed bag: manual `L`/`h`, or imported `tr`/`sa`/`sb`. */
+/** The terrain keys of a completed bag: manual `L`/`h`, or the imported profil `tr`. */
 type CompletedTerrain =
-  | (Pick<SearchValues, "L" | "h"> & Absent<"sa" | "sb" | "tr">)
-  | (Pick<SearchValues, "sa" | "sb" | "tr"> & Absent<"L" | "h">);
+  | (Pick<SearchValues, "L" | "h"> & Absent<"tr">)
+  | (Pick<SearchValues, "tr"> & Absent<"L" | "h">);
 
 /** Exactly one tightness driver — two refuse the link before it is ever completed. */
 type CompletedDriver = {
@@ -273,14 +272,6 @@ const TIGHTNESS_KEY_SET: ReadonlySet<SearchKey> = new Set<SearchKey>(TIGHTNESS_K
  */
 const DEFAULT_FAMILY: FamilyToken = FIRST_RUN_SCENARIO.material.family === "steel" ? "ac" : "tx";
 
-/**
- * Where an imported link with no `sa` starts **when its `tr` cannot be decoded**: the file's own
- * origin, with the shipped span after it. A decodable `tr` completes from the Trace's own ends —
- * voir {@link importedTerrain}; this is the pre-#55 rule, kept only for the payload that never
- * yields a Trace.
- */
-const FILE_ORIGIN = 0;
-
 /** What {@link completeFromDefaults} returns — the canonical bag, and the strip's second sentence. */
 export type Completion = {
   readonly search: CompletedSearch;
@@ -309,16 +300,14 @@ export type Completion = {
  *    **no rope is invented**: § 9 ships `MBL` and `μ` « vides et requis », because one made-up
  *    `MBL` decides the verdict, and those two blocking errors are the correct arrival state.
  *    Polyester's `k` stays blank too, because §13.2 publishes none.
- * 2. The **inactive** terrain source. `tr` present ⇒ imported: `L`/`h` are derived read-outs and
- *    are dropped rather than completed; `tr` absent ⇒ manual, and `sa`/`sb` never appear.
+ * 2. The **inactive** terrain source. `tr` present ⇒ imported: `L`/`h` are derived read-outs of
+ *    the whole profil and are dropped rather than completed; `tr` absent ⇒ manual.
  * 3. The **inactive** family's keys, dropped the same way.
  *
- * Some keys complete from the link rather than from a constant. An imported link's `sa` completes
- * to the Trace's first distance and its `sb` to its last — where « tracé/importé » places them, both
- * read through `traceEnds` — so a completed station never lands off the Trace. A station the link
- * gives is kept as given, off the Trace included (ADR-0001). `x` completes to
- * half the *completed* span — 125,0 m for `?L=250&h=-40` rather than the constant 75,0 — because
- * it selects a **view**, and a viewpoint off the end of the span is worse than a moved viewpoint.
+ * Some keys complete from the link rather than from a constant. `x` completes to half the
+ * *completed* span — 125,0 m for `?L=250&h=-40` rather than the constant 75,0, half the profil's
+ * extent for a `tr` — because it selects a **view**, and a viewpoint off the end of the span is
+ * worse than a moved viewpoint.
  * `na`/`nb` complete to the decoded end's own `η`, so `?ta=huit` is judged on the knot's 0,60 and
  * not on the shipped end's 0,90, and `k` completes to the decoded rope class's `TEXTILE.kDefault`.
  *
@@ -365,7 +354,7 @@ function completionValues(search: AcceptedSearch, family: FamilyToken): Accepted
   const terrain: CompletedTerrain =
     search.tr === undefined
       ? { L: search.L ?? firstRun.L, h: search.h ?? firstRun.h }
-      : importedTerrain(search.tr, search.sa, search.sb);
+      : { tr: search.tr };
   const lineFamily = family === "tx" ? "textile" : "steel";
   const eta = (token: TerminationToken) =>
     TERMINATIONS[terminationIdFromToken(token, lineFamily)].eta;
@@ -382,44 +371,9 @@ function completionValues(search: AcceptedSearch, family: FamilyToken): Accepted
 }
 
 /**
- * An imported link's stations. Each one the link gives is kept **as given** — ADR-0001: off the
- * Trace it still raises « Station hors du tracé », and `sb ≤ sa` is still the blocked placement
- * « Inverser A et B » repairs. Each absent one completes to the Trace's own end on its side, which
- * is where an in-app import places it, read through the same {@link traceEnds}.
- *
- * The Trace is decoded only when a station is missing. A `tr` that does not decode keeps the
- * pre-#55 rule — {@link FILE_ORIGIN}, then `sa` plus the shipped span — because how a bad payload
- * is handled is the refusal's business, not completion's. An accepted bag cannot carry one: the
- * validator walked it with the same structural check `decodeP1` runs first.
- */
-function importedTerrain(
-  tr: string,
-  sa: number | undefined,
-  sb: number | undefined,
-): CompletedTerrain {
-  if (sa !== undefined && sb !== undefined) return { tr, sa, sb };
-  const ends = decodedEnds(tr);
-  if (ends === null) {
-    const start = sa ?? FILE_ORIGIN;
-    return { tr, sa: start, sb: sb ?? start + FIRST_RUN_SCENARIO.geometry.L };
-  }
-  return { tr, sa: sa ?? ends.start, sb: sb ?? ends.end };
-}
-
-/** The ends of the Trace a `tr` encodes, or `null` when the payload does not decode. */
-function decodedEnds(tr: string): TraceEnds | null {
-  try {
-    return traceEnds(decodeP1(tr));
-  } catch (error) {
-    if (error instanceof P1Error) return null;
-    throw error;
-  }
-}
-
-/**
  * Is this key part of the **active** configuration? § 7's one governing rule: « the URL carries the
- * active configuration and never a retained alternate », so an imported link has `tr`/`sa`/`sb` and
- * no `L`/`h`, a steel link has no `cls`/`mbl`/`k`, and a textile link has no `r0`/`cst`.
+ * active configuration and never a retained alternate », so an imported link has `tr` and no
+ * `L`/`h`, a steel link has no `cls`/`mbl`/`k`, and a textile link has no `r0`/`cst`.
  *
  * Out-of-scope keys leave the canonical bag **without** a strip line: the strip's two kinds are an
  * unknown key and an unrepresentable value, and a redundant `L` beside a `tr` is neither — with a
@@ -430,8 +384,6 @@ function inActiveConfiguration(key: SearchKey, imported: boolean, family: Family
     case "L":
     case "h":
       return !imported;
-    case "sa":
-    case "sb":
     case "tr":
       return imported;
     case "r0":
@@ -450,9 +402,24 @@ function inActiveConfiguration(key: SearchKey, imported: boolean, family: Family
   }
 }
 
-/** The span a bag describes, m — `L` in manual mode, `sb − sa` in imported mode. */
+/** The span a bag describes, m — `L` in manual mode, the profil's whole extent in imported mode. */
 function spanOf(bag: CompletedTerrain): number {
-  return bag.tr === undefined ? bag.L : bag.sb - bag.sa;
+  return bag.tr === undefined ? bag.L : profilExtent(bag.tr);
+}
+
+/**
+ * The extent of the profil a `tr` encodes. A payload that does not decode falls back to the shipped
+ * span, because how a bad payload is handled is the refusal's business, not completion's. An
+ * accepted bag cannot carry one: the validator walked it with the same structural check `decodeP1`
+ * runs first.
+ */
+function profilExtent(tr: string): number {
+  try {
+    return traceExtent(decodeP1(tr));
+  } catch (error) {
+    if (error instanceof P1Error) return FIRST_RUN_SCENARIO.geometry.L;
+    throw error;
+  }
 }
 
 /** § 7's presence-encoded driver, back into the app's union. */
@@ -513,7 +480,7 @@ export function searchToScenario(search: CompletedSearch): ScenarioDraft {
     geometry:
       search.tr === undefined
         ? { source: "manual", L: search.L, h: search.h }
-        : { source: "trace", trace: search.tr, sa: search.sa, sb: search.sb },
+        : { source: "trace", trace: search.tr },
     anchors: { zA: search.za, zB: search.zb },
     // Absent **is** one member — the meaning of absence, never a completed default.
     carryingLines: search.bp ?? 1,
@@ -561,9 +528,6 @@ export function scenarioToSearch(scenario: Scenario): CompletedSearch {
   if (geometry.source === "manual") {
     out.L = geometry.L;
     out.h = geometry.h;
-  } else {
-    out.sa = geometry.sa;
-    out.sb = geometry.sb;
   }
   out.za = anchors.zA;
   out.zb = anchors.zB;

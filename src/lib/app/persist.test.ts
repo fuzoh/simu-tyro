@@ -147,7 +147,7 @@ describe("oversize refuses at « Copier le lien » — it never degrades", () =>
     const trace = bigTrace(4812);
     const scenario: ScenarioDraft = {
       ...firstRunDefaults(),
-      geometry: { source: "trace", trace: encodeP1(trace), sa: 0, sb: trace.d[4811] },
+      geometry: { source: "trace", trace: encodeP1(trace) },
     };
     const result = copyLink({ scenario, trace, origin: ORIGIN, page: PAGE });
     expect(result.ok).toBe(false);
@@ -164,7 +164,7 @@ describe("oversize refuses at « Copier le lien » — it never degrades", () =>
     const trace = bigTrace(200);
     const scenario: ScenarioDraft = {
       ...firstRunDefaults(),
-      geometry: { source: "trace", trace: encodeP1(trace), sa: 0, sb: trace.d[199] },
+      geometry: { source: "trace", trace: encodeP1(trace) },
     };
     const result = copyLink({ scenario, trace, origin: ORIGIN, page: PAGE });
     expect(result.ok).toBe(true);
@@ -191,7 +191,7 @@ describe("one gate for both writers — an oversize import never reaches the add
     const trace = ruggedTrace(points);
     const scenario: ScenarioDraft = {
       ...firstRunDefaults(),
-      geometry: { source: "trace", trace: encodeP1(trace), sa: 0, sb: trace.d[points - 1] },
+      geometry: { source: "trace", trace: encodeP1(trace) },
     };
     return { trace, scenario };
   }

@@ -1,23 +1,21 @@
 /**
  * The imported profile as the app holds it — « v1 build spec » § 4 (*La Trace est immuable ; le
- * `Terrain` est dérivé à un seul joint*, *Placement des ancrages*) — plus the **one seam** that
- * turns it into the engine's `Terrain`.
+ * `Terrain` est dérivé à un seul joint*) — plus the **one seam** that turns it into the engine's
+ * `Terrain`.
  *
  * Rules this module exists to keep:
  *
- * - **The Trace is held once, immutably, in file coordinates.** Moving an anchor is a *different
- *   derivation*, never a mutation: `deriveTerrain` reads `trace` and allocates its own arrays, so
- *   what the Session persists is the file and re-anchoring is always possible. That is also why
- *   ticket 09's `Terrain` union needed **no** change — no `x0` offset field, which would have put
- *   an offset in the clearance inner loop.
- * - **`Distance` is horizontal.** `d` is `x` after the origin shift below, never a surface length:
- *   § 4 measured 183,4 m reported against a 183,42 m planimetric chord and a **263,9 m** 3-D
- *   surface length, so any « slope correction » re-introduces a **44 %** inflation of `L`.
- * - **Three steps, in this order** — subtract `d_A`, slice to `[0, L]`, **insert interpolated
- *   endpoints**. The endpoints are not tidiness: `d_A` generally lands between two samples, and
- *   without them `zGroundAt` would be asked to extrapolate exactly where the anchors are and where
- *   the clearance read-outs get the most scrutiny. Post-condition: `xs[0] === 0` and
- *   `xs[xs.length − 1] === L`, exactly.
+ * - **The Trace runs from anchor A to anchor B** (#88): its first sample is under A and its last
+ *   under B. No anchor is placed at a distance along it — a point that does not suit is moved,
+ *   which makes a new profil — so `L` is the profil's whole extent and there is no station to bound,
+ *   snap or swap.
+ * - **The Trace is held once, immutably, in file coordinates.** `deriveTerrain` reads `trace` and
+ *   allocates its own arrays, so what the Session persists is the file. That is also why ticket 09's
+ *   `Terrain` union needed **no** change — no `x0` offset field, which would have put an offset in
+ *   the clearance inner loop.
+ * - **`Distance` is horizontal.** `d` is `x` after the origin shift, never a surface length: § 4
+ *   measured 183,4 m reported against a 183,42 m planimetric chord and a **263,9 m** 3-D surface
+ *   length, so any « slope correction » re-introduces a **44 %** inflation of `L`.
  * - **The samples are the file's own.** No resampling, no smoothing — § 4 rejected them for adding
  *   zero terrain knowledge while making a coarse import indistinguishable from a fine one. The
  *   honest move is disclosure, which is `provenance.ts`'s job.
@@ -46,112 +44,26 @@ export type Trace = {
   readonly fileName: string | null;
 };
 
-/** One anchor's placement on the Trace: a station in **file** coordinates and its tower height. */
-export type AnchorPlacement = {
-  /** `Station`, m, in the file's own `Distance` frame. */
-  readonly station: number;
-  /** `Hauteur d'ancrage`, m above this anchor's own base. */
-  readonly height: number;
-};
-
-/** § 4's derived read-outs: `L = d_B − d_A` and `h`, measured anchor top to anchor top. */
+/** § 4's derived read-outs: `L` and `h`, measured anchor top to anchor top. */
 export type DerivedSpan = {
   /** `Portée`, m. */
   readonly L: number;
   /** `Dénivelé`, m — negative when B is lower than A. */
   readonly h: number;
-  /** Ground altitude under anchor A, m — the rail's « Alt. base A ». */
+  /** Ground altitude under anchor A, m — the profil's first sample, the rail's « Alt. base A ». */
   readonly zBaseA: number;
-  /** Ground altitude under anchor B, m — the rail's « Alt. base B ». */
+  /** Ground altitude under anchor B, m — the profil's last sample, the rail's « Alt. base B ». */
   readonly zBaseB: number;
 };
 
 /**
- * The profile's altitude at a station, by **linear interpolation between the file's own samples**
- * — § 4's `z(d)`. Outside the trace the ends are **held, never extrapolated**, matching
- * `zGroundAt`: a station off the trace is a blocked placement (« Station hors du tracé »), caught
- * by the degenerate-placement table, not silently invented here.
- *
- * @param trace the imported profile; at least one sample, `d` strictly increasing.
- * @param station m, in file coordinates.
- * @returns the altitude, m, in the file's own frame.
- */
-export function altitudeAt(trace: Trace, station: number): number {
-  const { d, z } = trace;
-  const last = d.length - 1;
-  if (station <= d[0]) return z[0];
-  if (station >= d[last]) return z[last];
-
-  // The bracketing pair `d[lo] ≤ station < d[hi]`, `hi === lo + 1` on exit.
-  let lo = 0;
-  let hi = last;
-  while (hi - lo > 1) {
-    const mid = (lo + hi) >> 1;
-    if (d[mid] <= station) lo = mid;
-    else hi = mid;
-  }
-  return z[lo] + ((station - d[lo]) / (d[hi] - d[lo])) * (z[hi] - z[lo]);
-}
-
-/**
- * § 4's pointer rule for the two Station handles: **pointer input snaps to a terrain sample, a typed
- * station is exact and interpolates.** The justification is measured, not stylistic — 1 px ≈ 1,2 m at
- * a 1500 m span, so there is no precision in a drag to preserve, while a station taken from a site
- * survey must stay enterable to the metre.
- *
- * **Clamped to the trace's own extent**, which is what makes § 4's degenerate-placement row « poignée
- * glissée au-delà de l'extrémité ⇒ bornée à l'extrémité du tracé — l'état d'erreur est inatteignable »
- * true of the pointer path: a drag cannot produce « Station hors du tracé », while a typed station
- * still blocks.
- *
- * @param trace the imported profile; `d` strictly increasing.
- * @param station m, in file coordinates — where the pointer landed.
- * @returns the file's own nearest sample. Exactly halfway between two, the **lower** one, so one
- *   pointer position always yields one station.
- */
-export function snapStation(trace: Trace, station: number): number {
-  const { d } = trace;
-  const last = d.length - 1;
-  if (!(station > d[0])) return d[0];
-  if (station >= d[last]) return d[last];
-
-  // The bracketing pair `d[lo] ≤ station < d[hi]`, `hi === lo + 1` on exit — `altitudeAt`'s walk.
-  let lo = 0;
-  let hi = last;
-  while (hi - lo > 1) {
-    const mid = (lo + hi) >> 1;
-    if (d[mid] <= station) lo = mid;
-    else hi = mid;
-  }
-  return station - d[lo] > d[hi] - station ? d[hi] : d[lo];
-}
-
-/** A Trace's first and last `Distance`, m, in file coordinates. */
-export type TraceEnds = {
-  /** The first sample's `Distance` — where an import places Station A. */
-  readonly start: number;
-  /** The last sample's `Distance` — where an import places Station B. */
-  readonly end: number;
-};
-
-/**
- * **The one definition of « the Trace's ends »**, m, in file coordinates. § 4's import reads it to
- * place A on the first station and B on the last — the trace *is* the intended span — and a link
- * missing a station completes it from the same pair, so the in-app import and a shared link cannot
- * drift apart on where a Trace begins and ends.
+ * The trace's own horizontal extent, m — `d[last] − d[0]`. It **is** the span: the anchors stand on
+ * the two end samples. Also the « sur *X* m » of § 6's copy.
  *
  * Typed on `d` alone so a decoded `p1.` payload, which has no `fileName`, reads it as a `Trace` does.
- *
- * @param trace the profile; at least one sample, `d` strictly increasing.
  */
-export function traceEnds(trace: Pick<Trace, "d">): TraceEnds {
-  return { start: trace.d[0], end: trace.d[trace.d.length - 1] };
-}
-
-/** The trace's own horizontal extent, m — `d[last] − d[0]`, the « sur *X* m » of § 6's copy. */
-export function traceExtent(trace: Trace): number {
-  const { start, end } = traceEnds(trace);
-  return end - start;
+export function traceExtent(trace: Pick<Trace, "d">): number {
+  return trace.d[trace.d.length - 1] - trace.d[0];
 }
 
 /**
@@ -172,18 +84,21 @@ export function maxSpacing(trace: Trace): number {
 }
 
 /**
- * § 4's two derived read-outs, `L = d_B − d_A` and
- * `h = (z(d_B) + hauteur_B) − (z(d_A) + hauteur_A)`.
+ * § 4's two derived read-outs over the whole profil: `L = d_last − d_first` and
+ * `h = (z_last + hauteur_B) − (z_first + hauteur_A)`.
  *
  * The two `hauteur d'ancrage` fields feed the `Terrain` and the anchor altitudes and **never**
  * `solveSpan`, which takes span and elevation difference measured anchor to anchor.
  */
-export function deriveSpan(trace: Trace, a: AnchorPlacement, b: AnchorPlacement): DerivedSpan {
-  const zBaseA = altitudeAt(trace, a.station);
-  const zBaseB = altitudeAt(trace, b.station);
+export function deriveSpan(
+  trace: Trace,
+  heights: { readonly zA: number; readonly zB: number },
+): DerivedSpan {
+  const zBaseA = trace.z[0];
+  const zBaseB = trace.z[trace.z.length - 1];
   return {
-    L: b.station - a.station,
-    h: zBaseB + b.height - (zBaseA + a.height),
+    L: traceExtent(trace),
+    h: zBaseB + heights.zB - (zBaseA + heights.zA),
     zBaseA,
     zBaseB,
   };
@@ -192,51 +107,29 @@ export function deriveSpan(trace: Trace, a: AnchorPlacement, b: AnchorPlacement)
 /**
  * **The one seam.** Pure, and `trace` is never mutated.
  *
+ * `x` is `Distance` less the first sample's, so `xs[0] === 0` and `xs[last] === L` exactly: the
+ * anchors stand on the file's own end samples, and `zGroundAt` is never asked to extrapolate where
+ * the clearance read-outs get the most scrutiny.
+ *
  * `z` is returned in the engine's **anchor-A-top frame** — the frame `clearance.ts` compares the
  * cable against, where anchor A's top is the origin and manual ground is the two-point case
- * `zs: [z_base_A, z_base_B]`. § 4's sketch writes the array as `interp(62)…interp(245)` to show
- * the *x* translation; the *z* datum is fixed by § 2 and §11, so raw altitudes (540 m against a
- * cable at −40 m) are not an option here.
+ * `zs: [z_base_A, z_base_B]`. The *z* datum is fixed by § 2 and §11, so raw altitudes (540 m against
+ * a cable at −40 m) are not an option here.
  *
  * @param trace the imported profile, in file coordinates.
- * @param a anchor A's placement — its station is the new origin.
- * @param b anchor B's placement — `L = b.station − a.station`.
- * @returns a `profile` terrain whose `xs` run from `0` to `L` exactly.
- * @throws RangeError when `L` is not finite and positive. That is the degenerate placement
- *   `station B ≤ station A`, which the UI blocks with « L doit être > 0 » and
- *   `[ Inverser A et B ]` — reaching this derivation with it is a caller bug, not a physics
- *   failure.
+ * @param zA anchor A's height above the first sample — its top is the datum.
+ * @returns a `profile` terrain whose `xs` run from `0` to `L`.
  */
-export function deriveTerrain(trace: Trace, a: AnchorPlacement, b: AnchorPlacement): Terrain {
-  const dA = a.station;
-  const dB = b.station;
-  const L = dB - dA;
-  if (!Number.isFinite(L) || L <= 0) {
-    throw new RangeError(`deriveTerrain: L must be finite and > 0, got ${L}`);
-  }
-
+export function deriveTerrain(trace: Trace, zA: number): Extract<Terrain, { kind: "profile" }> {
   const { d, z } = trace;
-  // Samples **strictly** inside `(d_A, d_B)`: a sample landing exactly on an anchor is already
-  // the synthesised endpoint, and duplicating it would break `xs` strict increase.
-  let first = 0;
-  while (first < d.length && d[first] <= dA) first++;
-  let lastExclusive = d.length;
-  while (lastExclusive > first && d[lastExclusive - 1] >= dB) lastExclusive--;
-
-  const inner = lastExclusive - first;
-  const xs = new Float64Array(inner + 2);
-  const zs = new Float64Array(inner + 2);
-
-  // The datum: anchor A's top. `zs[0]` is therefore `−hauteur_A` exactly.
-  const zRef = altitudeAt(trace, dA) + a.height;
-  xs[0] = 0;
-  zs[0] = -a.height;
-  for (let i = 0; i < inner; i++) {
-    xs[i + 1] = d[first + i] - dA;
-    zs[i + 1] = z[first + i] - zRef;
+  const xs = new Float64Array(d.length);
+  const zs = new Float64Array(d.length);
+  const zRef = z[0] + zA;
+  // Set rather than computed: `z[0] − (z[0] + zA)` is not `−zA` in floating point.
+  zs[0] = -zA;
+  for (let i = 1; i < d.length; i++) {
+    xs[i] = d[i] - d[0];
+    zs[i] = z[i] - zRef;
   }
-  xs[inner + 1] = L;
-  zs[inner + 1] = altitudeAt(trace, dB) - zRef;
-
   return { kind: "profile", xs, zs };
 }

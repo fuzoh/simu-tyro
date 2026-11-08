@@ -12,7 +12,7 @@
  *
  * - **Three tiers, because § 8 suppresses three different amounts of picture.**
  *   {@link buildSceneFrame} is the input half — terrain, both anchors, the span markers, the 5 %
- *   margin — and it fails **only** for « l'exception géométrique » (`L` / `h` / station), the one
+ *   margin — and it fails **only** for « l'exception géométrique » (`L` / `h` / no profil), the one
  *   state where there is no shared x domain and the scrub track stops being a pointer path.
  *   {@link buildSceneBase} is the solved half on top of it, and its `null` is « Aucun résultat »,
  *   where « les entrées se dessinent toujours ». Returning one `null` for both — a blank textile
@@ -48,7 +48,8 @@
  *   minimum sits at **−0,36 m** against a ridge, so one linear axis leaves the crossing this whole
  *   Chart Block exists to show **0,2 px** tall at § 5's reference column.
  * - **Terrain enters at one joint.** `placeSpan` builds the engine's `Terrain` over `[0, L]`; the
- *   *drawn* ground spans the whole shared domain, holding the ends exactly as `zGroundAt` does.
+ *   *drawn* ground spans the whole shared domain, holding the ends exactly as `zGroundAt` does. An
+ *   imported profil runs anchor to anchor, so there the domain is the span and the two are one.
  */
 
 import type { SweepRider } from "@/lib/scenario/traverse.ts";
@@ -63,7 +64,7 @@ import type {
   SweepStep,
   Terrain,
 } from "@/lib/sim";
-import type { AnchorPlacement, Trace } from "@/lib/terrain/trace.ts";
+import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { xDomain } from "@/lib/layout/contract.ts";
 import { clampX, type PlacedSpan } from "@/lib/scenario/geometry.ts";
@@ -76,7 +77,6 @@ import {
   sweepStep,
   zGroundAt,
 } from "@/lib/sim";
-import { altitudeAt } from "@/lib/terrain/trace.ts";
 
 /**
  * Vertices minus one on a drawn cable. Nothing downstream is measured against it — it is a drawing
@@ -200,8 +200,8 @@ export type SceneRider = {
  *
  * `null` from {@link buildSceneFrame} is the **only** state § 8 lets collapse both plots to an
  * empty frame with no ticks and an inert scrub track — « l'exception géométrique », scoped to `L` /
- * `h` / station failures, and written down as an exception precisely so nobody applies it to every
- * failure alike.
+ * `h` failures and an imported line with no profil, and written down as an exception precisely so
+ * nobody applies it to every failure alike.
  */
 export type SceneFrame = {
   /** Portée, m. */
@@ -282,8 +282,8 @@ export type ChartScene = SceneBase & {
  * @param placed the unloaded line's `span`, which every outcome but stage `geometry` carries: the
  *   frame is drawn on the placement the line was solved on, and `placeSpan` runs once per edit.
  * @returns `null` for § 8's *exception géométrique* and nothing else — a `null` placement: a
- *   non-finite or non-positive `L`, a non-finite `h`, `station B ≤ station A`, or a `tr` geometry
- *   with no Trace. Those are the states where the shared x domain — span + 5 % — does not exist,
+ *   non-finite or non-positive `L`, a non-finite `h`, or a `tr` geometry with no Trace. Those are
+ *   the states where the shared x domain — span + 5 % — does not exist,
  *   so `x_D` has no interval to live in and the scrub track has nothing to be a pointer path over.
  */
 export function buildSceneFrame(placed: PlacedSpan | null): SceneFrame | null {
@@ -395,11 +395,11 @@ export function snapToStep(traverse: SweepResult, x: number): number | null {
 }
 
 /** What only the picture needs on top of the placement: the drawn ground and the trace's extent. */
-function drawnGround({ L, terrain, onTrace }: PlacedSpan): {
+function drawnGround({ L, terrain, bases }: PlacedSpan): {
   ground: Polyline;
   extent: { min: number; max: number } | null;
 } {
-  if (onTrace === null) {
+  if (bases === null) {
     const [lo, hi] = xDomain(L, null);
     const zBaseA = zGroundAt(terrain, 0);
     const zBaseB = zGroundAt(terrain, L);
@@ -413,37 +413,10 @@ function drawnGround({ L, terrain, onTrace }: PlacedSpan): {
     };
   }
 
-  const { trace, a } = onTrace;
-  const extent = {
-    min: trace.d[0] - a.station,
-    max: trace.d[trace.d.length - 1] - a.station,
-  };
-  return { ground: drawnTrace(trace, a, xDomain(L, extent)), extent };
-}
-
-/**
- * The imported profile over the **whole** shared domain, translated into the anchor-A-top frame.
- *
- * The file's own samples, **never a resampling** — § 4 killed resampling for making a coarse import
- * indistinguishable from a fine one, and that rule does not stop at the engine's edge.
- */
-function drawnTrace(
-  trace: Trace,
-  a: AnchorPlacement,
-  [lo, hi]: readonly [number, number],
-): Polyline {
-  const zRef = altitudeAt(trace, a.station) + a.height;
-  const xs: number[] = [lo];
-  const zs: number[] = [altitudeAt(trace, lo + a.station) - zRef];
-  for (let i = 0; i < trace.d.length; i++) {
-    const x = trace.d[i] - a.station;
-    if (x <= lo || x >= hi) continue;
-    xs.push(x);
-    zs.push(trace.z[i] - zRef);
-  }
-  xs.push(hi);
-  zs.push(altitudeAt(trace, hi + a.station) - zRef);
-  return { xs: Float64Array.from(xs), zs: Float64Array.from(zs) };
+  // The profil runs anchor to anchor, so the domain clamps to the span and the drawn ground is the
+  // engine's own: the file's samples, **never a resampling** — § 4 killed resampling for making a
+  // coarse import indistinguishable from a fine one, and that rule does not stop at the engine's edge.
+  return { ground: terrain, extent: { min: 0, max: L } };
 }
 
 /**

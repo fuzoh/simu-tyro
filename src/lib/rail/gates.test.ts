@@ -1,7 +1,6 @@
 import { describe, expect, test } from "vitest";
 
 import type { ScenarioDraft, TextileDraft } from "@/lib/scenario/types.ts";
-import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
 
@@ -31,17 +30,9 @@ import { applyRopeClass, applyShippedTerminations } from "./values.ts";
  * | Grille | Entrées |
  * | --- | --- |
  * | Solve | `L`, `h`, le champ de tension directeur, famille + Material Spec, famille × usage (§10.4), `m_p` |
- * | Clearance | hauteurs d'ancrage A / B, terrain (stations), `h_rider` |
+ * | Clearance | hauteurs d'ancrage A / B, terrain, `h_rider` |
  * | Verdict | régime, les deux terminaisons, `DAF` |
  */
-
-/** A 224 m profile, the length of `example-profile-trace2.csv`, at a metre-per-100 m slope. */
-const TRACE: Trace = {
-  d: Float64Array.from([0, 112, 224]),
-  z: Float64Array.from([540, 520, 500]),
-  dev: 0,
-  fileName: "profil-2.csv",
-};
 
 function scenario(patch: (draft: ScenarioDraft) => void = () => {}): ScenarioDraft {
   const draft = firstRunDefaults() as ScenarioDraft;
@@ -61,7 +52,7 @@ function gateFor(report: ReturnType<typeof evaluateGates>, field: FieldId): Gate
 }
 
 describe("the first screen — verdict-less, and it still computes", () => {
-  const report = evaluateGates({ scenario: scenario(), trace: null });
+  const report = evaluateGates({ scenario: scenario() });
 
   test("Solve and Clearance pass; only the Verdict Gate is breached", () => {
     // « Régime choisi » is **struck** from the Solve Gate: as ticket 04 wrote it, first run blocked
@@ -87,7 +78,6 @@ describe("the first screen — verdict-less, and it still computes", () => {
       scenario: scenario((draft) => {
         draft.regime = "acct10";
       }),
-      trace: null,
     });
     expect(chosen.noRegime).toBe(false);
     expect(chosen.passed).toEqual({ solve: true, clearance: true, verdict: true });
@@ -111,12 +101,12 @@ describe("the optional textile diameter", () => {
     });
 
   test("an absent `d` pushes no `empty` error", () => {
-    const { errors } = evaluateGates({ scenario: rope(), trace: null });
+    const { errors } = evaluateGates({ scenario: rope() });
     expect(errors.filter((error) => error.field === "dTextile")).toEqual([]);
   });
 
   test("`d: 0` from a link is an `invalid` Solve breach", () => {
-    const { errors } = evaluateGates({ scenario: rope(0), trace: null });
+    const { errors } = evaluateGates({ scenario: rope(0) });
     expect(errors.find((error) => error.field === "dTextile")).toMatchObject({
       gate: "solve",
       kind: "invalid",
@@ -129,7 +119,7 @@ describe("§10.4 — the use-class gate, family first, two Fix Actions", () => {
     onRope(draft, { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 });
     draft.regime = "secours10";
   });
-  const report = evaluateGates({ scenario: textileUnderPermanente, trace: null });
+  const report = evaluateGates({ scenario: textileUnderPermanente });
 
   test("textile in a permanent installation is a Solve breach on `Famille de ligne`", () => {
     expect(report.errors[0]).toMatchObject({
@@ -163,7 +153,6 @@ describe("§10.4 — the use-class gate, family first, two Fix Actions", () => {
         onRope(draft, { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 });
         draft.regime = "secours10";
       }),
-      trace: null,
     });
     expect(ok.errors).toEqual([]);
     expect(blockingSummary(ok)).toBeNull();
@@ -176,7 +165,6 @@ describe("the Verdict Gate's régime × famille rule", () => {
       scenario: scenario((draft) => {
         draft.regime = "secours10";
       }),
-      trace: null,
     });
     expect(report.errors[0]).toMatchObject({
       gate: "verdict",
@@ -203,7 +191,6 @@ describe("the Verdict Gate's régime × famille rule", () => {
         onRope(draft, { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 });
         draft.regime = "secours10";
       }),
-      trace: null,
     });
     const regimeError = report.errors.find((error) => error.field === "regime");
     expect(regimeError?.message).toBe(
@@ -221,7 +208,6 @@ describe("the Verdict Gate's régime × famille rule", () => {
         onRope(draft, { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 });
         draft.regime = "secours10";
       }),
-      trace: null,
     });
     expect(report.errors.filter((error) => error.field === "regime")).toEqual([]);
   });
@@ -237,7 +223,6 @@ describe("§ 10.1 — the régime select's note shows the reason", () => {
         draft.usage = "TEMPORAIRE";
         draft.regime = "secours10";
       }),
-      trace: null,
     });
     expect(report.errors.find((error) => error.field === "regime")?.message).toBe(
       "⛔ Régime « Secours textile — 10:1 » indisponible avec un câble acier.",
@@ -277,7 +262,6 @@ describe("« No rope ships » — the two blanks a family flip lands on", () => 
       onRope(draft, { family: "textile", ropeClass: "hmpe", MBL: null, mu: null, k: 22 });
       draft.regime = "secours10";
     }),
-    trace: null,
   });
 
   test("`MBL` and `μ` raise blocking errors, **not** « Saisie en cours »", () => {
@@ -307,7 +291,6 @@ describe("« No rope ships » — the two blanks a family flip lands on", () => 
         });
         draft.regime = "secours10";
       }),
-      trace: null,
     });
     expect(polyester.errors.find((error) => error.field === "k")?.message).toBe(
       "valeur requise — aucune valeur publiée pour le polyester",
@@ -315,47 +298,21 @@ describe("« No rope ships » — the two blanks a family flip lands on", () => 
   });
 });
 
-describe("imported placement — the hard checks run on **derived** values", () => {
-  const imported = (sa: number, sb: number) =>
-    scenario((draft) => {
-      draft.geometry = { source: "trace", trace: "p1.x", sa, sb };
-      draft.regime = "en15567";
-    });
-
-  test("`station B ≤ station A` blames Station A, outlines Station B, and offers one repair", () => {
-    // Otherwise `L = 0` reaches `solveSpan` and returns `invalid-input{field:"L"}` pointing at a
-    // field the user cannot edit — the invariant the culprit table exists for.
-    const report = evaluateGates({ scenario: imported(120, 120), trace: TRACE });
-    expect(report.errors[0]).toEqual({
-      gate: "solve",
-      kind: "invalid",
-      field: "sa",
-      alsoOutlined: ["sb"],
-      message: "⛔ Portée nulle ou négative — l'ancrage B est avant l'ancrage A.",
-      fixes: [{ id: "inverser-a-b", label: "Inverser A et B" }],
-    });
+describe("an imported profil is taken whole (#88)", () => {
+  const imported = scenario((draft) => {
+    draft.geometry = { source: "trace", trace: "p1.x" };
+    draft.regime = "en15567";
   });
 
-  test("`[ Inverser A et B ]` rather than a silent auto-swap, which would flip the sign of `h`", () => {
-    const report = evaluateGates({ scenario: imported(120, 120), trace: TRACE });
-    expect(report.errors[0].fixes[0].label).toBe("Inverser A et B");
+  test("there is no placement to check, so the gates pass on the profil alone", () => {
+    expect(evaluateGates({ scenario: imported }).errors).toEqual([]);
   });
 
-  test("a station off the trace names the file's own bound", () => {
-    const report = evaluateGates({ scenario: imported(0, 260), trace: TRACE });
-    expect(report.errors[0]).toMatchObject({
-      gate: "solve",
-      field: "sb",
-      message: "⛔ Distance hors du profil (0,0 – 224,0 m). Valeur : 260,0 m.",
-    });
-  });
-
-  test("a valid placement passes, and `Portée` / `Dénivelé` are not fields there at all", () => {
-    const report = evaluateGates({ scenario: imported(0, 224), trace: TRACE });
-    expect(report.errors).toEqual([]);
-    const draft = imported(0, 224);
-    expect(isFieldActive("L", draft)).toBe(false);
-    expect(isFieldActive("sa", draft)).toBe(true);
+  test("`Portée` and `Dénivelé` are not fields there, and the anchor heights still are", () => {
+    expect(isFieldActive("L", imported)).toBe(false);
+    expect(isFieldActive("h", imported)).toBe(false);
+    expect(isFieldActive("zA", imported)).toBe(true);
+    expect(isFieldActive("zB", imported)).toBe(true);
   });
 });
 
@@ -365,7 +322,6 @@ describe("a link restores state faithfully, including invalid state", () => {
       scenario: scenario((draft) => {
         draft.geometry = { source: "manual", L: -5, h: -18 };
       }),
-      trace: null,
     });
     expect(report.errors[0]).toMatchObject({
       gate: "solve",
@@ -379,7 +335,6 @@ describe("a link restores state faithfully, including invalid state", () => {
       scenario: scenario((draft) => {
         draft.tightness = { mode: "tension", H_target: -1000 };
       }),
-      trace: null,
     });
     expect(gateFor(report, "H_target")).toBe("solve");
     expect(report.errors.find((error) => error.field === "H_target")?.message).toContain(
@@ -425,7 +380,6 @@ describe("the gate matrix, one input at a time", () => {
         draft.regime = "en15567";
         patch(draft);
       }),
-      trace: null,
     });
     expect(report.errors).toHaveLength(1);
     expect(report.errors[0].gate).toBe(gate);
@@ -438,7 +392,6 @@ describe("the gate matrix, one input at a time", () => {
         draft.regime = "en15567";
         draft.rider.hRider = 0;
       }),
-      trace: null,
     });
     expect(report.passed).toEqual({ solve: true, clearance: false, verdict: true });
     expect(blockingSummary(report)).toBe("⛔ 1 erreur bloquante — garde au sol indisponible");
@@ -450,7 +403,6 @@ describe("the gate matrix, one input at a time", () => {
         draft.regime = "en15567";
         draft.rider.xD = 4000;
       }),
-      trace: null,
     });
     expect(report.errors).toEqual([]);
   });
@@ -470,7 +422,6 @@ describe("tier one arrives from the form for the text the Scenario cannot hold",
       scenario: scenario((draft) => {
         draft.regime = "en15567";
       }),
-      trace: null,
       issues: [{ field: "mp", kind: "empty", message: "valeur requise" }],
     });
     expect(report.errors).toEqual([
@@ -491,7 +442,6 @@ describe("tier one arrives from the form for the text the Scenario cannot hold",
       scenario: scenario((draft) => {
         draft.regime = "en15567";
       }),
-      trace: null,
       issues: [{ field: "MBL", kind: "empty", message: "valeur requise" }],
     });
     expect(report.errors).toEqual([]);
@@ -503,7 +453,6 @@ describe("tier one arrives from the form for the text the Scenario cannot hold",
         draft.regime = "en15567";
         draft.rider.mp = -1;
       }),
-      trace: null,
       issues: [
         {
           field: "mp",
@@ -522,7 +471,6 @@ describe("« Saisie en cours » — a required field empty **and holding focus**
     scenario: scenario((draft) => {
       draft.regime = "en15567";
     }),
-    trace: null,
     issues: [{ field: "D_target", kind: "empty", message: "valeur requise" }],
   });
 
@@ -546,7 +494,6 @@ describe("« Saisie en cours » — a required field empty **and holding focus**
     });
     const midEdit = evaluateGates({
       scenario: state,
-      trace: null,
       issues: [{ field: "vRatio", kind: "empty", message: "valeur requise" }],
     });
     const committed = committedValue(state, "vRatio", deduceValues(state, null));
@@ -562,7 +509,6 @@ describe("« Saisie en cours » — a required field empty **and holding focus**
     const state = scenario();
     const midEdit = evaluateGates({
       scenario: state,
-      trace: null,
       issues: [{ field: "mbfOverride", kind: "empty", message: "valeur requise" }],
     });
     const committed = committedValue(state, "mbfOverride", deduceValues(state, null));
@@ -584,7 +530,6 @@ describe("« Saisie en cours » — a required field empty **and holding focus**
         draft.regime = "en15567";
         draft.rider.mp = -1;
       }),
-      trace: null,
     });
     expect(saisieEnCours(invalid, "mp", "120 kg")).toBeNull();
   });
@@ -599,13 +544,17 @@ describe("« Saisie en cours » — a required field empty **and holding focus**
 describe("the culprit table — static, indexed by (grandeur × mode), never inference", () => {
   test("§ 7's rows, verbatim", () => {
     expect(culprits("L", "manuel")).toEqual(["L"]);
-    expect(culprits("L", "importé")).toEqual(["sa", "sb"]);
     expect(culprits("h", "manuel")).toEqual(["h"]);
-    expect(culprits("h", "importé")).toEqual(["sa", "sb", "zA", "zB"]);
     expect(culprits("L0", "mode Longueur")).toEqual(["L0"]);
     expect(culprits("L0", "mode Flèche")).toEqual(["D_target"]);
     expect(culprits("L0", "mode Prétension")).toEqual(["T_target"]);
     expect(culprits("L0", "mode Tension horizontale")).toEqual(["H_target"]);
+  });
+
+  test("an imported `L` has no culprit and an imported `h` names the two heights (#88)", () => {
+    // The anchors stand on the profil's two ends: no field moves `L`, and `h` moves with A and B.
+    expect(culprits("L", "importé")).toEqual([]);
+    expect(culprits("h", "importé")).toEqual(["zA", "zB"]);
   });
 
   test("the steel rows follow §13.1's formulas, not the field group", () => {
@@ -652,7 +601,7 @@ describe("ADR-0001 — a knot on HMPE is kept as given and blocks the verdict", 
       B: { id: "noeud-de-chaise", eta: 0.55 },
     };
   });
-  const report = evaluateGates({ scenario: knotted, trace: null });
+  const report = evaluateGates({ scenario: knotted });
 
   test("one Verdict-gate error on Terminaison A, B outlined", () => {
     expect(report.errors).toEqual([
@@ -678,7 +627,7 @@ describe("ADR-0001 — a knot on HMPE is kept as given and blocks the verdict", 
       A: { id: "oeil-cousu-epissure", eta: 0.9 },
       B: { id: "oeil-cousu-epissure", eta: 0.9 },
     });
-    expect(evaluateGates({ scenario: fixed, trace: null }).errors).toEqual([]);
+    expect(evaluateGates({ scenario: fixed }).errors).toEqual([]);
   });
 
   test("switching a knotted PA rope to HMPE keeps the knots and raises the error", () => {
@@ -690,8 +639,8 @@ describe("ADR-0001 — a knot on HMPE is kept as given and blocks the verdict", 
         B: { id: "noeud-de-chaise", eta: 0.55 },
       };
     });
-    expect(evaluateGates({ scenario: pa, trace: null }).errors).toEqual([]);
-    const hmpe = evaluateGates({ scenario: applyRopeClass(pa, "hmpe"), trace: null });
+    expect(evaluateGates({ scenario: pa }).errors).toEqual([]);
+    const hmpe = evaluateGates({ scenario: applyRopeClass(pa, "hmpe") });
     expect(hmpe.errors.map((error) => [error.field, error.message])).toEqual([
       ["ta", KNOT_ON_HMPE],
     ]);
@@ -703,7 +652,7 @@ describe("ADR-0001 — an end of the other family is kept as given and blocks th
     const steel = scenario((draft) => {
       draft.terminations.A = { id: "noeud-de-huit", eta: 0.6 };
     });
-    const report = evaluateGates({ scenario: steel, trace: null });
+    const report = evaluateGates({ scenario: steel });
     expect(report.errors).toEqual([
       {
         gate: "verdict",
@@ -721,7 +670,7 @@ describe("ADR-0001 — an end of the other family is kept as given and blocks th
     ]);
     const fixed = applyShippedTerminations(steel, report.errors[0]);
     expect(fixed.terminations.A).toEqual({ id: "cosse-oeil-flamand", eta: 0.9 });
-    expect(evaluateGates({ scenario: fixed, trace: null }).errors).toEqual([]);
+    expect(evaluateGates({ scenario: fixed }).errors).toEqual([]);
   });
 
   test("a steel termination on a rope, repaired with the spliced eye", () => {
@@ -730,7 +679,7 @@ describe("ADR-0001 — an end of the other family is kept as given and blocks th
       onRope(draft, { family: "textile", ropeClass: "pa-en1891a", MBL: 3e5, mu: 0.08, k: 1.5 });
       draft.terminations.B = { id: "cosse-oeil-flamand", eta: 0.9 };
     });
-    const report = evaluateGates({ scenario: rope, trace: null });
+    const report = evaluateGates({ scenario: rope });
     expect(report.errors).toEqual([
       {
         gate: "verdict",
@@ -742,7 +691,7 @@ describe("ADR-0001 — an end of the other family is kept as given and blocks th
       },
     ]);
     const fixed = applyShippedTerminations(rope, report.errors[0]);
-    expect(evaluateGates({ scenario: fixed, trace: null }).errors).toEqual([]);
+    expect(evaluateGates({ scenario: fixed }).errors).toEqual([]);
   });
 
   test("two causes are two errors, and repairing one leaves the other standing", () => {
@@ -754,14 +703,13 @@ describe("ADR-0001 — an end of the other family is kept as given and blocks th
         B: { id: "cosse-oeil-flamand", eta: 0.9 },
       };
     });
-    const report = evaluateGates({ scenario: mixed, trace: null });
+    const report = evaluateGates({ scenario: mixed });
     expect(report.errors.map((error) => [error.field, error.alsoOutlined])).toEqual([
       ["ta", []],
       ["tb", []],
     ]);
     const once = evaluateGates({
       scenario: applyShippedTerminations(mixed, report.errors[0]),
-      trace: null,
     });
     expect(once.errors.map((error) => error.field)).toEqual(["tb"]);
   });

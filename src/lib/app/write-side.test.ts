@@ -57,7 +57,7 @@ function imported(points: number): AppState {
   const trace: Trace = { d, z, dev: 0, fileName: "releve.csv" };
   const scenario: ScenarioDraft = {
     ...firstRunDefaults(),
-    geometry: { source: "trace", trace: encodeP1(trace), sa: 0, sb: d[points - 1] },
+    geometry: { source: "trace", trace: encodeP1(trace) },
   };
   return appState(scenario, trace);
 }

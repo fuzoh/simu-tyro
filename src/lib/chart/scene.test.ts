@@ -475,47 +475,38 @@ describe("the imported profile — one terrain joint, one domain", () => {
     fileName: "profil.csv",
   };
 
-  const imported = (sa: number, sb: number): ScenarioDraft => ({
+  const imported: ScenarioDraft = {
     ...firstRunDefaults(),
-    geometry: { source: "trace", trace: "p1.stub", sa, sb },
-  });
+    geometry: { source: "trace", trace: "p1.stub" },
+  };
 
-  it("derives L and h from the stations, and the ground from the file's own samples", () => {
-    const built = scene(imported(100, 300), trace);
-    expect(built.L).toBe(200);
-    // h = (z_B + hauteur_B) − (z_A + hauteur_A), both anchors 12 m: the altitude difference.
-    expect(built.h).toBeCloseTo(478 - 498, 9);
+  it("takes L and h from the whole profil, and the ground from the file's own samples", () => {
+    const built = scene(imported, trace);
+    expect(built.L).toBe(400);
+    // h = (z_last + hauteur_B) − (z_first + hauteur_A), both anchors 12 m: the altitude difference.
+    expect(built.h).toBeCloseTo(470 - 500, 9);
     expect(built.terrain.kind).toBe("profile");
     // Anchor A's top is the datum, so the ground under it is exactly −hauteur_A.
-    expect(built.ground.zs[built.ground.xs.indexOf(0)]).toBeCloseTo(-12, 9);
+    expect(built.ground.zs[built.ground.xs.indexOf(0)]).toBe(-12);
   });
 
-  it("clamps the 5 % margin to the trace extent — a whole-trace import is the domain", () => {
-    // Stations at the two ends: the margin has nowhere to go, and the domain is the trace.
-    const whole = scene(imported(0, 400), trace);
+  it("the profil is the domain — the 5 % margin has nowhere to go past its two ends", () => {
+    const whole = scene(imported, trace);
     expect(whole.extent).toEqual({ min: 0, max: 400 });
     expect(whole.domain).toEqual([0, 400]);
-    // Stations well inside: the margin stands, and the drawn ground covers it. Everything is in
-    // the **span** frame — metres from anchor A — which is the frame the x axis reads in.
-    const inside = scene(imported(100, 300), trace);
-    expect(inside.extent).toEqual({ min: -100, max: 300 });
-    expect(inside.domain).toEqual([-10, 210]);
-    expect(inside.ground.xs[0]).toBe(-10);
-    expect(inside.ground.xs[inside.ground.xs.length - 1]).toBe(210);
   });
 
-  it("never resamples: every file sample inside the domain is drawn, and no other", () => {
+  it("never resamples: every file sample is drawn, and no other", () => {
     // Resampling was killed for making a coarse import indistinguishable from a fine one, and that
-    // rule does not stop at the engine's edge. The file's 100…300 land at 0…200 in the span frame.
-    const built = scene(imported(100, 300), trace);
-    expect([...built.ground.xs]).toEqual([-10, 0, 50, 100, 150, 200, 210]);
+    // rule does not stop at the engine's edge.
+    expect([...scene(imported, trace).ground.xs]).toEqual([...trace.d]);
   });
 
-  it("a degenerate placement has no picture — « L doit être > 0 »", () => {
-    expect(buildScene({ scenario: imported(300, 300), trace })).toBeNull();
-    expect(buildScene({ scenario: imported(300, 100), trace })).toBeNull();
-    // A trace-mode scenario with no cached Trace is the same: nothing to draw, and no throw.
-    expect(buildScene({ scenario: imported(100, 300), trace: null })).toBeNull();
+  it("a profil with no span has no picture, and no throw", () => {
+    const lone: Trace = { ...trace, d: Float64Array.of(0), z: Float64Array.of(500) };
+    expect(buildScene({ scenario: imported, trace: lone })).toBeNull();
+    // A trace-mode scenario with no cached Trace is the same: nothing to draw.
+    expect(buildScene({ scenario: imported, trace: null })).toBeNull();
   });
 });
 
@@ -546,7 +537,7 @@ describe("« Aucun résultat » — the null arm", () => {
 });
 
 describe("the frame outlives the solve — § 8's « les entrées se dessinent toujours »", () => {
-  /** The same synthetic trace the imported-profile block uses, for the station cases. */
+  /** A coarser cut of the imported-profile block's synthetic trace. */
   const trace: Trace = {
     d: Float64Array.from([0, 100, 200, 300, 400]),
     z: Float64Array.from([500, 498, 486, 478, 470]),
@@ -586,7 +577,7 @@ describe("the frame outlives the solve — § 8's « les entrées se dessinent t
     expect(frameOf(draft)).not.toBeNull();
   });
 
-  it("only l'exception géométrique loses the frame — L, h, and the stations", () => {
+  it("only l'exception géométrique loses the frame — L and h", () => {
     // The one state § 8 wrote down *as* an exception: no shared x domain, so no scale, no ticks
     // and no pointer path.
     for (const geometry of [
@@ -601,15 +592,15 @@ describe("the frame outlives the solve — § 8's « les entrées se dessinent t
     }
   });
 
-  it("`station B ≤ station A` yields no frame, and neither does a missing Trace", () => {
-    const imported = (sa: number, sb: number): ScenarioDraft => ({
+  it("a missing Trace yields no frame, and neither does a one-sample one", () => {
+    const imported: ScenarioDraft = {
       ...firstRunDefaults(),
-      geometry: { source: "trace", trace: "p1.stub", sa, sb },
-    });
-    expect(frameOf(imported(300, 300), trace)).toBeNull();
-    expect(frameOf(imported(300, 100), trace)).toBeNull();
-    expect(frameOf(imported(100, 300), null)).toBeNull();
-    expect(frameOf(imported(100, 300), trace)).not.toBeNull();
+      geometry: { source: "trace", trace: "p1.stub" },
+    };
+    const lone: Trace = { ...trace, d: Float64Array.of(0), z: Float64Array.of(500) };
+    expect(frameOf(imported, null)).toBeNull();
+    expect(frameOf(imported, lone)).toBeNull();
+    expect(frameOf(imported, trace)).not.toBeNull();
   });
 
   it("draws the frame on the unloaded line's placement: one terrain derivation", async () => {
@@ -625,7 +616,7 @@ describe("the frame outlives the solve — § 8's « les entrées se dessinent t
 
     const draft: ScenarioDraft = {
       ...firstRunDefaults(),
-      geometry: { source: "trace", trace: "p1.stub", sa: 100, sb: 300 },
+      geometry: { source: "trace", trace: "p1.stub" },
     };
     sceneModule.buildScene({ scenario: draft, trace });
     expect(spies.deriveTerrain).toHaveBeenCalledTimes(1);

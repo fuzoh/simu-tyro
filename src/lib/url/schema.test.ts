@@ -66,8 +66,6 @@ describe("the key table and canonical order", () => {
       "reg",
       "L",
       "h",
-      "sa",
-      "sb",
       "za",
       "zb",
       "fl",
@@ -234,9 +232,17 @@ describe("the three refusal classes come back as a marker, never as a throw", ()
   });
 
   test("a valid trace is kept verbatim, never decoded into the validated search", () => {
-    const search = validateSearch(parse(`?tr=${TRACE}&sa=0&sb=100`));
+    const search = validateSearch(parse(`?tr=${TRACE}`));
     expect(search.tr).toBe(TRACE);
-    expect(search).toEqual({ tr: TRACE, sa: 0, sb: 100 });
+    expect(search).toEqual({ tr: TRACE });
+  });
+
+  test("the stations of a link from before #88 are unknown keys, not a refusal", () => {
+    expect(validateSearch(parse(`?tr=${TRACE}&sa=0&sb=100`))).toEqual({ tr: TRACE });
+    expect(salvageSearch(parse(`?tr=${TRACE}&sa=0&sb=100`)).dropped).toEqual([
+      { key: "sa", reason: "clé-inconnue" },
+      { key: "sb", reason: "clé-inconnue" },
+    ]);
   });
 });
 

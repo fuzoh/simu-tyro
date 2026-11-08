@@ -63,7 +63,6 @@ import type {
   VerdictResult,
   VerdictState,
 } from "@/lib/sim";
-import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { formatAtX, formatQuantity, formatValue } from "@/lib/format/quantity.ts";
 import { amplifiedTension, evaluateVerdict, REGIMES, scanTensionEnvelope } from "@/lib/sim";
@@ -229,8 +228,6 @@ export type SolvedTraverse = {
 /** What {@link deriveResults} reads. The scene is already solved: this module never solves. */
 export type ResultsInput = {
   readonly scenario: TraverseScenario;
-  /** The active profile, or `null` in manual mode — the Solve Gate's stations read it. */
-  readonly trace: Trace | null;
   /**
    * The scenario's half of the scene — the sweep, the unloaded solve and §11, computed **once**
    * behind the `useSweep` seam and shared with the Chart Block. `null` is « Aucun résultat ».
@@ -255,8 +252,8 @@ export type ResultsInput = {
  * @returns `null` for « Aucun résultat » — no scene, or a Solve Gate breach. The cause line that
  *   replaces the block in that state is A11's, and it is a *sentence*, never a set of dashes.
  */
-export function deriveResults({ scenario, trace, base, report }: ResultsInput): Results | null {
-  const gates = report ?? evaluateGates({ scenario, trace });
+export function deriveResults({ scenario, base, report }: ResultsInput): Results | null {
+  const gates = report ?? evaluateGates({ scenario });
   if (base === null || !gates.passed.solve) return null;
 
   const { unit } = scenario;

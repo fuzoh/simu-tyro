@@ -26,7 +26,7 @@ function scenario(patch: (draft: ScenarioDraft) => void = () => {}): ScenarioDra
 }
 
 function report(patch: (draft: ScenarioDraft) => void = () => {}): GateReport {
-  return evaluateGates({ scenario: scenario(patch), trace: null });
+  return evaluateGates({ scenario: scenario(patch) });
 }
 
 const REFUSAL: EngineRefusal = {
@@ -97,7 +97,7 @@ describe("the three gates, each removing exactly what § 7 says it does", () => 
   });
 });
 
-describe("l'exception géométrique — scoped to `L` / `h` / station failures", () => {
+describe("l'exception géométrique — scoped to `L` / `h` failures", () => {
   test.each([
     [
       "une portée invalide",
@@ -142,7 +142,6 @@ describe("the two structural claims the whole fix rests on", () => {
     // screen kept the last valid Sweep while the banner announced « aucun résultat ».
     const typed = evaluateGates({
       scenario: scenario(),
-      trace: null,
       issues: [
         {
           field: "L",
@@ -161,7 +160,6 @@ describe("the two structural claims the whole fix rests on", () => {
     const draft = scenario();
     const mid = evaluateGates({
       scenario: draft,
-      trace: null,
       issues: [{ field: "mp", kind: "empty", message: "valeur requise" }],
     });
     const saisie = saisieEnCours(mid, "mp", "120 kg");

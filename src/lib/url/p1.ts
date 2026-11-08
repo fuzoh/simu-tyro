@@ -14,10 +14,10 @@
  *   decoding it asynchronously downstream, would put terrain behind a boundary the whole app then
  *   has to model, when the engine is synchronous by contract. Deflate also buys little on 200
  *   monotone integers: that shape is what delta coding is *for*.
- * - **The trace is embedded, never omitted.** `L` and `h` are **derived** from anchor placements
- *   on the Trace, so a link without terrain does not describe a coarser span — it describes **no
- *   span at all**, and falling back to the straight anchor-base ground line would fabricate a
- *   manual scenario the sender never entered.
+ * - **The trace is embedded, never omitted.** `L` and `h` are **derived** from the Trace, whose
+ *   ends are the two anchors, so a link without terrain does not describe a coarser span — it
+ *   describes **no span at all**, and falling back to the straight anchor-base ground line would
+ *   fabricate a manual scenario the sender never entered.
  * - **Altitude is quantised by ceiling, never nearest.** That is the assertion that matters most
  *   here: it makes the one lossy step provably **safe-side** — shared terrain is never *lower*
  *   than the original — at a magnitude (≤ 0,010 m) already ruled beneath notice by the ≈5 mm
@@ -31,8 +31,9 @@
  *   scalar every shared trace would degrade to « rectitude non vérifiable » and the recipient
  *   would lose a disclosure the sender had. Varint `0` **is** that unverifiable state; a measured
  *   deviation rides as `cm + 1`, so a perfectly straight trace is not the sentinel.
- * - **Quantisation never touches `L`.** Stations ride as the full-precision scalars `sa`/`sb`, and
- *   `L = sb − sa`. The centimetre grid is a property of the *profile*, not of the span.
+ * - **`L` rides on `d`.** The span is the profil's own extent, which is why `d` goes onto the
+ *   centimetre grid to the nearest centimetre — a re-read of what the geoportal writes — and only
+ *   `z` takes the lossy ceiling.
  * - **{@link validateP1} is structural only, allocates no arrays, and returns the string
  *   verbatim.** Arrays in the validated search would be stringified back into the address bar —
  *   200 points of JSON against a 2000-character budget. It also runs 3× per document request, on

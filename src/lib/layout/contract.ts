@@ -307,47 +307,9 @@ export function chartBlockHeight(
   );
 }
 
-/**
- * § 5's anchor target — « each with a **44 × 48 px** hit target spanning the lane plus the label
- * band ». The 48 is **derived**, {@link PROFILE_CHROME}'s `handleLane + xLabels`: the target *is*
- * those two rows, so it cannot drift from them, and 44 is the coarse-pointer minimum the rider's
- * grab circle already meets.
- */
-export const ANCHOR_TARGET = {
-  width: 44,
-  height: PROFILE_CHROME.handleLane + PROFILE_CHROME.xLabels,
-} as const;
-
-/** An anchor's hit target in the Handle Lane, in the profile SVG's own user coordinates. */
-export type AnchorTarget = {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-};
-
-/**
- * One anchor's target, placed. **Entirely below the plot area**, which is the whole point: the
- * anchors are pinned at the domain edges, so at 390 px a 44 px target covers the first and last
- * 12 % of the span and the rider glyph overlaps it whenever `x_D` comes within ~46 m of an anchor.
- * You cannot size your way out of two targets that are always at `x = 0` and `x = L` — putting them
- * in their own lane makes confusing one with the rider geometrically impossible.
- *
- * @param centreX the anchor's x in SVG user units — `SharedX.x(0)` or `SharedX.x(L)`.
- * @param laneTop the Handle Lane's top edge, i.e. the **bottom of the plot area**.
- */
-export function anchorTarget(centreX: number, laneTop: number): AnchorTarget {
-  return {
-    x: centreX - ANCHOR_TARGET.width / 2,
-    y: laneTop,
-    width: ANCHOR_TARGET.width,
-    height: ANCHOR_TARGET.height,
-  };
-}
-
 // ─── § 5 — One shared x scale object, one `GUTTER`, one inverse ────────────────────────────────
 
-/** The span margin each side of the x domain: `[d_A − 0,05 L, d_B + 0,05 L]`, i.e. `1,1 L` wide. */
+/** The span margin each side of the x domain: `[−0,05 L, 1,05 L]`, i.e. `1,1 L` wide. */
 export const X_MARGIN = 0.05;
 
 /**
@@ -382,18 +344,16 @@ export type SharedX = {
 };
 
 /**
- * § 4's shared x domain: **`[d_A − 0,05 L, d_B + 0,05 L]`, clamped to the trace extent** — so a
- * whole-trace import makes the domain exactly the trace.
+ * § 4's shared x domain: **`[−0,05 L, 1,05 L]`, clamped to the trace extent** — an imported profil
+ * runs anchor to anchor, so there the domain is exactly the span.
  *
  * It is a function of `(L, terrain source)` alone and **not of the box**, which is why the drawn
- * ground polyline can be built from it before any width is measured. The margin is not decoration:
- * with a domain of exactly `[0, L]`, dragging anchor A inward rescales the chart under the cursor
- * *and* makes the terrain you just excluded vanish. The clearance curve stays undefined outside
- * `[0, L]`, which marks the span's boundaries for free.
+ * ground polyline can be built from it before any width is measured. The clearance curve stays
+ * undefined outside `[0, L]`, which marks the span's boundaries for free.
  *
- * @param L the span, m. Must be finite and positive: `L ≤ 0` is § 4's degenerate placement, which
- *   the form blocks with « L doit être > 0 » and `[ Inverser A et B ]`, so reaching the scale with
- *   it is a caller bug of `sampleCable`'s class rather than a state to render.
+ * @param L the span, m. Must be finite and positive: a geometry with no span is § 8's geometric
+ *   exception, which never reaches the scale, so reaching it with one is a caller bug of
+ *   `sampleCable`'s class rather than a state to render.
  * @param extent the terrain's own horizontal extent in the **span frame** (metres from anchor A),
  *   or `null` in manual mode, where the ground is the straight line between the two anchor bases.
  * @throws RangeError when `L` is not finite and positive.

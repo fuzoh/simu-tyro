@@ -63,9 +63,7 @@ import {
 } from "@/lib/layout/contract.ts";
 import { CELL_IDS, CELL_LABEL, readOutCells } from "@/lib/rail/cells.ts";
 import { CELL_HELP } from "@/lib/rail/help.ts";
-import { applyField } from "@/lib/rail/values.ts";
 import { clampX } from "@/lib/scenario/geometry.ts";
-import { snapStation } from "@/lib/terrain/trace.ts";
 import { cn } from "@/lib/utils.ts";
 
 import { Profile } from "./profile.tsx";
@@ -270,31 +268,6 @@ export function ChartBlock({
     if (snapped !== null) moveRider(roundToDisplay("x_D", snapped));
   }
 
-  /**
-   * § 4's two Station handles. **The snap is the pointer path's whole rule** — `snapStation` takes
-   * the file's own nearest sample and clamps to the trace, so a drag cannot reach « Station hors du
-   * tracé » while a typed station still blocks. The metres arrive in the span frame, so `s_A` is what
-   * turns them into a station: at `x = 0` the pointer is on anchor A, whatever the file numbers it.
-   *
-   * `applyField` is the write, rather than a geometry patch built here, because it is the one path
-   * that brings `x_D`'s clamp along with a new span — « no route into a new span can forget it ».
-   */
-  function dragStation(anchor: "A" | "B", metres: number) {
-    const { geometry } = state.scenario;
-    if (inert || geometry.source !== "trace" || state.trace === null) return;
-    const next = applyField(
-      state.scenario,
-      anchor === "A" ? "sa" : "sb",
-      snapStation(state.trace, geometry.sa + metres),
-    );
-    // Two keys rather than the whole draft: the store's shallow merge is what keeps
-    // `unloadedInputs` stable for everything this drag does not touch.
-    dispatch({
-      type: "scénario/modifié",
-      patch: { geometry: next.geometry, rider: next.rider },
-    });
-  }
-
   /** A typed position is exact, clamped into `[0, L]` because `x_D` selects a view. */
   function moveRider(metres: number) {
     if (frame === null || inert) return;
@@ -335,13 +308,6 @@ export function ChartBlock({
           frame={frame}
           layers={state.layers}
           onScrub={scrub}
-          // Manual mode passes nothing, and that **is** § 5's « bracket, non-interactive »: with no
-          // trace to snap to there is no station to place, and the same two rectangles stay inert.
-          onStation={
-            state.scenario.geometry.source === "trace" && state.trace !== null
-              ? dragStation
-              : undefined
-          }
           plot={{ top: PROFILE_CHROME.badge, height: plotHeight }}
           scene={scene}
           wide={wide}

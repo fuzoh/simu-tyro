@@ -198,19 +198,20 @@ const TERMINATION_IDS = Object.keys(TERMINATIONS) as [TerminationId, ...Terminat
 const FORCE_UNIT: v.GenericSchema<unknown, ForceUnit> = v.picklist(["daN", "kN", "kgf"]);
 
 /**
- * § 7's geometry union — manual `L`/`h`, or an import's verbatim `p1.` payload and its two
- * stations. The payload is checked **structurally**, by the codec that wrote it: a corrupt one
- * would otherwise surface as a throw inside a memoised derivation, several frames after the read
- * that could still have discarded it. Structurally and **not** against the address budget — voir
+ * § 7's geometry union — manual `L`/`h`, or an import's verbatim `p1.` payload, taken whole. The
+ * payload is checked **structurally**, by the codec that wrote it: a corrupt one would otherwise
+ * surface as a throw inside a memoised derivation, several frames after the read that could still
+ * have discarded it. Structurally and **not** against the address budget — voir
  * {@link isDecodableP1}.
+ *
+ * A Session written before #88 also holds two stations here; `v.object` drops unknown keys, so its
+ * retained profil comes back whole rather than discarding the user's import.
  */
 const GEOMETRY: v.GenericSchema<unknown, Scenario["geometry"]> = v.variant("source", [
   v.object({ source: v.literal("manual"), L: FINITE, h: FINITE }),
   v.object({
     source: v.literal("trace"),
     trace: v.pipe(v.string(), v.check(isDecodableP1, "not a p1. payload")),
-    sa: FINITE,
-    sb: FINITE,
   }),
 ]);
 

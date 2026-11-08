@@ -22,7 +22,7 @@
  *
  * Rules this module exists to keep:
  *
- * - **The geometric exception is scoped to `L` / `h` / station failures** and written down *as* an
+ * - **The geometric exception is scoped to `L` / `h` failures** and written down *as* an
  *   exception: without the scope somebody applies « collapse both plots » to every failure alike
  *   and computes a scale over a NaN domain.
  * - **A refusal suppresses like a Solve breach.** « Tension impossible » leaves no `SpanState`, so
@@ -38,11 +38,12 @@ import type { FieldId } from "@/lib/rail/fields.ts";
 import type { GateReport } from "@/lib/rail/gates.ts";
 
 /**
- * The four fields whose failure leaves **no shared x domain at all** — it is defined as span + 5 %,
+ * The two fields whose failure leaves **no shared x domain at all** — it is defined as span + 5 %,
  * so `x_D`, defined on `[0, L]`, has no interval to live in and the clamp has nothing to clamp
- * into. § 7 scopes the exception to exactly these and no others.
+ * into. § 7 scopes the exception to exactly these and no others; an imported profil has no field
+ * that can take its span away.
  */
-const GEOMETRY_FIELDS: ReadonlySet<FieldId> = new Set<FieldId>(["L", "h", "sa", "sb"]);
+const GEOMETRY_FIELDS: ReadonlySet<FieldId> = new Set<FieldId>(["L", "h"]);
 
 /** How much picture survives. Each flag is « suppressed », so `false` everywhere is a clean line. */
 export type Suppression = {

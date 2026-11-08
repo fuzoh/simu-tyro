@@ -48,8 +48,8 @@ const ALL_IDS = Object.keys(QUANTITIES) as QuantityId[];
  * stiffness — voir its own comment in the table, and ticket 37 defect 4 for why it is a
  * `QuantityId` rather than a second rounding site — `unloadedGap`, the « Écart à vide » cell
  * added after § 3 was written, and `memberLoad`, the « Charge par ligne » of two Brins porteurs.
- * The four rows the column leaves empty or dashed (`Station`, `MBL`, `T adm`, `Réserve de
- * tension`) take § 3's or § 6's quoted figures instead.
+ * The three rows the column leaves empty or dashed (`MBL`, `T adm`, `Réserve de tension`) take
+ * § 3's or § 6's quoted figures instead.
  *
  * `value` is always the row's **canonical** unit — § 3's SI storage: metres, mm, kg, kg/m,
  * **newtons**, N/m, percent — so the N → daN → kN → kgf and N → MN conversions are exercised by
@@ -61,8 +61,7 @@ const ROWS: ReadonlyArray<{ id: QuantityId; value: number; expected: string }> =
   { id: "L", value: 150, expected: "150,0 m" },
   { id: "h", value: -18, expected: "-18,0 m" },
   { id: "anchorHeight", value: 12, expected: "12,0 m" },
-  // No first-run value: the Stations exist in imported mode only, at the file's 0,1 m grain.
-  { id: "station", value: 87.42, expected: "87,4 m" },
+
   // § 4's own printed « Alt. base A 540,4 m » — an altitude in the file's frame, not a difference.
   { id: "zBase", value: 540.44, expected: "540,4 m" },
   { id: "D_target", value: 6, expected: "6,00 m" },

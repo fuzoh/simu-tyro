@@ -32,10 +32,8 @@ export const FIELD_HELP: Record<FieldId, string> = {
     "Le référentiel de sécurité contre lequel le verdict est rendu. Chaque régime fixe un diviseur k : la tension admissible vaut T adm = η · MBF / k et le facteur de sécurité effectif FS = η · MBF / T max majoré doit atteindre k. Certains régimes ajoutent un second critère (charge suspendue) ou une obligation non évaluée (essai de charge 2×). « — choisir — » est un état légitime : sans régime, l'outil calcule tout sauf le verdict et la grille critères × extrémités.",
   L: "Portée horizontale L entre les deux ancrages, en mètres. C'est la longueur de référence de toute la statique : la chaînette y est résolue, la flèche s'exprime en fraction de L, et le passager se déplace sur x ∈ [0, L]. Le domaine de validité des références est 50 – 2000 m ; hors de cette bande, un avertissement s'affiche mais le calcul reste effectué.",
   h: "Dénivelé h = z(B) − z(A) entre les deux ancrages, en mètres. Négatif quand B est plus bas que A (ligne descendante). Il fixe la ligne A–B et la pente moyenne. Sur un sol plan (mode manuel, sol = droite entre les bases), le dénivelé n'apporte aucune garde au sol supplémentaire : celle-ci dépend surtout des hauteurs d'ancrage et de la flèche chargée.",
-  zA: "Hauteur de l'ancrage A au-dessus de sa base au sol, en mètres. En mode manuel, la base A est l'origine du sol et cette hauteur fixe directement la garde disponible sous la ligne côté A. Avec un profil importé, elle s'ajoute à l'altitude du terrain à la distance A pour donner l'altitude de l'ancrage, et entre donc dans le dénivelé résolu.",
-  zB: "Hauteur de l'ancrage B au-dessus de sa base au sol, en mètres. Même rôle que la hauteur A : en mode manuel elle fixe la garde côté B ; avec un profil importé elle s'ajoute à l'altitude du terrain à la distance B et entre dans le dénivelé résolu.",
-  sa: "Position de l'ancrage A le long du profil importé, en mètres dans le repère du fichier (colonne Distance). La portée devient L = distance B − distance A et le dénivelé se lit sur le terrain à ces deux distances. La distance doit rester dans l'étendue du profil.",
-  sb: "Position de l'ancrage B le long du profil importé, en mètres dans le repère du fichier. Avec la distance A, elle définit la portée L = sB − sA et le dénivelé h = (z(sB) + hauteur B) − (z(sA) + hauteur A). Elle doit être supérieure à la distance A et rester dans le profil.",
+  zA: "Hauteur de l'ancrage A au-dessus de sa base au sol, en mètres. En mode manuel, la base A est l'origine du sol et cette hauteur fixe directement la garde disponible sous la ligne côté A. Avec un profil importé, elle s'ajoute à l'altitude du premier point du profil, sous l'ancrage A, pour donner l'altitude de l'ancrage, et entre donc dans le dénivelé résolu.",
+  zB: "Hauteur de l'ancrage B au-dessus de sa base au sol, en mètres. Même rôle que la hauteur A : en mode manuel elle fixe la garde côté B ; avec un profil importé elle s'ajoute à l'altitude du dernier point du profil, sous l'ancrage B, et entre dans le dénivelé résolu.",
   family:
     "Famille de ligne : câble acier (famille A) ou corde textile (famille B). Les deux modèles physiques sont distincts : l'acier est quasi élastique et ses terminaisons sont normalisées (EN 13411) ; la corde textile flue, sa raideur est exprimée en EA = k · MBL, et §10.4 la réserve aux installations temporaires. La spécification de l'autre famille est conservée en mémoire et restaurée si vous revenez dessus.",
   carryingLines:
@@ -92,12 +90,12 @@ export const TIGHTNESS_HELP =
 
 /** Help for the read-only rows of `Valeurs déduites`. The three steel derived rows use {@link FIELD_HELP}. */
 export const DEDUCED_HELP: Record<DeducedRowId, string> = {
-  L: "Portée déduite du profil importé : L = distance B − distance A, en mètres. Avec un profil la portée n'est pas saisie mais dérivée des deux distances.",
-  h: "Dénivelé déduit du profil importé : h = (z(sB) + hauteur B) − (z(sA) + hauteur A), en mètres. Négatif quand l'ancrage B est plus bas que A.",
+  L: "Portée déduite du profil importé, pris entier d'un ancrage à l'autre : son premier point est sous l'ancrage A, son dernier sous l'ancrage B. L = distance du dernier point − distance du premier, en mètres. Avec un profil la portée n'est pas saisie.",
+  h: "Dénivelé déduit du profil importé : h = (altitude du dernier point + hauteur B) − (altitude du premier point + hauteur A), en mètres. Négatif quand l'ancrage B est plus bas que A.",
   zBaseA:
-    "Altitude du sol à la distance A, lue sur le profil importé (colonne Altitude, interpolée). L'ancrage A se trouve à cette altitude plus la hauteur d'ancrage A.",
+    "Altitude du sol sous l'ancrage A : celle du premier point du profil importé (colonne Altitude). L'ancrage A se trouve à cette altitude plus la hauteur d'ancrage A.",
   zBaseB:
-    "Altitude du sol à la distance B, lue sur le profil importé. L'ancrage B se trouve à cette altitude plus la hauteur d'ancrage B.",
+    "Altitude du sol sous l'ancrage B : celle du dernier point du profil importé. L'ancrage B se trouve à cette altitude plus la hauteur d'ancrage B.",
   MBL: "Charge de rupture minimale MBL de la corde, telle que saisie, affichée dans l'unité de force choisie. Numérateur de T adm = η · MBL / k et de FS = η · MBL / T max majoré.",
   EAtextile:
     "Raideur axiale de la corde EA = k · MBL, en MN (§13.2). Elle règle l'allongement élastique sous charge : plus EA est grand, moins la flèche chargée augmente.",

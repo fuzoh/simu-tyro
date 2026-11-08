@@ -302,9 +302,9 @@ describe("a formatter, not a second chain — `vi.mock` on the engine barrel", (
 });
 
 describe("imported mode — `L` and `h` become read-outs of their own", () => {
-  test("`L = d_B − d_A` and `h` measured anchor top to anchor top", () => {
+  test("`L` is the whole profil and `h` is measured anchor top to anchor top", () => {
     const imported = scenario((draft) => {
-      draft.geometry = { source: "trace", trace: "p1.x", sa: 0, sb: 224 };
+      draft.geometry = { source: "trace", trace: "p1.x" };
       draft.anchors = { zA: 4, zB: 2.5 };
     });
     const { span } = deduceValues(imported, TRACE);
@@ -318,27 +318,28 @@ describe("imported mode — `L` and `h` become read-outs of their own", () => {
     // altitudes: the two `hauteur d'ancrage` fields are already accounted for in `h` and may not be
     // added again here.
     const imported = scenario((draft) => {
-      draft.geometry = { source: "trace", trace: "p1.x", sa: 56, sb: 224 };
+      draft.geometry = { source: "trace", trace: "p1.x" };
       draft.anchors = { zA: 4, zB: 2.5 };
     });
-    // Station 56 sits between samples 0 and 112: 540 − 20·(56/112) = 530.
-    expect(deduceValues(imported, TRACE).span?.bases).toEqual({ zBaseA: 530, zBaseB: 500 });
+    // The profil's first and last samples: A stands on the one, B on the other.
+    expect(deduceValues(imported, TRACE).span?.bases).toEqual({ zBaseA: 540, zBaseB: 500 });
   });
 
   test("manual mode has no base altitudes — a straight ground line has no altitude to print", () => {
     expect(deduceValues(scenario(), null).span?.bases).toBeNull();
   });
 
-  test("a degenerate placement has no span at all, and therefore no `corde`", () => {
-    const degenerate = scenario((draft) => {
-      draft.geometry = { source: "trace", trace: "p1.x", sa: 120, sb: 120 };
+  test("a one-sample profil has no span at all, and therefore no `corde`", () => {
+    const lone = scenario((draft) => {
+      draft.geometry = { source: "trace", trace: "p1.x" };
     });
-    expect(deduceValues(degenerate, TRACE).span).toBeNull();
+    const point: Trace = { ...TRACE, d: Float64Array.of(0), z: Float64Array.of(540) };
+    expect(deduceValues(lone, point).span).toBeNull();
   });
 
   test("a trace-sourced geometry with no trace loaded has no span either", () => {
     const orphan = scenario((draft) => {
-      draft.geometry = { source: "trace", trace: "p1.x", sa: 0, sb: 224 };
+      draft.geometry = { source: "trace", trace: "p1.x" };
     });
     expect(deduceValues(orphan, null).span).toBeNull();
   });
@@ -446,20 +447,19 @@ describe("`deducedRows` — the rows the Rail prints, decided outside the compon
 
   test("an imported profile puts `Portée`, `Dénivelé` and both base altitudes first", () => {
     const imported = scenario((draft) => {
-      draft.geometry = { source: "trace", trace: "p1.x", sa: 56, sb: 224 };
+      draft.geometry = { source: "trace", trace: "p1.x" };
       draft.anchors = { zA: 4, zB: 2.5 };
     });
     const rows = deducedRows(imported, deduceValues(imported, TRACE), null);
-    // L = 224 − 56 = 168; z(56) = 530, so h = (500 + 2,5) − (530 + 4) = −31,5;
-    // corde = √(168² + 31,5²) = √29 216,25 = 170,928.
+    // L = 224; h = (500 + 2,5) − (540 + 4) = −41,5; corde = √(224² + 41,5²) = √51 898,25 = 227,812.
     expect(shown(rows.filter((row) => row.group === "placement"))).toEqual([
-      ["Portée", "168,0 m", null],
-      ["Dénivelé", "-31,5 m", null],
-      ["Alt. base A", "530,0 m", null],
+      ["Portée", "224,0 m", null],
+      ["Dénivelé", "-41,5 m", null],
+      ["Alt. base A", "540,0 m", null],
       ["Alt. base B", "500,0 m", null],
     ]);
     expect(rows.slice(0, 4).every((row) => row.group === "placement")).toBe(true);
-    expect(rows.find((row) => row.label === "Ligne A–B")?.value).toBe("170,93 m");
+    expect(rows.find((row) => row.label === "Ligne A–B")?.value).toBe("227,81 m");
   });
 });
 

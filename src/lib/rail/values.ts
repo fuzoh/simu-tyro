@@ -23,17 +23,17 @@
  *   that is correct, not a bug to smooth over.
  * - **`x_D` clamps on every path**, and in **both** terrain modes. It selects a view, not a design
  *   input, and refusing to draw a valid span because the viewpoint is stale is worse than moving
- *   the viewpoint. The clamp runs against {@link spanLength} — typed `L` in manual mode, `s_B − s_A`
- *   in imported mode — so state never holds an out-of-span `x_D` for one mode and not the other,
- *   and the transient note has a single event to fire on: the value that *entered* state differing
- *   from the one that was asked for.
+ *   the viewpoint. {@link applyField} clamps against {@link spanLength} — typed `L` in manual mode,
+ *   the profil's extent in imported mode — after **every** write, so neither a new span nor a new
+ *   position can leave state holding an out-of-span `x_D`, and the transient note has a single
+ *   event to fire on: the value that *entered* state differing from the one that was asked for.
  * - **One lens per numeric field.** {@link FIELD_ACCESS} is the only place a field is read out of
  *   or written into the Scenario, so the Rail, the gates and « Saisie en cours » cannot disagree on
  *   what a field holds — the drift that left « Rapport V cible » without a committed value.
  */
 
 import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
-import type { Geometry, ScenarioDraft, TightnessDraft } from "@/lib/scenario/types.ts";
+import type { ScenarioDraft, TightnessDraft } from "@/lib/scenario/types.ts";
 import type { TextileSpec } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
@@ -148,12 +148,15 @@ type FieldAccess = {
  * A write to a field the Scenario does not render is the mode's own rule: a Tightness Driver field
  * becomes the driver, and `Portée` and `Dénivelé` in imported mode, the steel fields on a rope and
  * the rope fields on steel leave the Scenario as it was.
+ *
+ * No lens clamps `x_D`: {@link applyField} does, after whichever write moved the span or the
+ * position.
  */
 export const FIELD_ACCESS: FieldAccess = {
   L: {
     read: ({ geometry }) => (geometry.source === "manual" ? geometry.L : undefined),
-    // `x_D` selects a view, so a shorter span moves the viewpoint rather than refusing the span.
-    write: (s, L) => (s.geometry.source === "manual" ? applyGeometry(s, { ...s.geometry, L }) : s),
+    write: (s, L) =>
+      s.geometry.source === "manual" ? { ...s, geometry: { ...s.geometry, L } } : s,
   },
   h: {
     read: ({ geometry }) => (geometry.source === "manual" ? geometry.h : undefined),
@@ -168,16 +171,7 @@ export const FIELD_ACCESS: FieldAccess = {
     read: ({ anchors }) => anchors.zB,
     write: (s, zB) => ({ ...s, anchors: { ...s.anchors, zB } }),
   },
-  // The stations *are* the span in imported mode (`L = s_B − s_A`), so moving one moves the
-  // viewpoint exactly as `Portée` does in the other mode.
-  sa: {
-    read: ({ geometry }) => (geometry.source === "trace" ? geometry.sa : undefined),
-    write: (s, sa) => (s.geometry.source === "trace" ? applyGeometry(s, { ...s.geometry, sa }) : s),
-  },
-  sb: {
-    read: ({ geometry }) => (geometry.source === "trace" ? geometry.sb : undefined),
-    write: (s, sb) => (s.geometry.source === "trace" ? applyGeometry(s, { ...s.geometry, sb }) : s),
-  },
+
   d: {
     read: ({ material }) => (material.family === "steel" ? material.d : undefined),
     write: (s, d) => (s.material.family === "steel" ? { ...s, material: { ...s.material, d } } : s),
@@ -262,9 +256,7 @@ export const FIELD_ACCESS: FieldAccess = {
   },
   xD: {
     read: ({ rider }) => rider.xD,
-    // **Both modes**: an imported span is a span, and a viewpoint past station B is as stale there
-    // as one past `Portée` is here.
-    write: (s, xD) => ({ ...s, rider: { ...s.rider, xD: clampRider(xD, s.geometry) } }),
+    write: (s, xD) => ({ ...s, rider: { ...s.rider, xD } }),
   },
   windSpeed: {
     read: ({ wind }) => wind.speedKmh,
@@ -294,11 +286,10 @@ function overrideLens(
 }
 
 /** Everything tier one needs beside a field's own text, gathered once from the Scenario. */
-export function fieldContext(scenario: TraverseScenario, trace: Trace | null): FieldContext {
+export function fieldContext(scenario: TraverseScenario): FieldContext {
   return {
     unit: scenario.unit,
     ropeClass: scenario.material.family === "textile" ? scenario.material.ropeClass : undefined,
-    extent: trace === null ? undefined : { min: trace.d[0], max: trace.d[trace.d.length - 1] },
     L: scenario.geometry.source === "manual" ? scenario.geometry.L : undefined,
   };
 }
@@ -335,6 +326,11 @@ export function heldValue(
  * has already run `commitField`, so the number here is newtons, metres, millimetres or kilograms
  * and already sits on the field's display grid.
  *
+ * **`x_D` comes out inside the span** whatever was written — a shorter `Portée` moves the
+ * viewpoint rather than refusing the span — through `clampX`'s one rule, so a geometry that is no
+ * span leaves `x_D` exactly as the reducer's terrain path does.
+ *
+ * @param trace the decoded profile beside the Scenario — the span `x_D` clamps to in imported mode.
  * @returns a new draft; the argument is never mutated, because the store's shallow patch merge is
  *   what keeps `unloadedInputs` stable across a scrub.
  */
@@ -342,45 +338,24 @@ export function applyField(
   scenario: ScenarioDraft,
   id: NumericFieldId,
   value: number,
+  trace: Trace | null,
 ): ScenarioDraft {
-  return FIELD_ACCESS[id].write(scenario, value);
+  const written = FIELD_ACCESS[id].write(scenario, value);
+  const xD = clampX(written.rider.xD, spanOfGeometry(written.geometry, trace));
+  return xD === written.rider.xD ? written : { ...written, rider: { ...written.rider, xD } };
 }
 
 /**
- * The span `x_D` is clamped against: `Portée` in manual mode, `s_B − s_A` in imported mode — the
- * same arithmetic `deriveSpan` uses, and the only part of it the clamp needs, which is why it does
- * not wait for the Trace to be decoded.
+ * The span `x_D` is clamped against: `Portée` in manual mode, the profil's whole extent in imported
+ * mode — the `L` `deriveSpan` returns, without deriving the terrain.
  *
- * @returns `null` when the placement describes no span at all — `station B ≤ station A`, or an `L`
- *   the hard range has yet to refuse. Nothing is clamped against a non-span.
+ * @param trace the decoded profile beside the Scenario, `null` when none is loaded.
+ * @returns `null` when the geometry describes no span at all — an imported line with no profil, or
+ *   an `L` the hard range has yet to refuse. Nothing is clamped against a non-span.
  */
-export function spanLength(scenario: ScenarioDraft): number | null {
-  return spanOf(scenario.geometry);
-}
-
-function spanOf(geometry: Geometry): number | null {
-  const L = spanOfGeometry(geometry);
+export function spanLength(scenario: ScenarioDraft, trace: Trace | null): number | null {
+  const L = spanOfGeometry(scenario.geometry, trace);
   return Number.isFinite(L) && L > 0 ? L : null;
-}
-
-/**
- * One geometry change, **with the viewpoint brought along** — the shared path for `Portée`, the two
- * stations and « Inverser A et B », so no route into a new span can forget the clamp.
- */
-export function applyGeometry(scenario: ScenarioDraft, geometry: Geometry): ScenarioDraft {
-  return {
-    ...scenario,
-    geometry,
-    rider: { ...scenario.rider, xD: clampRider(scenario.rider.xD, geometry) },
-  };
-}
-
-/**
- * `x_D` clamps on every path, and it is the one field that does — through `clampX`'s one rule, so
- * a placement that is no span leaves `x_D` exactly as the reducer's terrain path does.
- */
-function clampRider(x: number, geometry: Geometry): number {
-  return clampX(x, spanOfGeometry(geometry));
 }
 
 /** Typing into a derived field flips it to « valeur saisie ». Steel only, and per value. */

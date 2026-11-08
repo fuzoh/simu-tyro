@@ -109,7 +109,7 @@ export type DeducedSolve = {
 /** Everything § 3's `Valeurs déduites` block reports, plus why a row is missing when one is. */
 export type Deduced = {
   readonly material: DeducedMaterial;
-  /** `null` for a placement with no span at all — `station B ≤ station A`, or no trace loaded. */
+  /** `null` for a geometry with no span at all — an invalid `L`, or an import with no profil. */
   readonly span: DeducedSpan | null;
   readonly solve: DeducedSolve | null;
   /**
@@ -194,8 +194,9 @@ export type DeducedRowId =
 export type ReadOutRow = {
   readonly id: DeducedRowId;
   /**
-   * `placement` is § 4's anchor-placement rows, printed above the material; the steel Override
-   * rows, which are editable and stay in the component, sit between the two groups.
+   * `placement` is the span an imported profil derives — portée, dénivelé, the two base
+   * altitudes — printed above the material; the steel Override rows, which are editable and stay
+   * in the component, sit between the two groups.
    */
   readonly group: "placement" | "line";
   readonly label: string;
@@ -338,14 +339,9 @@ function deducedMaterial(scenario: Pick<ScenarioDraft, "material" | "unit">): De
   };
 }
 
-/** The span, typed in manual mode and derived from the stations in imported mode. */
+/** The span, typed in manual mode and derived from the whole profil in imported mode. */
 function deducedSpan(placed: PlacedSpan | null): DeducedSpan | null {
   if (placed === null) return null;
-  const { L, h, onTrace } = placed;
-  return {
-    L,
-    h,
-    chord: Math.hypot(L, h),
-    bases: onTrace === null ? null : { zBaseA: onTrace.zBaseA, zBaseB: onTrace.zBaseB },
-  };
+  const { L, h, bases } = placed;
+  return { L, h, chord: Math.hypot(L, h), bases };
 }

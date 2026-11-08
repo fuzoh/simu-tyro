@@ -70,7 +70,7 @@ export type RailFormState = {
  *   leaves the report identical.
  */
 export function useRailForm(deduced: Deduced, traverse: TraverseScenario): RailFormState {
-  const { scenario, trace } = useAppState();
+  const { scenario } = useAppState();
 
   const [focused, setFocused] = useState<FieldId | null>(null);
   const values = useMemo(() => railValues(scenario, deduced), [scenario, deduced]);
@@ -98,19 +98,16 @@ export function useRailForm(deduced: Deduced, traverse: TraverseScenario): RailF
   // Tier one, over the text the form currently holds. The gates take it beside the Scenario,
   // because an emptied field and « 12,3,4 » are states a Scenario of numbers cannot represent.
   const issues = useMemo(() => {
-    const context = fieldContext(traverse, trace);
+    const context = fieldContext(traverse);
     return GATED_FIELDS.filter((id) => isFieldActive(id, traverse)).flatMap(
       (id) => checkField(id, gatedText[id] ?? "", context) ?? [],
     );
-  }, [gatedText, traverse, trace]);
+  }, [gatedText, traverse]);
 
   // Memoised because A11 made the report a **memo key**: the results, the scene's suppression and
   // the banner all hang off it, and a fresh object per render would re-run `evaluateVerdict` over
   // 260 steps on every keystroke and every scrub frame — the one measured cost in the app.
-  const report = useMemo(
-    () => evaluateGates({ scenario: traverse, trace, issues }),
-    [traverse, trace, issues],
-  );
+  const report = useMemo(() => evaluateGates({ scenario: traverse, issues }), [traverse, issues]);
 
   return { form, text, focused, setFocused, issues, report };
 }

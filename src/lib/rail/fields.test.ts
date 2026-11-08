@@ -180,16 +180,6 @@ describe("§ 7's message table — committed invalid, ⛔ and blocking", () => {
     expect(checkField("h", "0")).toBeNull();
   });
 
-  test("a station names the file's bound rather than the field, because two stations share it", () => {
-    const extent = { min: 0, max: 224 };
-    expect(checkField("sa", "260", { extent })).toEqual({
-      field: "sa",
-      kind: "invalid",
-      message: "⛔ Distance hors du profil (0,0 – 224,0 m). Valeur : 260,0 m.",
-    });
-    expect(checkField("sb", "224", { extent })).toBeNull();
-  });
-
   test("an out-of-range but representable value is **valid** here", () => {
     // The URL is a typing boundary and so is the form's tier one: `L = 3000` lights up a warning
     // and solves, and `L₀` below §5.4's floor is the **engine's** refusal, never a field error.
@@ -282,7 +272,7 @@ describe("the gate each field belongs to — wired with the field, not as a late
   });
 
   test("the anchor heights move to the Solve Gate in imported mode, because `h` derives there", () => {
-    // § 7's culprit table: « `h` importé → Station A, Station B, Hauteur A, Hauteur B ».
+    // § 7's culprit table, less the stations #88 retired: « `h` importé → Hauteur A, Hauteur B ».
     expect(gateOf("zA", "manual")).toBe("clearance");
     expect(gateOf("zA", "trace")).toBe("solve");
     expect(gateOf("zB", "trace")).toBe("solve");
@@ -382,8 +372,7 @@ describe("the Rail labels its fields in the exact register", () => {
   const LABELS_BY_FIELD: readonly (readonly [FieldId, string])[] = [
     ["usage", "Installation"],
     ["regime", "Régime de sécurité"],
-    ["sa", "Distance A"],
-    ["sb", "Distance B"],
+
     ["D_target", "Flèche à vide"],
     ["tensioningSide", "Côté de la Mise en tension"],
     // #85: the prétension is read at the tensioning anchor; `H` keeps its own exact name.

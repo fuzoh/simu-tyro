@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
 
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
+import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 
@@ -29,6 +30,14 @@ import {
  * writes the displayed value into state, never the underlying float**.
  */
 
+/** A 200 m profil, falling 20 m from A to B. */
+const TRACE: Trace = {
+  d: Float64Array.from([0, 200]),
+  z: Float64Array.from([100, 80]),
+  dev: null,
+  fileName: "t.csv",
+};
+
 function scenario(patch: (draft: ScenarioDraft) => void = () => {}): ScenarioDraft {
   const draft = firstRunDefaults() as ScenarioDraft;
   patch(draft);
@@ -56,8 +65,7 @@ describe("railValues — the read direction of the force selector", () => {
 
   test("a field the current mode, family or driver does not render is blank", () => {
     const values = railValues(scenario());
-    // Manual geometry has no stations; steel has no rope class; `Flèche` is the driver.
-    expect(values.sa).toBe("");
+    // Steel has no rope class; `Flèche` is the driver.
     expect(values.MBL).toBe("");
     expect(values.L0).toBe("");
     expect(values.H_target).toBe("");
@@ -85,19 +93,11 @@ describe("railValues — the read direction of the force selector", () => {
     expect(values.k).toBe("22,00");
   });
 
-  test("imported mode shows `L` and `h` as read-outs of the derived span", () => {
+  test("imported mode leaves `L` and `h` to the read-outs of the whole profil", () => {
     const imported = scenario((draft) => {
-      draft.geometry = { source: "trace", trace: "p1.x", sa: 0, sb: 200 };
+      draft.geometry = { source: "trace", trace: "p1.x" };
     });
-    const trace = {
-      d: Float64Array.from([0, 200]),
-      z: Float64Array.from([100, 80]),
-      dev: null,
-      fileName: "t.csv",
-    };
-    const values = railValues(imported, deduceValues(imported, trace));
-    expect(values.sa).toBe("0,0");
-    expect(values.sb).toBe("200,0");
+    const values = railValues(imported, deduceValues(imported, TRACE));
     expect(values.L).toBe("");
     expect(values.h).toBe("");
   });
@@ -119,7 +119,7 @@ describe("sameGatedText — the text tier one reads, through a scrub", () => {
 describe("the Vent fields (#87)", () => {
   test("typing a speed and a direction writes the wind, and nothing else", () => {
     const before = scenario();
-    const typed = applyField(applyField(before, "windSpeed", 50), "windDirection", 45);
+    const typed = applyField(applyField(before, "windSpeed", 50, null), "windDirection", 45, null);
     expect(typed.wind).toEqual({ speedKmh: 50, directionDeg: 45 });
     expect({ ...typed, wind: before.wind }).toEqual(before);
   });
@@ -182,7 +182,7 @@ describe("the unit invariant — daN → X → daN is the identity", () => {
 describe("applyField — one committed field, written back", () => {
   test("it never mutates the draft it was handed", () => {
     const before = scenario();
-    const after = applyField(before, "mp", 100);
+    const after = applyField(before, "mp", 100, null);
     expect(before.rider.mp).toBe(120);
     expect(after.rider.mp).toBe(100);
     expect(after).not.toBe(before);
@@ -190,54 +190,42 @@ describe("applyField — one committed field, written back", () => {
 
   test("shortening the span moves the viewpoint rather than refusing the span", () => {
     // `x_D` clamps on **every** path, this one included: a geometry change under a stale viewpoint.
-    const short = applyField(scenario(), "L", 50);
+    const short = applyField(scenario(), "L", 50, null);
     expect(short.rider.xD).toBe(50);
     if (short.geometry.source !== "manual") throw new Error("expected manual geometry");
     expect(short.geometry.L).toBe(50);
   });
 
   test("a typed `x_D` outside the span clamps too, and blocks nothing", () => {
-    expect(applyField(scenario(), "xD", 400).rider.xD).toBe(150);
-    expect(applyField(scenario(), "xD", -20).rider.xD).toBe(0);
+    expect(applyField(scenario(), "xD", 400, null).rider.xD).toBe(150);
+    expect(applyField(scenario(), "xD", -20, null).rider.xD).toBe(0);
   });
 
-  test("the clamp runs in imported mode as well, against `s_B − s_A`", () => {
-    // The span is the stations there, so a viewpoint past station B is exactly as stale as one
-    // past `Portée` in manual mode. Left unclamped, state publishes an `x_D` the span does not
-    // contain while the scene silently draws the rider somewhere else.
+  test("the clamp runs in imported mode as well, against the whole profil", () => {
+    // A viewpoint past the profil's last sample is exactly as stale as one past `Portée` in manual
+    // mode. Left unclamped, state publishes an `x_D` the span does not contain while the scene
+    // silently draws the rider somewhere else.
     const imported = scenario((draft) => {
-      draft.geometry = { source: "trace", trace: "p1.x", sa: 20, sb: 120 };
+      draft.geometry = { source: "trace", trace: "p1.x" };
     });
-    expect(applyField(imported, "xD", 500).rider.xD).toBe(100);
-    expect(applyField(imported, "xD", -3).rider.xD).toBe(0);
+    expect(applyField(imported, "xD", 500, TRACE).rider.xD).toBe(200);
+    expect(applyField(imported, "xD", -3, TRACE).rider.xD).toBe(0);
   });
 
-  test("moving a station moves the viewpoint with it", () => {
-    const imported = scenario((draft) => {
-      draft.geometry = { source: "trace", trace: "p1.x", sa: 0, sb: 200 };
-      draft.rider.xD = 180;
-    });
-    expect(applyField(imported, "sb", 100).rider.xD).toBe(100);
-    // `s_A` shortens the span from the other end, and it is the same span.
-    expect(applyField(imported, "sa", 120).rider.xD).toBe(80);
-  });
-
-  test("a placement that is no span at all clamps against nothing", () => {
-    // `station B ≤ station A` is a blocking error, not a licence to move the viewpoint to a
-    // negative span — and a negative `L` never reaches `applyField`, because tier one refuses it.
-    const inverted = scenario((draft) => {
-      draft.geometry = { source: "trace", trace: "p1.x", sa: 100, sb: 100 };
+  test("an imported geometry with no profil loaded clamps against nothing", () => {
+    const unloaded = scenario((draft) => {
+      draft.geometry = { source: "trace", trace: "p1.x" };
       draft.rider.xD = 75;
     });
-    expect(applyField(inverted, "xD", 400).rider.xD).toBe(400);
-    expect(applyField(inverted, "sb", 100).rider.xD).toBe(75);
+    expect(applyField(unloaded, "xD", 400, null).rider.xD).toBe(400);
+    expect(applyField(unloaded, "zB", 3, null).rider.xD).toBe(75);
     // Below 0 too: `clampX`'s rule, the one the reducer's terrain path applies to the same `x_D`.
-    expect(applyField(inverted, "xD", -5).rider.xD).toBe(-5);
-    expect(applyField(inverted, "xD", Number.NaN).rider.xD).toBe(0);
+    expect(applyField(unloaded, "xD", -5, null).rider.xD).toBe(-5);
+    expect(applyField(unloaded, "xD", Number.NaN, null).rider.xD).toBe(0);
   });
 
   test("writing the driving tightness field keeps the driver it belongs to", () => {
-    const tighter = applyField(scenario(), "D_target", 4);
+    const tighter = applyField(scenario(), "D_target", 4, null);
     expect(tighter.tightness).toEqual({ mode: "sag", D_target: 4 });
   });
 
@@ -246,7 +234,7 @@ describe("applyField — one committed field, written back", () => {
     // nothing — the failure mode a `default:` branch hides.
     const complete = scenario((draft) => {
       draft.usage = "TEMPORAIRE";
-      draft.geometry = { source: "trace", trace: "p1.x", sa: 0, sb: 200 };
+      draft.geometry = { source: "trace", trace: "p1.x" };
       draft.material = { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 };
     });
     const steel = scenario((draft) => {
@@ -261,7 +249,7 @@ describe("applyField — one committed field, written back", () => {
     for (const id of NUMERIC_FIELDS) {
       const base = id === "L" || id === "h" ? steel : complete;
       const host = id.endsWith("Override") || id === "d" ? steel : base;
-      const after = applyField(host, id, 7);
+      const after = applyField(host, id, 7, null);
       const before = railValues(host, deduceValues(host, null))[id];
       expect(railValues(after, deduceValues(after, null))[id]).not.toBe(before);
     }
@@ -275,8 +263,6 @@ describe("FIELD_ACCESS — one lens per numeric field", () => {
       "h",
       "zA",
       "zB",
-      "sa",
-      "sb",
       "d",
       "mbfOverride",
       "eaOverride",
@@ -477,7 +463,7 @@ describe("#85 — the prétension's lens and the tensioning side", () => {
     const atB = scenario((draft) => {
       draft.tensioningSide = "B";
     });
-    const written = applyField(atB, "T_target", 2500);
+    const written = applyField(atB, "T_target", 2500, null);
     expect(written.tightness).toEqual({ mode: "anchor", T_target: 2500 });
     expect(written.tensioningSide).toBe("B");
   });

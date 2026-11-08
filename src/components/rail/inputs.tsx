@@ -1,9 +1,8 @@
 /**
  * The Rail's **input half** — « v1 build spec » § 3 (the whole field table, the Tightness Spec, the
- * §10.4 use-class gate, Override, `Valeurs déduites`), § 4 (*Placement des ancrages*, *Deux
- * sources, un concept*, *Échecs de parsing*), § 7 (*Deux états par champ*, *Fix Actions*) and § 9's
- * opening screen, region by region — under
- * [amendment D](../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md).
+ * §10.4 use-class gate, Override, `Valeurs déduites`), § 4 (*Deux sources, un concept*, *Échecs de
+ * parsing*), § 7 (*Deux états par champ*, *Fix Actions*) and § 9's opening screen, region by region
+ * — under [amendment D](../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md).
  *
  * **Field state is `@tanstack/react-form`; per-field validators are valibot Standard Schemas.**
  * Everything either of them decides is a pure function in `@/lib/rail/`, which is where the `node`
@@ -95,7 +94,6 @@ import { PROVENANCE_COPY, warningLadder } from "@/lib/rail/provenance.ts";
 import { MAESTRO_ROPE_ONLY, PASS_TO_PULLEY } from "@/lib/rail/tensioning.ts";
 import {
   applyField,
-  applyGeometry,
   applyRopeClass,
   applyShippedTerminations,
   clearOverride,
@@ -137,8 +135,8 @@ import {
  */
 const PROVENANCE = PROVENANCE_COPY;
 
-/** The three numeric fields that change the span, and therefore what `x_D` is clamped against. */
-const SPAN_FIELDS = new Set<NumericFieldId>(["L", "sa", "sb"]);
+/** The numeric field that changes the span, and therefore what `x_D` is clamped against. */
+const SPAN_FIELDS = new Set<NumericFieldId>(["L"]);
 
 /** What a row needs of the screen around it. **The reason every row is a module-scope component.** */
 type RailRowContext = {
@@ -199,7 +197,7 @@ export function RailInputs({
    * leaves no trace at all, which is precisely what the clamp was elected *against*.
    */
   const [clamped, setClamped] = useState<ClampEvent>(() =>
-    state.link.xClamped ? { L: spanLength(scenario) ?? 0, nonce: 1 } : { L: 0, nonce: 0 },
+    state.link.xClamped ? { L: spanLength(scenario, trace) ?? 0, nonce: 1 } : { L: 0, nonce: 0 },
   );
   const [importFailure, setImportFailure] = useState<ParseFailure | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
@@ -217,7 +215,7 @@ export function RailInputs({
   const rung = (row: LadderRow): string | null =>
     ladder.find((warning) => warning.row === row)?.text ?? null;
   const readOuts = deducedRows(scenario, deduced, cause);
-  const context = fieldContext(scenario, trace);
+  const context = fieldContext(scenario);
 
   const breaches = new Map<FieldId, BlockingError>();
   const outlined = new Set<FieldId>();
@@ -247,8 +245,8 @@ export function RailInputs({
     }
     const value = commitField(id, raw, context);
     if (value === null) return null;
-    const applied = applyField(scenario, id, value);
-    // **A span still being typed does not drag the viewpoint.** « 100 » into Station B passes
+    const applied = applyField(scenario, id, value, trace);
+    // **A span still being typed does not drag the viewpoint.** « 100 » into Portée passes
     // through « 1 », and clamping against a 1 m span would leave `x_D` at 1,0 m on the 100 m span
     // the user actually typed — a viewpoint destroyed by a keystroke nobody meant as a value. The
     // clamp lands when the edit lands; until then the scene clamps the *drawing* and state keeps
@@ -276,16 +274,6 @@ export function RailInputs({
         // button covers the context the user has just travelled to.
         regimePicker.current?.focus();
         return;
-      case "inverser-a-b": {
-        if (scenario.geometry.source !== "trace") return;
-        const { sa, sb } = scenario.geometry;
-        // Through `applyGeometry` like every other span change: the swap is what *creates* the
-        // span, so it is also the moment a viewpoint from the inverted state can be out of it.
-        const next = applyGeometry(scenario, { ...scenario.geometry, sa: sb, sb: sa });
-        announceClamp(next, scenario.rider.xD);
-        patch(next);
-        return;
-      }
       case "passer-a-la-terminaison-de-depart":
         patch(applyShippedTerminations(scenario, breach));
     }
@@ -293,7 +281,7 @@ export function RailInputs({
 
   /** The clamp note's one trigger: the value that landed is not the one that was asked for. */
   function announceClamp(next: typeof scenario, asked: number) {
-    const L = spanLength(next);
+    const L = spanLength(next, trace);
     if (next.rider.xD !== asked && L !== null) {
       setClamped((previous) => ({ L, nonce: previous.nonce + 1 }));
     }
@@ -449,15 +437,11 @@ export function RailInputs({
           </Group>
 
           <Group title="Géométrie">
-            {scenario.geometry.source === "manual" ? (
+            {/* An imported profil is taken whole, so its `Portée` and `Dénivelé` are read-outs. */}
+            {scenario.geometry.source === "manual" && (
               <>
                 <NumericRow hint="m" id="L" />
                 <NumericRow hint="m" id="h" />
-              </>
-            ) : (
-              <>
-                <NumericRow hint="m" id="sa" />
-                <NumericRow hint="m" id="sb" />
               </>
             )}
             <NumericRow hint="m" id="zA" />

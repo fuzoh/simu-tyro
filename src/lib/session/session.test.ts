@@ -113,10 +113,10 @@ function fullSession(): Session {
   };
 }
 
-/** § 9's scenario re-anchored on the imported profile — `tr` verbatim, `L`/`h` derived. */
+/** § 9's scenario on the imported profile, taken whole — `tr` verbatim, `L`/`h` derived. */
 function importedScenario(): Scenario {
   const scenario = firstRunDefaults();
-  scenario.geometry = { source: "trace", trace: PAYLOAD, sa: 12.5, sb: 183.4 };
+  scenario.geometry = { source: "trace", trace: PAYLOAD };
   return scenario;
 }
 
@@ -189,12 +189,27 @@ describe("the round-trip", () => {
     const storage = memoryStorage();
     writeSession(storage, { ...fullSession(), scenario: importedScenario() });
 
-    expect(readSession(storage)?.scenario.geometry).toEqual({
-      source: "trace",
-      trace: PAYLOAD,
-      sa: 12.5,
-      sb: 183.4,
-    });
+    expect(readSession(storage)?.scenario.geometry).toEqual({ source: "trace", trace: PAYLOAD });
+  });
+
+  test("a Session from before #88 restores its profil whole: the stored stations are dropped", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob({ ...fullSession(), scenario: importedScenario() });
+    const scenario = blob.scenario as Record<string, unknown>;
+    storage.map.set(
+      SESSION_KEY,
+      JSON.stringify({
+        ...blob,
+        scenario: {
+          ...scenario,
+          geometry: { source: "trace", trace: PAYLOAD, sa: 12.5, sb: 183.4 },
+        },
+      }),
+    );
+
+    const restored = readSession(storage);
+    expect(restored?.scenario.geometry).toEqual({ source: "trace", trace: PAYLOAD });
+    expect(restored?.trace).toEqual(TRACE);
   });
 
   test("an over-budget import round-trips: the 2000 characters are the URL's rule, not the Session's", () => {
@@ -206,7 +221,7 @@ describe("the round-trip", () => {
       ...fullSession(),
       scenario: {
         ...firstRunDefaults(),
-        geometry: { source: "trace", trace: OVERSIZE_PAYLOAD, sa: 0, sb: 1188.4 },
+        geometry: { source: "trace", trace: OVERSIZE_PAYLOAD },
       } satisfies Scenario,
     };
 
@@ -365,7 +380,7 @@ describe("a blob that fails its schema is discarded, whole", () => {
         ...storedBlob(bareSession()),
         scenario: {
           ...firstRunDefaults(),
-          geometry: { source: "trace", trace: "p1.@@@@", sa: 0, sb: 100 },
+          geometry: { source: "trace", trace: "p1.@@@@" },
         },
       }),
     },
@@ -375,7 +390,7 @@ describe("a blob that fails its schema is discarded, whole", () => {
         ...storedBlob(bareSession()),
         scenario: {
           ...firstRunDefaults(),
-          geometry: { source: "trace", trace: PAYLOAD.slice(0, 20), sa: 0, sb: 100 },
+          geometry: { source: "trace", trace: PAYLOAD.slice(0, 20) },
         },
       }),
     },
@@ -454,12 +469,7 @@ describe("the quota rule — store the scenario without the Trace, and say so", 
     storage.budget = JSON.stringify({ ...storedBlob(session), trace: null }).length;
 
     expect(writeSession(storage, session)).toBe("sans-tracé");
-    expect(readSession(storage)?.scenario.geometry).toEqual({
-      source: "trace",
-      trace: PAYLOAD,
-      sa: 12.5,
-      sb: 183.4,
-    });
+    expect(readSession(storage)?.scenario.geometry).toEqual({ source: "trace", trace: PAYLOAD });
   });
 
   test("a storage that refuses even the scenario reports « échec » and destroys nothing", () => {
@@ -674,7 +684,7 @@ describe("ADR-0001 — a restored Session is kept as given, and the gates judge 
     const restored = readSession(storage);
     if (restored === null) throw new Error("the stored Session was discarded");
     expect(restored.scenario.terminations).toEqual(knotted.terminations);
-    expect(evaluateGates({ scenario: restored.scenario, trace: null }).errors).toEqual([
+    expect(evaluateGates({ scenario: restored.scenario }).errors).toEqual([
       {
         gate: "verdict",
         kind: "invalid",

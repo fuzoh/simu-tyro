@@ -177,7 +177,7 @@ describe("a Maestro on a câble", () => {
     const withMaestro = onCable("maestro-s");
     const withPulley = onCable("pulley");
     const gates = (scenario: ScenarioDraft) =>
-      evaluateGates({ scenario: traverseScenario(traverseInputs(scenario)), trace: null });
+      evaluateGates({ scenario: traverseScenario(traverseInputs(scenario)) });
     expect(gates(withMaestro).errors).toEqual([]);
     expect(gates(withMaestro)).toEqual(gates(withPulley));
     expect(resultsOf(withMaestro)).toEqual(resultsOf(withPulley));
@@ -195,9 +195,8 @@ function resultsOf(scenario: ScenarioDraft) {
   const traverseScenarioOf = traverseScenario(traverseInputs(scenario));
   return deriveResults({
     scenario: traverseScenarioOf,
-    trace: null,
     base: { L: span.L, h: span.h, unloaded: state, material, P, traverse, clearance, soleCarrier },
-    report: evaluateGates({ scenario: traverseScenarioOf, trace: null }),
+    report: evaluateGates({ scenario: traverseScenarioOf }),
   });
 }
 

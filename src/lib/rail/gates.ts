@@ -32,8 +32,8 @@
  *   « Tension impossible », an engine refusal — never a field error and never a gate.
  * - **Attribution, never inference.** No hard check renders only on a read-out: every check is
  *   declared on a **quantity** and attributed to an editable field by {@link culprits}, the static
- *   table keyed by (grandeur × mode). Without it `station B = station A` yields `L = 0`, reaches
- *   `solveSpan` and returns `invalid-input{field:"L"}` pointing at a field the user cannot edit.
+ *   table keyed by (grandeur × mode) — otherwise a check on a derived read-out, such as an imported
+ *   `h`, would point at a field the user cannot edit.
  * - **The Scenario holds numbers; the form holds text.** A cleared field cannot be a number, so
  *   emptiness arrives here as a {@link FieldIssue} from the form while the Scenario keeps the last
  *   committed value — which is exactly what « Saisie en cours » freezes on screen. The two
@@ -48,7 +48,6 @@
 import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { RegimeId, RegimeMismatch, TerminationId, TextileSpec } from "@/lib/sim";
-import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { isFamilyAllowed, REGIMES, regimeMismatch, TERMINATIONS } from "@/lib/sim";
@@ -101,7 +100,6 @@ const GATE_RANK: Record<GateId, number> = { solve: 0, clearance: 1, verdict: 2 }
  * the first frame of a link.
  */
 export type FixActionId =
-  | "inverser-a-b"
   | "passer-a-l-acier"
   | "passer-en-usage-temporaire"
   | "choisir-un-autre-regime"
@@ -111,7 +109,6 @@ export type FixAction = { readonly id: FixActionId; readonly label: string };
 
 /** The fifth names the end it sets, which depends on the family, so it is built at the gate. */
 const FIX: Record<Exclude<FixActionId, "passer-a-la-terminaison-de-depart">, FixAction> = {
-  "inverser-a-b": { id: "inverser-a-b", label: "Inverser A et B" },
   "passer-a-l-acier": { id: "passer-a-l-acier", label: "Passer à l'acier" },
   "passer-en-usage-temporaire": {
     id: "passer-en-usage-temporaire",
@@ -160,8 +157,6 @@ export type GateReport = {
 /** What the gates read. Everything else in the app is downstream of these three. */
 export type GateInput = {
   readonly scenario: TraverseScenario;
-  /** The active profile, or `null` in manual mode — the stations' bound comes from it. */
-  readonly trace: Trace | null;
   /**
    * Tier one's standing failures, from the form. Text the Scenario cannot hold: an emptied field,
    * or « 12,3,4 ». Omitted, the gates judge the Scenario alone — which is what a link arrival, a
@@ -201,9 +196,9 @@ export type CulpritMode =
 
 const CULPRITS: Partial<Record<`${Grandeur}/${CulpritMode}`, readonly FieldId[]>> = {
   "L/manuel": ["L"],
-  "L/importé": ["sa", "sb"],
   "h/manuel": ["h"],
-  "h/importé": ["sa", "sb", "zA", "zB"],
+  // An imported `L` is the profil's own extent: no field moves it, so it has no row.
+  "h/importé": ["zA", "zB"],
   "L0/mode Longueur": ["L0"],
   "L0/mode Flèche": ["D_target"],
   "L0/mode Prétension": ["T_target"],
@@ -375,7 +370,7 @@ export function isFieldActive(id: FieldId, scenario: TraverseScenario): boolean 
  * @returns every standing breach, worst gate first then rail order, with the three pass flags §
  *   7's table hangs its three different suppressions off.
  */
-export function evaluateGates({ scenario, trace, issues = [] }: GateInput): GateReport {
+export function evaluateGates({ scenario, issues = [] }: GateInput): GateReport {
   const mode = geometryMode(scenario);
   const errors: BlockingError[] = [];
   /** One breach per field: a scenario-level check never doubles a standing form issue. */
@@ -474,7 +469,7 @@ export function evaluateGates({ scenario, trace, issues = [] }: GateInput): Gate
   // ── Every number the Scenario holds, as a link can carry it ────────────────────────────────
   // `?L=-5` restores state faithfully, including invalid state, and must light up here on the first
   // frame even though nobody has typed into the field yet.
-  const context = fieldContext(scenario, trace);
+  const context = fieldContext(scenario);
   for (const field of GATED_FIELDS) {
     const value = FIELD_ACCESS[field].read(scenario);
     if (value === undefined) continue;
@@ -506,21 +501,6 @@ export function evaluateGates({ scenario, trace, issues = [] }: GateInput): Gate
     const gate = gateOf(field, mode);
     if (gate === null) continue;
     push({ gate, kind: issue.kind, field, alsoOutlined: [], message: issue.message, fixes: [] });
-  }
-
-  // `L = d_B − d_A` is a **read-out** in imported mode, so `L > 0` is attributed back to the
-  // stations. Not a silent auto-swap: normalising to `A = min(station)` would **flip the sign of
-  // `h`**, the silent model reinterpretation the §10.4 family gate already ruled out.
-  if (scenario.geometry.source === "trace" && !(scenario.geometry.sb > scenario.geometry.sa)) {
-    const [first, ...rest] = culprits("L", "importé");
-    push({
-      gate: "solve",
-      kind: "invalid",
-      field: first,
-      alsoOutlined: rest,
-      message: "⛔ Portée nulle ou négative — l'ancrage B est avant l'ancrage A.",
-      fixes: [FIX["inverser-a-b"]],
-    });
   }
 
   errors.sort(

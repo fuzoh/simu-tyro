@@ -5,12 +5,19 @@
  * can be (amendment A).
  */
 
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import type { Session } from "@/lib/session/session.ts";
+import type { Trace } from "@/lib/terrain/trace.ts";
 
+import { buildScene } from "@/lib/chart/scene.ts";
+import { evaluateGates } from "@/lib/rail/gates.ts";
+import { deriveResults } from "@/lib/rail/results.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
+import { placeSpan } from "@/lib/scenario/geometry.ts";
 import { DEFAULT_LAYERS } from "@/lib/session/session.ts";
+import { parseProfileCsv } from "@/lib/terrain/csv.ts";
 import { encodeP1 } from "@/lib/url/p1.ts";
 import { FIRST_RUN_LINK } from "@/lib/url/scenario.ts";
 
@@ -175,7 +182,7 @@ describe("initialAppState — § 8's mount order", () => {
       // A redundant `L` beside a `tr` gets no strip line — with a trace present `L` is derived —
       // but leaving it in the address bar would contradict the screen.
       const state = initialAppState({
-        query: `?v=1&L=250&sa=0&sb=200&tr=${TRACE}${completeTail()}`,
+        query: `?v=1&L=250&tr=${TRACE}${completeTail()}`,
         session: null,
       });
       expect(state.link.rewrite).not.toBeNull();
@@ -208,15 +215,15 @@ describe("initialAppState — § 8's mount order", () => {
   });
 
   describe("an arriving `tr` is a profile, so it is decoded and not merely carried", () => {
-    /** A link of an imported scenario: the two stations, and the payload they stand on. */
-    const IMPORTED_QUERY = `?v=1&sa=0&sb=200&tr=${TRACE}${completeTail()}`;
+    /** A link of an imported scenario: the payload, taken whole. */
+    const IMPORTED_QUERY = `?v=1&tr=${TRACE}${completeTail()}`;
 
-    it("holds the decoded Trace, so the span the stations describe exists", () => {
-      // Without it `geometry.source === "trace"` stands beside `trace: null` — stations on nothing,
-      // no `Portée`, no `Dénivelé`, no ground, and « (aucun tracé) » on the identity line.
+    it("holds the decoded Trace, so the span the profil describes exists", () => {
+      // Without it `geometry.source === "trace"` stands beside `trace: null` — a profil with no
+      // samples, no `Portée`, no `Dénivelé`, no ground, and « (aucun tracé) » on the identity line.
       const state = initialAppState({ query: IMPORTED_QUERY, session: null });
 
-      expect(state.scenario.geometry).toMatchObject({ source: "trace", sa: 0, sb: 200 });
+      expect(state.scenario.geometry).toEqual({ source: "trace", trace: TRACE });
       expect(state.trace?.d).toEqual(TRACE_DATA.d);
       expect(state.trace?.z).toEqual(TRACE_DATA.z);
       // § 4's third identity state: the filename does not travel, so its absence *is* « tracé reçu
@@ -228,7 +235,7 @@ describe("initialAppState — § 8's mount order", () => {
       // § 8: « The Session keeps the filename, since that is the user's own session. » Reloading a
       // link built from your own import may not rename your file « tracé reçu par lien ».
       const session = storedSession();
-      session.scenario.geometry = { source: "trace", trace: TRACE, sa: 0, sb: 200 };
+      session.scenario.geometry = { source: "trace", trace: TRACE };
       const cached = { d: TRACE_DATA.d, z: TRACE_DATA.z, dev: 0, fileName: "pont.csv" };
       const state = initialAppState({
         query: IMPORTED_QUERY,
@@ -260,6 +267,24 @@ describe("initialAppState — § 8's mount order", () => {
 
       expect(state.trace).toBe(cached);
       expect(state.scenario.geometry).toEqual({ source: "manual", L: 250, h: -40 });
+    });
+
+    it("opens a link from before #88 on the whole profil, naming `sa` and `sb` as unknown", () => {
+      // The stations were the sender's placement; the profil now *is* the span, so they are keys
+      // nothing reads — dropped with a strip line, never a refusal of the link.
+      const state = initialAppState({
+        query: `?v=1&sa=50&sb=150&tr=${TRACE}${completeTail()}`,
+        session: null,
+      });
+
+      expect(state.link.refused).toBeNull();
+      expect(state.link.dropped).toEqual([
+        { key: "sa", reason: "clé-inconnue" },
+        { key: "sb", reason: "clé-inconnue" },
+      ]);
+      expect(state.scenario.geometry).toEqual({ source: "trace", trace: TRACE });
+      expect(state.link.rewrite).not.toHaveProperty("sa");
+      expect(state.link.rewrite).not.toHaveProperty("sb");
     });
   });
 });
@@ -384,13 +409,8 @@ describe("appReducer — the Rail's five structural actions", () => {
     const trace = { d: TRACE_DATA.d, z: TRACE_DATA.z, dev: 0, fileName: "pont.csv" };
     const imported = appReducer(first, { type: "tracé/importé", trace, tr: TRACE });
 
-    it("anchor A goes to the first station and B to the last — the trace *is* the span", () => {
-      expect(imported.scenario.geometry).toEqual({
-        source: "trace",
-        trace: TRACE,
-        sa: 0,
-        sb: 200,
-      });
+    it("the profil is taken whole — A over its first sample, B over its last", () => {
+      expect(imported.scenario.geometry).toEqual({ source: "trace", trace: TRACE });
       expect(imported.trace).toBe(trace);
     });
 
@@ -398,11 +418,11 @@ describe("appReducer — the Rail's five structural actions", () => {
       const removed = appReducer(imported, { type: "tracé/retiré" });
       expect(imported.retainedManual).toEqual({ L: 150, h: -18 });
       expect(removed.scenario.geometry).toEqual({ source: "manual", L: 150, h: -18 });
-      // Removal discards the stations, **not** the Trace.
+      // Removal changes the terrain source, **not** the Trace.
       expect(removed.trace).toBe(trace);
     });
 
-    it("« Réutiliser ce tracé » re-places A and B exactly as an import does", () => {
+    it("« Réutiliser ce tracé » takes the profil back exactly as an import does", () => {
       const removed = appReducer(imported, { type: "tracé/retiré" });
       const reused = appReducer(removed, { type: "tracé/réutilisé", tr: TRACE });
       expect(reused.scenario.geometry).toEqual(imported.scenario.geometry);
@@ -432,5 +452,46 @@ describe("appReducer — the Rail's five structural actions", () => {
       expect(appReducer(first, { type: "tracé/retiré" })).toBe(first);
       expect(appReducer(first, { type: "tracé/réutilisé", tr: TRACE })).toBe(first);
     });
+  });
+});
+
+describe("#88's trial — the geoadmin profil of 2026-11-08, imported with nothing else typed", () => {
+  /** `[MEASURED]` geoadmin export of 2026-11-08: 200 points over 435,2 m. */
+  function trialProfil(): Trace {
+    const text = readFileSync(
+      new URL("../../../docs/mesures dynamometre/trace-geoadmin-2026-11-08.csv", import.meta.url),
+      "utf8",
+    );
+    const parsed = parseProfileCsv(text, "trace-geoadmin-2026-11-08.csv");
+    if (!parsed.ok) throw new Error("the trial profil must import");
+    return parsed.trace;
+  }
+
+  // The anchor heights of the trial, and a régime so that there is a verdict to reach.
+  const ready = appReducer(initialAppState({ query: "", session: null }), {
+    type: "scénario/modifié",
+    patch: { anchors: { zA: 1.5, zB: 1 }, regime: "en15567" },
+  });
+  const trace = trialProfil();
+  const state = appReducer(ready, { type: "tracé/importé", trace, tr: encodeP1(trace) });
+
+  it("spans the whole profil: L 435,2 m, h −15,5 m, the ground lowest near 243 m", () => {
+    const placed = placeSpan(state.scenario, state.trace);
+    if (placed === null) throw new Error("the trial profil must place");
+    expect(placed.L).toBeCloseTo(435.2, 9);
+    expect(placed.h).toBeCloseTo(-15.5, 9);
+    const lowest = placed.terrain.zs.indexOf(Math.min(...placed.terrain.zs));
+    expect(placed.terrain.xs[lowest]).toBeCloseTo(242.7, 9);
+  });
+
+  it("passes every gate and reaches a verdict", () => {
+    const report = evaluateGates({ scenario: state.scenario });
+    expect(report.errors).toEqual([]);
+    const results = deriveResults({
+      scenario: state.scenario,
+      base: buildScene({ scenario: state.scenario, trace: state.trace }),
+      report,
+    });
+    expect(results?.verdict).not.toBeNull();
   });
 });

@@ -134,13 +134,11 @@ export const QUANTITIES = {
   h: { unit: "m", decimals: 1 },
   /** `Hauteur d'ancrage A / B`, m — garde moves metre for metre, so 0,1 m suffices. */
   anchorHeight: { unit: "m", decimals: 1 },
-  /** `Station A / B`, m — the file's own grain (`Distance` is written to 0,1 m). */
-  station: { unit: "m", decimals: 1 },
   /**
-   * `Alt. base A / B`, m — the ground altitude § 4's anchor-placement block prints beside `Portée`
-   * and `Dénivelé`. The grain is that block's own printed « 540,4 m » — the file's `Altitude`
-   * column, written to 0,1 m, exactly as `Station` reads `Distance`. A read-out, never a field:
-   * `h` already carries the difference these two altitudes make, so no solve consumes them.
+   * `Alt. base A / B`, m — the ground altitude under each anchor, printed beside `Portée` and
+   * `Dénivelé`. The grain is § 4's own printed « 540,4 m » — the file's `Altitude` column, written
+   * to 0,1 m. A read-out, never a field: `h` already carries the difference these two altitudes
+   * make, so no solve consumes them.
    */
   zBase: { unit: "m", decimals: 1 },
   /**

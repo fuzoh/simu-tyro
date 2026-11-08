@@ -4,9 +4,9 @@
  * changed no byte.
  *
  * Provenance: `[MEASURED]` in `testing.md`'s sense, tagged on every row. Each link is this app's own
- * output as of 2026-11-07, written out here in § 7's canonical key order and checked against the
- * codec, not produced by it. A failing row after a refactor is a changed contract, not a stale
- * fixture.
+ * output as of the date its tag names, written out here in § 7's canonical key order and checked
+ * against the codec, not produced by it. A failing row after a refactor is a changed contract, not
+ * a stale fixture.
  *
  * Plain data, no codec import: a fixture must never be re-derived from the code it checks. The
  * scenarios are literals for the same reason — they do not spread `FIRST_RUN_SCENARIO`, so a
@@ -55,6 +55,7 @@ export const BRANCHES = [
   "wind-speed-and-direction",
   "wind-direction-only",
   "wind-explicit-zero",
+  "trace-stations-retired",
 ] as const;
 
 export type Branch = (typeof BRANCHES)[number];
@@ -68,7 +69,8 @@ export type CanonicalLinkFixture = {
     | typeof MEASURED_84
     | typeof MEASURED_85
     | typeof MEASURED_86
-    | typeof MEASURED_87;
+    | typeof MEASURED_87
+    | typeof MEASURED_88;
   covers: readonly Branch[];
   scenario: Scenario;
   link: string;
@@ -88,7 +90,8 @@ export type DecodeOnlyFixture = {
     | typeof MEASURED_84
     | typeof MEASURED_85
     | typeof MEASURED_86
-    | typeof MEASURED_87;
+    | typeof MEASURED_87
+    | typeof MEASURED_88;
   covers: readonly Branch[];
   link: string;
 } & ({ scenario: Scenario; canonical: string } | { scenario: ScenarioDraft; canonical: null });
@@ -99,8 +102,9 @@ const MEASURED_84 = "[MEASURED] issue #84, codec as of 2026-11-08";
 const MEASURED_85 = "[MEASURED] issue #85, codec as of 2026-11-08";
 const MEASURED_86 = "[MEASURED] issue #86, codec as of 2026-11-08";
 const MEASURED_87 = "[MEASURED] issue #87, codec as of 2026-11-08";
+const MEASURED_88 = "[MEASURED] issue #88, codec as of 2026-11-08";
 
-/** Three stations `(0,0) (50,-4) (100,-9)`, as `encodeP1` writes them. */
+/** Three samples `(0,0) (50,-4) (100,-9)`, as `encodeP1` writes them — a 100 m profil. */
 export const TRACE_P1 = "p1.AwCQTpBOAJ8G5wcA";
 
 const STEEL: Scenario = {
@@ -375,11 +379,11 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=0&daf=1.2&x=150`,
   },
   {
-    name: "imported trace geometry",
-    source: MEASURED,
+    name: "imported trace geometry: the profil taken whole, no `L`/`h` and no stations",
+    source: MEASURED_88,
     covers: ["trace", "steel"],
-    scenario: { ...STEEL, geometry: { source: "trace", trace: TRACE_P1, sa: 10, sb: 90 } },
-    link: `/?v=1&u=daN&use=perm&sa=10&sb=90&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}&tr=${TRACE_P1}`,
+    scenario: { ...STEEL, geometry: { source: "trace", trace: TRACE_P1 } },
+    link: `/?v=1&u=daN&use=perm&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}&tr=${TRACE_P1}`,
   },
   {
     name: "textile hmpe: sag driver, tempo, oeil and epissure",
@@ -431,11 +435,11 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
   },
   {
     name: "textile polyester on a trace, tension driver, attelage",
-    source: MEASURED,
+    source: MEASURED_88,
     covers: ["textile", "trace", "driver-tension"],
     scenario: {
       ...TEXTILE,
-      geometry: { source: "trace", trace: TRACE_P1, sa: 0, sb: 100 },
+      geometry: { source: "trace", trace: TRACE_P1 },
       tightness: { mode: "tension", H_target: 1500 },
       material: { family: "textile", ropeClass: "polyester", MBL: 250000, mu: 0.07, k: 12 },
       terminations: {
@@ -444,7 +448,7 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
       },
     },
     link:
-      "/?v=1&u=daN&use=tempo&sa=0&sb=100&za=12&zb=12&te=150&fam=tx&mu=0.07&cls=pes&mbl=25000&k=12" +
+      "/?v=1&u=daN&use=tempo&za=12&zb=12&te=150&fam=tx&mu=0.07&cls=pes&mbl=25000&k=12" +
       `&ta=attelage&tb=oeil&na=1&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=75&tr=${TRACE_P1}`,
   },
 ];
@@ -505,6 +509,14 @@ export const DECODE_ONLY_LINKS: readonly DecodeOnlyFixture[] = [
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&mt=mou&${STEEL_HEAD}&${TAIL}`,
     scenario: STEEL,
     canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "a link from before #88 keeps its profil whole: `sa` and `sb` are unknown keys",
+    source: MEASURED_88,
+    covers: ["trace-stations-retired"],
+    link: `/?v=1&u=daN&use=perm&sa=10&sb=90&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}&tr=${TRACE_P1}`,
+    scenario: { ...STEEL, geometry: { source: "trace", trace: TRACE_P1 } },
+    canonical: `/?v=1&u=daN&use=perm&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}&tr=${TRACE_P1}`,
   },
   {
     name: "textile with MBL and mu left blank",

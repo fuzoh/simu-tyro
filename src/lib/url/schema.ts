@@ -93,8 +93,6 @@ export const CANONICAL_KEYS = [
   "reg",
   "L",
   "h",
-  "sa",
-  "sb",
   "za",
   "zb",
   "fl",
@@ -267,8 +265,7 @@ const KEY_SCHEMAS = {
   reg: v.picklist(REGIME_TOKENS),
   L: FINITE, // Portée, m — manual geometry only.
   h: FINITE, // Dénivelé, m — manual geometry only.
-  sa: FINITE, // Station A, m in file coordinates — imported geometry only.
-  sb: FINITE, // Station B, m in file coordinates — imported geometry only. `L = sb − sa`.
+
   za: FINITE, // Hauteur d'ancrage A, m.
   zb: FINITE, // Hauteur d'ancrage B, m.
   fl: FINITE, // Flèche à vide cible, m.

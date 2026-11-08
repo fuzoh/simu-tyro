@@ -341,10 +341,10 @@ _Avoid_: toolbar, chart controls, options bar, legend
 
 **Handle Lane**:
 The 24 px band between the bottom of the profile's plot area and its x-axis labels,
-holding the two draggable anchor handles — outside the plot area, so they can never be
-confused with the rider. Reserved at every width and in both terrain modes: in manual
-mode it draws the non-interactive span bracket, so the profile's height never changes on
-import.
+holding the non-interactive span bracket from A to B — outside the plot area, so it can
+never be confused with the rider. Reserved at every width and in both terrain modes, so the
+profile's height never changes on import. It holds no anchor handle: the anchors are the
+profil's two ends, and moving one is a new Position, not a drag along the profil.
 _Avoid_: handle row, anchor bar, gutter, axis area
 
 **Pinned Safety Header**:

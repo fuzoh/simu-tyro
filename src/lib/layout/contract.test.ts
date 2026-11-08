@@ -15,8 +15,6 @@ import { describe, expect, it } from "vitest";
 import { formatValue } from "@/lib/format/quantity.ts";
 
 import {
-  ANCHOR_TARGET,
-  anchorTarget,
   BANNER,
   bannerBudget,
   CELL_BASIS_PX,
@@ -39,7 +37,6 @@ import {
   plotAspect,
   profileOuterHeight,
   PROFILE_ASPECT,
-  PROFILE_CHROME,
   PROFILE_CHROME_HEIGHT,
   profilePlotHeight,
   PROFILE_PLOT_MAX,
@@ -904,52 +901,9 @@ describe("§ 5 — SharedX, one object for both charts", () => {
   });
 
   it("a degenerate span is a caller bug, not a state to render", () => {
-    // `station B ≤ station A` is § 4's blocked placement, repaired by `[ Inverser A et B ]`.
+    // A geometry with no span is § 8's geometric exception, which never reaches the scale.
     expect(() => createSharedX({ width: 390, L: 0 })).toThrow(RangeError);
     expect(() => createSharedX({ width: 390, L: Number.NaN })).toThrow(RangeError);
-  });
-});
-
-/**
- * § 5's Handle Lane — « the two anchors move down here, each with a **44 × 48 px** hit target
- * spanning the lane plus the label band, **entirely below the plot area** ».
- *
- * Where those rectangles land on a real screen is `agent-browser`'s (tickets 29 and 30); what is
- * pure is the geometry that makes confusing an anchor with the rider impossible — the target's
- * size, and the fact that it starts where the plot ends.
- */
-describe("§ 5 — the anchor targets in the Handle Lane", () => {
-  it("44 × 48, and the 48 is the two rows rather than a second number", () => {
-    expect(ANCHOR_TARGET.width).toBe(44);
-    expect(ANCHOR_TARGET.height).toBe(48);
-    expect(ANCHOR_TARGET.height).toBe(PROFILE_CHROME.handleLane + PROFILE_CHROME.xLabels);
-    // The coarse-pointer minimum, which the rider's grab circle also meets — voir `.chart-grab`.
-    expect(ANCHOR_TARGET.width).toBeGreaterThanOrEqual(44);
-  });
-
-  it("entirely below the plot area, at both ends of the domain", () => {
-    const x = createSharedX({ width: 390, L: 1000 });
-    const plot = { top: PROFILE_CHROME.badge, height: profilePlotHeight(innerWidth(390)) };
-    const laneTop = plot.top + plot.height;
-    for (const at of [0, 1000]) {
-      const target = anchorTarget(x.x(at), laneTop);
-      expect(target.y).toBe(laneTop);
-      expect(target.y).toBeGreaterThanOrEqual(plot.top + plot.height);
-      // …and it does not reach back up into the plot, which is the collision the lane retires.
-      expect(target.y + target.height).toBe(laneTop + ANCHOR_TARGET.height);
-    }
-  });
-
-  it("centred on the anchor, which is why the two never overlap at 390 px", () => {
-    const x = createSharedX({ width: 390, L: 1000 });
-    const a = anchorTarget(x.x(0), 200);
-    const b = anchorTarget(x.x(1000), 200);
-    expect(a.x + a.width / 2).toBeCloseTo(x.x(0), 9);
-    expect(b.x + b.width / 2).toBeCloseTo(x.x(1000), 9);
-    // 342 px of inner width against two 44 px targets: they clear each other by 298 px, and § 5's
-    // « 44 px covers the first and last 12 % of the span » is exactly this ratio.
-    expect(b.x - (a.x + a.width)).toBeGreaterThan(0);
-    expect(ANCHOR_TARGET.width / innerWidth(390)).toBeCloseTo(0.1287, 4);
   });
 });
 

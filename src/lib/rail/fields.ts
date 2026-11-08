@@ -69,8 +69,6 @@ export type FieldId =
   | "h"
   | "zA"
   | "zB"
-  | "sa"
-  | "sb"
   | "family"
   | "carryingLines"
   | "d"
@@ -104,9 +102,8 @@ export type FieldId =
   | "windDirection";
 
 /**
- * A field's tier-one hard rule — the whole of it. Three shapes, because § 7's message column has
- * three: a sign rule, « the number must be readable at all », and the station's in-trace bound,
- * which needs the file's extent and therefore states its own copy.
+ * A field's tier-one hard rule — the whole of it. Two shapes, because § 7's message column has
+ * two: a sign rule, and « the number must be readable at all ».
  */
 type HardRule =
   /** `> 0`. `sentence` is § 7's own wording of the rule, stated as a property of the world. */
@@ -114,9 +111,7 @@ type HardRule =
   /** `≥ 0` — « une hauteur négative n'existe pas ». */
   | { readonly kind: "non-negative"; readonly sentence: string }
   /** Finite and nothing more: the only committed-invalid state is « nombre illisible ». */
-  | { readonly kind: "finite" }
-  /** « dans le tracé » — the bound is the file's, so the message is built from the extent. */
-  | { readonly kind: "in-trace" };
+  | { readonly kind: "finite" };
 
 /** § 3's non-blocking warning band, and the copy it renders. Needs no physics and no solve. */
 type WarningRule =
@@ -232,26 +227,7 @@ export const FIELDS = {
     warning: { kind: "above", max: 30, copy: "hauteur d'ancrage supérieure à 30 m" },
     gate: "clearance",
   },
-  sa: {
-    id: "sa",
-    label: withEnd("distance", "A"),
-    errorLabel: withEnd("distance", "A"),
-    quantity: "station",
-    rule: { kind: "in-trace" },
-    warning: null,
-    // `L` and `h` are **derived** from the stations, so a station failure takes the whole span
-    // down — § 7's culprit table, row « `L` importé → Station A, Station B ».
-    gate: "solve",
-  },
-  sb: {
-    id: "sb",
-    label: withEnd("distance", "B"),
-    errorLabel: withEnd("distance", "B"),
-    quantity: "station",
-    rule: { kind: "in-trace" },
-    warning: null,
-    gate: "solve",
-  },
+
   family: {
     id: "family",
     label: heading("lineFamily", "exact"),
@@ -590,7 +566,7 @@ export type TightnessFieldId = (typeof TIGHTNESS_FIELD)[TightnessDraft["mode"]];
  * grouped the gate by rail section would silently undo § 7's central finding.
  */
 export function gateOf(id: FieldId, mode: "manual" | "trace"): GateId | null {
-  // In imported mode `h = (z(d_B) + hauteur_B) − (z(d_A) + hauteur_A)`, so the anchor heights are
+  // In imported mode `h = (z_last + hauteur_B) − (z_first + hauteur_A)`, so the anchor heights are
   // a **Solve** input there — § 7's culprit table, row « `h` importé ». In manual mode they feed
   // the Terrain only and never `solveSpan`, which is the Clearance Gate's own row.
   if (mode === "trace" && (id === "zA" || id === "zB")) return "solve";
@@ -619,8 +595,7 @@ export type FieldContext = {
   readonly unit?: ForceUnit;
   /** `Classe de corde`, for the one empty message that carries a reason instead of a hole. */
   readonly ropeClass?: TextileSpec["ropeClass"];
-  /** The imported profile's `Distance` extent, m, in file coordinates — the stations' bound. */
-  readonly extent?: { readonly min: number; readonly max: number };
+
   /** `Portée`, m — the only warning that reads a second field (`|h| > L`). */
   readonly L?: number;
 };
@@ -780,8 +755,7 @@ export function unreadableMessage(id: FieldId, raw: string): string {
 
 /**
  * Tier one on one field's raw text. **This is the whole of what a form validator may decide**:
- * emptiness, readability, a sign rule, and the station's in-trace bound, which is the file's own
- * extent and no physics at all.
+ * emptiness, readability and a sign rule — no physics at all.
  *
  * @returns the standing issue, or `null` when the text is a value tier one accepts. An
  *   out-of-range-but-representable value is **valid here** and lights up as a warning or as an
@@ -823,19 +797,6 @@ export function checkField(
         kind: "invalid",
         message: blocking(id, spec.rule.sentence, echo(id, shown, unit)),
       };
-    case "in-trace": {
-      const extent = context.extent;
-      if (extent === undefined || (shown >= extent.min && shown <= extent.max)) return null;
-      const from = formatValue("station", extent.min);
-      const to = formatValue("station", extent.max);
-      return {
-        field: id,
-        kind: "invalid",
-        // This row's message names the bound instead of the field, because the bound is the file's
-        // and the two distances share one rule — § 7 writes it once, for « Distance A / B ».
-        message: `⛔ Distance hors du profil (${from} – ${to} m). Valeur : ${echo(id, shown, unit)}.`,
-      };
-    }
   }
 }
 

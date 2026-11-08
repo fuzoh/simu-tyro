@@ -38,8 +38,9 @@ import { useAppState } from "./store.tsx";
 export type Scene = {
   /**
    * The input half — terrain, both anchors, the span markers, the 5 % margin. `null` **only** for
-   * § 8's *exception géométrique*: an invalid `L` / `h` / station, where there is no shared x
-   * domain at all and both plots collapse to an empty frame with an inert scrub track.
+   * § 8's *exception géométrique*: an invalid `L` / `h`, or an import with no profil, where there
+   * is no shared x domain at all and both plots collapse to an empty frame with an inert scrub
+   * track.
    */
   readonly frame: SceneFrame | null;
   /**

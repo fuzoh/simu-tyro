@@ -50,11 +50,11 @@ function readReference(n: 1 | 2 | 3): Trace {
 
 /**
  * The readable half of an imported-mode link, in § 8's canonical key order — the first-run URL
- * (141 characters, measured) with `L`/`h` replaced by the stations an import carries. `tr` is the
- * key table's last row, so the payload closes the query.
+ * (141 characters, measured) less `L`/`h`, which an imported profil derives. `tr` is the key
+ * table's last row, so the payload closes the query.
  */
 const READABLE_KEYS =
-  "/?v=1&u=daN&use=perm&sa=62.0&sb=245.0&za=12&zb=12&fl=6.0&fam=ac&d=12&r0=1770" +
+  "/?v=1&u=daN&use=perm&za=12&zb=12&fl=6.0&fam=ac&d=12&r0=1770" +
   "&cst=iwrc&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&daf=1.2&x=91.5&tr=";
 
 /** A deterministic LCG — the synthetic spans must cost the same characters on every machine. */
@@ -164,7 +164,7 @@ describe("round-trip — the three real traces", () => {
     expect(decoded.z).toHaveLength(200);
     expect(trace.d).toHaveLength(200);
 
-    // `d` is bit-for-bit — stations ride as full-precision scalars and `L = sb − sa`.
+    // `d` is bit-for-bit, because `L` is the profil's own `d_last − d_first`.
     expect(Array.from(decoded.d)).toEqual(Array.from(trace.d));
 
     for (let i = 0; i < trace.z.length; i++) {

@@ -164,11 +164,19 @@ describe("an unknown rope class is ignored and the default class is named, never
     expect(sentence).toContain("rendement de terminaison A 0,60");
   });
 
-  test("an imported link with no stations names the two it was given", () => {
-    const query = `?tr=${TRACE_P1}`;
-    expect(strip(query)?.completed).toContain("distance A 0,0 m");
-    // The Trace's own end — TRACE_P1 runs 0 → 100 m — and no longer « distance A + 150 m » (#55).
-    expect(strip(query)?.completed).toContain("distance B 100,0 m");
+  test("an imported link completes no distance: the profil is taken whole (#88)", () => {
+    const completed = strip(`?tr=${TRACE_P1}`)?.completed;
+    expect(completed).not.toContain("distance");
+    // The viewpoint lands mid-profil — TRACE_P1 runs 0 → 100 m.
+    expect(completed).toContain("position du passager 50,0 m");
+  });
+
+  test("a link from before #88 names its two stations as unknown keys, and is not refused", () => {
+    const state = initialAppState({ query: `?v=1&sa=10&sb=90&tr=${TRACE_P1}`, session: null });
+    expect(state.link.refused).toBeNull();
+    expect(linkStrip(state.link)?.ignored).toBe(
+      "Une partie du lien a été ignorée : clé inconnue « sa » ; clé inconnue « sb ».",
+    );
   });
 
   test("each token reads in the French of its domain value", () => {

@@ -21,8 +21,6 @@ import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 
 import { deriveResults } from "@/lib/rail/results.ts";
 
-import { useAppState } from "./store.tsx";
-
 /**
  * @param traverse `useTraverse`'s Scenario without `x_D`.
  * @param report the **standing** gate report. It is threaded rather than re-derived because a
@@ -34,9 +32,8 @@ export function useResults(
   base: SceneBase | null,
   report: GateReport,
 ): Results | null {
-  const { trace } = useAppState();
   return useMemo(
-    () => deriveResults({ scenario: traverse, trace, base, report }),
-    [traverse, trace, base, report],
+    () => deriveResults({ scenario: traverse, base, report }),
+    [traverse, base, report],
   );
 }
