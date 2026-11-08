@@ -563,6 +563,23 @@ describe("searchToScenario — the read side of § 7's key table", () => {
     expect(decode("?L=250&mt=mou").tensioningDevice).toBe("pulley");
   });
 
+  it("reads `ws` and `wd` absent as no wind — and neither completes nor names them (#87)", () => {
+    const { search, completed } = complete("?L=250&h=-40");
+    expect(searchToScenario(search).wind).toEqual({ speedKmh: 0, directionDeg: 0 });
+    expect(search.ws).toBeUndefined();
+    expect(search.wd).toBeUndefined();
+    expect(completed).not.toContain("ws");
+    expect(completed).not.toContain("wd");
+    expect(decode("?L=250&ws=50&wd=45").wind).toEqual({ speedKmh: 50, directionDeg: 45 });
+    // Each key stands alone: a direction without a speed, and a speed without a direction.
+    expect(decode("?L=250&wd=270").wind).toEqual({ speedKmh: 0, directionDeg: 270 });
+    expect(decode("?L=250&ws=30").wind).toEqual({ speedKmh: 30, directionDeg: 0 });
+  });
+
+  it("keeps a negative wind speed as it arrived, for the form to refuse (ADR-0001)", () => {
+    expect(decode("?L=250&ws=-5").wind.speedKmh).toBe(-5);
+  });
+
   it("keeps a Maestro that arrives beside a câble, as given (ADR-0001)", () => {
     const scenario = decode("?L=250&fam=ac&d=12&r0=1770&cst=iwrc&mt=ms");
     expect(scenario.material.family).toBe("steel");

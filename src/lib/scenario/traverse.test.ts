@@ -46,6 +46,11 @@ describe("`traverseInputs` — the fields a memo keys on", () => {
     for (const key of KEYS) expect(scrubbed[key]).toBe(inputs[key]);
   });
 
+  test("a wind edit changes no Traverse-scope field, so it cannot re-run the Sweep (#87)", () => {
+    const windy = traverseInputs({ ...before, wind: { speedKmh: 50, directionDeg: 45 } });
+    for (const key of KEYS) expect(windy[key]).toBe(inputs[key]);
+  });
+
   test("a « Garde min. admise » edit changes `hClearMin`, and nothing else", () => {
     const stricter = traverseInputs({ ...before, rider: { ...before.rider, hClearMin: 3 } });
     expect(stricter.hClearMin).toBe(3);

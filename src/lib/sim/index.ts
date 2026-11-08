@@ -151,3 +151,7 @@ export type { SteelSpec, SteelValues } from "./materials/steel.ts";
 export { STEEL, deriveSteel, resolveSteelValues, steelFormula } from "./materials/steel.ts";
 export type { TextileSpec } from "./materials/textile.ts";
 export { TEXTILE, deriveTextile } from "./materials/textile.ts";
+
+// —— wind.ts — the wind projected on the line, per #6 and the speed-model research (#8) ——————
+export type { WindComponents } from "./wind.ts";
+export { kmhToMs, windComponents } from "./wind.ts";

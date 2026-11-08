@@ -102,6 +102,7 @@ import {
   drivingField,
   FIELD_ACCESS,
   fieldContext,
+  isGatedField,
   spanLength,
   switchTightness,
   TERMINATION_FIELD,
@@ -772,6 +773,12 @@ export function RailInputs({
               note={<ClampNote className="text-muted-foreground block text-xs" event={clamped} />}
             />
           </Group>
+
+          {/* The Vent (#87): descriptive for now — no statics, clearance or Verdict reads it. */}
+          <Group title={heading("wind", "exact")}>
+            <NumericRow hint="km/h" id="windSpeed" />
+            <NumericRow hint="°" id="windDirection" />
+          </Group>
         </div>
       </RailSection>
 
@@ -888,7 +895,10 @@ function NumericRow({
     useRailRowContext();
   const breach = breaches.get(id);
   const value = text[id] ?? "";
-  const parsed = checkField(id, value, context) === null ? (parseDecimal(value) ?? NaN) : NaN;
+  const issue = checkField(id, value, context);
+  const parsed = issue === null ? (parseDecimal(value) ?? NaN) : NaN;
+  // A field in no gate has no breach to show its failure, but its text is still refused.
+  const shown = breach ?? (isGatedField(id) ? null : issue);
   return (
     <form.Field
       name={id}
@@ -901,7 +911,7 @@ function NumericRow({
           control={
             <NumericInput
               id={`rail-${id}`}
-              invalid={breach !== undefined && breach.kind !== "empty"}
+              invalid={shown !== null && shown.kind !== "empty"}
               onBlur={(raw) => {
                 field.handleBlur();
                 setFocused(null);
@@ -924,9 +934,7 @@ function NumericRow({
           htmlFor={`rail-${id}`}
           label={label}
           message={
-            breach === undefined
-              ? undefined
-              : { text: breach.message, blocking: breach.kind !== "empty" }
+            shown === null ? undefined : { text: shown.message, blocking: shown.kind !== "empty" }
           }
           note={
             <>
@@ -945,9 +953,7 @@ function NumericRow({
             </>
           }
           outlined={outlined.has(id)}
-          warning={
-            breach === undefined ? (warningFor(id, parsed, context) ?? warning ?? null) : null
-          }
+          warning={shown === null ? (warningFor(id, parsed, context) ?? warning ?? null) : null}
         />
       )}
     </form.Field>

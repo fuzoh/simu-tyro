@@ -266,6 +266,14 @@ export const FIELD_ACCESS: FieldAccess = {
     // as one past `Portée` is here.
     write: (s, xD) => ({ ...s, rider: { ...s.rider, xD: clampRider(xD, s.geometry) } }),
   },
+  windSpeed: {
+    read: ({ wind }) => wind.speedKmh,
+    write: (s, speedKmh) => ({ ...s, wind: { ...s.wind, speedKmh } }),
+  },
+  windDirection: {
+    read: ({ wind }) => wind.directionDeg,
+    write: (s, directionDeg) => ({ ...s, wind: { ...s.wind, directionDeg } }),
+  },
 };
 
 /**

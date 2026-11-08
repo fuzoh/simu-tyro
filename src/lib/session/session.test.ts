@@ -635,6 +635,27 @@ describe("the Mise en tension device in the Session (#86)", () => {
   });
 });
 
+describe("the Vent in the Session (#87)", () => {
+  test("a wind survives a write and a read", () => {
+    const storage = memoryStorage();
+    const wind = { speedKmh: 50, directionDeg: 45 };
+    writeSession(storage, { ...bareSession(), scenario: { ...firstRunDefaults(), wind } });
+    expect(readSession(storage)?.scenario.wind).toEqual(wind);
+  });
+
+  test("a Session stored before the key is kept, and reads no wind", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const older = { ...(blob.scenario as Record<string, unknown>) };
+    delete older.wind;
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: older }));
+
+    const restored = readSession(storage);
+    expect(restored?.trace).not.toBeNull();
+    expect(restored?.scenario.wind).toEqual({ speedKmh: 0, directionDeg: 0 });
+  });
+});
+
 describe("ADR-0001 — a restored Session is kept as given, and the gates judge it", () => {
   test("a knot on HMPE comes back unchanged and blocks the verdict on Terminaison A", () => {
     const knotted: Scenario = {

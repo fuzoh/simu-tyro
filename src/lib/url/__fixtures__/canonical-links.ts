@@ -51,6 +51,10 @@ export const BRANCHES = [
   "tensioning-device-maestro-s",
   "tensioning-device-maestro-l",
   "tensioning-device-pulley-explicit",
+  "wind-absent",
+  "wind-speed-and-direction",
+  "wind-direction-only",
+  "wind-explicit-zero",
 ] as const;
 
 export type Branch = (typeof BRANCHES)[number];
@@ -63,7 +67,8 @@ export type CanonicalLinkFixture = {
     | typeof MEASURED_83
     | typeof MEASURED_84
     | typeof MEASURED_85
-    | typeof MEASURED_86;
+    | typeof MEASURED_86
+    | typeof MEASURED_87;
   covers: readonly Branch[];
   scenario: Scenario;
   link: string;
@@ -82,7 +87,8 @@ export type DecodeOnlyFixture = {
     | typeof MEASURED_83
     | typeof MEASURED_84
     | typeof MEASURED_85
-    | typeof MEASURED_86;
+    | typeof MEASURED_86
+    | typeof MEASURED_87;
   covers: readonly Branch[];
   link: string;
 } & ({ scenario: Scenario; canonical: string } | { scenario: ScenarioDraft; canonical: null });
@@ -92,6 +98,7 @@ const MEASURED_83 = "[MEASURED] issue #83, codec as of 2026-11-08";
 const MEASURED_84 = "[MEASURED] issue #84, codec as of 2026-11-08";
 const MEASURED_85 = "[MEASURED] issue #85, codec as of 2026-11-08";
 const MEASURED_86 = "[MEASURED] issue #86, codec as of 2026-11-08";
+const MEASURED_87 = "[MEASURED] issue #87, codec as of 2026-11-08";
 
 /** Three stations `(0,0) (50,-4) (100,-9)`, as `encodeP1` writes them. */
 export const TRACE_P1 = "p1.AwCQTpBOAJ8G5wcA";
@@ -112,6 +119,7 @@ const STEEL: Scenario = {
     B: { id: "cosse-oeil-flamand", eta: 0.9 },
   },
   rider: { mp: 120, hRider: 2.1, hClearMin: 1, DAF: 1.2, xD: 75 },
+  wind: { speedKmh: 0, directionDeg: 0 },
 };
 
 const TEXTILE: Scenario = {
@@ -139,8 +147,8 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
   {
     name: "first-run: steel, manual, sag driver, perm, no regime",
     source: MEASURED,
-    // No `bp`, `cp` or `mt`, as before the keys existed: one Brin porteur, Mise en tension at A,
-    // by mouflage.
+    // No `bp`, `cp`, `mt`, `ws` or `wd`, as before the keys existed: one Brin porteur, Mise en
+    // tension at A, by mouflage, no wind.
     covers: [
       "steel",
       "manual",
@@ -149,6 +157,7 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
       "carrying-lines-absent",
       "tensioning-side-absent",
       "tensioning-device-absent",
+      "wind-absent",
     ],
     scenario: STEEL,
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
@@ -224,6 +233,24 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
     covers: ["steel", "tensioning-device-maestro-l"],
     scenario: { ...STEEL, tensioningDevice: "maestro-l" },
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&mt=ml&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "wind of 50 km/h from 45°: `ws`, `wd` after `daf`, before `x`",
+    source: MEASURED_87,
+    covers: ["wind-speed-and-direction"],
+    scenario: { ...STEEL, wind: { speedKmh: 50, directionDeg: 45 } },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&ws=50&wd=45&x=75",
+  },
+  {
+    name: "a direction without a speed is kept: `wd` alone",
+    source: MEASURED_87,
+    covers: ["wind-direction-only"],
+    scenario: { ...STEEL, wind: { speedKmh: 0, directionDeg: 270 } },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&wd=270&x=75",
   },
   {
     name: "ratio driver, kgf display",
@@ -460,6 +487,16 @@ export const DECODE_ONLY_LINKS: readonly DecodeOnlyFixture[] = [
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&tp=260&cp=a&${STEEL_HEAD}&${TAIL}`,
     scenario: { ...STEEL, tightness: { mode: "anchor", T_target: 2600 } },
     canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&tp=260&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "`ws=0&wd=0` is no wind, and the canonical link says so by omitting both",
+    source: MEASURED_87,
+    covers: ["wind-explicit-zero"],
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&ws=0&wd=0&x=75",
+    scenario: STEEL,
+    canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
   },
   {
     name: "`mt=mou` is the mouflage, and the canonical link says so by omitting it",

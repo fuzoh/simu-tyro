@@ -100,6 +100,8 @@ export const FIRST_RUN_SCENARIO = {
    * 2,42 m clears it, so the first screen carries no clearance breach.
    */
   rider: { mp: 120, hRider: 2.1, hClearMin: 1, DAF: 1.2, xD: 75 },
+  /** No wind, which is `ws` and `wd` **absent**: the shipped link did not change either. */
+  wind: { speedKmh: 0, directionDeg: 0 },
 } as const satisfies Scenario;
 
 /**

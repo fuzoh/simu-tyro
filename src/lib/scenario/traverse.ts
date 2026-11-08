@@ -17,10 +17,10 @@ import type { UnloadedLine } from "./unloaded.ts";
 
 /**
  * The Scenario as every Traverse-scope number reads it: all of it but `x_D`, which selects a Sweep
- * Step and judges nothing, and the Mise en tension device, which is descriptive (#86) — so a change
- * of device cannot re-run the Sweep.
+ * Step and judges nothing, and the Mise en tension device and the Vent, which are descriptive (#86,
+ * #87) — so a change of either cannot re-run the Sweep.
  */
-export type TraverseScenario = Omit<ScenarioDraft, "rider" | "tensioningDevice"> & {
+export type TraverseScenario = Omit<ScenarioDraft, "rider" | "tensioningDevice" | "wind"> & {
   readonly rider: Omit<Rider, "xD">;
 };
 
@@ -29,7 +29,7 @@ export type TraverseScenario = Omit<ScenarioDraft, "rider" | "tensioningDevice">
  * memo compares its keys one level deep, and `rider` is a fresh object on every scrub.
  */
 export type TraverseInputs = Readonly<
-  Omit<ScenarioDraft, "rider" | "tensioningDevice"> & Omit<Rider, "xD">
+  Omit<ScenarioDraft, "rider" | "tensioningDevice" | "wind"> & Omit<Rider, "xD">
 >;
 
 /**

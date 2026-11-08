@@ -81,6 +81,9 @@ const ROWS: ReadonlyArray<{ id: QuantityId; value: number; expected: string }> =
   { id: "h_clear_min", value: 1, expected: "1,0 m" },
   { id: "DAF", value: 1.2, expected: "1,2" },
   { id: "x_D", value: 75, expected: "75,0 m" },
+  // The Vent (#87): whole km/h and whole degrees, in state exactly as typed.
+  { id: "windSpeed", value: 50, expected: "50 km/h" },
+  { id: "windDirection", value: 45, expected: "45 °" },
   // The badge's own row: the formula value, not the override, so the padding is what rounds it.
   { id: "MBF", value: 90_739.8, expected: "9074 daN" },
   // 6,897 MN in canonical newtons — the declared carve-out renders MN under every setting.

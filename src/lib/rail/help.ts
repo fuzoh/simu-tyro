@@ -80,6 +80,10 @@ export const FIELD_HELP: Record<FieldId, string> = {
     "Garde exigée, en mètres : le seuil en dessous duquel la garde au sol calculée est jugée insuffisante. L'outil compare la garde minimale (traversée) — le minimum de h_clear sur toutes les positions du passager — à cette valeur ; sous le seuil, la ligne « Garde min (traversée) » et la cellule « Garde min. ligne » passent en rouge. 1,0 m est une [CONVENTION] ; 0 désactive la vérification. Ce seuil ne modifie aucun calcul.",
   DAF: "Majoration au départ, notée DAF dans les formules (§8.2). Elle majore l'écart de tension dû au passager : T max majoré = T à vide + DAF · (T chargé − T à vide). C'est ce T majoré que divise le facteur de sécurité. 1,2 est le plafond mesuré pour un départ contrôlé sur ligne tendue [FIELD:SSF] ; sous 3 % de flèche / portée, la ligne sort du régime où il a été mesuré. Elle ne touche pas la garde au sol.",
   xD: "Position du passager x_D le long de la portée, en mètres depuis l'ancrage A. Elle sélectionne une vue : les cinq cellules de lecture (garde, tensions, pente, flèche) sont calculées pour le passager à cette position, et le profil la dessine. Elle est ramenée dans [0, L] à chaque changement de portée et n'entre dans aucun agrégat « traversée ».",
+  windSpeed:
+    "Vitesse du vent, en km/h (0 ou plus). 0 est l'absence de vent, et c'est ce que lit un lien qui n'en porte pas. Information descriptive pour l'instant : elle ne change ni la statique, ni la garde au sol, ni le verdict. Elle servira à la dynamique du passager, qui en projette la composante le long de la ligne.",
+  windDirection:
+    "Direction du vent : d'où il vient, relativement au sens de parcours A → B, en degrés dans le sens horaire vu de dessus. 0° est un vent de face, 90° un vent de la droite, 180° un vent dans le dos, 270° un vent de la gauche. Elle est relative à la ligne, pas au nord : le scénario reste le même sans carte. Sans effet tant que la vitesse est nulle.",
 };
 
 /** Help for the pilot control of `Tension de la ligne` — a segmented control, not a field. */

@@ -89,6 +89,10 @@ type UnitKind =
   | "mm"
   /** Kilograms. */
   | "kg"
+  /** Kilometres per hour — the wind's speed, as it is read off an anemometer and typed. */
+  | "km/h"
+  /** Degrees of arc — the wind's bearing. */
+  | "°"
   /** Linear mass, kg/m — a mass, so the force selector does not touch it. */
   | "kg/m"
   /** A force: **newtons canonical** — § 3's SI storage — displayed in the selected unit. */
@@ -191,6 +195,10 @@ export const QUANTITIES = {
   DAF: { unit: "", decimals: 1 },
   /** `Position du passager` `x_D`, m — 1 px ≈ 1,2 m at 1500 m, so 0,1 m is under the pointer. */
   x_D: { unit: "m", decimals: 1 },
+  /** `Vitesse du vent`, km/h — a forecast or an anemometer reads whole km/h, and no model reads finer. */
+  windSpeed: { unit: "km/h", decimals: 0 },
+  /** `Direction du vent`, ° — « 45 à 55° » is how the field trial reported it: whole degrees. */
+  windDirection: { unit: "°", decimals: 0 },
   /**
    * `Charge de rupture` `MBF`, daN — **consumed by the Override badge**: the formula gives
    * 9073,98 where a freshly prefilled override holds 9074, and float equality would badge it.

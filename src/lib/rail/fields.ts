@@ -99,7 +99,9 @@ export type FieldId =
   | "hRider"
   | "hClearMin"
   | "DAF"
-  | "xD";
+  | "xD"
+  | "windSpeed"
+  | "windDirection";
 
 /**
  * A field's tier-one hard rule — the whole of it. Three shapes, because § 7's message column has
@@ -534,6 +536,26 @@ export const FIELDS = {
     // **It clamps on every path** — typed input, a geometry change, a link arrival — and says so
     // with a transient note. A clamp produces no error state, so `x_D` sits in **no gate**.
     rule: null,
+    warning: null,
+    gate: null,
+  },
+  // The two Vent fields sit in no gate: nothing reads them yet (#87), so a bad one must not take
+  // the statics or the Verdict down. Tier one still refuses the text, which stays as typed.
+  windSpeed: {
+    id: "windSpeed",
+    label: heading("windSpeed", "exact"),
+    errorLabel: heading("windSpeed", "exact"),
+    quantity: "windSpeed",
+    rule: { kind: "non-negative", sentence: "une vitesse négative n'existe pas" },
+    warning: null,
+    gate: null,
+  },
+  windDirection: {
+    id: "windDirection",
+    label: heading("windDirection", "exact"),
+    errorLabel: heading("windDirection", "exact"),
+    quantity: "windDirection",
+    rule: { kind: "finite" },
     warning: null,
     gate: null,
   },

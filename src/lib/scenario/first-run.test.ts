@@ -174,6 +174,8 @@ describe("FIRST_RUN_SCENARIO — § 9's shipped inputs", () => {
     expect(FIRST_RUN_SCENARIO.tensioningSide).toBe("A");
     // The mouflage — `mt` absent, likewise (#86).
     expect(FIRST_RUN_SCENARIO.tensioningDevice).toBe("pulley");
+    // No wind — `ws` and `wd` absent, likewise (#87).
+    expect(FIRST_RUN_SCENARIO.wind).toEqual({ speedKmh: 0, directionDeg: 0 });
   });
 
   test("Flèche is the active Tightness segment, at 6,0 m", () => {

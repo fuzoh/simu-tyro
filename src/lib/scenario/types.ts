@@ -146,6 +146,19 @@ export type TensioningSide = AnchorSide;
  */
 export type TensioningDevice = "pulley" | "maestro-s" | "maestro-l";
 
+/**
+ * The **Vent** (#87): how fast, and from where relative to the travel A → B — `direction` is
+ * degrees clockwise seen from above, 0 head wind, 90 from the right, 180 tail wind, 270 from the
+ * left. Relative to the line so a Scenario needs no Position. `ws` / `wd` in a link, **both absent
+ * for no wind**. Nothing reads it yet: statics and the Verdict are unchanged.
+ */
+export type Wind = {
+  /** Wind speed, km/h (≥ 0). */
+  speedKmh: number;
+  /** Where the wind comes from, degrees. */
+  directionDeg: number;
+};
+
 /** § 7's Scenario: everything a link transports, and nothing the Session keeps on the side. */
 export type Scenario = {
   unit: ForceUnit;
@@ -169,6 +182,7 @@ export type Scenario = {
   material: MaterialSpec;
   terminations: { A: EndTermination; B: EndTermination };
   rider: Rider;
+  wind: Wind;
 };
 
 /**

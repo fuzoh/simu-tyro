@@ -116,6 +116,28 @@ describe("sameGatedText — the text tier one reads, through a scrub", () => {
   });
 });
 
+describe("the Vent fields (#87)", () => {
+  test("typing a speed and a direction writes the wind, and nothing else", () => {
+    const before = scenario();
+    const typed = applyField(applyField(before, "windSpeed", 50), "windDirection", 45);
+    expect(typed.wind).toEqual({ speedKmh: 50, directionDeg: 45 });
+    expect({ ...typed, wind: before.wind }).toEqual(before);
+  });
+
+  test("the fields show the wind in whole km/h and whole degrees", () => {
+    const windy = scenario((draft) => {
+      draft.wind = { speedKmh: 50, directionDeg: 45 };
+    });
+    expect(railValues(windy)).toMatchObject({ windSpeed: "50", windDirection: "45" });
+    expect(railValues(scenario())).toMatchObject({ windSpeed: "0", windDirection: "0" });
+  });
+
+  test("a wind field is in no gate, so a scrub-free edit never reaches tier one", () => {
+    const shown = railValues(scenario());
+    expect(sameGatedText(shown, { ...shown, windSpeed: "-5", windDirection: "x" })).toBe(true);
+  });
+});
+
 describe("the unit invariant — daN → X → daN is the identity", () => {
   test("a selector change writes nothing into state", () => {
     const daN = scenario((draft) => {
@@ -275,6 +297,8 @@ describe("FIELD_ACCESS — one lens per numeric field", () => {
       "hClearMin",
       "DAF",
       "xD",
+      "windSpeed",
+      "windDirection",
     ]);
   });
 

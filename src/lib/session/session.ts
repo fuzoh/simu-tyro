@@ -308,6 +308,8 @@ const SCENARIO: v.GenericSchema<unknown, Scenario> = v.object({
     DAF: FINITE,
     xD: FINITE,
   }),
+  // Added with #87, optional with no wind: a Session written before it had no wind to carry.
+  wind: v.optional(v.object({ speedKmh: FINITE, directionDeg: FINITE }), FIRST_RUN_SCENARIO.wind),
 });
 
 /**

@@ -144,6 +144,11 @@ describe("§ 7's message table — committed invalid, ⛔ and blocking", () => {
       "0",
       "⛔ Raideur relative k — une valeur strictement positive est requise. Valeur : 0,00.",
     ],
+    [
+      "windSpeed",
+      "-5",
+      "⛔ Vitesse du vent — une vitesse négative n'existe pas. Valeur : −5 km/h.",
+    ],
   ];
 
   test.each(ROWS)("%s at « %s »", (field, raw, message) => {
@@ -283,6 +288,18 @@ describe("the gate each field belongs to — wired with the field, not as a late
     expect(gateOf("zB", "trace")).toBe("solve");
   });
 
+  test("the Vent fields sit in no gate — nothing reads them, so they can block nothing (#87)", () => {
+    expect(gateOf("windSpeed", "manual")).toBeNull();
+    expect(gateOf("windDirection", "manual")).toBeNull();
+  });
+
+  test("no wind is a valid value, and any direction is — it is read modulo 360°", () => {
+    expect(checkField("windSpeed", "0")).toBeNull();
+    expect(checkField("windDirection", "-90")).toBeNull();
+    expect(checkField("windDirection", "450")).toBeNull();
+    expect(checkField("windDirection", "abc")?.kind).toBe("unreadable");
+  });
+
   test("« régime choisi » is in the Verdict Gate and nowhere else", () => {
     expect(gateOf("regime", "manual")).toBe("verdict");
   });
@@ -377,6 +394,8 @@ describe("the Rail labels its fields in the exact register", () => {
     ["hRider", "Gabarit du passager"],
     ["hClearMin", "Garde exigée"],
     ["DAF", "Majoration au départ"],
+    ["windSpeed", "Vitesse du vent"],
+    ["windDirection", "Direction du vent"],
     ["cst", "Construction"],
     ["ta", "Terminaison A"],
     ["etaA", "Rendement η"],

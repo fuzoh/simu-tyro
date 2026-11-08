@@ -131,6 +131,8 @@ describe("§ 8's second sentence — the completion names the values", () => {
     expect(sentence).not.toContain("Mise en tension");
     // `cp` absent is the Mise en tension at A (#85), likewise.
     expect(sentence).not.toContain("Mise en tension");
+    // `ws` and `wd` absent are no wind (#87), likewise.
+    expect(sentence).not.toContain("vent");
   });
 });
 

@@ -223,6 +223,16 @@ _Avoid_: câble à vide, corde à vide
 The lateral bow of the unloaded line in a cross-wind, seen from above. Qualitative. Not a distance the app states in metres.
 _Avoid_: déport, drift, flèche latérale
 
+**Vent**:
+The wind the Scénario carries: a speed in km/h (zero or more) and a direction. The direction is
+where the wind comes **from**, relative to the travel A → B, in degrees clockwise seen from
+above: 0° head wind, 90° from the right, 180° tail wind (dans le dos), 270° from the left. It is
+relative to the line, so a Scénario needs no Position; the compass rose on the map converts from
+an azimuth. No wind is speed 0 and direction 0, and it is what a link without `ws` and `wd`
+reads. The engine projects it onto the line as a component along it (positive toward B) and one
+across it (positive from the right); it is a vector, never a whole `±` along the line.
+_Avoid_: rafale, souffle, orientation du vent (as an azimuth)
+
 **Marge exigée**:
 The margin the chosen Safety Regime demands. Not the margin the line actually has — that
 result is Marge faible, or a number.

@@ -237,7 +237,7 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
   SearchValues,
   "v" | "u" | "use" | "za" | "zb" | "ta" | "tb" | "na" | "nb" | "mp" | "hr" | "gm" | "daf" | "x"
 > &
-  Partial<Pick<SearchValues, "reg" | "bp" | "cp" | "mt">> &
+  Partial<Pick<SearchValues, "reg" | "bp" | "cp" | "mt" | "ws" | "wd">> &
   CompletedTerrain &
   CompletedDriver &
   (CompletedSteel | CompletedTextile);
@@ -246,14 +246,17 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
  * The keys whose **absence is meaning**, never completed. `reg` absent is « — choisir — »,
  * `mbf`/`ea`/`mu` absent is « non surchargée », which differs from « equal to the formula value »,
  * `mbl` absent — with `mu`, under `fam=tx` — is § 9's rope nobody typed, `bp` absent is one
- * Brin porteur, `cp` absent is the Mise en tension at A and `mt` absent is the mouflage:
- * completing any would rewrite, and name in the strip, every link older than the key.
+ * Brin porteur, `cp` absent is the Mise en tension at A, `mt` absent is the mouflage and `ws` / `wd`
+ * absent is no wind: completing any would rewrite, and name in the strip, every link older than the
+ * key.
  */
 const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>([
   "reg",
   "bp",
   "cp",
   "mt",
+  "ws",
+  "wd",
   "mbf",
   "ea",
   "mu",
@@ -302,7 +305,7 @@ export type Completion = {
  *
  * Three groups are exempt, all of them § 7's meanings of absence:
  *
- * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, `cp`, `mt`, the Overrides and the textile blanks. Under `fam=tx`
+ * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, `cp`, `mt`, `ws`, `wd`, the Overrides and the textile blanks. Under `fam=tx`
  *    **no rope is invented**: § 9 ships `MBL` and `μ` « vides et requis », because one made-up
  *    `MBL` decides the verdict, and those two blocking errors are the correct arrival state.
  *    Polyester's `k` stays blank too, because §13.2 publishes none.
@@ -531,6 +534,8 @@ export function searchToScenario(search: CompletedSearch): ScenarioDraft {
       DAF: search.daf,
       xD: clampX(search.x, spanOf(search)),
     },
+    // Absent **is** no wind, each key on its own: a link may state a direction before any speed.
+    wind: { speedKmh: search.ws ?? 0, directionDeg: search.wd ?? 0 },
   };
 }
 
@@ -609,6 +614,9 @@ export function scenarioToSearch(scenario: Scenario): CompletedSearch {
   out.hr = rider.hRider;
   out.gm = rider.hClearMin;
   out.daf = rider.DAF;
+  // Each is written only off its default, because no wind is both keys **absent**.
+  if (scenario.wind.speedKmh !== 0) out.ws = scenario.wind.speedKmh;
+  if (scenario.wind.directionDeg !== 0) out.wd = scenario.wind.directionDeg;
   out.x = rider.xD;
 
   if (geometry.source === "trace") out.tr = geometry.trace;

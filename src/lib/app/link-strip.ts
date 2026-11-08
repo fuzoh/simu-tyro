@@ -133,6 +133,8 @@ const KEYS: Record<StripKey, KeyRow> = {
   hr: fromField("hRider", "m"),
   gm: fromField("hClearMin", "f"),
   daf: fromField("DAF", "f"),
+  ws: fromField("windSpeed", "f"),
+  wd: fromField("windDirection", "f"),
   x: fromField("xD", "f"),
   tr: { label: "Profil", genre: "m", quantity: null },
   // `v` is deliberately absent: it is the schema version, not a champ of the scenario, and naming
@@ -198,6 +200,8 @@ const TOKENS: Record<StripKey, Readonly<Record<string, string>> | null> = {
   hr: null,
   gm: null,
   daf: null,
+  ws: null,
+  wd: null,
   x: null,
   tr: null,
 };
