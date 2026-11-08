@@ -98,13 +98,19 @@ every Page shares rather than by having one Page.
   the shell under it is `h-full`. The collapse rule reads it as `ViewportFit.navigationHeight` on
   both arms: unlike § 8's strip it is never dismissed, so `MIN_RAIL` is owed under it below B2.
   At 44 px it would pin budget C, whose letterbox is 43,68 px.
-- **`/` redirects to `/avance` in `beforeLoad`, with `location.search` and `replace: true`.** Under
-  `ssr: false` the server skips `beforeLoad`, so dev answers `/?…` with a 200 and a Skeleton and
-  the client redirects. The raw search keeps key order and unknown keys, so the strip still names
-  them on `/avance`. The router re-stringifies it, which is byte-identical for every link the app
-  or a fixture writes.
+- **`/` is the Page Statique (#91)** — `ssr: false`, its own Skeleton, the shared schema. It
+  replaced the client redirect to `/avance` that held the path until then, so a link shared before
+  the Pages (`/?…`) opens its Scenario on Statique, and the navigation bar's links carry the search
+  between the two Pages unchanged. Its `Link` is `exact`, or it would be active on every path.
 - **Writes stay on the current Page.** The load-time rewrite, the debounced address bar and the
   Rail's resets navigate `to: "."`, so a future Page that hosts the store never jumps to Avancé.
+- **A link that leaves a Page flushes its pending writes first.** Each Page mounts its own store,
+  which reads the URL before the Session, and the address bar trails the store by ≈400 ms — so a
+  link pressed inside the debounce would carry the Scenario from before the last edit. `PageLink`
+  (`src/components/app/navigation-bar.tsx`) runs the slot `usePersist` registers in `PageFrame`,
+  and when that wrote the address bar, a plain click navigates with the search it wrote rather
+  than the one the link was rendered with. Nothing is pending under « Saisie en cours », so the
+  link then carries the last complete Scenario, as the address bar does.
 - **GitHub Pages answers `/avance?…` with a 301 to `/avance/?…`**, keeping the query — measured on
   the live site for `/docs`. The router's mount-time canonicalisation then replaces `/avance/?…`
   with `/avance?…`. A bare `/avance/` compares equal after `trimPathRight` and is left alone.
@@ -115,7 +121,8 @@ against a production build served the way GitHub Pages serves it:
 
 | Request | Result |
 | --- | --- |
-| `/?<fixture>`, each of the 26 golden links | lands on `/avance?<fixture>`; same page text and field values as opening `/avance?<fixture>` directly |
+| `/?<fixture>`, each of the 26 golden links | lands on `/avance?<fixture>`; same page text and field values as opening `/avance?<fixture>` directly — **superseded by #91**: `/` is Statique |
+| `/?…` → « Avancé » → « Statique » (#91, dev, 2026-11-08) | Statique on the link's Scenario; each Page switch keeps the search byte for byte, and Statique's link is the only one active on `/` |
 | `/avance?fl=6&lo=151.64` (static host) | 301 → `/avance/?…` → **200**, refusal surface, URL intact |
 | `/avance?fl=6&lo=151.64`, `/?fl=6&lo=151.64`, `/avance?v=3` (dev) | **200**, no 307 |
 | `/avance?L=250&junk=zz` | strip names « junk », then the rewrite stays on `/avance` |
@@ -131,11 +138,13 @@ must not be enabled speculatively; a GitHub Pages deploy is the ask that spends 
 - `vite.config.ts` sets `spa: { enabled: true, prerender: { outputPath: "/index" } }`. The build
   gains a prerender pass that server-renders **the root alone** — shell mode gives every other
   match `ssr: false` — so the root's first child paints its `pendingComponent`. That child is the
-  app layout `_app.tsx`, whose `pendingComponent` is Avancé's frame: the navigation bar as text
-  over Avancé's Skeleton, the same frame `/` shows in dev, not an empty `<body>`. `maskPath` stays
-  at its default `/`. **When a Page takes `/`, that `pendingComponent` becomes its Skeleton.**
-- **Every app Page is also prerendered on its own**, from `APP_PAGES` in `src/lib/app/pages.ts`
-  (`pages` in `vite.config.ts`, `outputPath: "/<page>/index.html"`). That is not shell mode: the
+  app layout `_app.tsx`, whose `pendingComponent` is Statique's frame, the Page at `/` (#91): the
+  navigation bar as text over Statique's Skeleton, the same frame `/` shows in dev, not an empty
+  `<body>`. `maskPath` stays at its default `/`. **The Page at `/` and this `pendingComponent` share
+  one Skeleton.**
+- **Every other app Page is also prerendered on its own**, from `APP_PAGES` in
+  `src/lib/app/pages.ts` (`pages` in `vite.config.ts`, `outputPath: "/<page>/index.html"`, `/`
+  skipped because the shell is its file). That is not shell mode: the
   layout renders its bar and the Page its own Skeleton, so a direct `/avance?…` lands with a
   **200** on Avancé's frame rather than with a 404 on `404.html`.
 - `outputPath: "/index"` and not the default `/_shell`: a static host serves `index.html` at a
@@ -167,10 +176,12 @@ must not be enabled speculatively; a GitHub Pages deploy is the ask that spends 
 | `src/routes/__root.tsx` | the document only — `lang="fr"`, the French `<title>`, the viewport meta with `interactive-widget=resizes-content`, the French `notFoundComponent`, the unguarded devtools block. **No root `component`, no navigation bar.** |
 | `src/routes/_app.tsx` | the app Pages' pathless layout, server-rendered: `validateSearch` and `search.middlewares`, **declared once**; the navigation bar; the SPA shell's `pendingComponent` |
 | `src/routes/_app.avance.tsx` | the Page Avancé: `ssr: false`, `pendingComponent`, and an `errorComponent` for **genuine load failures only** |
-| `src/routes/_app.index.tsx` | `/`: `ssr: false` and a client-side `beforeLoad` redirect to `/avance` with the search as it came |
+| `src/routes/_app.index.tsx` | `/`, the Page Statique: `ssr: false`, its Skeleton as `pendingComponent`, the shared `errorComponent` |
+| `src/components/statique/` | Statique's frame and Skeleton (`frame.tsx`), its fields, outputs and vue de dessus — over the same store, form and writer as Avancé (`usePage`) |
+| `src/components/app/load-failure.tsx` | every app Page's `errorComponent`, for **genuine load failures only** |
 | `src/lib/app/pages.ts` | `APP_PAGES`, the table the navigation bar and the prerender list both read |
 | `src/components/app/navigation-bar.tsx` | `PageFrame` — the bar above, the Page's shell below, one viewport tall |
-| `src/components/app/skeleton.tsx` | Avancé's `pendingComponent` — what the server renders under the navigation bar |
+| `src/components/app/skeleton.tsx` | Avancé's `pendingComponent` — what the server renders under the navigation bar on `/avance` |
 | `src/components/app/shell.tsx` | the one layout the Skeleton and the live app both render, with § 5's band heights as CSS custom properties over container-query units |
 | `src/components/app/refusal.tsx` | the refusal surface, an **ordinary component** driven by `search.refused` |
 | `src/components/app/store.tsx` | the React-context store, its lazy Session read and the rewrite mount effect |
@@ -182,7 +193,7 @@ Three rules that only become visible once the shell exists:
   Session, any recognised scenario key then wins **wholesale**, and the mount effect diffs the raw
   keys to produce both the strip's evidence and the rewrite.
 - **The rewrite fires on content, never on order.** Same keys in another order is left exactly as
-  typed, and a bare Page (`/avance`, or `/` before its redirect) is never rewritten — bare *means*
+  typed, and a bare Page (`/`, `/avance`) is never rewritten — bare *means*
   « restore the Session ». **`?junk=zz`
   is not bare**: no recognised key survived, so the Session is restored like a bare `/`, but
   something *was* dropped — the strip still names the key and the rewrite still fires, onto the

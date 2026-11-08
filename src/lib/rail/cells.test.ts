@@ -16,7 +16,7 @@ import {
 
 import type { PlacedRider } from "./cells.ts";
 
-import { readOutCells } from "./cells.ts";
+import { cellsOf, readOutCells } from "./cells.ts";
 
 /** The chart's drawn-cable resolution — `CABLE_SAMPLES`, which `belowUnloaded` is read off. */
 const CABLE_SAMPLES = 240;
@@ -114,5 +114,25 @@ describe("`readOutCells` — every cell by id, as the chart block printed it", (
     // 817,1 daN = 8,171 kN.
     const cells = readOutCells(riderOf(), { clearance: true, hClearMin: 1, unit: "kN" });
     expect(cells.TA.value).toBe("8,171 kN");
+  });
+});
+
+describe("the terrain register's cells (#91)", () => {
+  test("drop « Garde min. ligne », Avancé's alone, and name the rest in terrain words", () => {
+    expect(cellsOf("terrain")).toEqual(["TA", "TB", "slope", "sag", "underRider", "belowUnloaded"]);
+    const cells = readOutCells(riderOf(), {
+      clearance: true,
+      hClearMin: 2,
+      unit: "daN",
+      register: "terrain",
+    });
+    expect(cellsOf("terrain").map((id) => cells[id].label)).toEqual([
+      "T anc. A",
+      "T anc. B",
+      "Pente",
+      "Flèche chargée",
+      "Garde au sol",
+      "Écart à vide",
+    ]);
   });
 });

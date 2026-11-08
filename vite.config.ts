@@ -29,8 +29,9 @@ const config = defineConfig({
        * **SPA mode — the app ships as static files.** Nothing here needs a server: every app Page
        * sets `ssr: false`, there is no `createServerFn` and no server route, and computation never
        * crosses a network boundary. The build gains a prerender step that renders the root route
-       * with its first child's `pendingComponent` — the app layout's, i.e. Avancé's frame — into a
-       * single HTML file; `dist/server/` is still emitted and is simply not deployed.
+       * with its first child's `pendingComponent` — the app layout's, i.e. Statique's Skeleton, the
+       * Page at `/` — into a single HTML file; `dist/server/` is still emitted and is simply not
+       * deployed.
        *
        * `outputPath: "/index"` instead of the default `/_shell`: a static host serves `index.html`
        * at a directory URL, and GitHub Pages runs Jekyll, which would drop an `_`-prefixed file
@@ -55,9 +56,9 @@ const config = defineConfig({
          * **Every app Page is prerendered with its own Skeleton** (ADR-0002), so a direct
          * `/avance?…` on GitHub Pages lands with a **200** on Avancé's frame — not with a 404 on
          * `404.html`, which carries the shell's. The search never reaches a static host, so one
-         * file per Page serves every Scenario.
+         * file per Page serves every Scenario. `/` is the shell itself, prerendered above.
          */
-        ...APP_PAGES.map(({ path }) => ({
+        ...APP_PAGES.filter(({ path }) => path !== "/").map(({ path }) => ({
           path,
           prerender: { enabled: true, outputPath: `${path}/index.html` },
         })),

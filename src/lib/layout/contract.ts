@@ -650,7 +650,7 @@ export function createZScale({
  * The clamped rows read « ×1 » and never « ×1,0 »: the floor is exact, and a decimal on it would
  * suggest a measurement where there is a rule.
  */
-export function veBadgeLabel(exaggerationValue: Exaggeration): string {
+export function veBadgeLabel(exaggerationValue: Pick<Exaggeration, "state" | "ve">): string {
   if (exaggerationValue.state === "auto") {
     return `Éch. verticale ×${exaggerationValue.ve.toFixed(1).replace(".", ",")}`;
   }
@@ -677,7 +677,7 @@ export function veBadgeLabel(exaggerationValue: Exaggeration): string {
  * requires the same line to be whole at {@link PROFILE_ASPECT}, i.e. `k ≥ 1 / (1,24 × 0,42)` = 1,92,
  * and the cap holds `plotAspect` above 0,1 at any column a browser can produce.
  */
-export function peekBadgeLabel(exaggerationValue: Exaggeration): string {
+export function peekBadgeLabel(exaggerationValue: Pick<Exaggeration, "peek" | "autofit">): string {
   if (exaggerationValue.peek !== "fit") return "Éch. verticale ×1 — vraie échelle";
   const factor = exaggerationValue.autofit.toFixed(1).replace(".", ",");
   return `Éch. verticale ×${factor} — sous la vraie échelle · câble entier`;

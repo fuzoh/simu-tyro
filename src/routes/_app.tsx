@@ -11,7 +11,7 @@
 import { createFileRoute, Outlet, useHydrated } from "@tanstack/react-router";
 
 import { PageFrame } from "@/components/app/navigation-bar.tsx";
-import { Skeleton } from "@/components/app/skeleton.tsx";
+import { StatiqueSkeleton } from "@/components/statique/frame.tsx";
 import { keepRefusalOutOfTheAddressBar, validateSearch } from "@/lib/url/schema.ts";
 
 export const Route = createFileRoute("/_app")({
@@ -29,7 +29,8 @@ export const Route = createFileRoute("/_app")({
   /**
    * **The SPA shell, and only that.** The shell prerender server-renders the root alone, so this
    * route — the root's first child — paints its `pendingComponent` into `index.html`, which
-   * `build:pages` copies to `404.html`. `/` opens Avancé, so the shell is Avancé's frame.
+   * `build:pages` copies to `404.html`. `/` is Statique (#91), so the shell is Statique's Skeleton,
+   * and the Page's own `pendingComponent` is the same one.
    */
   pendingComponent: ShellSkeleton,
   component: AppLayout,
@@ -51,7 +52,7 @@ function AppLayout() {
 function ShellSkeleton() {
   return (
     <PageFrame live={false}>
-      <Skeleton />
+      <StatiqueSkeleton />
     </PageFrame>
   );
 }

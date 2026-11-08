@@ -44,7 +44,7 @@ export type MaterialPreset = {
 };
 
 const SHEET = "fiche technique Courant du 12/09/2022";
-const SHEET_CHIP = "fiche Courant 12/09/2022";
+export const SHEET_CHIP = "fiche Courant 12/09/2022";
 
 const sheet = (detail: string): PresetProvenance => ({
   label: SHEET_CHIP,
@@ -89,7 +89,8 @@ export function applyMaterialPreset(scenario: ScenarioDraft, id: PresetId): Scen
   return { ...scenario, material: { family: "textile", ...preset.spec } };
 }
 
-const VALUE_CHIP: PresetProvenance = {
+/** A preset field moved off the preset's value. */
+export const VALUE_CHIP: PresetProvenance = {
   label: "valeur utilisateur",
   detail: "Valeur modifiée depuis le préréglage.",
   tone: "neutral",

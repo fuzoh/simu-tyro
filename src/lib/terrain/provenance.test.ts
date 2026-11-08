@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest";
 import type { Trace } from "./trace.ts";
 
 import { parseProfileCsv } from "./csv.ts";
-import { isStraight, terrainDisclosure, traceName } from "./provenance.ts";
+import { isStraight, terrainDisclosure, terrainSource, traceName } from "./provenance.ts";
 
 /**
  * The terrain-provenance disclosure block — « v1 build spec » § 6 (*La qualité du terrain est
@@ -49,6 +49,19 @@ describe("manual ground", () => {
     expect(lines[0].detail).toContain("le dénivelé ne gagne aucune garde");
     expect(lines[0].detail).toContain("garde min 2,43 / 2,42 / 2,34 / 2,22 m");
     expect(lines[0].detail).toContain("−62,8 m sur une ligne de 1109 m");
+  });
+});
+
+describe("the source every Page discloses (#91)", () => {
+  const cached = exported(183.4, 0.007);
+
+  test("is the active Trace", () => {
+    expect(terrainSource("trace", cached)).toEqual({ kind: "trace", trace: cached });
+  });
+
+  test("is manual ground under manual geometry, even with a Trace in memory", () => {
+    expect(terrainSource("manual", cached)).toEqual({ kind: "manual" });
+    expect(terrainSource("trace", null)).toEqual({ kind: "manual" });
   });
 });
 

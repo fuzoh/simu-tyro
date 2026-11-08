@@ -19,7 +19,7 @@ import { DEFAULT_LAYERS, readSession } from "@/lib/session/session.ts";
 import { encodeP1 } from "@/lib/url/p1.ts";
 
 import type { AppState } from "./state.ts";
-import type { Disarm, WriteEffects } from "./write-side.ts";
+import type { Pending, WriteEffects } from "./write-side.ts";
 
 import {
   publishable,
@@ -27,7 +27,7 @@ import {
   sessionOf,
   URL_WRITE_DEBOUNCE_MS,
 } from "./persist.ts";
-import { armAddressBarWrite, armSessionWrite } from "./write-side.ts";
+import { armAddressBarWrite, armSessionWrite, writtenSearch } from "./write-side.ts";
 
 const ORIGIN = "https://scoutech.example";
 const PAGE = "/avance";
@@ -105,8 +105,8 @@ function mount({ storage }: { storage: SessionStorage | null }) {
   };
   let current: AppState | null = null;
   let wasSuspended: boolean | null = null;
-  let addressBar: Disarm;
-  let session: Disarm;
+  let addressBar: Pending | undefined;
+  let session: Pending | undefined;
   const read = () => {
     if (current === null) throw new Error("unreachable: read before the first edit");
     return current;
@@ -118,11 +118,15 @@ function mount({ storage }: { storage: SessionStorage | null }) {
       current = state;
       wasSuspended = suspended;
       if (rearm) {
-        addressBar?.();
+        addressBar?.cancel();
         addressBar = armAddressBarWrite({ read, suspended, effects });
       }
-      session?.();
+      session?.cancel();
       session = armSessionWrite({ state, suspended, effects });
+    },
+    /** A link leaving the Page: both pending writes, performed now. */
+    leave() {
+      return [...(session?.flush() ?? []), ...(addressBar?.flush() ?? [])];
     },
   };
 }
@@ -273,5 +277,54 @@ describe("« Saisie en cours » suspends both writes together", () => {
     vi.advanceTimersByTime(10 * SESSION_WRITE_DEBOUNCE_MS);
     expect(app.navigations).toEqual([]);
     expect(storage.sets()).toBe(0);
+  });
+});
+
+describe("a Page left inside the debounce hands over its last edit", () => {
+  it("performs both pending writes at once, and says what the address bar now holds", () => {
+    const storage = memoryStorage();
+    const app = mount({ storage });
+    const fitting = imported(200);
+    const link = publishable(fitting.scenario, ORIGIN, PAGE);
+    app.edit(fitting);
+    vi.advanceTimersByTime(URL_WRITE_DEBOUNCE_MS / 4);
+
+    const written = app.leave();
+    expect(written).toEqual([
+      { to: "session", session: sessionOf(fitting) },
+      { to: "address-bar", search: link.ok ? link.search : null },
+    ]);
+    expect(writtenSearch(written)).toEqual(link.ok ? link.search : null);
+    expect(app.navigations.map((n) => n.at)).toEqual([URL_WRITE_DEBOUNCE_MS / 4]);
+    expect(readSession(storage)).toEqual(sessionOf(fitting));
+  });
+
+  it("hands over a bare search for an oversize draft, whose Session is already stored", () => {
+    const storage = memoryStorage();
+    const app = mount({ storage });
+    const oversize = imported(600);
+    app.edit(oversize);
+    expect(writtenSearch(app.leave())).toEqual({});
+    expect(readSession(storage)).toEqual(sessionOf(oversize));
+  });
+
+  it("writes each once: the timers that would have fired write nothing more", () => {
+    const storage = memoryStorage();
+    const app = mount({ storage });
+    app.edit(imported(200));
+    app.leave();
+    vi.advanceTimersByTime(10 * SESSION_WRITE_DEBOUNCE_MS);
+    expect(app.navigations).toHaveLength(1);
+    expect(storage.sets()).toBe(1);
+    expect(app.leave()).toEqual([]);
+  });
+
+  it("has nothing to hand over once the writes have run, or under « Saisie en cours »", () => {
+    const app = mount({ storage: memoryStorage() });
+    app.edit(imported(200));
+    vi.advanceTimersByTime(SESSION_WRITE_DEBOUNCE_MS);
+    expect(app.leave()).toEqual([]);
+    app.edit(imported(150), { suspended: true });
+    expect(writtenSearch(app.leave())).toBeNull();
   });
 });

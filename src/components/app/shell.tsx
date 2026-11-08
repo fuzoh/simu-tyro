@@ -107,9 +107,10 @@ export const NOSCRIPT_LINE = "Ce simulateur nécessite JavaScript pour fonctionn
 /**
  * The layout contract as CSS custom properties. `100cqi` is the **chart column's** inline size —
  * the column is the query container, so `--w-inner` is exactly § 5's `W_inner = col − 48`, and
- * every band below is a function of it and of nothing else.
+ * every band below is a function of it and of nothing else. Exported for the other Pages that
+ * stand the Chart Block in a column of their own — Statique — so its bands read the same contract.
  */
-const LAYOUT_VARS = {
+export const LAYOUT_VARS = {
   "--gutter": `${GUTTER}px`,
   "--w-inner": `calc(100cqi - ${2 * GUTTER}px)`,
   "--profile-badge": `${PROFILE_CHROME.badge}px`,

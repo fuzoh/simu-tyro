@@ -8,7 +8,7 @@ import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { sweepRider, sweepRiderOf } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { evaluateVerdict } from "@/lib/sim";
-import { proscribedIn } from "@/lib/vocabulary/labels.ts";
+import { exactTermsIn, label, proscribedIn } from "@/lib/vocabulary/labels.ts";
 
 import type { ResultRowId, Results, SolvedTraverse } from "./results.ts";
 
@@ -18,6 +18,7 @@ import {
   NO_REGIME_ASIDE,
   PER_LINE_SCOPE,
   REGIME_PROMPT,
+  refusalReason,
   TRAVERSE_SCOPE,
   verdictSentence,
 } from "./results.ts";
@@ -453,6 +454,41 @@ describe("the five verdict states and their grammar", () => {
     );
   });
 
+  test("on a terrain Page, « Marge faible » spells out the facteur de sécurité (#91)", () => {
+    const verdict = verdictOf({ steps: [step(22735, 22000)] });
+    expect(verdictSentence(verdict, "terrain")).toMatch(
+      /^Marge faible — EN 15567-1 : facteur de sécurité \d,\d\d pour k = 3,0$/,
+    );
+  });
+
+  test("refusalReason gives « Interdit »'s prohibition, and nothing for any other state", () => {
+    const refused = verdictOf({
+      steps: [step(3000, 2900)],
+      terminations: { A: "serre-cables-etrier", B: "cosse-oeil-flamand" },
+    });
+    expect(refusalReason(refused, "terrain")).toBe(
+      "serre-câbles sur une ligne portant des passagers",
+    );
+    expect(refusalReason(verdictOf({ steps: [step(3000, 2900)] }), "terrain")).toBeNull();
+  });
+
+  test("a terrain Page words the banner in its register; the state and the rows are Avancé's", () => {
+    const results = resultsOf({ regime: "en15567" });
+    const terrain = deriveResults({
+      scenario: { ...SHIPPED, regime: "en15567" },
+      base: solvedTraverseOf({ ...SHIPPED, regime: "en15567" }),
+      register: "terrain",
+    });
+    const state = results.banner?.state ?? "indetermine";
+    const text = terrain?.banner?.text ?? "";
+    expect(text.startsWith(`${label(state, "terrain")} — `)).toBe(true);
+    expect(exactTermsIn(text)).toEqual([]);
+    expect(proscribedIn(text)).toEqual([]);
+    // The `Résultats` verdict row is Avancé's own, so it stays in the exact register.
+    expect(terrain?.banner?.state).toBe(state);
+    expect(terrain?.rows).toEqual(results.rows);
+  });
+
   test("the grammar never says « conforme » nor « non conforme »", () => {
     const regimes: RegimeId[] = ["en15567", "wsqld", "acct10", "ansi5"];
     for (const regime of regimes) {
@@ -634,7 +670,8 @@ describe("a scrub re-derives nothing — `vi.mock` on the engine barrel", () => 
   /**
    * React's `useMemo`, as far as the app root goes: recompute when any key moved under
    * `Object.is`. Vitest renders no hook, so the chain `useTraverse` → `useRailForm`'s report →
-   * `useResults` is rebuilt here from the same calls and the same keys.
+   * the results `useErrorSurfaces` memoises is rebuilt here from the same calls. That memo's other
+   * keys — the failure, the caret, the frame, the register — stand still through a scrub.
    */
   function memo<T>(): (compute: () => T, keys: readonly unknown[]) => T {
     let held: { keys: readonly unknown[]; value: T } | null = null;

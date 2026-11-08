@@ -302,3 +302,34 @@ describe("« Aucun résultat » — one cause, written once", () => {
     expect(noResultCause({ report: BAD_SPAN, refusal: null })).toMatch(/^Aucun résultat — .+\.$/);
   });
 });
+
+describe("the terrain register — a simplified Page's banner (#91)", () => {
+  test("rank 4b asks for a marge exigée, in the strip and on its button", () => {
+    expect(
+      banner({
+        report: FIRST_RUN,
+        refusal: null,
+        saisie: null,
+        verdict: null,
+        register: "terrain",
+      }),
+    ).toEqual({
+      rank: 4,
+      kind: "no-regime",
+      text: "Choisissez une marge exigée pour obtenir un verdict.",
+      action: "Choisir une marge exigée",
+    });
+  });
+
+  test("the cause names a value only Avancé shows without its exact term", () => {
+    const report = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.tightness = { mode: "ratio", ratio: -1 };
+      }),
+      register: "terrain",
+    });
+    expect(noResultCause({ report, refusal: null, register: "terrain" })).toBe(
+      "Aucun résultat — réglage de la Page Avancé invalide.",
+    );
+  });
+});

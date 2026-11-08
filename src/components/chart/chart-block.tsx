@@ -33,6 +33,7 @@ import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 
 import type { ChartScene, SceneBase, SceneFrame } from "@/lib/chart/scene.ts";
+import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import {
   BannerSlot,
@@ -45,6 +46,7 @@ import {
   ViewStripSlot,
 } from "@/components/app/shell.tsx";
 import { useAppDispatch, useAppState } from "@/components/app/store.tsx";
+import { NO_SPAN_LINE } from "@/lib/chart/copy.ts";
 import { placeRider, snapToStep } from "@/lib/chart/scene.ts";
 import { roundToDisplay } from "@/lib/format/quantity.ts";
 import {
@@ -61,7 +63,7 @@ import {
   stripOuterHeight,
   veBadgeLabel,
 } from "@/lib/layout/contract.ts";
-import { CELL_IDS, CELL_LABEL, readOutCells } from "@/lib/rail/cells.ts";
+import { cellLabel, cellsOf, READ_OUT_SCOPE, readOutCells } from "@/lib/rail/cells.ts";
 import { CELL_HELP } from "@/lib/rail/help.ts";
 import { clampX } from "@/lib/scenario/geometry.ts";
 import { cn } from "@/lib/utils.ts";
@@ -69,13 +71,6 @@ import { cn } from "@/lib/utils.ts";
 import { Profile } from "./profile.tsx";
 import { ClearanceStrip } from "./strip.tsx";
 import { ViewStrip } from "./view-strip.tsx";
-
-/**
- * § 8's own line for *l'exception géométrique*, centred in **both** empty plots — the one state
- * where there is no shared x domain, so nothing can be drawn against it and nothing can be pointed
- * at. Every other failure keeps its frame.
- */
-const NO_SPAN_LINE = "Portée invalide — aucun dessin possible.";
 
 /**
  * `Indéterminé`'s one legal glyph — *tenté, indisponible*. It is **not** the empty state and it is
@@ -92,6 +87,7 @@ export function ChartBlock({
   inert = false,
   onPositionFocus,
   onReveal,
+  register = "exact",
   revealGrantable = true,
   solved,
   width,
@@ -134,6 +130,11 @@ export function ChartBlock({
   /** « Afficher le profil » — the pinned header's one control. */
   onReveal: () => void;
   /**
+   * The Page's vocabulary (#61): which read-out cells the row carries and what they are called. A
+   * simplified Page prints the terrain set, without help — the help is Avancé's exact prose.
+   */
+  register?: Register;
+  /**
    * May the policy **grant** that request here? `false` under § 5's two height constraints, where
    * the chevron would otherwise be a press that changes nothing — voir `revealGrantable` in
    * `@/lib/layout/collapse.ts` and `RevealProfile`. It is a derived boolean like `inert`, not a
@@ -170,7 +171,14 @@ export function ChartBlock({
   // Not measured yet: the bands keep their heights and hold their labels, which is the Skeleton's
   // own content. Nothing about the scenario is being said here.
   if (width === null) {
-    return <EmptyBands banner={banner} onReveal={onReveal} revealGrantable={revealGrantable} />;
+    return (
+      <EmptyBands
+        banner={banner}
+        onReveal={onReveal}
+        register={register}
+        revealGrantable={revealGrantable}
+      />
+    );
   }
   // § 8's *exception géométrique*, and **only** it: no shared x domain, so both plots are empty
   // frames with no axis ticks, they carry the cause line, and pointer input is inert. The read-out
@@ -183,6 +191,7 @@ export function ChartBlock({
         cause={NO_SPAN_LINE}
         cells={cause ?? null}
         onReveal={onReveal}
+        register={register}
         revealGrantable={revealGrantable}
       />
     );
@@ -288,7 +297,7 @@ export function ChartBlock({
   const values =
     rider === null
       ? null
-      : readOutCells(rider, { clearance, hClearMin: riderInput.hClearMin, unit });
+      : readOutCells(rider, { clearance, hClearMin: riderInput.hClearMin, unit, register });
 
   return (
     <>
@@ -339,15 +348,17 @@ export function ChartBlock({
           xD={rider === null ? clampX(riderInput.xD, frame.L) : rider.step.xD}
         />
       </ViewStripSlot>
-      <ReadOutCells scope="à la position du passager">
-        {CELL_IDS.map((id) => (
+      <ReadOutCells scope={READ_OUT_SCOPE}>
+        {cellsOf(register).map((id) => (
           <ReadOutCell
             className={cn(READ_OUT_CELLS[id].basis, READ_OUT_CELLS[id].pinned)}
-            help={CELL_HELP[id]}
+            help={register === "exact" ? CELL_HELP[id] : undefined}
             key={id}
             // No label under the cause line: the row is **replaced** by it, and the box stays only
             // to hold the row's height — voir `ReadOutCell`'s own `label`.
-            label={replaced ? undefined : values === null ? CELL_LABEL[id] : values[id].label}
+            label={
+              replaced ? undefined : values === null ? cellLabel(id, register) : values[id].label
+            }
           >
             {values !== null &&
               (values[id].note ? (
@@ -392,10 +403,12 @@ function EmptyBands({
   cause,
   cells = null,
   onReveal,
+  register,
   revealGrantable = true,
 }: {
   banner?: ReactNode;
   cause?: string;
+  register: Register;
   /**
    * The pinned header's chevron. It is here too, because both of these states can be reached
    * *while* the block is pinned — a link with an invalid span arrives on a phone — and a collapse
@@ -430,14 +443,14 @@ function EmptyBands({
       )}
       <ViewStripSlot />
       <ReadOutCells>
-        {CELL_IDS.map((id) => (
+        {cellsOf(register).map((id) => (
           <ReadOutCell
             className={cn(READ_OUT_CELLS[id].basis, READ_OUT_CELLS[id].pinned)}
             key={id}
             // The pre-measurement frame keeps its five labels — nothing was attempted, and that *is*
             // the Skeleton's own content. Under the geometric exception the cause line occupies the
             // row instead, so the labels go with it (ticket 31, **D2**).
-            label={cells === null ? CELL_LABEL[id] : undefined}
+            label={cells === null ? cellLabel(id, register) : undefined}
           />
         ))}
         {cells !== null && (

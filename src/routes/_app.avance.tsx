@@ -14,6 +14,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { App } from "@/components/app/app.tsx";
+import { LoadFailure } from "@/components/app/load-failure.tsx";
 import { LinkRefusalSurface } from "@/components/app/refusal.tsx";
 import { Skeleton } from "@/components/app/skeleton.tsx";
 
@@ -64,21 +65,4 @@ function AvanceRoute() {
   if (refused !== undefined) return <LinkRefusalSurface refusal={refused} />;
 
   return <App page={Route.fullPath} />;
-}
-
-/**
- * A genuine load failure — the state that is now the only occupant of `errorComponent`. It says so
- * plainly, which is the one thing the refusal surface may **not** say: there, nothing failed and
- * the status line agrees; here, something did.
- */
-function LoadFailure() {
-  return (
-    <main className="mx-auto flex max-w-md flex-col items-start gap-3 p-6 pt-16" role="alert">
-      {/* `text-lg` / `text-xs`: the three-size scale covers the error screens too. */}
-      <h1 className="font-heading text-lg font-semibold tracking-tight">
-        Le simulateur n'a pas pu démarrer.
-      </h1>
-      <p className="text-muted-foreground text-xs">Rechargez la page.</p>
-    </main>
-  );
 }

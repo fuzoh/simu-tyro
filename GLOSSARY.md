@@ -367,8 +367,9 @@ _Avoid_: chart ratio, plot proportions, flex ratio, aspect ratio
 The frame the server renders below the document, and the only thing it renders: the
 Navigation Bar's reserved height with the Page names as plain text, then the Page's own
 frame. On Avancé that frame is the Rail's five section headings in order, the app's name,
-two empty chart frames at final proportions, and the read-out cells' labels. Each app Page
-ships its own. It carries no number, no Verdict, no spinner, no « — » and no live control
+two empty chart frames at final proportions, and the read-out cells' labels; on Statique it
+is the field groups' headings, the output tiles' labels, the coupe's empty bands and the vue
+de dessus's frame. Each app Page ships its own. It carries no number, no Verdict, no spinner, no « — » and no live control
 (not even a link in the Navigation Bar), only reserved height where one will be. Same CSS
 layout as the app, so it is correct at every width for free, and replaced wholesale at
 hydration.

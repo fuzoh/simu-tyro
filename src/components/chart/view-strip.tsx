@@ -44,11 +44,11 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { Toggle } from "@/components/ui/toggle.tsx";
+import { LAYER_LABEL, PEEK_LABEL } from "@/lib/chart/copy.ts";
 import { formatValue } from "@/lib/format/quantity.ts";
 import { keepCaret } from "@/lib/layout/collapse.ts";
 import { riderPositionEntry } from "@/lib/rail/fields.ts";
 import { cn } from "@/lib/utils.ts";
-import { label } from "@/lib/vocabulary/labels.ts";
 
 /**
  * One control's label at the three widths of chart column: **full** from 768 px, **short** from B1,
@@ -91,18 +91,6 @@ function Abbr({
 const PRESSED =
   "text-muted-foreground aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:text-background aria-pressed:hover:bg-foreground/85";
 
-/**
- * The peek control's two labels, per mode — § 5's « ×1 vraie échelle », and the **decision 4**
- * toggle that puts a box-clipped cable back inside the frame. The label names *what pressing it does*, so
- * the mode that no longer shows ×1 no longer says ×1; the disabled control keeps § 5's own words,
- * because that is the row the spec's table describes.
- */
-const PEEK_LABEL: Record<PeekMode, { full: string; short: string }> = {
-  off: { full: "×1 vraie échelle", short: "×1" },
-  "true-scale": { full: "×1 vraie échelle", short: "×1" },
-  fit: { full: "voir tout le câble", short: "tout" },
-};
-
 /** The layer toggles, in the row's order: § 5's two, then the two of 2026-09-23. */
 const LAYERS = [
   "unloadedLine",
@@ -110,14 +98,6 @@ const LAYERS = [
   "trajectory",
   "riderTip",
 ] as const satisfies readonly (keyof LayerToggles)[];
-
-/** Each layer toggle's two labels. `full` is also its `aria-label` and `title`. */
-const LAYER_LABEL: Record<keyof LayerToggles, { full: string; short: string }> = {
-  unloadedLine: { full: label("unloadedLine", "exact"), short: "à vide" },
-  chordAB: { full: label("anchorLine", "exact"), short: "A–B" },
-  trajectory: { full: label("trajectory", "exact"), short: "trajet" },
-  riderTip: { full: "distances", short: "dist." },
-};
 
 /**
  * A layer's swatch — **its own stroke, drawn small**: the dash of « ligne à vide », the straight dash

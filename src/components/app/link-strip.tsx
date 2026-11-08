@@ -19,9 +19,7 @@ import { useState } from "react";
 import type { LinkStrip } from "@/lib/app/link-strip.ts";
 
 import { Button } from "@/components/ui/button.tsx";
-
-/** The dismiss control. Labelled by its **effect**, like every other action in the app. */
-const DISMISS_LABEL = "Masquer ce message";
+import { DISMISS_LABEL } from "@/lib/app/link-strip.ts";
 
 export function LinkStripNotice({
   bandRef,

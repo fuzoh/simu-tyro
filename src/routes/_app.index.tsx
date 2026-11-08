@@ -1,25 +1,30 @@
 /**
- * `/` — every link shared before the Pages existed points here, and it opens Avancé until the Page
- * Statique takes this path (ADR-0002).
+ * `/` — the Page Statique (#91), the simplified Page in the terrain register. Every link shared
+ * before the Pages existed points here, and it opens on the same Scenario Avancé would: the schema
+ * is the layout's, read here as on every app Page, never declared twice.
  *
- * The redirect is the **client's**: `ssr: false` skips `beforeLoad` on the server, so the server —
- * the dev server, or the build's shell prerender — answers 200 with a Skeleton and never a 307 a
- * static host could not reproduce anyway.
+ * `ssr: false` and its own Skeleton, for Avancé's reasons (`_app.avance.tsx`): a server-painted
+ * Scenario would be somebody else's numbers for one frame. Its Skeleton is also the shell's — the
+ * layout's `pendingComponent` — because the build's shell prerender is this Page's `index.html`.
  */
 
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
-import { Skeleton } from "@/components/app/skeleton.tsx";
+import { LoadFailure } from "@/components/app/load-failure.tsx";
+import { LinkRefusalSurface } from "@/components/app/refusal.tsx";
+import { StatiqueSkeleton } from "@/components/statique/frame.tsx";
+import { Statique } from "@/components/statique/statique.tsx";
 
 export const Route = createFileRoute("/_app/")({
   ssr: false,
-  /**
-   * `location.search` is the **raw** parse, so the redirect carries the link exactly as it came —
-   * key order included — and never the validated merge. `replace`, so Back does not land on `/`
-   * and bounce forward again.
-   */
-  beforeLoad: ({ location }) => {
-    throw redirect({ replace: true, search: location.search, to: "/avance" });
-  },
-  pendingComponent: Skeleton,
+  pendingComponent: StatiqueSkeleton,
+  errorComponent: LoadFailure,
+  component: StatiqueRoute,
 });
+
+function StatiqueRoute() {
+  // The one thing app code reads off the router, as on Avancé: the synthesised refusal marker.
+  const refused = Route.useSearch({ select: (search) => search.refused });
+  if (refused !== undefined) return <LinkRefusalSurface refusal={refused} />;
+  return <Statique page={Route.fullPath} />;
+}

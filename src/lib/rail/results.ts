@@ -63,6 +63,7 @@ import type {
   VerdictResult,
   VerdictState,
 } from "@/lib/sim";
+import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { formatAtX, formatQuantity, formatValue } from "@/lib/format/quantity.ts";
 import { amplifiedTension, evaluateVerdict, REGIMES, scanTensionEnvelope } from "@/lib/sim";
@@ -206,6 +207,12 @@ export const REGIME_PROMPT: RegimePrompt = {
  */
 export const NO_REGIME_BANNER = "Choisissez un régime de sécurité pour obtenir un verdict.";
 
+/** The same strip on each register's Pages: a simplified Page asks for a marge exigée (#61). */
+export const NO_REGIME_BANNER_BY_REGISTER: Record<Register, string> = {
+  exact: NO_REGIME_BANNER,
+  terrain: `Choisissez une ${label("regime", "terrain")} pour obtenir un verdict.`,
+};
+
 /**
  * The solved traverse {@link deriveResults} reports — the fields of the chart's `SceneBase` it
  * reads, typed here so `lib/rail` does not depend on `lib/chart`.
@@ -244,6 +251,8 @@ export type ResultsInput = {
    * verdict under a banner that says there is none.
    */
   readonly report?: GateReport;
+  /** The Page's vocabulary, which words the verdict sentence. `exact` when absent. */
+  readonly register?: Register;
 };
 
 /**
@@ -252,7 +261,12 @@ export type ResultsInput = {
  * @returns `null` for « Aucun résultat » — no scene, or a Solve Gate breach. The cause line that
  *   replaces the block in that state is A11's, and it is a *sentence*, never a set of dashes.
  */
-export function deriveResults({ scenario, base, report }: ResultsInput): Results | null {
+export function deriveResults({
+  scenario,
+  base,
+  report,
+  register = "exact",
+}: ResultsInput): Results | null {
   const gates = report ?? evaluateGates({ scenario });
   if (base === null || !gates.passed.solve) return null;
 
@@ -285,11 +299,14 @@ export function deriveResults({ scenario, base, report }: ResultsInput): Results
         })
       : null;
 
-  const banner = verdict === null ? null : { state: verdict.state, text: verdictSentence(verdict) };
+  const banner =
+    verdict === null ? null : { state: verdict.state, text: verdictSentence(verdict, register) };
 
   // ── The four headline rows ────────────────────────────────────────────────────────────────
-  if (banner !== null && verdict !== null) {
-    rows.push(row("verdict", label("verdict", "exact"), banner.text, null, "headline"));
+  if (verdict !== null) {
+    // The `Résultats` rows are Avancé's whatever the Page: only the banner speaks its register.
+    const sentence = verdictSentence(verdict, "exact");
+    rows.push(row("verdict", label("verdict", "exact"), sentence, null, "headline"));
     const required = requiredDivisor(verdict);
     rows.push(
       row(
@@ -490,30 +507,46 @@ export function deriveResults({ scenario, base, report }: ResultsInput): Results
  * prohibition that survives any margin (naming a régime there would suggest another régime could
  * repair it), and `Indéterminé` reports that nothing was judged at all.
  */
-export function verdictSentence(verdict: VerdictResult): string {
+export function verdictSentence(verdict: VerdictResult, register: Register = "exact"): string {
   const regimeLabel = REGIMES[verdict.regime].label;
 
   if (verdict.state === "refuse-usage-interdit") {
-    return `${label(verdict.state, "exact")} — ${REFUSAL_COPY[verdict.refusal ?? "serre-cables-sur-ligne-portant-des-personnes"]}`;
+    return `${label(verdict.state, register)} — ${refusalReason(verdict, register)}`;
   }
   if (verdict.state === "indetermine") {
     const total = verdict.coverage === 0 ? 0 : Math.round(verdict.stepsSolved / verdict.coverage);
-    return `${label(verdict.state, "exact")} — ${verdict.stepsSolved} des ${total} pas résolus`;
+    return `${label(verdict.state, register)} — ${verdict.stepsSolved} des ${total} pas résolus`;
   }
 
   const cell = verdict.governing;
-  if (cell === null) return `${label("indetermine", "exact")} — ${verdict.stepsSolved} pas résolus`;
+  if (cell === null)
+    return `${label("indetermine", register)} — ${verdict.stepsSolved} pas résolus`;
 
   if (verdict.state === "hors-limites") {
-    return `${label(verdict.state, "exact")} — ${regimeLabel}, critère ${criterionName(cell)}`;
+    return `${label(verdict.state, register)} — ${regimeLabel}, critère ${criterionName(cell)}`;
   }
   if (verdict.state === "marge-faible") {
     // § 6's own copy reads « Marge faible — FS effectif 3,05 pour k = 3,0 » and names no régime;
     // the grammar rule — « nomme **toujours** le régime choisi à l'intérieur de la phrase » — is
     // the mechanism, and it is the stricter of the two. Hence the régime, then the spec's clause.
-    return `${label(verdict.state, "exact")} — ${regimeLabel} : FS effectif ${formatQuantity("FS", cell.FS)} pour k = ${divisor(cell.k)}`;
+    return `${label(verdict.state, register)} — ${regimeLabel} : ${EFFECTIVE_FACTOR[register]} ${formatQuantity("FS", cell.FS)} pour k = ${divisor(cell.k)}`;
   }
-  return `${label(verdict.state, "exact")} — ${regimeLabel} (k = ${divisor(cell.k)})`;
+  return `${label(verdict.state, register)} — ${regimeLabel} (k = ${divisor(cell.k)})`;
+}
+
+/** The figure « Marge faible » quotes: `FS effectif` on Avancé, spelled out on a simplified Page. */
+const EFFECTIVE_FACTOR: Record<Register, string> = {
+  exact: "FS effectif",
+  terrain: label("safetyFactor", "terrain"),
+};
+
+/**
+ * Why the Verdict is « Interdit » — the prohibition it names, never a margin. `null` in any other
+ * state, which a simplified Page reads to show the reason with the state only where there is one.
+ */
+export function refusalReason(verdict: VerdictResult, register: Register = "exact"): string | null {
+  if (verdict.state !== "refuse-usage-interdit") return null;
+  return REFUSAL_COPY[register][verdict.refusal ?? "serre-cables-sur-ligne-portant-des-personnes"];
 }
 
 /**
@@ -547,12 +580,21 @@ function requiredDivisor(verdict: VerdictResult): number | null {
 }
 
 /** § 6's three refusals, each a `[REGULATOR]` rule or a use-class boundary — never a margin. */
-const REFUSAL_COPY = {
+const EXACT_REFUSAL_COPY = {
   "serre-cables-sur-ligne-portant-des-personnes":
     "serre-câbles sur une ligne portant des passagers",
   "textile-en-installation-permanente": "corde textile en installation permanente (§10.4)",
   "regime-indisponible-pour-cette-ligne": "régime indisponible pour cette ligne",
-} as const;
+} as const satisfies Record<NonNullable<VerdictResult["refusal"]>, string>;
+
+/** The same three on each register's Pages: only the régime is named differently (#61). */
+const REFUSAL_COPY = {
+  exact: EXACT_REFUSAL_COPY,
+  terrain: {
+    ...EXACT_REFUSAL_COPY,
+    "regime-indisponible-pour-cette-ligne": `${label("regime", "terrain")} indisponible pour cette ligne`,
+  },
+} as const satisfies Record<Register, Record<NonNullable<VerdictResult["refusal"]>, string>>;
 
 /** Which quantity a criterion bites on — « lequel est contraignant est une information ». */
 function criterionName(cell: VerdictCell): string {

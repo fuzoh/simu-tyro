@@ -31,6 +31,7 @@ import type { FieldId, FieldIssue } from "@/lib/rail/fields.ts";
 import type { GateReport } from "@/lib/rail/gates.ts";
 import type { RailValues } from "@/lib/rail/values.ts";
 import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
+import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { checkField } from "@/lib/rail/fields.ts";
 import { evaluateGates, isFieldActive } from "@/lib/rail/gates.ts";
@@ -69,8 +70,13 @@ export type RailFormState = {
 /**
  * @param traverse `useTraverse`'s Scenario without `x_D`: the gates read nothing else, so a scrub
  *   leaves the report identical.
+ * @param register the Page's vocabulary, which names the fields in every message the report holds.
  */
-export function useRailForm(deduced: Deduced, traverse: TraverseScenario): RailFormState {
+export function useRailForm(
+  deduced: Deduced,
+  traverse: TraverseScenario,
+  register: Register = "exact",
+): RailFormState {
   const { scenario } = useAppState();
 
   const [focused, setFocused] = useState<FieldId | null>(null);
@@ -101,16 +107,19 @@ export function useRailForm(deduced: Deduced, traverse: TraverseScenario): RailF
   // Tier one, over the text the form currently holds. The gates take it beside the Scenario,
   // because an emptied field and « 12,3,4 » are states a Scenario of numbers cannot represent.
   const issues = useMemo(() => {
-    const context = fieldContext(traverse);
+    const context = fieldContext(traverse, register);
     return GATED_FIELDS.filter((id) => isFieldActive(id, traverse)).flatMap(
       (id) => checkField(id, gatedText[id] ?? "", context) ?? [],
     );
-  }, [gatedText, traverse]);
+  }, [gatedText, traverse, register]);
 
   // Memoised because A11 made the report a **memo key**: the results, the scene's suppression and
   // the banner all hang off it, and a fresh object per render would re-run `evaluateVerdict` over
   // 260 steps on every keystroke and every scrub frame — the one measured cost in the app.
-  const report = useMemo(() => evaluateGates({ scenario: traverse, issues }), [traverse, issues]);
+  const report = useMemo(
+    () => evaluateGates({ scenario: traverse, issues, register }),
+    [traverse, issues, register],
+  );
 
   return { form, text, focused, setFocused, issues, report };
 }

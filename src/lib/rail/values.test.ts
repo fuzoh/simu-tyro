@@ -7,7 +7,8 @@ import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { traverseInputs } from "@/lib/scenario/traverse.ts";
 
 import { deduceValues } from "./deduced.ts";
-import { commitField } from "./fields.ts";
+import { commitField, displayField } from "./fields.ts";
+import { pretensionOf } from "./tensioning.ts";
 import {
   applyField,
   applyPosition,
@@ -15,8 +16,13 @@ import {
   applyRopeClass,
   applyShippedTerminations,
   clearOverride,
+  commitPageText,
+  commitText,
   drivingField,
+  fieldContext,
   FIELD_ACCESS,
+  idleDriverText,
+  idleShown,
   NUMERIC_FIELDS,
   isPositionField,
   isPositionTwin,
@@ -672,5 +678,115 @@ describe("Positions (#90) — an anchor's two coordinates, committed as one", ()
     expect(positionPairNote(blank, "A")).toBeNull();
     // Another anchor's blanks say nothing about this one.
     expect(positionPairNote({ ...blank, latB: "46,84" }, "A")).toBeNull();
+  });
+});
+
+describe("commitText — the one write path every Page's fields share (#91)", () => {
+  const base = scenario();
+  const text = railValues(base, deduceValues(base, null));
+  const commit = (id: Parameters<typeof commitText>[0]["id"], raw: string, settled = true) =>
+    commitText({
+      scenario: base,
+      trace: null,
+      id,
+      raw,
+      settled,
+      text,
+      context: fieldContext(base),
+    });
+
+  test("text tier one refuses leaves the Scenario alone", () => {
+    expect(commit("mp", "abc")).toEqual({ next: null, value: null, asked: null });
+    expect(commit("mp", "")).toEqual({ next: null, value: null, asked: null });
+  });
+
+  test("a tension de pose typed on a line driven by its flèche moves the line onto it", () => {
+    const { next, value } = commit("T_target", "800");
+    expect(next?.tightness).toEqual({ mode: "anchor", T_target: 8000 });
+    expect(value).toBe(8000);
+  });
+
+  test("a span still being typed does not drag the viewpoint; a settled one does", () => {
+    const typing = commit("L", "1", false);
+    expect(typing.next?.rider).toBe(base.rider);
+    const settled = commit("L", "1", true);
+    expect(settled.next?.rider.xD).toBe(1);
+    expect(settled.asked).toBe(1);
+  });
+});
+
+describe("the driver a Page offers alone takes the line over (#91)", () => {
+  // The shipped line hangs on its flèche; Statique offers the tension de pose alone.
+  const sagged = scenario();
+  const deduced = deduceValues(sagged, null);
+  const solve = deduced.solve;
+  if (solve === null) throw new Error("the shipped line solves");
+  const readOut = pretensionOf(solve, sagged);
+  const takeOver = { mode: "anchor", deduced, lastGood: null } as const;
+  const text = railValues(sagged, deduced);
+  const shown = displayField("T_target", readOut, sagged.unit);
+  const type = (raw: string, on: ScenarioDraft = sagged) =>
+    commitPageText({
+      scenario: on,
+      trace: null,
+      id: "T_target",
+      raw,
+      settled: false,
+      text,
+      context: fieldContext(on),
+      takeOver,
+    });
+
+  test("the field shows the read-out until the line is on it, then its own text", () => {
+    expect(idleDriverText(sagged, "anchor", readOut)).toBe(shown);
+    expect(idleDriverText(sagged, "anchor", null)).toBe("");
+    const anchored = scenario((draft) => void (draft.tightness = { mode: "anchor", T_target: 1 }));
+    expect(idleDriverText(anchored, "anchor", readOut)).toBeUndefined();
+  });
+
+  test("a glance writes nothing: the field is idle until something is typed into it", () => {
+    const idle = idleDriverText(sagged, "anchor", readOut);
+    expect(idleShown(idle, text.T_target)).toBe(shown);
+    expect(idleShown(idle, "1")).toBeNull();
+    expect(idleShown(undefined, "")).toBeNull();
+  });
+
+  test("a keystroke that reads drives the line with the typed value", () => {
+    const { write, value } = type("800");
+    expect(write?.tightness).toEqual({ mode: "anchor", T_target: 8000 });
+    expect(value).toBe(8000);
+  });
+
+  test("a refused keystroke still moves the line, onto the read-out it showed", () => {
+    for (const raw of ["abc", "-5", ""]) {
+      const { next, value, write } = type(raw);
+      expect(next).toBeNull();
+      expect(value).toBeNull();
+      // The gates now judge the field's text as the driver's, and state holds the last good value.
+      expect(write === null ? null : drivingField(write)).toBe("T_target");
+      expect(write === null ? null : railValues(write).T_target).toBe(shown);
+    }
+  });
+
+  test("once the line is on the driver, a refused keystroke writes nothing", () => {
+    const anchored = type("800").write;
+    if (anchored === null) throw new Error("the keystroke drives the line");
+    expect(type("abc", anchored).write).toBeNull();
+  });
+
+  test("every other field commits as `commitText` does", () => {
+    const input = {
+      scenario: sagged,
+      trace: null,
+      id: "mp",
+      raw: "abc",
+      settled: true,
+      text,
+      context: fieldContext(sagged),
+    } as const;
+    expect(commitPageText({ ...input, takeOver }).write).toBeNull();
+    expect(commitPageText({ ...input, raw: "90", takeOver }).write).toEqual(
+      commitText({ ...input, raw: "90" }).next,
+    );
   });
 });

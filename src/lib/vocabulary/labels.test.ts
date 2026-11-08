@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import type { LabelId, Register } from "./labels.ts";
 
-import { heading, label, LABELS, proscribedIn } from "./labels.ts";
+import { exactTermsIn, heading, isHiddenTerm, label, LABELS, proscribedIn } from "./labels.ts";
 
 const REGISTERS = ["terrain", "exact"] as const satisfies readonly Register[];
 const IDS = Object.keys(LABELS) as LabelId[];
@@ -141,5 +141,28 @@ describe("heading", () => {
     expect(heading("safetyFactor", "exact")).toBe("FS");
     expect(heading("constructionFibreCore", "exact")).toBe("6×19");
     expect(heading("refuse-usage-interdit", "exact")).toBe("Interdit");
+  });
+});
+
+describe("exactTermsIn — the words a terrain Page may not print (#91)", () => {
+  test("catches a renamed quantity's exact wording and a hidden one, plural and capitals included", () => {
+    expect(exactTermsIn("Prétension de la ligne")).toEqual(["prétension"]);
+    expect(exactTermsIn("Flèche à vide : 6,00 m")).toEqual(["flèche à vide"]);
+    expect(exactTermsIn("Choisir un régime de sécurité")).toEqual(["régime de sécurité"]);
+    expect(exactTermsIn("Deux terminaisons")).toEqual(["terminaison"]);
+    expect(exactTermsIn("FS 3,05")).toEqual(["FS"]);
+  });
+
+  test("leaves the terrain words, and a longer word that merely contains one, alone", () => {
+    expect(exactTermsIn("Tension de pose, flèche, flèche chargée, garde au sol")).toEqual([]);
+    expect(exactTermsIn("Marge exigée")).toEqual([]);
+    expect(exactTermsIn("dégradé, reconstruction")).toEqual([]);
+  });
+
+  test("isHiddenTerm reads the table's « masqué » flag", () => {
+    expect(isHiddenTerm("startMultiplier")).toBe(true);
+    expect(isHiddenTerm("termination")).toBe(true);
+    expect(isHiddenTerm("pretension")).toBe(false);
+    expect(isHiddenTerm("sag")).toBe(false);
   });
 });

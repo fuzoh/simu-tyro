@@ -43,10 +43,11 @@ import type { FieldId } from "@/lib/rail/fields.ts";
 import type { BlockingError, GateReport, SaisieEnCours } from "@/lib/rail/gates.ts";
 import type { VerdictBanner } from "@/lib/rail/results.ts";
 import type { VerdictState } from "@/lib/sim";
+import type { Register } from "@/lib/vocabulary/labels.ts";
 
-import { FIELDS, lowerFirst } from "@/lib/rail/fields.ts";
+import { fieldErrorLabel, lowerFirst } from "@/lib/rail/fields.ts";
 import { blockingSummary } from "@/lib/rail/gates.ts";
-import { NO_REGIME_BANNER } from "@/lib/rail/results.ts";
+import { NO_REGIME_BANNER_BY_REGISTER } from "@/lib/rail/results.ts";
 import { label } from "@/lib/vocabulary/labels.ts";
 
 import { REFUSAL_CAUSE } from "./refusals.ts";
@@ -56,6 +57,12 @@ export const JUMP_LABEL = "voir la première";
 
 /** § 7's `[ Choisir un régime ]`, beside the neutral no-régime strip. A **focus** action. */
 export const CHOOSE_REGIME_LABEL = "Choisir un régime";
+
+/** The same action on each register's Pages: a simplified Page says marge exigée (#61). */
+export const CHOOSE_REGIME_BY_REGISTER: Record<Register, string> = {
+  exact: CHOOSE_REGIME_LABEL,
+  terrain: `Choisir une ${label("regime", "terrain")}`,
+};
 
 /**
  * The one thing in the slot. `rank` is carried rather than inferred so a consumer can style the
@@ -92,7 +99,7 @@ export type BannerOccupant =
       readonly rank: 4;
       readonly kind: "no-regime";
       readonly text: string;
-      readonly action: typeof CHOOSE_REGIME_LABEL;
+      readonly action: string;
     };
 
 /** Everything that can claim the slot, in one object. Every field is optional-by-`null`. */
@@ -104,6 +111,8 @@ export type BannerInput = {
   readonly saisie: SaisieEnCours | null;
   /** The verdict sentence, from `deriveResults`. `null` whenever no verdict was computed. */
   readonly verdict: VerdictBanner | null;
+  /** The Page's vocabulary, which words the no-régime prompt. `exact` when absent. */
+  readonly register?: Register;
 };
 
 /**
@@ -113,7 +122,13 @@ export type BannerInput = {
  *   verdict *and* no régime cannot happen (rank 4b covers it), so `null` means the band is empty
  *   and reserved, which is the Skeleton's own state.
  */
-export function banner({ report, refusal, saisie, verdict }: BannerInput): BannerOccupant | null {
+export function banner({
+  report,
+  refusal,
+  saisie,
+  verdict,
+  register = "exact",
+}: BannerInput): BannerOccupant | null {
   const standing = standingReport(report, saisie);
   // **The summary may never promise more than the screen shows.** Rank 1 pre-empts rank 2 — that
   // is § 7's precedence and it stands — but a live engine refusal has already removed « tout
@@ -149,7 +164,12 @@ export function banner({ report, refusal, saisie, verdict }: BannerInput): Banne
   }
 
   if (report.noRegime) {
-    return { rank: 4, kind: "no-regime", text: NO_REGIME_BANNER, action: CHOOSE_REGIME_LABEL };
+    return {
+      rank: 4,
+      kind: "no-regime",
+      text: NO_REGIME_BANNER_BY_REGISTER[register],
+      action: CHOOSE_REGIME_BY_REGISTER[register],
+    };
   }
 
   return null;
@@ -173,17 +193,20 @@ export function noResultCause({
   report,
   refusal,
   saisie = null,
+  register = "exact",
 }: {
   readonly report: GateReport;
   readonly refusal: EngineRefusal | null;
   /** Mid-edit suppresses nothing: the output half **freezes** on the last valid Sweep instead. */
   readonly saisie?: SaisieEnCours | null;
+  /** The Page's vocabulary, which names the culpable field. `exact` when absent. */
+  readonly register?: Register;
 }): string | null {
   if (refusal !== null)
-    return `${label("aucun-resultat", "exact")} — ${REFUSAL_CAUSE[refusal.id]}.`;
+    return `${label("aucun-resultat", register)} — ${REFUSAL_CAUSE[refusal.id]}.`;
   const first = standingReport(report, saisie).errors.find((error) => error.gate === "solve");
   if (first === undefined) return null;
-  return `${label("aucun-resultat", "exact")} — ${fieldCause(first)}.`;
+  return `${label("aucun-resultat", register)} — ${fieldCause(first, register)}.`;
 }
 
 /**
@@ -216,7 +239,7 @@ export function standingReport(report: GateReport, saisie: SaisieEnCours | null)
  * without a second column nobody would keep in step. An *empty* field is not invalid — nothing was
  * typed — so it echoes the field's own neutral message instead.
  */
-function fieldCause(error: BlockingError): string {
-  const label = lowerFirst(FIELDS[error.field].errorLabel);
+function fieldCause(error: BlockingError, register: Register): string {
+  const label = lowerFirst(fieldErrorLabel(error.field, register));
   return error.kind === "empty" ? `${label} : valeur requise` : `${label} invalide`;
 }

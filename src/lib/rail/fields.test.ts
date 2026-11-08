@@ -5,6 +5,7 @@ import { formatQuantity } from "@/lib/format/quantity.ts";
 import type { FieldId } from "./fields.ts";
 
 import {
+  AVANCE_SETTING,
   checkField,
   commitField,
   CONSTRUCTION_OPTIONS,
@@ -12,12 +13,17 @@ import {
   emptyMessage,
   FIELD_ORDER,
   FIELDS,
+  fieldErrorLabel,
+  fieldLabel,
   fieldSchema,
+  isHiddenOnTerrain,
   gateOf,
   parseDecimal,
+  regimeChoice,
   riderPositionEntry,
   REQUIRED_MESSAGE,
   ROPE_CLASS_OPTIONS,
+  usageOptions,
   warningFor,
 } from "./fields.ts";
 
@@ -396,5 +402,60 @@ describe("the Rail labels its fields in the exact register", () => {
 
   test("the passenger's mass is named a passager's in a message, never a charge", () => {
     expect(FIELDS.mp.errorLabel).toBe("Masse du passager");
+  });
+});
+
+describe("the terrain register — a simplified Page's names for the fields (#61, #91)", () => {
+  test("a renamed quantity is labelled in terrain words there, and in exact ones on Avancé", () => {
+    expect(fieldLabel("T_target", "terrain")).toBe("Tension de pose");
+    expect(fieldLabel("T_target")).toBe("Prétension");
+    expect(fieldLabel("regime", "terrain")).toBe("Marge exigée");
+    expect(fieldLabel("d", "terrain")).toBe("Diamètre");
+    expect(fieldLabel("mp", "terrain")).toBe(FIELDS.mp.label);
+  });
+
+  test("tier one's message names the field the way the Page labels it", () => {
+    expect(checkField("T_target", "abc", { register: "terrain" })?.message).toBe(
+      "⛔ Tension de pose — nombre illisible. Saisie : « abc ».",
+    );
+  });
+
+  test("a field only Avancé shows is never named by its exact term on a terrain Page", () => {
+    const hidden: readonly FieldId[] = [
+      "DAF",
+      "etaA",
+      "etaB",
+      "ta",
+      "tb",
+      "k",
+      "muTextile",
+      "vRatio",
+    ];
+    for (const id of hidden) {
+      expect(isHiddenOnTerrain(id)).toBe(true);
+      expect(fieldLabel(id, "terrain")).toBe(AVANCE_SETTING);
+      expect(fieldErrorLabel(id, "terrain")).toBe(AVANCE_SETTING);
+      expect(fieldErrorLabel(id)).toBe(FIELDS[id].errorLabel);
+    }
+    for (const id of ["T_target", "regime", "mp", "L"] as const) {
+      expect(isHiddenOnTerrain(id)).toBe(false);
+    }
+  });
+});
+
+describe("the shared choice rows' values", () => {
+  test("the régime picker yields no régime for its empty entry or an id the engine does not know", () => {
+    expect(regimeChoice("")).toBeNull();
+    expect(regimeChoice("en15567")).toBe("en15567");
+    expect(regimeChoice("zz")).toBeNull();
+    expect(regimeChoice("toString")).toBeNull();
+  });
+
+  test("the installation reads the same on both registers", () => {
+    expect(usageOptions("terrain")).toEqual(usageOptions("exact"));
+    expect(usageOptions("terrain").map((option) => option.label)).toEqual([
+      "Installation permanente",
+      "Installation temporaire",
+    ]);
   });
 });

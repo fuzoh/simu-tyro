@@ -72,6 +72,7 @@ export type TermId =
   | "traverseClearance"
   | "riderEnvelope"
   | "anchor"
+  | "anchors"
   | "anchorHeight"
   // The safety judgement.
   | "regime"
@@ -203,6 +204,8 @@ export const LABELS = {
   traverseClearance: exactOnly("garde min (traversée)"),
   riderEnvelope: same("gabarit du passager"),
   anchor: same("ancrage"),
+  // The pair, as a group heading names them: a plural is a wording of its own, not a suffix.
+  anchors: same("ancrages"),
   anchorHeight: same("hauteur d'ancrage"),
 
   // ── The safety judgement ──────────────────────────────────────────────────────────────────
@@ -275,6 +278,39 @@ export const LABELS = {
   "saisie-en-cours": same("Saisie en cours"),
   "aucun-resultat": same("Aucun résultat"),
 } as const satisfies Record<LabelId, Wording>;
+
+/**
+ * The wordings a terrain Page must not print: every entry Avancé alone names (`hiddenOnTerrain`)
+ * and every exact wording that differs from its terrain one — « prétension », « flèche à vide »,
+ * « régime de sécurité », « FS »…
+ */
+const EXACT_ONLY_WORDINGS: readonly string[] = [
+  ...new Set(
+    (Object.keys(LABELS) as LabelId[])
+      .map((id): Wording => LABELS[id])
+      .filter((wording) => wording.hiddenOnTerrain === true || wording.exact !== wording.terrain)
+      .map((wording) => wording.exact),
+  ),
+];
+
+/**
+ * The exact-register wordings a piece of copy contains, for a test to name them in its failure.
+ * A wording counts as a whole word, plural included — « terminaisons » is caught, « dégradé » is not
+ * « grade » and « flèche » is not « flèche à vide ».
+ */
+export function exactTermsIn(copy: string): readonly string[] {
+  const lower = copy.toLocaleLowerCase("fr");
+  return EXACT_ONLY_WORDINGS.filter((wording) => {
+    const escaped = wording.toLocaleLowerCase("fr").replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+    return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}s?(?![\\p{L}\\p{N}])`, "u").test(lower);
+  });
+}
+
+/** Does a simplified Page leave this quantity unnamed — « masqué » or « supposé, non saisi » (#61)? */
+export function isHiddenTerm(id: LabelId): boolean {
+  const wording: Wording = LABELS[id];
+  return wording.hiddenOnTerrain === true;
+}
 
 /** The wording as the table spells it: lowercase for a quantity, capitalised for a state. */
 export function label(id: LabelId, register: Register): string {

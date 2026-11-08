@@ -1,6 +1,6 @@
 import type { AnyRoute } from "@tanstack/react-router";
 
-import { createMemoryHistory, createRouter, isRedirect } from "@tanstack/react-router";
+import { createMemoryHistory, createRouter } from "@tanstack/react-router";
 import { describe, expect, test } from "vitest";
 
 import { keepRefusalOutOfTheAddressBar, validateSearch } from "@/lib/url/schema.ts";
@@ -65,8 +65,8 @@ describe("one schema for every app Page", () => {
     const under = routes.filter((route) => branch(route).includes(schemaRoutes[0]));
     const leaves = under.filter((route) => route.children === undefined);
     const paths = new Set<string>(leaves.map((route) => route.fullPath));
-    // `/` is the redirect, not a Page; everything else under the schema is in the table.
-    expect(paths).toEqual(new Set(["/", ...APP_PAGES.map((page) => page.path)]));
+    // Every route under the schema is in the table — `/` included, since it is Statique.
+    expect(paths).toEqual(new Set(APP_PAGES.map((page) => page.path)));
     expect(leaves).toHaveLength(paths.size);
   });
 });
@@ -93,47 +93,24 @@ describe.each(APP_PAGES.map((page) => [page.path, page] as const))("%s", (path) 
   });
 });
 
-describe("`/` opens Avancé", () => {
-  /** The redirect `/`'s `beforeLoad` throws, resolved by a router the way a navigation would. */
-  function redirectFrom(href: string, basepath = "/") {
-    const router = routerAt(href, basepath);
-    const index = router.routesByPath["/"] as AnyRoute;
-    const beforeLoad = index.options.beforeLoad as (context: {
-      location: typeof router.latestLocation;
-    }) => unknown;
-    try {
-      beforeLoad({ location: router.latestLocation });
-    } catch (thrown) {
-      if (!isRedirect(thrown)) throw thrown;
-      return {
-        replace: thrown.options.replace,
-        href: router.buildLocation(thrown.options).publicHref,
-      };
-    }
-    throw new Error("`/` did not redirect");
-  }
+describe("`/` is the Page Statique (#91)", () => {
+  const index = routerAt("/").routesByPath["/"] as AnyRoute;
 
-  test("on the client only — the server answers `/` with a Skeleton, never a 307", () => {
-    expect((routerAt("/").routesByPath["/"] as AnyRoute).options.ssr).toBe(false);
+  test("a Page of the table, no longer a redirect to Avancé", () => {
+    expect(APP_PAGES.map((page) => page.path)).toContain("/");
+    expect(index.options.beforeLoad).toBeUndefined();
   });
 
-  test("with the search exactly as it came, key order and unknown keys included", () => {
-    expect(redirectFrom("/?h=-40&L=250&junk=zz")).toEqual({
-      replace: true,
-      href: "/avance?h=-40&L=250&junk=zz",
-    });
-  });
-
-  test("a refused link arrives refused, with no marker in its URL", () => {
-    expect(redirectFrom(`/${REFUSED}`).href).toBe(`/avance${REFUSED}`);
+  test("an Avancé link opened on `/` keeps its search, key order and unknown keys included", () => {
+    const { incoming, rebuilt, search } = rebuild("/?h=-40&L=250&junk=zz");
+    expect(rebuilt).toBe(incoming);
+    expect(search?.L).toBe(250);
+    expect(search?.h).toBe(-40);
   });
 
   test("under the GitHub Pages base path", () => {
-    expect(redirectFrom("/simu-tyro/?L=250", "/simu-tyro/").href).toBe("/simu-tyro/avance?L=250");
-  });
-
-  test("and a bare `/` stays bare, which means « restore the Session »", () => {
-    expect(redirectFrom("/").href).toBe("/avance");
+    const router = routerAt("/simu-tyro/?L=250", "/simu-tyro/");
+    expect(router.matchRoutes(router.latestLocation).at(-1)?.fullPath).toBe("/");
   });
 });
 

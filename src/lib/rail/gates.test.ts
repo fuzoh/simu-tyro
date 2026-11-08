@@ -759,3 +759,34 @@ describe("terminationOptions — the picker's entries and its one reason", () =>
     expect(reason).toBeNull();
   });
 });
+
+describe("the terrain register (#91)", () => {
+  test("an unavailable régime is « marge exigée » in the message and in its Fix Action", () => {
+    const report = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.regime = "secours10";
+      }),
+      register: "terrain",
+    });
+    expect(report.errors.map(({ field, message, fixes }) => ({ field, message, fixes }))).toEqual([
+      {
+        field: "regime",
+        message:
+          "⛔ Marge exigée « Secours textile — 10:1 » indisponible avec un câble acier et en installation permanente.",
+        fixes: [{ id: "choisir-un-autre-regime", label: "Choisir une autre marge exigée" }],
+      },
+    ]);
+  });
+
+  test("a value only Avancé shows is refused without its exact name", () => {
+    const report = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.rider.DAF = -1;
+      }),
+      register: "terrain",
+    });
+    expect(report.errors.map((error) => error.message)).toEqual([
+      "⛔ Réglage de la Page Avancé — une valeur strictement positive est requise. Valeur : −1,0.",
+    ]);
+  });
+});

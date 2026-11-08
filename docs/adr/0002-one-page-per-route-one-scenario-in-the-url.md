@@ -56,3 +56,11 @@ Skeleton, not the Page's.
 - Adding a Page takes a route file under `_app.` and an entry in `APP_PAGES`. Prerendering and the
   navigation bar follow from the entry. `src/lib/app/pages.test.ts` fails if a route under the
   layout is missing from the table, and fails if any route declares the schema a second time.
+
+## Update — 2026-11-08, #91
+
+The Page Statique takes `/`. The client redirect to `/avance` is gone: `/` is a Page under the
+layout like Avancé, reading the same schema, and a link shared before the Pages (`/?…`) now opens
+its Scenario on Statique. The layout's `pendingComponent` — the SPA shell's — is Statique's
+Skeleton, the same one `/` declares, so `index.html` and `404.html` paint Statique's frame; the
+prerender list in `vite.config.ts` skips `/`, which the shell already is.

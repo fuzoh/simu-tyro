@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { SolveError } from "@/lib/sim";
 
+import { deduceValues } from "@/lib/rail/deduced.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 
 import { diagnosticPayload, engineRefusal, REFUSAL_CAUSE } from "./refusals.ts";
@@ -451,5 +452,21 @@ describe("the injected chain — `vi.mock` on the collaborator, never a widened 
     expect(mapped(failure!, { tightness: draft.tightness })?.id).toBe("calcul-impossible");
     vi.doUnmock("@/lib/sim");
     vi.resetModules();
+  });
+});
+
+describe("the terrain register (#91)", () => {
+  test("« Tension impossible » quotes the longueur à vide, on « cette ligne »", () => {
+    const tightness = { mode: "length", L0: 100 } as const;
+    const failure = deduceValues(
+      scenario((draft) => {
+        draft.tightness = tightness;
+      }),
+      null,
+    ).failure;
+    if (failure === null) throw new Error("expected §5.4's chord bound to refuse");
+    expect(engineRefusal(failure, { tightness, unit: "daN", register: "terrain" })?.message).toBe(
+      "⛔ Tension impossible — la ligne casserait avant d'atteindre cette tension. Longueur à vide minimale pour cette ligne : 149,11 m · valeur : 100,00 m.",
+    );
   });
 });

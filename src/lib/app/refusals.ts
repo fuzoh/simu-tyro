@@ -40,6 +40,7 @@ import type { TightnessFieldId } from "@/lib/rail/fields.ts";
 import type { ForceUnit, ScenarioDraft, TightnessDraft } from "@/lib/scenario/types.ts";
 import type { EngineFailure } from "@/lib/scenario/unloaded.ts";
 import type { SolveError, SolveNote } from "@/lib/sim";
+import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { FIELDS, lowerFirst } from "@/lib/rail/fields.ts";
@@ -99,7 +100,11 @@ export const REFUSAL_CAUSE: Record<RefusalId, string> = {
  */
 export function engineRefusal(
   failure: EngineFailure,
-  { tightness, unit = "daN" }: { tightness: TightnessDraft; unit?: ForceUnit },
+  {
+    tightness,
+    unit = "daN",
+    register = "exact",
+  }: { tightness: TightnessDraft; unit?: ForceUnit; register?: Register },
 ): EngineRefusal | null {
   if (failure.error === null) return null;
   const { stage, error } = failure;
@@ -113,16 +118,15 @@ export function engineRefusal(
           // The one row that echoes the offending value: `L₀` is a field the user typed, and what
           // was typed is the evidence. The two inverted modes quote the bound **alone** — a second
           // number beside an attainable maximum reads as a second target.
-          message: `${TENSION_LEAD} Longueur non tendue minimale pour ce câble : ${formatQuantity(
-            "L0",
-            error.bound,
-          )} · valeur : ${formatQuantity("L0", error.value)}.`,
+          message: `${TENSION_LEAD} ${heading("unstretchedLength", register)} minimale pour ${
+            register === "exact" ? "ce câble" : "cette ligne"
+          } : ${formatQuantity("L0", error.bound)} · valeur : ${formatQuantity("L0", error.value)}.`,
           diagnostic: false,
         };
       case "T_target":
         return {
           id: "tension-impossible",
-          message: `${TENSION_LEAD} ${heading("pretension", "exact")} maximale atteignable : ${formatQuantity(
+          message: `${TENSION_LEAD} ${heading("pretension", register)} maximale atteignable : ${formatQuantity(
             "T_target",
             error.bound,
             unit,
@@ -130,6 +134,11 @@ export function engineRefusal(
           diagnostic: false,
         };
       case "H_target":
+        // A simplified Page shows no tension horizontale, so it quotes no bound in one: the
+        // physics sentence stands alone there, and the bound is Avancé's to state.
+        if (register === "terrain") {
+          return { id: "tension-impossible", message: TENSION_LEAD, diagnostic: false };
+        }
         return {
           id: "tension-impossible",
           // In « Rapport V » the engine still speaks of `H_target` — the ratio resolved to one —
@@ -161,10 +170,10 @@ export function engineRefusal(
   if (error.kind === "no-convergence" && stage === "L0" && tightness.mode !== "length") {
     return {
       id: "cible-inatteignable",
-      message: `⛔ ${label("cible-inatteignable", "exact")} — aucune longueur non tendue ne donne ${target(
-        tightness,
-        unit,
-      )}.`,
+      message: `⛔ ${label("cible-inatteignable", register)} — aucune ${label(
+        "unstretchedLength",
+        register,
+      )} ne donne ${target(tightness, unit, register)}.`,
       diagnostic: false,
     };
   }
@@ -172,19 +181,33 @@ export function engineRefusal(
   return CALCUL_IMPOSSIBLE;
 }
 
-/** How « Cible inatteignable » names each driver's target — the refusal's own wording. */
-const TARGET_NOUN: Record<TightnessFieldId, string> = {
-  D_target: "cette flèche à vide",
-  T_target: "cette prétension",
-  H_target: "cette tension horizontale",
-  L0: "cette longueur non tendue",
-  vRatio: "ce rapport V",
+/**
+ * How « Cible inatteignable » names each driver's target — the refusal's own wording. A simplified
+ * Page names the two drivers only Avancé offers as the tension they ask for.
+ */
+const TARGET_NOUN: Record<Register, Record<TightnessFieldId, string>> = {
+  exact: {
+    D_target: "cette flèche à vide",
+    T_target: "cette prétension",
+    H_target: "cette tension horizontale",
+    L0: "cette longueur non tendue",
+    vRatio: "ce rapport V",
+  },
+  terrain: {
+    D_target: `cette ${label("sag", "terrain")}`,
+    T_target: `cette ${label("pretension", "terrain")}`,
+    H_target: "cette tension",
+    L0: `cette ${label("unstretchedLength", "terrain")}`,
+    vRatio: "cette tension",
+  },
 };
 
 /** « cette flèche à vide (6,00 m) » / « cette prétension (9074,0 daN) » — the target, named. */
-function target(tightness: TightnessDraft, unit: ForceUnit): string {
+function target(tightness: TightnessDraft, unit: ForceUnit, register: Register): string {
   const { field, value } = tightnessDriver({ tightness });
-  return `${TARGET_NOUN[field]} (${formatQuantity(FIELDS[field].quantity, value, unit)})`;
+  // A ratio quoted after « cette tension » would read as a tension.
+  if (register === "terrain" && field === "vRatio") return TARGET_NOUN.terrain.vRatio;
+  return `${TARGET_NOUN[register][field]} (${formatQuantity(FIELDS[field].quantity, value, unit)})`;
 }
 
 /**

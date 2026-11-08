@@ -51,6 +51,19 @@ export type TerrainSource =
   | { readonly kind: "trace"; readonly trace: Trace };
 
 /**
+ * The terrain *this run* uses — the active Trace, or manual ground. A cached Trace under manual
+ * geometry is not a source: every Page that discloses the terrain asks here, so they cannot differ.
+ */
+export function terrainSource(
+  geometrySource: "manual" | "trace",
+  trace: Trace | null,
+): TerrainSource {
+  return geometrySource === "trace" && trace !== null
+    ? { kind: "trace", trace }
+    : { kind: "manual" };
+}
+
+/**
  * How the Rail names a profil: a CSV by its file, the two others by where they came from (#103).
  * A link carries no filename, so a profil it brought is only ever « reçu par lien ».
  */
@@ -64,6 +77,22 @@ export function traceName(origin: TraceOrigin): string {
       return "profil reçu par lien";
   }
 }
+
+/**
+ * § 4's import controls and their file-identity line, worded once for every Page that takes a
+ * profil — the label tables of the simplified Pages read it from here.
+ */
+export const PROFILE_IMPORT_COPY = {
+  choose: "Importer un profil…",
+  remove: "Retirer le profil",
+  reuse: "Réutiliser ce profil",
+  reuseCsv: "Réutiliser le CSV",
+  chooseAnother: "Choisir un autre fichier",
+  none: "(aucun profil)",
+  unused: "(non utilisé)",
+  cachedCsv: "Profil en mémoire :",
+  retainedCsv: "CSV en mémoire :",
+} as const;
 
 /** The source mention a profil geo.admin carries wherever it is shown (#103). */
 export const SWISSTOPO_ATTRIBUTION = "Altitudes © swisstopo, service de profil de geo.admin.ch.";

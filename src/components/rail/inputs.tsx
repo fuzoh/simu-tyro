@@ -34,7 +34,7 @@
  *   about the current line changed — and **a rejected file leaves the current terrain untouched**.
  */
 
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 
 import { Link, useNavigate } from "@tanstack/react-router";
 import { createContext, Fragment, use, useEffect, useRef, useState } from "react";
@@ -45,11 +45,12 @@ import type { FieldContext, FieldId } from "@/lib/rail/fields.ts";
 import type { BlockingError, FixActionId } from "@/lib/rail/gates.ts";
 import type { PresetProvenance } from "@/lib/rail/presets.ts";
 import type { LadderRow } from "@/lib/rail/provenance.ts";
-import type { NumericFieldId, RailValues } from "@/lib/rail/values.ts";
-import type { ForceUnit, UseClass } from "@/lib/scenario/types.ts";
-import type { RegimeId, TerminationId, TextileSpec } from "@/lib/sim";
+import type { DriverTakeOver, NumericFieldId, RailValues } from "@/lib/rail/values.ts";
+import type { ForceUnit, ScenarioDraft, UseClass } from "@/lib/scenario/types.ts";
+import type { TerminationId, TextileSpec } from "@/lib/sim";
 import type { ParseFailure } from "@/lib/terrain/csv.ts";
 import type { Trace, TraceEnds } from "@/lib/terrain/trace.ts";
+import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { RailSection } from "@/components/app/shell.tsx";
 import { useAppDispatch, useAppState } from "@/components/app/store.tsx";
@@ -67,16 +68,20 @@ import { deducedRows } from "@/lib/rail/deduced.ts";
 import {
   CARRYING_LINES_OPTIONS,
   checkField,
-  commitField,
   CONSTRUCTION_OPTIONS,
   displayField,
+  FAMILY_LABEL,
   FIELDS,
-  isOptionalField,
+  fieldLabel,
   fieldSchema,
+  OVERRIDE_COPY,
   parseDecimal,
+  PICKER_COPY,
+  regimeChoice,
   ROPE_CLASS_OPTIONS,
   TENSIONING_DEVICE_OPTIONS,
   TENSIONING_SIDE_OPTIONS,
+  usageOptions,
   warningFor,
 } from "@/lib/rail/fields.ts";
 import {
@@ -101,17 +106,15 @@ import {
 import { PROVENANCE_COPY, warningLadder } from "@/lib/rail/provenance.ts";
 import { MAESTRO_ROPE_ONLY, PASS_TO_PULLEY } from "@/lib/rail/tensioning.ts";
 import {
-  applyField,
-  commitPosition,
   applyRopeClass,
   applyShippedTerminations,
   clearOverride,
+  commitPageText,
   drivingField,
-  FIELD_ACCESS,
   fieldContext,
+  idleShown,
   isGatedField,
   POSITION_FIELDS,
-  isPositionField,
   positionPairNote,
   spanLength,
   switchTightness,
@@ -122,7 +125,7 @@ import { isFamilyAllowed, isRegimeAvailable, REGIMES, TERMINATIONS } from "@/lib
 import { parseFailureMessage, parseProfileCsv, readFailure } from "@/lib/terrain/csv.ts";
 import { geoadminNotice, loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
 import { formatLv95, inLv95Domain, lv95FromWgs84 } from "@/lib/terrain/lv95.ts";
-import { traceName } from "@/lib/terrain/provenance.ts";
+import { PROFILE_IMPORT_COPY, traceName } from "@/lib/terrain/provenance.ts";
 import { encodeP1 } from "@/lib/url/p1.ts";
 import { cn } from "@/lib/utils.ts";
 import { heading, label } from "@/lib/vocabulary/labels.ts";
@@ -135,6 +138,7 @@ import {
   ClampNote,
   DisabledReason,
   FixButton,
+  GroupHeading,
   InfoTip,
   NumericInput,
   Picker,
@@ -150,32 +154,145 @@ import {
  */
 const PROVENANCE = PROVENANCE_COPY;
 
-/** The numeric field that changes the span, and therefore what `x_D` is clamped against. */
-const SPAN_FIELDS = new Set<NumericFieldId>(["L"]);
-
 /** What a row needs of the screen around it. **The reason every row is a module-scope component.** */
-type RailRowContext = {
+export type RailRowContext = {
   readonly form: RailFormApi;
   /** The text the form currently holds — tier one runs over this, never over the Scenario. */
   readonly text: RailValues;
   readonly context: FieldContext;
   readonly unit: ForceUnit;
+  /** The Page's vocabulary (#61): it labels the rows, and only Avancé's carry help. */
+  readonly register: Register;
   /** One standing breach per culprit field, from the same report the output half reads. */
   readonly breaches: ReadonlyMap<FieldId, BlockingError>;
   /** A second culprit of the same check: **outline only**, never a second copy of the message. */
   readonly outlined: ReadonlySet<FieldId>;
   /** @returns the canonical value that **entered state**, or `null` when tier one refused. */
   readonly commit: (id: NumericFieldId, raw: string, settled: boolean) => number | null;
+  /** A choice's write — a whole Scenario, through the store's one patch action. */
+  readonly patch: (next: ScenarioDraft) => void;
   readonly runFix: (id: FixActionId, breach: BlockingError) => void;
   readonly setFocused: (id: FieldId | null) => void;
+  /** The régime picker, which « Choisir un autre régime » focuses. */
+  readonly regimePicker: RefObject<HTMLSelectElement | null>;
 };
 
-const RailRow = createContext<RailRowContext | null>(null);
+export const RailRow = createContext<RailRowContext | null>(null);
 
 function useRailRowContext(): RailRowContext {
   const row = use(RailRow);
   if (row === null) throw new Error("a Rail row rendered outside RailInputs");
   return row;
+}
+
+/**
+ * The context a Page's field rows render against, and the writer behind it — **one for every
+ * Page**, so a field on Statique and the same field on Avancé commit through `commitPageText`,
+ * raise the same breach and repair with the same Fix Action.
+ *
+ * @param onCommitted after a write lands, with the value the text asked for — the Rail's clamp
+ *   note listens here.
+ * @param takeOver the one driver a Page offers alone, which a keystroke takes the line over with —
+ *   Statique's tension de pose. `lastGood` is read when the keystroke lands.
+ */
+export function useFieldRows({
+  rail,
+  register,
+  onCommitted,
+  takeOver,
+}: {
+  rail: RailFormState;
+  register: Register;
+  onCommitted?: (committed: {
+    readonly id: NumericFieldId;
+    readonly next: ScenarioDraft;
+    readonly asked: number | null;
+  }) => void;
+  takeOver?: Omit<DriverTakeOver, "lastGood"> & {
+    readonly lastGood: RefObject<DeducedSolve | null>;
+  };
+}): RailRowContext {
+  const { scenario, trace } = useAppState();
+  const dispatch = useAppDispatch();
+  const regimePicker = useRef<HTMLSelectElement | null>(null);
+  const { form, text, setFocused, report } = rail;
+  const context = fieldContext(scenario, register);
+
+  const breaches = new Map<FieldId, BlockingError>();
+  const outlined = new Set<FieldId>();
+  for (const error of report.errors) {
+    breaches.set(error.field, error);
+    for (const id of error.alsoOutlined) outlined.add(id);
+  }
+
+  function patch(next: ScenarioDraft) {
+    dispatch({ type: "scénario/modifié", patch: next });
+  }
+
+  function commit(id: NumericFieldId, raw: string, settled: boolean): number | null {
+    const { next, value, asked, write } = commitPageText({
+      scenario,
+      trace,
+      id,
+      raw,
+      settled,
+      text,
+      context,
+      takeOver:
+        takeOver === undefined ? undefined : { ...takeOver, lastGood: takeOver.lastGood.current },
+    });
+    if (next !== null) onCommitted?.({ id, next, asked });
+    if (write !== null) patch(write);
+    return value;
+  }
+
+  function runFix(id: FixActionId, breach: BlockingError) {
+    switch (id) {
+      case "passer-a-l-acier":
+        dispatch({ type: "matériau/famille", family: "steel" });
+        return;
+      case "passer-en-usage-temporaire":
+        patch({ ...scenario, usage: "TEMPORAIRE" });
+        return;
+      case "choisir-un-autre-regime":
+        // A **focus** action, and it does not open the picker: opening a popup from a remote
+        // button covers the context the user has just travelled to.
+        regimePicker.current?.focus();
+        return;
+      case "passer-a-la-terminaison-de-depart":
+        patch(applyShippedTerminations(scenario, breach));
+    }
+  }
+
+  // Unmemoised on purpose: every field of it is rebuilt each render anyway, and every consumer is
+  // a child of the Page's fields. What matters is that the consumers are **stable component
+  // types**, which they are only because they are declared at module scope.
+  return {
+    form,
+    text,
+    context,
+    unit: scenario.unit,
+    register,
+    breaches,
+    outlined,
+    commit,
+    patch,
+    runFix,
+    setFocused,
+    regimePicker,
+  };
+}
+
+/**
+ * The last solve the line had — what a driver switch or a take-over prefills from under « Aucun
+ * résultat », where there is no read-out. Read when the write lands, never during render.
+ */
+export function useLastGoodSolve(deduced: Deduced): RefObject<DeducedSolve | null> {
+  const lastGood = useRef<DeducedSolve | null>(null);
+  useEffect(() => {
+    if (deduced.solve !== null) lastGood.current = deduced.solve;
+  }, [deduced.solve]);
+  return lastGood;
 }
 
 /**
@@ -198,9 +315,8 @@ export function RailInputs({
   rail: RailFormState;
 }) {
   const state = useAppState();
-  const dispatch = useAppDispatch();
   const { scenario, trace } = state;
-  const { form, text, setFocused, report } = rail;
+  const { text } = rail;
 
   /**
    * The last `x_D` clamp, as an **event**: a nonce so a second clamp restarts the note's timer.
@@ -214,14 +330,7 @@ export function RailInputs({
   const [clamped, setClamped] = useState<ClampEvent>(() =>
     state.link.xClamped ? { L: spanLength(scenario, trace) ?? 0, nonce: 1 } : { L: 0, nonce: 0 },
   );
-  const [importFailure, setImportFailure] = useState<ParseFailure | null>(null);
-  const fileInput = useRef<HTMLInputElement | null>(null);
-  const regimePicker = useRef<HTMLSelectElement | null>(null);
-  // What a tightness switch prefills from under « Aucun résultat », where there is no read-out.
-  const lastGoodSolve = useRef<DeducedSolve | null>(null);
-  useEffect(() => {
-    if (deduced.solve !== null) lastGoodSolve.current = deduced.solve;
-  }, [deduced.solve]);
+  const lastGoodSolve = useLastGoodSolve(deduced);
 
   // § 6's warning ladder, on the rows it qualifies. The terrain rung renders inside the terrain
   // disclosure block and the verdict rung is a banner state — neither is here, so nothing is said
@@ -230,75 +339,18 @@ export function RailInputs({
   const rung = (row: LadderRow): string | null =>
     ladder.find((warning) => warning.row === row)?.text ?? null;
   const readOuts = deducedRows(scenario, deduced, cause);
-  const context = fieldContext(scenario);
-
-  const breaches = new Map<FieldId, BlockingError>();
-  const outlined = new Set<FieldId>();
-  for (const error of report.errors) {
-    breaches.set(error.field, error);
-    for (const id of error.alsoOutlined) outlined.add(id);
-  }
-
-  function patch(next: typeof scenario) {
-    dispatch({ type: "scénario/modifié", patch: next });
-  }
-
-  /**
-   * @param settled `true` when the edit has landed — a blur — and `false` for a keystroke that is
-   *   still mid-word. It changes nothing about the value; it decides only whether the span change
-   *   may drag `x_D` with it.
-   * @returns the canonical value that **entered state**, or `null` when tier one refused the text.
-   *   Not the value that was asked for: `x_D` clamps, and the field has to snap to what the
-   *   Scenario now holds rather than to what was typed.
-   */
-  function commit(id: NumericFieldId, raw: string, settled: boolean): number | null {
-    if (checkField(id, raw, context) !== null) return null;
-    if (isPositionField(id)) {
-      // A Position is both coordinates or neither: this one's text commits with its pair's.
-      const committed = commitPosition(scenario, id, { ...text, [id]: raw }, context);
-      patch(committed.scenario);
-      return committed.value;
-    }
-    // An optional field emptied is « absent »: the one blank that is written, not refused.
-    if (isOptionalField(id) && raw.trim() === "") {
-      patch(FIELD_ACCESS.dTextile.write(scenario, null));
-      return null;
-    }
-    const value = commitField(id, raw, context);
-    if (value === null) return null;
-    const applied = applyField(scenario, id, value, trace);
-    // **A span still being typed does not drag the viewpoint.** « 100 » into Portée passes
-    // through « 1 », and clamping against a 1 m span would leave `x_D` at 1,0 m on the 100 m span
-    // the user actually typed — a viewpoint destroyed by a keystroke nobody meant as a value. The
-    // clamp lands when the edit lands; until then the scene clamps the *drawing* and state keeps
-    // the position. `x_D` itself is exempt: it is the direct path and clamps as it is typed.
-    const next = settled || !SPAN_FIELDS.has(id) ? applied : { ...applied, rider: scenario.rider };
+  const row = useFieldRows({
+    rail,
+    register: "exact",
     // **The note is driven by the clamp**, never by an out-of-range value surviving in state:
     // state is clamped on the way in, so a note conditioned on `0 ≤ x_D ≤ L` could only ever fire
     // where nothing moved. What is compared is the value asked for against the one that landed —
     // for `x_D` the typed one, for a span field the viewpoint it dragged along.
-    announceClamp(next, id === "xD" ? value : scenario.rider.xD);
-    patch(next);
-    return id === "xD" ? next.rider.xD : value;
-  }
-
-  function runFix(id: FixActionId, breach: BlockingError) {
-    switch (id) {
-      case "passer-a-l-acier":
-        dispatch({ type: "matériau/famille", family: "steel" });
-        return;
-      case "passer-en-usage-temporaire":
-        patch({ ...scenario, usage: "TEMPORAIRE" });
-        return;
-      case "choisir-un-autre-regime":
-        // A **focus** action, and it does not open the picker: opening a popup from a remote
-        // button covers the context the user has just travelled to.
-        regimePicker.current?.focus();
-        return;
-      case "passer-a-la-terminaison-de-depart":
-        patch(applyShippedTerminations(scenario, breach));
-    }
-  }
+    onCommitted: ({ id, next, asked }) => {
+      if (asked !== null) announceClamp(next, id === "xD" ? asked : scenario.rider.xD);
+    },
+  });
+  const { patch } = row;
 
   /** The clamp note's one trigger: the value that landed is not the one that was asked for. */
   function announceClamp(next: typeof scenario, asked: number) {
@@ -308,25 +360,6 @@ export function RailInputs({
     }
   }
 
-  async function importProfile(file: File) {
-    let text: string;
-    try {
-      text = await file.text();
-    } catch {
-      setImportFailure(readFailure(file.name));
-      return;
-    }
-    const parsed = parseProfileCsv(text, file.name);
-    if (!parsed.ok) {
-      // A rejected file leaves the current terrain untouched: destroying it would turn a rejected
-      // import into data loss.
-      setImportFailure(parsed.failure);
-      return;
-    }
-    setImportFailure(null);
-    dispatch({ type: "tracé/importé", trace: parsed.trace, tr: encodeP1(parsed.trace) });
-  }
-
   const unit = scenario.unit;
   // Narrowed once, here: TypeScript drops a property narrowing at every callback boundary, and the
   // Rail is nothing but callbacks.
@@ -334,127 +367,14 @@ export function RailInputs({
   const textileSpec = scenario.material.family === "textile" ? scenario.material : null;
   const provenance = textileSpec === null ? {} : presetProvenance(textileSpec);
   const driver = drivingField(scenario);
-  const familyBreach = breaches.get("family");
-  const regimeBreach = breaches.get("regime");
-  /**
-   * § 10.1's « une entrée indisponible montre sa raison », for the régime row. **One reason per
-   * row, not one per disabled option** — `Picker`'s docblock argues that at 288 px, and the rule
-   * applies here too — this select is spelled out rather than going through `Picker` only because
-   * it carries a ref for the « choisir un autre régime » Fix Action. Today at most one régime is ever
-   * unavailable, so the first is the reason; if a second ever were, they would share a cause and
-   * the sentence would be the same twice.
-   */
-  const regimeReason =
-    Object.values(REGIMES)
-      .map((regime) => regimeUnavailableNote(regime.id, scenario.material.family, scenario.usage))
-      .find((reason) => reason !== null) ?? null;
-
-  // Unmemoised on purpose: every field of it is rebuilt each render anyway, and every consumer is
-  // a child of this component. What matters is that the consumers are **stable component types**,
-  // which they are only because they are declared at module scope.
-  const row: RailRowContext = {
-    form,
-    text,
-    context,
-    unit,
-    breaches,
-    outlined,
-    commit,
-    runFix,
-    setFocused,
-  };
 
   return (
     <RailRow.Provider value={row}>
       <RailSection title="Paramètres">
         <div className="mt-2 flex flex-col gap-3">
           <Group title="Installation et régime">
-            <Row
-              control={
-                <Choice
-                  name="usage"
-                  onChange={(value: UseClass) => patch({ ...scenario, usage: value })}
-                  options={[
-                    {
-                      value: "PERMANENTE",
-                      label: heading("permanentInstallation", "exact"),
-                    },
-                    {
-                      value: "TEMPORAIRE",
-                      label: heading("temporaryInstallation", "exact"),
-                    },
-                  ]}
-                  value={scenario.usage}
-                />
-              }
-              help={FIELD_HELP.usage}
-              label={FIELDS.usage.label}
-              stacked
-            />
-            <Row
-              control={
-                <NativeSelect
-                  className="max-w-44"
-                  id="rail-regime"
-                  onChange={(event) =>
-                    patch({
-                      ...scenario,
-                      regime: event.target.value === "" ? null : (event.target.value as RegimeId),
-                    })
-                  }
-                  ref={regimePicker}
-                  size="sm"
-                  value={scenario.regime ?? ""}
-                >
-                  {/* No default, and its absence is legitimate state — never a hole to fill. */}
-                  <NativeSelectOption value="">— choisir —</NativeSelectOption>
-                  {Object.values(REGIMES).map((regime) => {
-                    const unavailable = !isRegimeAvailable(
-                      regime.id,
-                      scenario.material.family,
-                      scenario.usage,
-                    );
-                    return (
-                      <NativeSelectOption disabled={unavailable} key={regime.id} value={regime.id}>
-                        {/* `— indisponible` is `Picker`'s and `Choice`'s own convention, and it
-                            says *that*; § 10.1's *why* is the row's note below. */}
-                        {unavailable ? `${regime.label} — indisponible` : regime.label}
-                      </NativeSelectOption>
-                    );
-                  })}
-                </NativeSelect>
-              }
-              help={FIELD_HELP.regime}
-              htmlFor="rail-regime"
-              label={FIELDS.regime.label}
-              message={
-                regimeBreach === undefined
-                  ? undefined
-                  : { text: regimeBreach.message, blocking: regimeBreach.kind !== "empty" }
-              }
-              // § 10.1's reason and § 7's Fix Action share the one full-width slot, reason first:
-              // it explains the state the Fix Action offers to leave, so reading it in the other
-              // order asks the user to act before they are told why.
-              note={
-                regimeReason === null &&
-                (regimeBreach === undefined || regimeBreach.fixes.length === 0) ? null : (
-                  <>
-                    {regimeReason !== null && <DisabledReason reason={regimeReason} />}
-                    {regimeBreach !== undefined && regimeBreach.fixes.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {regimeBreach.fixes.map((fix) => (
-                          <FixButton
-                            key={fix.id}
-                            label={fix.label}
-                            onClick={() => runFix(fix.id, regimeBreach)}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )
-              }
-            />
+            <UsageRow />
+            <RegimeRow />
           </Group>
 
           <Group title="Géométrie">
@@ -467,99 +387,12 @@ export function RailInputs({
             )}
             <NumericRow hint="m" id="zA" />
             <NumericRow hint="m" id="zB" />
-            <FileControls
-              failure={importFailure}
-              geometrySource={scenario.geometry.source}
-              onChoose={() => fileInput.current?.click()}
-              onRemove={() => dispatch({ type: "tracé/retiré" })}
-              onReuse={() => {
-                if (state.trace !== null) {
-                  dispatch({ type: "tracé/réutilisé", tr: encodeP1(state.trace) });
-                }
-              }}
-              onReuseCsv={() => {
-                if (state.retainedCsv !== null) {
-                  const csv = state.retainedCsv;
-                  dispatch({ type: "tracé/importé", trace: csv, tr: encodeP1(csv) });
-                }
-              }}
-              retainedCsv={state.retainedCsv}
-              trace={trace}
-            />
-            {/* A **button, not a drop zone**: the chart already carries three drag targets. The
-                file element itself is never seen — it is the mechanism `Importer un profil…`
-                clicks — but it goes through the registry all the same, so « no `<input>` outside
-                `ui/` » stays one grep with no exception to remember. */}
-            <Input
-              accept=".csv,text/csv"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = "";
-                if (file !== undefined) void importProfile(file);
-              }}
-              ref={fileInput}
-              type="file"
-            />
+            <ProfileImport />
           </Group>
 
           <Group title="Ligne">
-            <Row
-              control={
-                <Choice
-                  name="family"
-                  onChange={(family: "steel" | "textile") =>
-                    dispatch({ type: "matériau/famille", family })
-                  }
-                  options={[
-                    { value: "steel", label: "Câble acier" },
-                    {
-                      value: "textile",
-                      label: "Corde textile",
-                      // **Visible but disabled, with the reason inline** — hiding it leaves a user
-                      // who came to compare families with no explanation.
-                      disabled: !isFamilyAllowed("textile", scenario.usage),
-                      reason: TEXTILE_UNAVAILABLE_REASON,
-                    },
-                  ]}
-                  value={scenario.material.family}
-                />
-              }
-              help={FIELD_HELP.family}
-              label={FIELDS.family.label}
-              message={
-                familyBreach === undefined
-                  ? undefined
-                  : { text: familyBreach.message, blocking: true }
-              }
-              note={
-                familyBreach !== undefined ? (
-                  <div className="flex flex-wrap gap-1">
-                    {familyBreach.fixes.map((fix) => (
-                      <FixButton
-                        key={fix.id}
-                        label={fix.label}
-                        onClick={() => runFix(fix.id, familyBreach)}
-                      />
-                    ))}
-                  </div>
-                ) : null
-              }
-              stacked
-            />
-            <Row
-              control={
-                <Choice
-                  name="carryingLines"
-                  onChange={(count) => patch({ ...scenario, carryingLines: count === "2" ? 2 : 1 })}
-                  options={CARRYING_LINES_OPTIONS}
-                  value={`${scenario.carryingLines}` as const}
-                />
-              }
-              help={FIELD_HELP.carryingLines}
-              label={FIELDS.carryingLines.label}
-              stacked
-            />
+            <FamilyRow />
+            <CarryingLinesRow />
 
             {steelSpec !== null ? (
               <>
@@ -604,21 +437,7 @@ export function RailInputs({
               </>
             ) : (
               <>
-                <Row
-                  control={
-                    // An **action**, not a selection: the Scenario holds the values, never the
-                    // preset's name, so the select returns to « — choisir — » after filling.
-                    <Picker
-                      id="rail-preset"
-                      onChange={(id) => patch(applyMaterialPreset(scenario, id))}
-                      options={MATERIAL_PRESETS.map(({ id, label }) => ({ value: id, label }))}
-                      value=""
-                    />
-                  }
-                  help={PRESET_HELP}
-                  htmlFor="rail-preset"
-                  label={PRESET_LABEL}
-                />
+                <PresetRow />
                 <Row
                   chip={presetChip(provenance.cls)}
                   control={
@@ -682,50 +501,9 @@ export function RailInputs({
           </Group>
 
           <Group title="Tension de la ligne">
-            <Row
-              control={
-                <Picker
-                  id="rail-tensioning-device"
-                  onChange={(device) => patch({ ...scenario, tensioningDevice: device })}
-                  // A Maestro is a rope device: unavailable on a câble, though one that arrived
-                  // there is still the held value and keeps its entry (and its warning below).
-                  options={TENSIONING_DEVICE_OPTIONS.map((option) => ({
-                    ...option,
-                    disabled: option.value !== "pulley" && steelSpec !== null,
-                  }))}
-                  value={scenario.tensioningDevice}
-                />
-              }
-              help={FIELD_HELP.tensioningDevice}
-              htmlFor="rail-tensioning-device"
-              label={FIELDS.tensioningDevice.label}
-              note={
-                rung("tensioningDevice") !== null ? (
-                  <div className="flex flex-wrap gap-1">
-                    <FixButton
-                      label={PASS_TO_PULLEY}
-                      onClick={() => patch({ ...scenario, tensioningDevice: "pulley" })}
-                    />
-                  </div>
-                ) : steelSpec !== null ? (
-                  <DisabledReason reason={MAESTRO_ROPE_ONLY} />
-                ) : undefined
-              }
-              warning={rung("tensioningDevice")}
-            />
+            <TensioningDeviceRow warning={rung("tensioningDevice")} />
             {/* Where the prétension is read — whatever drives, since its read-out reads there too. */}
-            <Row
-              control={
-                <Segmented
-                  onChange={(side) => patch({ ...scenario, tensioningSide: side })}
-                  options={TENSIONING_SIDE_OPTIONS}
-                  value={scenario.tensioningSide}
-                />
-              }
-              help={FIELD_HELP.tensioningSide}
-              label={FIELDS.tensioningSide.label}
-              stacked
-            />
+            <TensioningSideRow />
             {/* Exactly one field is editable; the other four appear under `Valeurs déduites`.
                 Switching mode **pre-fills the new field from its read-out**. */}
             <div className="flex items-center gap-1 py-1">
@@ -922,23 +700,31 @@ function DeducedReadOut({ row }: { row: ReadOutRow }) {
  * **Module scope, and it may never move back inside `RailInputs`.** Declared there it would be a
  * fresh component type on every keystroke, and React would remount the `<input>` under the caret.
  */
-function NumericRow({
+export function NumericRow({
   id,
-  label = FIELDS[id].label,
+  label,
   hint,
   chip,
   note,
   warning,
+  idle,
 }: {
   id: NumericFieldId;
+  /** The Page's own wording for the field, where it is not `fieldLabel`'s. */
   label?: string;
   hint?: string;
   chip?: ReactNode;
   note?: ReactNode;
   /** § 6's Avertissement tier, beside § 3's own band warning — the row can carry either. */
   warning?: string | null;
+  /**
+   * What the field shows while the Scenario does not hold it — a read-out the first keystroke takes
+   * over. Focusing and leaving it untouched writes nothing, so a shared line is not re-driven by a
+   * glance.
+   */
+  idle?: string;
 }) {
-  const { form, text, context, unit, breaches, outlined, commit, runFix, setFocused } =
+  const { form, text, context, unit, register, breaches, outlined, commit, runFix, setFocused } =
     useRailRowContext();
   const breach = breaches.get(id);
   const value = text[id] ?? "";
@@ -951,58 +737,53 @@ function NumericRow({
       name={id}
       validators={{ onBlur: fieldSchema(id, context), onChange: fieldSchema(id, context) }}
     >
-      {(field) => (
-        <Row
-          chip={chip}
-          help={FIELD_HELP[id]}
-          control={
-            <NumericInput
-              id={`rail-${id}`}
-              invalid={shown !== null && shown.kind !== "empty"}
-              onBlur={(raw) => {
-                field.handleBlur();
-                setFocused(null);
-                // « Rounding is always visible »: on commit the field snaps to exactly what state
-                // now holds — 82,5 kg reads back « 83 kg », a clamped `x_D` reads back the span's
-                // own end — and a refused text stays as typed, because what the user typed is the
-                // evidence the ⛔ message quotes.
-                const committed = commit(id, raw, true);
-                if (committed !== null) field.handleChange(displayField(id, committed, unit));
-              }}
-              onChange={(raw) => {
-                field.handleChange(raw);
-                commit(id, raw, false);
-              }}
-              onFocus={() => setFocused(id)}
-              value={field.state.value}
-            />
-          }
-          hint={hint}
-          htmlFor={`rail-${id}`}
-          label={label}
-          message={
-            shown === null ? undefined : { text: shown.message, blocking: shown.kind !== "empty" }
-          }
-          note={
-            <>
-              {note}
-              {breach !== undefined && breach.fixes.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {breach.fixes.map((fix) => (
-                    <FixButton
-                      key={fix.id}
-                      label={fix.label}
-                      onClick={() => runFix(fix.id, breach)}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
-          }
-          outlined={outlined.has(id)}
-          warning={shown === null ? (warningFor(id, parsed, context) ?? warning ?? null) : null}
-        />
-      )}
+      {(field) => {
+        const idling = idleShown(idle, field.state.value);
+        return (
+          <Row
+            chip={chip}
+            // The help is Avancé's: it explains the computation in the exact register.
+            help={register === "exact" ? FIELD_HELP[id] : undefined}
+            control={
+              <NumericInput
+                id={`rail-${id}`}
+                invalid={shown !== null && shown.kind !== "empty"}
+                onBlur={(raw) => {
+                  field.handleBlur();
+                  setFocused(null);
+                  if (idling !== null) return;
+                  // « Rounding is always visible »: on commit the field snaps to exactly what state
+                  // now holds — 82,5 kg reads back « 83 kg », a clamped `x_D` reads back the span's
+                  // own end — and a refused text stays as typed, because what the user typed is the
+                  // evidence the ⛔ message quotes.
+                  const committed = commit(id, raw, true);
+                  if (committed !== null) field.handleChange(displayField(id, committed, unit));
+                }}
+                onChange={(raw) => {
+                  field.handleChange(raw);
+                  commit(id, raw, false);
+                }}
+                onFocus={() => setFocused(id)}
+                value={idling ?? field.state.value}
+              />
+            }
+            hint={hint}
+            htmlFor={`rail-${id}`}
+            label={label ?? fieldLabel(id, register)}
+            message={
+              shown === null ? undefined : { text: shown.message, blocking: shown.kind !== "empty" }
+            }
+            note={
+              <>
+                {note}
+                {breach !== undefined && <FixButtons breach={breach} onFix={runFix} />}
+              </>
+            }
+            outlined={outlined.has(id)}
+            warning={shown === null ? (warningFor(id, parsed, context) ?? warning ?? null) : null}
+          />
+        );
+      }}
     </form.Field>
   );
 }
@@ -1193,12 +974,346 @@ const CLEAR_SESSION_CONFIRM =
  * {@link Row}'s `stacked` docblock records at the Rail's 288 px. The rows inside carry their own
  * `py-1`, so the group adds no gap of its own.
  */
-function Group({ title, children }: { title: string; children: ReactNode }) {
+export function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
-      <h3 className="text-foreground/70 text-xs font-semibold">{title}</h3>
+      <GroupHeading title={title} />
       <div className="mt-1">{children}</div>
     </section>
+  );
+}
+
+/** Help is Avancé's: only the exact register carries it. */
+function helpFor(register: Register, help: string): string | undefined {
+  return register === "exact" ? help : undefined;
+}
+
+// ── The choice rows both Pages show ─────────────────────────────────────────────────────────────
+// Each is declared **once**, worded by the context's register (#61), and writes through the
+// context's `patch` and repairs through its `runFix` — so a choice made on either Page is the same
+// write.
+
+/** The installation, which § 10.4's textile gate and the régimes' availability both read. */
+export function UsageRow() {
+  const { scenario } = useAppState();
+  const { register, patch } = useRailRowContext();
+  return (
+    <Row
+      control={
+        <Choice
+          name="usage"
+          onChange={(usage: UseClass) => patch({ ...scenario, usage })}
+          options={usageOptions(register)}
+          value={scenario.usage}
+        />
+      }
+      help={helpFor(register, FIELD_HELP.usage)}
+      label={fieldLabel("usage", register)}
+      stacked
+    />
+  );
+}
+
+/**
+ * The régime — the marge exigée on a terrain Page — with § 10.1's reason and § 7's Fix Actions.
+ *
+ * **One reason per row, not one per disabled option** — `Picker`'s docblock argues that at 288 px.
+ * This select is spelled out rather than going through `Picker` only because it carries the ref
+ * « Choisir un autre régime » focuses. Today at most one régime is ever unavailable, so the first
+ * is the reason; if a second ever were, they would share a cause and the sentence would repeat.
+ */
+export function RegimeRow() {
+  const { scenario } = useAppState();
+  const { register, breaches, patch, runFix, regimePicker } = useRailRowContext();
+  const breach = breaches.get("regime");
+  const { family } = scenario.material;
+  const reason =
+    Object.values(REGIMES)
+      .map((regime) => regimeUnavailableNote(regime.id, family, scenario.usage, register))
+      .find((note) => note !== null) ?? null;
+  const fixes = breach?.fixes ?? [];
+  return (
+    <Row
+      control={
+        <NativeSelect
+          className="max-w-44"
+          id="rail-regime"
+          onChange={(event) => patch({ ...scenario, regime: regimeChoice(event.target.value) })}
+          ref={regimePicker}
+          size="sm"
+          value={scenario.regime ?? ""}
+        >
+          {/* No default, and its absence is legitimate state — never a hole to fill. */}
+          <NativeSelectOption value="">{PICKER_COPY.empty}</NativeSelectOption>
+          {Object.values(REGIMES).map((regime) => {
+            const unavailable = !isRegimeAvailable(regime.id, family, scenario.usage);
+            return (
+              <NativeSelectOption disabled={unavailable} key={regime.id} value={regime.id}>
+                {/* The suffix says *that*; § 10.1's *why* is the row's note below. */}
+                {unavailable ? `${regime.label} — ${PICKER_COPY.unavailable}` : regime.label}
+              </NativeSelectOption>
+            );
+          })}
+        </NativeSelect>
+      }
+      help={helpFor(register, FIELD_HELP.regime)}
+      htmlFor="rail-regime"
+      label={fieldLabel("regime", register)}
+      message={
+        breach === undefined
+          ? undefined
+          : { text: breach.message, blocking: breach.kind !== "empty" }
+      }
+      // § 10.1's reason and § 7's Fix Action share the one full-width slot, reason first: it
+      // explains the state the Fix Action offers to leave.
+      note={
+        reason === null && fixes.length === 0 ? null : (
+          <>
+            {reason !== null && <DisabledReason reason={reason} />}
+            {breach !== undefined && <FixButtons breach={breach} onFix={runFix} />}
+          </>
+        )
+      }
+    />
+  );
+}
+
+/** The line's family, and § 10.4's textile gate with its Fix Actions. */
+export function FamilyRow() {
+  const { scenario } = useAppState();
+  const dispatch = useAppDispatch();
+  const { register, breaches, runFix } = useRailRowContext();
+  const breach = breaches.get("family");
+  const labels = FAMILY_LABEL[register];
+  return (
+    <Row
+      control={
+        <Choice
+          name="family"
+          onChange={(family: "steel" | "textile") => dispatch({ type: "matériau/famille", family })}
+          options={[
+            { value: "steel", label: labels.steel },
+            {
+              value: "textile",
+              label: labels.textile,
+              // **Visible but disabled, with the reason inline** — hiding it leaves a user who
+              // came to compare families with no explanation.
+              disabled: !isFamilyAllowed("textile", scenario.usage),
+              reason: TEXTILE_UNAVAILABLE_REASON,
+            },
+          ]}
+          value={scenario.material.family}
+        />
+      }
+      help={helpFor(register, FIELD_HELP.family)}
+      label={fieldLabel("family", register)}
+      message={breach === undefined ? undefined : { text: breach.message, blocking: true }}
+      note={breach === undefined ? null : <FixButtons breach={breach} onFix={runFix} />}
+      stacked
+    />
+  );
+}
+
+/** One or two carrying members. */
+export function CarryingLinesRow() {
+  const { scenario } = useAppState();
+  const { register, patch } = useRailRowContext();
+  return (
+    <Row
+      control={
+        <Choice
+          name="carryingLines"
+          onChange={(count) => patch({ ...scenario, carryingLines: count === "2" ? 2 : 1 })}
+          options={CARRYING_LINES_OPTIONS}
+          value={`${scenario.carryingLines}` as const}
+        />
+      }
+      help={helpFor(register, FIELD_HELP.carryingLines)}
+      label={fieldLabel("carryingLines", register)}
+      stacked
+    />
+  );
+}
+
+/**
+ * A rope preset — an **action**, not a selection: the Scenario holds the values, never the
+ * preset's name, so the select returns to « — choisir — » after filling.
+ */
+export function PresetRow() {
+  const { scenario } = useAppState();
+  const { register, patch } = useRailRowContext();
+  return (
+    <Row
+      control={
+        <Picker
+          id="rail-preset"
+          onChange={(id) => patch(applyMaterialPreset(scenario, id))}
+          options={MATERIAL_PRESETS.map(({ id, label }) => ({ value: id, label }))}
+          value=""
+        />
+      }
+      help={helpFor(register, PRESET_HELP)}
+      htmlFor="rail-preset"
+      label={PRESET_LABEL}
+    />
+  );
+}
+
+/**
+ * The Mise en tension's device. A Maestro is a rope device: unavailable on a câble, though one that
+ * arrived there is still the held value and keeps its entry — and its warning.
+ *
+ * @param label the Page's own name for the row, where its group already names the Mise en tension.
+ * @param warning § 6's Avertissement for this row, off the Page's warning ladder.
+ */
+export function TensioningDeviceRow({
+  label,
+  warning,
+}: {
+  label?: string;
+  warning: string | null;
+}) {
+  const { scenario } = useAppState();
+  const { register, patch } = useRailRowContext();
+  const steel = scenario.material.family === "steel";
+  return (
+    <Row
+      control={
+        <Picker
+          id="rail-tensioningDevice"
+          onChange={(device) => patch({ ...scenario, tensioningDevice: device })}
+          options={TENSIONING_DEVICE_OPTIONS.map((option) => ({
+            ...option,
+            disabled: option.value !== "pulley" && steel,
+          }))}
+          value={scenario.tensioningDevice}
+        />
+      }
+      help={helpFor(register, FIELD_HELP.tensioningDevice)}
+      htmlFor="rail-tensioningDevice"
+      label={label ?? fieldLabel("tensioningDevice", register)}
+      note={
+        warning !== null ? (
+          <div className="flex flex-wrap gap-1">
+            <FixButton
+              label={PASS_TO_PULLEY}
+              onClick={() => patch({ ...scenario, tensioningDevice: "pulley" })}
+            />
+          </div>
+        ) : steel ? (
+          <DisabledReason reason={MAESTRO_ROPE_ONLY} />
+        ) : undefined
+      }
+      warning={warning}
+    />
+  );
+}
+
+/** The anchor carrying the Mise en tension — where the prétension is read, whatever drives. */
+export function TensioningSideRow() {
+  const { scenario } = useAppState();
+  const { register, patch } = useRailRowContext();
+  return (
+    <Row
+      control={
+        <Segmented
+          onChange={(side) => patch({ ...scenario, tensioningSide: side })}
+          options={TENSIONING_SIDE_OPTIONS}
+          value={scenario.tensioningSide}
+        />
+      }
+      help={helpFor(register, FIELD_HELP.tensioningSide)}
+      label={fieldLabel("tensioningSide", register)}
+      stacked
+    />
+  );
+}
+
+/** A breach's Fix Actions, one button each. */
+function FixButtons({
+  breach,
+  onFix,
+}: {
+  breach: BlockingError;
+  onFix: (id: FixActionId, breach: BlockingError) => void;
+}) {
+  if (breach.fixes.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {breach.fixes.map((fix) => (
+        <FixButton key={fix.id} label={fix.label} onClick={() => onFix(fix.id, breach)} />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The profil's import, on every Page that takes one: § 4's controls, the file element they click,
+ * and the parse failure they report. **A rejected file leaves the current terrain untouched**, and
+ * its failure renders here, inline, never in the banner slot — nothing about the current line
+ * changed.
+ */
+export function ProfileImport() {
+  const state = useAppState();
+  const dispatch = useAppDispatch();
+  const [failure, setFailure] = useState<ParseFailure | null>(null);
+  const fileInput = useRef<HTMLInputElement | null>(null);
+
+  async function importProfile(file: File) {
+    let text: string;
+    try {
+      text = await file.text();
+    } catch {
+      setFailure(readFailure(file.name));
+      return;
+    }
+    const parsed = parseProfileCsv(text, file.name);
+    if (!parsed.ok) {
+      // Destroying the current terrain would turn a rejected import into data loss.
+      setFailure(parsed.failure);
+      return;
+    }
+    setFailure(null);
+    dispatch({ type: "tracé/importé", trace: parsed.trace, tr: encodeP1(parsed.trace) });
+  }
+
+  return (
+    <>
+      <FileControls
+        failure={failure}
+        geometrySource={state.scenario.geometry.source}
+        onChoose={() => fileInput.current?.click()}
+        onRemove={() => dispatch({ type: "tracé/retiré" })}
+        onReuse={() => {
+          if (state.trace !== null) {
+            dispatch({ type: "tracé/réutilisé", tr: encodeP1(state.trace) });
+          }
+        }}
+        onReuseCsv={() => {
+          if (state.retainedCsv !== null) {
+            const csv = state.retainedCsv;
+            dispatch({ type: "tracé/importé", trace: csv, tr: encodeP1(csv) });
+          }
+        }}
+        retainedCsv={state.retainedCsv}
+        trace={state.trace}
+      />
+      {/* A **button, not a drop zone**: the chart already carries three drag targets. The file
+          element itself is never seen — it is the mechanism `Importer un profil…` clicks — but it
+          goes through the registry all the same, so « no `<input>` outside `ui/` » stays one grep
+          with no exception to remember. */}
+      <Input
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (file !== undefined) void importProfile(file);
+        }}
+        ref={fileInput}
+        type="file"
+      />
+    </>
   );
 }
 
@@ -1233,21 +1348,21 @@ function FileControls({
     <div className="flex flex-col gap-1 py-1">
       <div className="flex flex-wrap items-center gap-1">
         <Button onClick={onChoose} size="sm" type="button" variant="outline">
-          Importer un profil…
+          {PROFILE_IMPORT_COPY.choose}
         </Button>
         {active && (
           <Button onClick={onRemove} size="sm" type="button" variant="outline">
-            Retirer le profil
+            {PROFILE_IMPORT_COPY.remove}
           </Button>
         )}
         {cached && (
           <Button onClick={onReuse} size="sm" type="button" variant="outline">
-            Réutiliser ce profil
+            {PROFILE_IMPORT_COPY.reuse}
           </Button>
         )}
         {retainedCsv !== null && (
           <Button onClick={onReuseCsv} size="sm" type="button" variant="outline">
-            Réutiliser le CSV
+            {PROFILE_IMPORT_COPY.reuseCsv}
           </Button>
         )}
       </div>
@@ -1256,13 +1371,14 @@ function FileControls({
           ? name
           : cached
             ? trace.origin.kind === "csv"
-              ? `Profil en mémoire : ${name} (non utilisé)`
-              : `${name} (non utilisé)`
-            : "(aucun profil)"}
+              ? `${PROFILE_IMPORT_COPY.cachedCsv} ${name} ${PROFILE_IMPORT_COPY.unused}`
+              : `${name} ${PROFILE_IMPORT_COPY.unused}`
+            : PROFILE_IMPORT_COPY.none}
       </p>
       {retainedCsv !== null && (
         <p className="text-muted-foreground text-xs">
-          CSV en mémoire : {traceName(retainedCsv.origin)} (non utilisé)
+          {PROFILE_IMPORT_COPY.retainedCsv} {traceName(retainedCsv.origin)}{" "}
+          {PROFILE_IMPORT_COPY.unused}
         </p>
       )}
       {failure !== null && (
@@ -1271,7 +1387,7 @@ function FileControls({
               line changed, and a rejected file leaves the current terrain untouched. */}
           <p className="text-destructive text-xs">⛔ {parseFailureMessage(failure)}</p>
           <div className="flex flex-wrap gap-1">
-            <FixButton label="Choisir un autre fichier" onClick={onChoose} />
+            <FixButton label={PROFILE_IMPORT_COPY.chooseAnother} onClick={onChoose} />
           </div>
         </div>
       )}
@@ -1370,17 +1486,7 @@ function TerminationRow({
         reason === null && breach === undefined ? null : (
           <>
             {reason !== null && <DisabledReason reason={reason} />}
-            {breach !== undefined && (
-              <div className="flex flex-wrap gap-1">
-                {breach.fixes.map((fix) => (
-                  <FixButton
-                    key={fix.id}
-                    label={fix.label}
-                    onClick={() => runFix(fix.id, breach)}
-                  />
-                ))}
-              </div>
-            )}
+            {breach !== undefined && <FixButtons breach={breach} onFix={runFix} />}
           </>
         )
       }
@@ -1396,7 +1502,7 @@ function TerminationRow({
  * The badge copy carries **no « maintenant »** — messages state, buttons act — and the reset is a
  * button rather than a clause in the sentence.
  */
-function DerivedRow({
+export function DerivedRow({
   id,
   stale,
   formula,
@@ -1426,10 +1532,10 @@ function DerivedRow({
           {/* The stale marker is a chip, and the quantity inside it is mono like every other
               computed value — the sentence around it is prose and stays sans. */}
           <Badge className="bg-warning/15 text-warning" variant="secondary">
-            ⚠ la formule donne
+            ⚠ {OVERRIDE_COPY.stale}
             <span className="font-mono">{formatQuantity(quantity, formula, unit)}</span>
           </Badge>
-          <FixButton label="Recalculer" onClick={onRecalculate} />
+          <FixButton label={OVERRIDE_COPY.recalculate} onClick={onRecalculate} />
         </div>
       )}
     </div>
@@ -1437,7 +1543,7 @@ function DerivedRow({
 }
 
 /** A preset's provenance as the chip its row carries; nothing where the row has none. */
-function presetChip(provenance: PresetProvenance | undefined): ReactNode {
+export function presetChip(provenance: PresetProvenance | undefined): ReactNode {
   if (provenance === undefined) return undefined;
   return <Chip detail={provenance.detail} label={provenance.label} tone={provenance.tone} />;
 }
@@ -1449,7 +1555,7 @@ function presetChip(provenance: PresetProvenance | undefined): ReactNode {
  * fire always and mean nothing. Textile `k` is its one case: §13.2 publishes the ratio for 10–30 %
  * MBL and a zip line stands at ≈0,6 % and rides at ≈6,3 %, so every rope is out of band.
  */
-function AmbientNote({ text }: { text: string | null }) {
+export function AmbientNote({ text }: { text: string | null }) {
   if (text === null) return null;
   return <p className="text-muted-foreground text-xs">{text}</p>;
 }

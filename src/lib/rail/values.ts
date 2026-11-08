@@ -36,6 +36,7 @@ import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 import type { ScenarioDraft, TightnessDraft } from "@/lib/scenario/types.ts";
 import type { TextileSpec } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
+import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { G, roundToDisplay } from "@/lib/format/quantity.ts";
 import {
@@ -57,6 +58,7 @@ import {
   displayField,
   FIELD_ORDER,
   FIELDS,
+  isOptionalField,
   TIGHTNESS_FIELD,
 } from "./fields.ts";
 import { pretensionOf } from "./tensioning.ts";
@@ -332,12 +334,20 @@ function overrideLens(
   };
 }
 
-/** Everything tier one needs beside a field's own text, gathered once from the Scenario. */
-export function fieldContext(scenario: TraverseScenario): FieldContext {
+/**
+ * Everything tier one needs beside a field's own text, gathered once from the Scenario.
+ *
+ * @param register the vocabulary of the Page the messages are read on.
+ */
+export function fieldContext(
+  scenario: TraverseScenario,
+  register: Register = "exact",
+): FieldContext {
   return {
     unit: scenario.unit,
     ropeClass: scenario.material.family === "textile" ? scenario.material.ropeClass : undefined,
     L: scenario.geometry.source === "manual" ? scenario.geometry.L : undefined,
+    register,
   };
 }
 
@@ -390,6 +400,128 @@ export function applyField(
   const written = FIELD_ACCESS[id].write(scenario, value);
   const xD = clampX(written.rider.xD, spanOfGeometry(written.geometry, trace));
   return xD === written.rider.xD ? written : { ...written, rider: { ...written.rider, xD } };
+}
+
+/** What one keystroke or blur in a numeric field does to the Scenario. */
+export type FieldCommit = {
+  /** The Scenario to write, or `null` when the text left state as it was. */
+  readonly next: ScenarioDraft | null;
+  /** The canonical value that **entered state** — what the field snaps to on blur — or `null`. */
+  readonly value: number | null;
+  /** The value the text asked for, before `x_D` clamped it. `null` where no number was asked. */
+  readonly asked: number | null;
+};
+
+/** What {@link commitText} reads: the Scenario, the field and its text, and the form around it. */
+export type CommitTextInput = {
+  readonly scenario: ScenarioDraft;
+  readonly trace: Trace | null;
+  readonly id: NumericFieldId;
+  readonly raw: string;
+  readonly settled: boolean;
+  readonly text: RailValues;
+  readonly context: FieldContext;
+};
+
+/**
+ * One numeric field's text, committed — the one write path every Page's fields share, so a value
+ * typed on Statique and on Avancé lands in the Scenario the same way.
+ *
+ * @param settled `true` when the edit has landed — a blur — and `false` for a keystroke still
+ *   mid-word. It changes nothing about the value; it decides only whether a span change may drag
+ *   `x_D` with it.
+ * @param text the form's text, for a Position, which commits with its pair.
+ */
+export function commitText({
+  scenario,
+  trace,
+  id,
+  raw,
+  settled,
+  text,
+  context,
+}: CommitTextInput): FieldCommit {
+  if (checkField(id, raw, context) !== null) return { next: null, value: null, asked: null };
+  if (isPositionField(id)) {
+    const committed = commitPosition(scenario, id, { ...text, [id]: raw }, context);
+    return { next: committed.scenario, value: committed.value, asked: null };
+  }
+  // An optional field emptied is « absent »: the one blank that is written, not refused.
+  if (isOptionalField(id) && raw.trim() === "") {
+    return { next: FIELD_ACCESS.dTextile.write(scenario, null), value: null, asked: null };
+  }
+  const value = commitField(id, raw, context);
+  if (value === null) return { next: null, value: null, asked: null };
+  const applied = applyField(scenario, id, value, trace);
+  // **A span still being typed does not drag the viewpoint.** « 100 » into Portée passes through
+  // « 1 », and clamping against a 1 m span would leave `x_D` at 1,0 m on the 100 m span the user
+  // actually typed. The clamp lands when the edit lands; until then the scene clamps the *drawing*
+  // and state keeps the position. `x_D` itself is the direct path and clamps as it is typed.
+  const next = settled || id !== "L" ? applied : { ...applied, rider: scenario.rider };
+  return { next, value: id === "xD" ? next.rider.xD : value, asked: value };
+}
+
+/**
+ * The one Tightness Driver a Page offers (#91: Statique's tension de pose), with what a line that
+ * arrives on another driver is taken over from — the rider-free chain's read-out, or the last good
+ * one under « Aucun résultat », as Avancé's selector prefills ({@link switchTightness}).
+ */
+export type DriverTakeOver = {
+  readonly mode: TightnessDraft["mode"];
+  readonly deduced: Deduced;
+  readonly lastGood: DeducedSolve | null;
+};
+
+/** {@link commitText}'s result, and what the Page dispatches for it — `null` for nothing. */
+export type PageCommit = FieldCommit & { readonly write: ScenarioDraft | null };
+
+/**
+ * A field's text, committed by a Page — {@link commitText}, and on a Page that offers one driver
+ * alone, the **takeover**. A line arriving on another driver shows its read-out in the offered
+ * field ({@link idleDriverText}); the first keystroke moves the line onto the offered driver. Typed
+ * text that reads lands as `commitText` lands it, which already moves the line. **Refused text
+ * moves it too**, prefilled from the read-out: the gates judge the driver's text alone, so a « −5 »
+ * typed over another driver would otherwise earn no ⛔ on the field responsible. The Scenario then
+ * holds the read-out — the last good value, which is what any refused text leaves in state.
+ */
+export function commitPageText({
+  takeOver,
+  ...input
+}: CommitTextInput & { readonly takeOver?: DriverTakeOver }): PageCommit {
+  const base =
+    takeOver !== undefined && input.id === TIGHTNESS_FIELD[takeOver.mode]
+      ? switchTightness(input.scenario, takeOver.mode, takeOver.deduced, takeOver.lastGood)
+      : input.scenario;
+  const committed = commitText({ ...input, scenario: base });
+  return { ...committed, write: committed.next ?? (base === input.scenario ? null : base) };
+}
+
+/**
+ * What the offered driver's field shows while the line is on another driver: the read-out, at the
+ * field's grain, or nothing when there is none to show. `undefined` once the line is on it, when
+ * the field shows its own text.
+ *
+ * @param readOut the offered quantity as the line hangs now, `null` under « Aucun résultat ».
+ */
+export function idleDriverText(
+  scenario: ScenarioDraft,
+  mode: TightnessDraft["mode"],
+  readOut: number | null,
+): string | undefined {
+  if (scenario.tightness.mode === mode) return undefined;
+  return readOut === null ? "" : displayField(TIGHTNESS_FIELD[mode], readOut, scenario.unit);
+}
+
+/**
+ * The idle read-out while the field still shows it — nothing typed into it yet — or `null` once it
+ * shows its own text. Leaving an idle field writes nothing, so a glance at a shared line does not
+ * re-drive it.
+ *
+ * @param idle {@link idleDriverText}'s text, `undefined` where the field holds the line.
+ * @param text the form's text for the field, which stays empty until a keystroke.
+ */
+export function idleShown(idle: string | undefined, text: string): string | null {
+  return idle !== undefined && text === "" ? idle : null;
 }
 
 /**

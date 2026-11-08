@@ -48,10 +48,11 @@
 import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { RegimeId, RegimeMismatch, TerminationId, TextileSpec } from "@/lib/sim";
+import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { isFamilyAllowed, REGIMES, regimeMismatch, TERMINATIONS } from "@/lib/sim";
-import { label } from "@/lib/vocabulary/labels.ts";
+import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 import type { Deduced } from "./deduced.ts";
 import type { FieldId, FieldIssue, FieldIssueKind, GateId } from "./fields.ts";
@@ -62,6 +63,7 @@ import {
   emptyMessage,
   FIELD_ORDER,
   FIELDS,
+  fieldLabel,
   gateOf,
   isOptionalField,
 } from "./fields.ts";
@@ -118,6 +120,15 @@ const FIX: Record<Exclude<FixActionId, "passer-a-la-terminaison-de-depart">, Fix
   "choisir-un-autre-regime": { id: "choisir-un-autre-regime", label: "Choisir un autre régime" },
 };
 
+/** The régime's Fix Action and its message's subject on a simplified Page, which says marge exigée. */
+const REGIME_WORDING: Record<Register, { readonly fix: string; readonly subject: string }> = {
+  exact: { fix: FIX["choisir-un-autre-regime"].label, subject: "Régime" },
+  terrain: {
+    fix: `Choisir une autre ${label("regime", "terrain")}`,
+    subject: heading("regime", "terrain"),
+  },
+};
+
 /** One breach: which gate, which field is to blame, what it says, and what repairs it. */
 export type BlockingError = {
   readonly gate: GateId;
@@ -163,6 +174,8 @@ export type GateInput = {
    * Session restore and every `node` test do.
    */
   readonly issues?: readonly FieldIssue[];
+  /** The Page's vocabulary, which names the fields in the messages. `exact` when absent. */
+  readonly register?: Register;
 };
 
 /**
@@ -241,6 +254,12 @@ function unavailabilityCause(mismatch: RegimeMismatch, family: "steel" | "textil
   return causes.join(" et ");
 }
 
+/** How the select note names the entry it explains, per register. */
+const THIS_REGIME: Record<Register, string> = {
+  exact: "ce régime",
+  terrain: `cette ${label("regime", "terrain")}`,
+};
+
 /** What a régime's `requires` asks for, as the noun the select note needs. */
 const FAMILY_REQUIRED = { steel: "un câble acier", textile: "une corde textile" } as const;
 const USAGE_REQUIRED = {
@@ -262,17 +281,19 @@ export function regimeUnavailableNote(
   regime: RegimeId,
   family: "steel" | "textile",
   usage: "PERMANENTE" | "TEMPORAIRE",
+  register: Register = "exact",
 ): string | null {
   const mismatch = regimeMismatch(regime, family, usage);
   const { requires } = REGIMES[regime];
   if (mismatch === null || requires === null) return null;
+  const subject = THIS_REGIME[register];
   if (mismatch.family && mismatch.usage) {
-    return `Indisponible — ce régime suppose ${FAMILY_REQUIRED[requires.family]} et ${USAGE_REQUIRED[requires.usage]}.`;
+    return `Indisponible — ${subject} suppose ${FAMILY_REQUIRED[requires.family]} et ${USAGE_REQUIRED[requires.usage]}.`;
   }
   if (mismatch.family) {
-    return `Indisponible — ce régime suppose ${FAMILY_REQUIRED[requires.family]} ; la famille active est ${FAMILY_ACTIVE[family]}.`;
+    return `Indisponible — ${subject} suppose ${FAMILY_REQUIRED[requires.family]} ; la famille active est ${FAMILY_ACTIVE[family]}.`;
   }
-  return `Indisponible — ce régime ne couvre pas ${USAGE_REQUIRED[usage]}.`;
+  return `Indisponible — ${subject} ne couvre pas ${USAGE_REQUIRED[usage]}.`;
 }
 
 /** §10.4, stated where `Corde textile` is disabled — the rule is a fact worth teaching. */
@@ -370,7 +391,11 @@ export function isFieldActive(id: FieldId, scenario: TraverseScenario): boolean 
  * @returns every standing breach, worst gate first then rail order, with the three pass flags §
  *   7's table hangs its three different suppressions off.
  */
-export function evaluateGates({ scenario, issues = [] }: GateInput): GateReport {
+export function evaluateGates({
+  scenario,
+  issues = [],
+  register = "exact",
+}: GateInput): GateReport {
   const mode = geometryMode(scenario);
   const errors: BlockingError[] = [];
   /** One breach per field: a scenario-level check never doubles a standing form issue. */
@@ -430,11 +455,11 @@ export function evaluateGates({ scenario, issues = [] }: GateInput): GateReport 
       kind: "invalid",
       field: "regime",
       alsoOutlined: [],
-      message: `⛔ Régime « ${REGIMES[scenario.regime].label} » indisponible ${unavailabilityCause(
+      message: `⛔ ${REGIME_WORDING[register].subject} « ${REGIMES[scenario.regime].label} » indisponible ${unavailabilityCause(
         mismatch,
         scenario.material.family,
       )}.`,
-      fixes: [FIX["choisir-un-autre-regime"]],
+      fixes: [{ id: "choisir-un-autre-regime", label: REGIME_WORDING[register].fix }],
     });
   }
 
@@ -469,7 +494,7 @@ export function evaluateGates({ scenario, issues = [] }: GateInput): GateReport 
   // ── Every number the Scenario holds, as a link can carry it ────────────────────────────────
   // `?L=-5` restores state faithfully, including invalid state, and must light up here on the first
   // frame even though nobody has typed into the field yet.
-  const context = fieldContext(scenario);
+  const context = fieldContext(scenario, register);
   for (const field of GATED_FIELDS) {
     const value = FIELD_ACCESS[field].read(scenario);
     if (value === undefined) continue;
@@ -570,6 +595,7 @@ export function saisieEnCours(
   report: GateReport,
   focused: FieldId | null,
   lastCommitted: string | null,
+  register: Register = "exact",
 ): SaisieEnCours | null {
   if (focused === null) return null;
   const breach = report.errors.find((error) => error.field === focused);
@@ -577,7 +603,7 @@ export function saisieEnCours(
   const value = lastCommitted === null ? "" : ` ${lastCommitted}`;
   return {
     field: focused,
-    message: `${label("saisie-en-cours", "exact")} — ces valeurs correspondent à ${FIELDS[focused].label}${value}.`,
+    message: `${label("saisie-en-cours", register)} — ces valeurs correspondent à ${fieldLabel(focused, register)}${value}.`,
   };
 }
 

@@ -8,12 +8,16 @@
 
 import type { ForceUnit } from "@/lib/scenario/types.ts";
 import type { SweepStep } from "@/lib/sim";
+import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { formatAtX, formatQuantity } from "@/lib/format/quantity.ts";
 import { heading } from "@/lib/vocabulary/labels.ts";
 
 import { GATE_CONSEQUENCE } from "./gates.ts";
 import { clearanceBreached } from "./results.ts";
+
+/** § 5's scope label for the row: every cell is read at the passenger's position. */
+export const READ_OUT_SCOPE = "à la position du passager";
 
 /** The cells in row order — the same order at every width. */
 export const CELL_IDS = [
@@ -48,6 +52,32 @@ export const CELL_LABEL: Record<CellId, string> = {
   underRider: "Garde passager",
   belowUnloaded: "Écart à vide",
 };
+
+/**
+ * The cells a simplified Page prints, and their terrain labels (#61). « Garde min. ligne » is
+ * Avancé's alone — the creux that is not under the passager — so the row there starts on the
+ * passager's own garde au sol; « Flèche » at the passager's position is the line loaded, a flèche
+ * chargée.
+ */
+const TERRAIN_CELL_LABEL: Partial<Record<CellId, string>> = {
+  underRider: heading("groundClearance", "terrain"),
+  TA: CELL_LABEL.TA,
+  TB: CELL_LABEL.TB,
+  slope: CELL_LABEL.slope,
+  sag: heading("loadedSag", "terrain"),
+  belowUnloaded: CELL_LABEL.belowUnloaded,
+};
+
+/** The cells a Page of this register prints, in row order. */
+export function cellsOf(register: Register = "exact"): readonly CellId[] {
+  if (register === "exact") return CELL_IDS;
+  return CELL_IDS.filter((id) => TERRAIN_CELL_LABEL[id] !== undefined);
+}
+
+/** A cell's label with no rider placed, in the Page's register. */
+export function cellLabel(id: CellId, register: Register = "exact"): string {
+  return register === "exact" ? CELL_LABEL[id] : (TERRAIN_CELL_LABEL[id] ?? CELL_LABEL[id]);
+}
 
 /**
  * One cell's content. `note` marks a clause standing where a number would — set apart
@@ -92,7 +122,13 @@ export function readOutCells(
     clearance,
     hClearMin,
     unit,
-  }: { readonly clearance: boolean; readonly hClearMin: number; readonly unit: ForceUnit },
+    register = "exact",
+  }: {
+    readonly clearance: boolean;
+    readonly hClearMin: number;
+    readonly unit: ForceUnit;
+    readonly register?: Register;
+  },
 ): Record<CellId, Cell> {
   const refused: Omit<Cell, "label"> = {
     value: GATE_CONSEQUENCE.clearance,
@@ -100,7 +136,7 @@ export function readOutCells(
     breach: false,
   };
   const cell = (id: CellId, value: string): Cell => ({
-    label: CELL_LABEL[id],
+    label: cellLabel(id, register),
     value,
     note: false,
     breach: false,
@@ -126,7 +162,7 @@ export function readOutCells(
     // heights and envelope.
     underRider: clearance
       ? cell("underRider", formatQuantity("clearance", rider.underRider))
-      : { label: CELL_LABEL.underRider, ...refused },
+      : { label: cellLabel("underRider", register), ...refused },
     // The cable alone — no ground, no envelope — so no gate touches it.
     belowUnloaded: cell("belowUnloaded", formatQuantity("unloadedGap", rider.belowUnloaded)),
   };

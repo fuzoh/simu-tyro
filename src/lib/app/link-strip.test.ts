@@ -4,6 +4,7 @@ import type { ValidatedSearch } from "@/lib/url/schema.ts";
 
 import { initialAppState } from "@/lib/app/state.ts";
 import { TRACE_P1 } from "@/lib/url/__fixtures__/canonical-links.ts";
+import { exactTermsIn, proscribedIn } from "@/lib/vocabulary/labels.ts";
 
 import { linkStrip } from "./link-strip.ts";
 
@@ -274,5 +275,34 @@ describe("§ 8's third sentence, and the states that produce no strip at all", (
     const refused = initialAppState({ query: "?v=3&L=150", session: null });
     expect(refused.link.refused).not.toBeNull();
     expect(linkStrip(refused.link)).toBeNull();
+  });
+});
+
+describe("on a terrain Page (#91)", () => {
+  const QUERY = "?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6";
+  const terrain = (query: string) =>
+    linkStrip(initialAppState({ query, session: null }).link, "daN", "terrain");
+
+  test("the completed fields are the ones the Page shows, in its own words", () => {
+    const completed = terrain(QUERY)?.completed ?? "";
+    expect(completed).toContain("diamètre 12,0 mm");
+    expect(completed).toContain("masse du passager 120 kg");
+    expect(exactTermsIn(completed)).toEqual([]);
+    expect(proscribedIn(completed)).toEqual([]);
+    for (const hidden of ["grade", "construction", "terminaison", "rendement", "majoration"]) {
+      expect(completed).not.toContain(hidden);
+    }
+  });
+
+  test("Avancé still names every completed field, exactly as before", () => {
+    const completed = strip(QUERY)?.completed ?? "";
+    expect(completed).toContain("diamètre nominal 12,0 mm");
+    expect(completed).toContain("majoration au départ 1,2");
+  });
+
+  test("a value only Avancé shows is ignored without its exact name", () => {
+    expect(terrain("?L=150&daf=abc")?.ignored).toBe(
+      "Une partie du lien a été ignorée : « daf » n'était pas un nombre (réglage de la Page Avancé ignoré).",
+    );
   });
 });

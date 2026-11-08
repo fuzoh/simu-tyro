@@ -25,7 +25,7 @@ import type { FieldId } from "@/lib/rail/fields.ts";
 import type { VerdictState } from "@/lib/sim";
 
 import { Button } from "@/components/ui/button.tsx";
-import { CHOOSE_REGIME_LABEL, JUMP_LABEL } from "@/lib/app/banner.ts";
+import { JUMP_LABEL } from "@/lib/app/banner.ts";
 import { DIAGNOSTIC_ACTION } from "@/lib/app/refusals.ts";
 import { CENTRE_IN_RAIL } from "@/lib/layout/collapse.ts";
 import { cn } from "@/lib/utils.ts";
@@ -53,7 +53,7 @@ export function jumpToField(field: FieldId): void {
 }
 
 /** The verdict's five states, as the two tints the rest of the app already uses for them. */
-const VERDICT_TONE: Record<VerdictState, string> = {
+export const VERDICT_TONE: Record<VerdictState, string> = {
   "dans-les-limites": "text-foreground",
   "marge-faible": "text-warning",
   "hors-limites": "text-destructive",
@@ -66,6 +66,7 @@ const VERDICT_TONE: Record<VerdictState, string> = {
 export function Banner({
   occupant,
   onDiagnostic,
+  onJump = jumpToField,
 }: {
   /** The single occupant, from the reducer. `null` leaves the band **reserved and unpainted**. */
   occupant: BannerOccupant | null;
@@ -74,6 +75,12 @@ export function Banner({
    * is, and it is the app's — the payload is built where the Scenario is.
    */
   onDiagnostic: () => void;
+  /**
+   * Where `[ voir la première ]` and the régime button take the caret — {@link jumpToField} unless
+   * the Page shows fewer fields than the report names: Statique lands a field it does not show on
+   * its way to Avancé instead.
+   */
+  onJump?: (field: FieldId) => void;
 }) {
   // **Nothing to say, nothing drawn**: no border, no fill, no text. Reserving height is layout;
   // painting a band is a statement, and an empty verdict-coloured band reads « rien à signaler ».
@@ -103,7 +110,7 @@ export function Banner({
         <BannerButton
           label={JUMP_LABEL}
           onClick={() => {
-            jumpToField(occupant.target);
+            onJump(occupant.target);
           }}
         />
       )}
@@ -112,9 +119,9 @@ export function Banner({
       )}
       {occupant.rank === 4 && occupant.kind === "no-regime" && (
         <BannerButton
-          label={CHOOSE_REGIME_LABEL}
+          label={occupant.action}
           onClick={() => {
-            jumpToField("regime");
+            onJump("regime");
           }}
         />
       )}

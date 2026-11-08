@@ -41,7 +41,16 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { formatValue } from "@/lib/format/quantity.ts";
+import { PICKER_COPY } from "@/lib/rail/fields.ts";
 import { cn } from "@/lib/utils.ts";
+
+/**
+ * A field group's heading — the live groups' and the Skeletons', so a Skeleton reserves the height
+ * the first live frame lands in.
+ */
+export function GroupHeading({ title }: { title: string }) {
+  return <h3 className="text-foreground/70 text-xs font-semibold">{title}</h3>;
+}
 
 /**
  * One labelled row of the Rail: control on the right, messages under the pair.
@@ -262,10 +271,10 @@ export function Picker<T extends string>({
       size="sm"
       value={value}
     >
-      {value === "" && <NativeSelectOption value="">— choisir —</NativeSelectOption>}
+      {value === "" && <NativeSelectOption value="">{PICKER_COPY.empty}</NativeSelectOption>}
       {options.map((option) => (
         <NativeSelectOption disabled={option.disabled} key={option.value} value={option.value}>
-          {option.disabled === true ? `${option.label} — indisponible` : option.label}
+          {option.disabled === true ? `${option.label} — ${PICKER_COPY.unavailable}` : option.label}
         </NativeSelectOption>
       ))}
     </NativeSelect>
@@ -310,7 +319,7 @@ export function Choice<T extends string>({
           <RadioGroupItem disabled={option.disabled} value={option.value} />
           <span>
             {option.label}
-            {option.disabled === true && " — indisponible"}
+            {option.disabled === true && ` — ${PICKER_COPY.unavailable}`}
           </span>
         </Label>
       ))}

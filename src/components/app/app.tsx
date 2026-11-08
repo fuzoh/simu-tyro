@@ -5,16 +5,15 @@
  * Skeleton paints. A8 filled the two charts and the View Strip, A9 and A10 the Rail's two halves,
  * and A11 the error surfaces — which is the stage that gives this file its shape.
  *
- * **Seven things are computed here, once, and handed down**, because more than one consumer reads
- * each of them and two copies could disagree: the unloaded line (`useUnloaded`), the scene's
- * expensive half (`useScene`), the rider-free read-outs (`useDeduced`), the Scenario without `x_D`
- * (`useTraverse`), the Rail's field state (`useRailForm`), the traverse aggregate (`useResults`)
- * and the error surfaces over the rest (`useErrorSurfaces`). The last one is the reason the others
- * moved: « the banner slot holds exactly one occupant » and « the cause sentence is written once
- * and echoed » are invariants about the *screen*, so the screen needs one place that decides them.
+ * **Six things are computed once, in `usePage`, and handed down** — the same hook Statique computes
+ * its screen from — because more than one consumer reads each of them and two copies could
+ * disagree: the unloaded line (`useUnloaded`), the scene's expensive half (`useScene`), the
+ * rider-free read-outs (`useDeduced`), the Scenario without `x_D` (`useTraverse`), the Rail's field
+ * state (`useRailForm`), and the error surfaces with the traverse aggregate they gate
+ * (`useErrorSurfaces`). The last one is the reason the others moved: « the banner slot holds
+ * exactly one occupant » and « the cause sentence is written once and echoed » are invariants about
+ * the *screen*, so the screen needs one place that decides them.
  */
-
-import { useState } from "react";
 
 import type { ViewportFit } from "@/lib/layout/collapse.ts";
 
@@ -22,24 +21,15 @@ import { ChartBlock } from "@/components/chart/chart-block.tsx";
 import { useChartWidth } from "@/components/chart/use-chart-width.ts";
 import { RailHeaderControls, RailInputs } from "@/components/rail/inputs.tsx";
 import { RailOutputs } from "@/components/rail/outputs.tsx";
-import { buildDiagnostic } from "@/lib/app/diagnostic.ts";
-import { linkStrip } from "@/lib/app/link-strip.ts";
-import { siteOrigin } from "@/lib/app/site.ts";
 import { compactRequired, fitsWholeBlock } from "@/lib/layout/collapse.ts";
 import { NAV_BAR } from "@/lib/layout/contract.ts";
 
 import { Banner } from "./banner.tsx";
 import { LinkStripNotice } from "./link-strip.tsx";
 import { RailHeader, Shell } from "./shell.tsx";
-import { AppStoreProvider, useAppState } from "./store.tsx";
+import { AppStoreProvider } from "./store.tsx";
 import { useCollapse } from "./use-collapse.ts";
-import { useDeduced } from "./use-deduced.ts";
-import { useErrorSurfaces } from "./use-error-surfaces.ts";
-import { usePersist } from "./use-persist.ts";
-import { useRailForm } from "./use-rail-form.ts";
-import { useScene } from "./use-scene.ts";
-import { useTraverse } from "./use-traverse.ts";
-import { useUnloaded } from "./use-unloaded.ts";
+import { usePage } from "./use-page.ts";
 import { useBandHeight, useViewport } from "./use-viewport.ts";
 
 /** @param page the router path of the Page the app is rendered on — every link it writes opens it. */
@@ -67,7 +57,6 @@ export function App({ page }: { page: string }) {
  * keystroke.
  */
 function Live({ page }: { page: string }) {
-  const state = useAppState();
   const { ref, width } = useChartWidth();
   /**
    * The app's **one** viewport reading, and the `--kb` writer with it. It reports a height and a
@@ -83,17 +72,7 @@ function Live({ page }: { page: string }) {
    * also what dismissing it restores.
    */
   const chrome = useBandHeight();
-  const unloaded = useUnloaded();
-  const scene = useScene(unloaded);
-  const deduced = useDeduced(unloaded);
-  /**
-   * § 8's « clé ignorée » strip. **Computed once**: the arrival is fixed at first render, the strip
-   * is shown once at load, and the unit is the one the app opened on — a value re-formatted later
-   * would stop describing the link and start describing the current screen.
-   */
-  const [strip] = useState(() => linkStrip(state.link, state.scenario.unit));
-  const traverse = useTraverse();
-  const rail = useRailForm(deduced, traverse);
+  const { deduced, strip, rail, surfaces, copyDiagnostic } = usePage({ page, register: "exact" });
   /**
    * § 5's Pinned Safety Header. **It does not read `rail.focused`**, and that is deliberate: the
    * form's focus is *which numeric field is being edited* — « Saisie en cours »'s question, which
@@ -116,44 +95,7 @@ function Live({ page }: { page: string }) {
     navigationHeight: NAV_BAR,
   };
   const collapse = useCollapse({ fits: fitsWholeBlock(fit), compact: compactRequired(fit) });
-  /**
-   * **The gates are applied here and nowhere else.** `useScene` derives the picture from the store,
-   * which holds numbers, while a committed-invalid « −5 » lives in the form, which holds text — so
-   * the raw derivation goes in and only what survives § 7's three gates comes out. That is what
-   * makes « typé −5 » and « arrivé dans un lien » one state instead of two.
-   */
-  const { cause, clearance, frame, occupant, results, saisie, solved } = useErrorSurfaces({
-    deduced,
-    focused: rail.focused,
-    frame: scene.frame,
-    report: rail.report,
-    solved: scene.solved,
-    traverse,
-  });
-
-  // § 7's write side. **Both writes suspend together under « Saisie en cours »**, so the address bar
-  // keeps the last complete Scenario rather than publishing a half-typed one — which is the same
-  // condition that disables « Copier le lien » two lines below.
-  usePersist({ state, page, suspended: saisie !== null });
-
-  /**
-   * « Calcul impossible »'s one action. The **evidence** goes to the clipboard rather than to the
-   * screen: no residual, no `SolveNote`, no dev panel — a residual read-out would document a number
-   * nobody has ever seen, and §5.3's tolerance is L-scaled beyond 1000 m, so it could not be read
-   * without printing its own tolerance beside it. Both are in here instead.
-   */
-  function copyDiagnostic() {
-    const payload = buildDiagnostic({
-      scenario: state.scenario,
-      trace: state.trace,
-      deduced,
-      at: new Date().toISOString(),
-      build: import.meta.env.MODE,
-      origin: siteOrigin(),
-      page,
-    });
-    if (payload !== null) void navigator.clipboard.writeText(payload).catch(() => undefined);
-  }
+  const { cause, clearance, frame, occupant, results, saisie, solved } = surfaces;
 
   return (
     <Shell

@@ -47,13 +47,15 @@ import type {
   TensioningDevice,
   TensioningSide,
   TightnessDraft,
+  UseClass,
 } from "@/lib/scenario/types.ts";
-import type { SteelSpec, TextileSpec } from "@/lib/sim";
-import type { LabelId } from "@/lib/vocabulary/labels.ts";
+import type { RegimeId, SteelSpec, TextileSpec } from "@/lib/sim";
+import type { LabelId, Register } from "@/lib/vocabulary/labels.ts";
 
 import { formatQuantity, formatValue, fromDisplay, roundToDisplay } from "@/lib/format/quantity.ts";
 import { clampX } from "@/lib/scenario/geometry.ts";
-import { heading, label } from "@/lib/vocabulary/labels.ts";
+import { REGIMES } from "@/lib/sim";
+import { heading, isHiddenTerm, label } from "@/lib/vocabulary/labels.ts";
 
 /**
  * § 7's three gates. Declared here rather than in `./gates.ts` because every field names the gate
@@ -568,6 +570,64 @@ export const FIELDS = {
   lonB: coordinateField("lonB", "longitude", "B"),
 } as const satisfies Record<FieldId, FieldSpec>;
 
+/**
+ * The fields a simplified Page names in the terrain register (#61), by the vocabulary id each is
+ * spelled from. A field whose term is `hiddenOnTerrain` is set on Avancé alone, so a terrain
+ * message names it {@link AVANCE_SETTING} rather than print the word the Page must not show. Every
+ * other field reads the same on every Page.
+ */
+const TERRAIN_TERM = {
+  regime: "regime",
+  d: "diameter",
+  dTextile: "diameter",
+  T_target: "pretension",
+  D_target: "sag",
+  L0: "unstretchedLength",
+  R0: "grade",
+  cst: "construction",
+  cls: "ropeClass",
+  eaOverride: "axialStiffness",
+  muOverride: "linearMass",
+  muTextile: "linearMass",
+  k: "relativeStiffness",
+  ta: "termination",
+  tb: "termination",
+  etaA: "efficiency",
+  etaB: "efficiency",
+  H_target: "horizontalTension",
+  vRatio: "vRatio",
+  DAF: "startMultiplier",
+} as const satisfies Partial<Record<FieldId, LabelId>>;
+
+/** How a terrain message names a field only Avancé shows. */
+export const AVANCE_SETTING = "Réglage de la Page Avancé";
+
+function terrainTerm(id: FieldId): LabelId | undefined {
+  return (TERRAIN_TERM as Partial<Record<FieldId, LabelId>>)[id];
+}
+
+/** Is this field set on Avancé alone — absent from a simplified Page and unnamed there? */
+export function isHiddenOnTerrain(id: FieldId): boolean {
+  const term = terrainTerm(id);
+  return term !== undefined && isHiddenTerm(term);
+}
+
+/** What the control is labelled on a Page of this register. */
+export function fieldLabel(id: FieldId, register: Register = "exact"): string {
+  return register === "terrain" ? terrainName(id, FIELDS[id].label) : FIELDS[id].label;
+}
+
+/** The name a message prints for this field on a Page of this register. */
+export function fieldErrorLabel(id: FieldId, register: Register = "exact"): string {
+  return register === "terrain" ? terrainName(id, FIELDS[id].errorLabel) : FIELDS[id].errorLabel;
+}
+
+function terrainName(id: FieldId, exact: string): string {
+  const term = terrainTerm(id);
+  if (term === undefined) return exact;
+  return isHiddenTerm(term) ? AVANCE_SETTING : heading(term, "terrain");
+}
+
 /** The fields whose blank is « absent »: the textile diameter and the four coordinates. */
 export type OptionalFieldId = "dTextile" | "latA" | "lonA" | "latB" | "lonB";
 
@@ -632,6 +692,8 @@ export type FieldContext = {
 
   /** `Portée`, m — the only warning that reads a second field (`|h| > L`). */
   readonly L?: number;
+  /** The Page's vocabulary, which names the field in a message. `exact` when absent. */
+  readonly register?: Register;
 };
 
 /**
@@ -736,6 +798,37 @@ export const TENSIONING_DEVICE_LABEL = {
 export type PickerOption<Id extends string> = { readonly value: Id; readonly label: string };
 
 /**
+ * A picker's two conventions: the empty entry a value nobody chose shows, and the suffix that says
+ * an entry is unavailable — the row's note says why.
+ */
+export const PICKER_COPY = { empty: "— choisir —", unavailable: "indisponible" } as const;
+
+/** A stale Override's badge, before the formula's value, and the action that restores it. */
+export const OVERRIDE_COPY = { stale: "la formule donne", recalculate: "Recalculer" } as const;
+
+/** The line's two families, as each register names them: Avancé names the material as well. */
+export const FAMILY_LABEL = {
+  exact: { steel: "Câble acier", textile: "Corde textile" },
+  terrain: { steel: heading("cable", "terrain"), textile: heading("rope", "terrain") },
+} as const satisfies Record<Register, Record<"steel" | "textile", string>>;
+
+/** `Installation`'s two entries, in a Page's vocabulary. */
+export function usageOptions(register: Register): readonly PickerOption<UseClass>[] {
+  return [
+    { value: "PERMANENTE", label: heading("permanentInstallation", register) },
+    { value: "TEMPORAIRE", label: heading("temporaryInstallation", register) },
+  ];
+}
+
+/**
+ * The régime picker's value as the Scenario holds it: `null` for the empty entry, or a régime the
+ * engine knows — a value off the DOM is a string, and only one of these is a `RegimeId`.
+ */
+export function regimeChoice(value: string): RegimeId | null {
+  return Object.values(REGIMES).find((regime) => regime.id === value)?.id ?? null;
+}
+
+/**
  * `Brins porteurs`'s two entries, in the glossary's words: one member is a « ligne », two are the
  * « ligne du haut » and the « ligne du bas ». Keyed by the count as text, which a radio holds.
  */
@@ -775,16 +868,16 @@ export function emptyMessage(id: FieldId, context: FieldContext = {}): string {
 }
 
 /** § 7's fixed template: `⛔ <Champ> — <la règle, énoncée>. Valeur : <v>.` */
-function blocking(id: FieldId, rule: string, value: string): string {
-  return `⛔ ${FIELDS[id].errorLabel} — ${rule}. Valeur : ${value}.`;
+function blocking(id: FieldId, rule: string, value: string, register?: Register): string {
+  return `⛔ ${fieldErrorLabel(id, register)} — ${rule}. Valeur : ${value}.`;
 }
 
 /**
  * « nombre illisible », and it **quotes the raw text back** — what the user typed is the evidence,
  * and the state exists at all because § 3 elected `inputMode="decimal"` over `type="number"`.
  */
-export function unreadableMessage(id: FieldId, raw: string): string {
-  return `⛔ ${FIELDS[id].errorLabel} — nombre illisible. Saisie : « ${raw.trim()} ».`;
+export function unreadableMessage(id: FieldId, raw: string, register?: Register): string {
+  return `⛔ ${fieldErrorLabel(id, register)} — nombre illisible. Saisie : « ${raw.trim()} ».`;
 }
 
 /**
@@ -810,7 +903,11 @@ export function checkField(
 
   const shown = parseDecimal(raw);
   if (shown === null) {
-    return { field: id, kind: "unreadable", message: unreadableMessage(id, raw) };
+    return {
+      field: id,
+      kind: "unreadable",
+      message: unreadableMessage(id, raw, context.register),
+    };
   }
 
   const unit = context.unit ?? "daN";
@@ -822,14 +919,14 @@ export function checkField(
       return {
         field: id,
         kind: "invalid",
-        message: blocking(id, spec.rule.sentence, echo(id, shown, unit)),
+        message: blocking(id, spec.rule.sentence, echo(id, shown, unit), context.register),
       };
     case "non-negative":
       if (shown >= 0) return null;
       return {
         field: id,
         kind: "invalid",
-        message: blocking(id, spec.rule.sentence, echo(id, shown, unit)),
+        message: blocking(id, spec.rule.sentence, echo(id, shown, unit), context.register),
       };
   }
 }
