@@ -24,7 +24,7 @@
  *   `validateSearch` answers **HTTP 500** under `ssr: false`, where the tree § 8 measured answered
  *   200, and § 8's refusal copy (« nothing failed to load and the status line agrees ») rests on
  *   the 200. So nothing here throws: a refused link comes back as `{ refused }`
- *   ({@link LinkRefusal}) and the index route renders the refusal surface as an ordinary
+ *   ({@link LinkRefusal}) and each app Page renders the refusal surface as an ordinary
  *   component. The refusal is still **whole-link** — checked on the **raw** bag before any per-key
  *   salvage, and it **suppresses** the rest of the bag rather than merging with it.
  * - **`refused` is not a URL key, and keeping it out of the URL takes a middleware.** It is not in
@@ -33,8 +33,8 @@
  *   returns `{ ...incoming, ...validated }`, `stringifySearch` writes **every** key of that merge,
  *   and `loadServerRoute` 307-redirects whenever the rebuilt href differs from the incoming one.
  *   A bare `/?v=3` therefore lands on `/?v=3&refused=%7B%22kind%22…` unless something removes the
- *   marker from the merge. {@link keepRefusalOutOfTheAddressBar} is that something, and the index
- *   route installing it is **not optional**.
+ *   marker from the merge. {@link keepRefusalOutOfTheAddressBar} is that something, and the app
+ *   Pages' layout route installing it is **not optional**.
  * - **No `transform`, anywhere.** `v.pipe(v.string(), v.transform(Number))` *is* the coercion the
  *   307 measurement forbids — returning `String(1)` for `bad=1` produced `307 → ?bad=%221%22`.
  *   Whatever the validator returns is what `stringifySearch` writes back, so every schema here
@@ -471,15 +471,16 @@ export function salvageSearch(raw: Record<string, unknown>): Salvage {
 }
 
 /**
- * The index route's `validateSearch`. Pure, synchronous, allocation-light and side-effect-free,
- * because it runs **3× per document request** — on the server, where module state is shared across
- * requests, inside a `try {…} catch {}` that swallows throws at one of the three call sites.
+ * The app Pages' `validateSearch`, declared once on their pathless layout (ADR-0002). Pure,
+ * synchronous, allocation-light and side-effect-free, because it runs **3× per document request**
+ * — on the server, where module state is shared across requests, inside a `try {…} catch {}` that
+ * swallows throws at one of the three call sites.
  *
  * It returns the bag and **nothing else**: the dropped-keys report may not ride here, because the
  * router stringifies the validated object straight back into the address bar.
  *
  * **It never throws** (amendment E). § 8's three refusal classes — unknown `v`, `tr` undecodable or
- * oversize, two tightness drivers present — come back as `search.refused`, which the index route
+ * oversize, two tightness drivers present — come back as `search.refused`, which every app Page
  * renders as an ordinary component at **HTTP 200**. On the pinned tree a throw would answer 500,
  * and « nothing failed to load and the status line agrees » is copy the app has to keep true.
  *
@@ -491,8 +492,9 @@ export function validateSearch(raw: Record<string, unknown>): ValidatedSearch {
 }
 
 /**
- * The index route's one `search.middlewares` entry, and **installing it is not optional**: it is
- * the only thing standing between amendment E's marker and the address bar.
+ * The app Pages' one `search.middlewares` entry, beside {@link validateSearch} on their layout,
+ * and **installing it is not optional**: it is the only thing standing between amendment E's
+ * marker and the address bar.
  *
  * Amendment E's marker is a key {@link validateSearch} *synthesises* — the raw bag never carries
  * it — and on the pinned tree (`@tanstack/react-router` 1.170.27) a synthesised key is a **307**.
@@ -560,8 +562,10 @@ export function hasScenarioKey(search: ValidatedSearch): boolean {
 }
 
 /**
- * A canonical bag as the link the address bar holds — `/` plus the router's own
- * `defaultStringifySearch`, so the string asserted in a test is the string the router emits.
+ * A canonical bag as the link the address bar holds on one Page — the Page's router path plus the
+ * router's own `defaultStringifySearch`, so the string asserted in a test is the string the router
+ * emits. Every Page reads the same keys (ADR-0002), so only the path differs between two Pages'
+ * links to one Scenario.
  *
  * Keys are re-inserted in canonical order first: a bag built by hand, or by spreading a partial
  * one, would otherwise emit in *its* insertion order and two links to the same Scenario would stop
@@ -574,11 +578,11 @@ export function hasScenarioKey(search: ValidatedSearch): boolean {
  * keepRefusalOutOfTheAddressBar} covers that path, and a refused link is never rewritten anyway:
  * it never reaches completion.
  */
-export function canonicalLink(search: ValidatedSearch): string {
+export function canonicalLink(search: ValidatedSearch, page: string): string {
   const ordered: Record<string, unknown> = {};
   for (const key of CANONICAL_KEYS) {
     const value = search[key];
     if (value !== undefined) ordered[key] = value;
   }
-  return `/${defaultStringifySearch(ordered)}`;
+  return `${page}${defaultStringifySearch(ordered)}`;
 }

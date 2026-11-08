@@ -281,6 +281,13 @@ A routed screen with its own layout and its own information set. The app is seve
 Pages. The Rail is a layout a Page may use, not the navigation model.
 _Avoid_: espace, mode, panel, view
 
+**Navigation Bar**:
+The row above every app Page that lists the Pages, then the documentation. Each link keeps
+the current Scenario in the URL, so changing Page never changes the line. It belongs to the
+Pages' shared layout, never to the document, so the documentation and the not-found page do
+not carry it. French: **barre de navigation**.
+_Avoid_: app bar, header, menu, tabs, Rail Header
+
 **Rail**:
 The app's one scrolling column: Rail Header, then `Paramètres → Valeurs déduites →
 Résultats → Provenance → Ce que cet outil ne calcule pas`. Its upper sections take input
@@ -294,9 +301,9 @@ _Avoid_: results panel, output half as a place, sidebar, right column, form
 The single action row at the top of the Rail, above `Paramètres` and scrolling with it:
 the app's name, the force-unit selector, « Copier le lien », and an overflow menu
 holding « Réinitialiser le scénario » and « Effacer la session ». Not a sixth section —
-it holds no parameter, no read-out and no disclosure — and not an app bar: the document
-root carries no visible chrome, and at 390 px a title bar is paid for out of the form's
-own height.
+it holds no parameter, no read-out and no disclosure — and not the Navigation Bar: it
+belongs to the Rail, scrolls with it and names no Page, while the Navigation Bar stands
+above the whole Page and is paid out of every Page's height.
 _Avoid_: app bar, toolbar, navbar, page header, chrome
 
 **Chart Block**:
@@ -339,9 +346,11 @@ _Avoid_: chart ratio, plot proportions, flex ratio, aspect ratio
 
 **Skeleton**:
 The frame the server renders below the document, and the only thing it renders: the
-Rail's five section headings in order, the app's name, two empty chart frames at final
-proportions, and the read-out cells' labels. It carries no number, no Verdict, no
-spinner, no « — » and no live control — only reserved height where one will be. Same CSS
+Navigation Bar's reserved height with the Page names as plain text, then the Page's own
+frame. On Avancé that frame is the Rail's five section headings in order, the app's name,
+two empty chart frames at final proportions, and the read-out cells' labels. Each app Page
+ships its own. It carries no number, no Verdict, no spinner, no « — » and no live control
+(not even a link in the Navigation Bar), only reserved height where one will be. Same CSS
 layout as the app, so it is correct at every width for free, and replaced wholesale at
 hydration.
 _Avoid_: loader, loading state, placeholder, spinner, shell (the shell is the document)

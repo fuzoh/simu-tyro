@@ -77,7 +77,7 @@ export type LinkArrival = {
   /** § 7's one elected clamp fired: `x` arrived outside `[0, L]` and the note says so. */
   readonly xClamped: boolean;
   /**
-   * The bag to `navigate({ to: "/", search: <this>, replace: true })` — a **plain object**, never
+   * The bag to `navigate({ to: ".", search: <this>, replace: true })` — a **plain object**, never
    * a function and never a spread of `useSearch()`, because `applyNext` hands a non-function
    * updater to the location verbatim and the incoming bag never enters. `null` when the address
    * bar already holds exactly the state the app holds.

@@ -26,6 +26,7 @@ import { buildDiagnostic } from "@/lib/app/diagnostic.ts";
 import { linkStrip } from "@/lib/app/link-strip.ts";
 import { siteOrigin } from "@/lib/app/site.ts";
 import { compactRequired, fitsWholeBlock } from "@/lib/layout/collapse.ts";
+import { NAV_BAR } from "@/lib/layout/contract.ts";
 
 import { Banner } from "./banner.tsx";
 import { LinkStripNotice } from "./link-strip.tsx";
@@ -41,10 +42,11 @@ import { useTraverse } from "./use-traverse.ts";
 import { useUnloaded } from "./use-unloaded.ts";
 import { useBandHeight, useViewport } from "./use-viewport.ts";
 
-export function App() {
+/** @param page the router path of the Page the app is rendered on — every link it writes opens it. */
+export function App({ page }: { page: string }) {
   return (
     <AppStoreProvider>
-      <Live />
+      <Live page={page} />
     </AppStoreProvider>
   );
 }
@@ -64,7 +66,7 @@ export function App() {
  * both halves of the Rail print it, and neither the sweep nor the `L₀` bisection may run twice per
  * keystroke.
  */
-function Live() {
+function Live({ page }: { page: string }) {
   const state = useAppState();
   const { ref, width } = useChartWidth();
   /**
@@ -110,6 +112,8 @@ function Live() {
     keyboardInset: viewport.keyboardInset,
     columnWidth: width,
     chromeHeight: chrome.height,
+    // Every app Page stands under the navigation bar, so the shell never has the whole viewport.
+    navigationHeight: NAV_BAR,
   };
   const collapse = useCollapse({ fits: fitsWholeBlock(fit), compact: compactRequired(fit) });
   /**
@@ -130,7 +134,7 @@ function Live() {
   // § 7's write side. **Both writes suspend together under « Saisie en cours »**, so the address bar
   // keeps the last complete Scenario rather than publishing a half-typed one — which is the same
   // condition that disables « Copier le lien » two lines below.
-  usePersist({ state, suspended: saisie !== null });
+  usePersist({ state, page, suspended: saisie !== null });
 
   /**
    * « Calcul impossible »'s one action. The **evidence** goes to the clipboard rather than to the
@@ -146,6 +150,7 @@ function Live() {
       at: new Date().toISOString(),
       build: import.meta.env.MODE,
       origin: siteOrigin(),
+      page,
     });
     if (payload !== null) void navigator.clipboard.writeText(payload).catch(() => undefined);
   }
@@ -164,7 +169,7 @@ function Live() {
             {/* « Copier le lien » is disabled under « Saisie en cours », on the same condition that
                 suspends both writes: the button and the address bar have to agree about what the
                 app is currently able to publish. */}
-            <RailHeaderControls incomplete={saisie !== null} />
+            <RailHeaderControls incomplete={saisie !== null} page={page} />
           </RailHeader>
           <RailInputs cause={cause} deduced={deduced} rail={rail} />
           <RailOutputs cause={cause} deduced={deduced} results={results} />

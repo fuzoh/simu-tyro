@@ -30,7 +30,9 @@ import {
   chartBlockHeight,
   COMPACT_HEIGHT_PX,
   MIN_RAIL,
+  NAV_BAR,
   PINNED_CELL,
+  RAIL_HEADER,
   RAIL_REFLOW_PX,
   VIEW_STRIP,
 } from "./contract.ts";
@@ -600,6 +602,70 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
     expect(fitsWholeBlock(phone)).toBe(true);
     expect(fitsWholeBlock({ ...phone, chromeHeight: 60 })).toBe(true);
     expect(fitsWholeBlock({ ...phone, chromeHeight: 200 })).toBe(true);
+  });
+});
+
+/**
+ * ADR-0002's navigation bar stands above every app Page's shell, so the shell never has the whole
+ * viewport. Unlike § 8's strip it is never dismissed, so it is owed on **both** arms.
+ */
+describe("la barre de navigation se paie sur toute largeur", () => {
+  const desktop: ViewportFit = {
+    viewportWidth: 1440,
+    viewportHeight: 900,
+    keyboardInset: 0,
+    columnWidth: 1152,
+  };
+
+  test("elle retire sa hauteur de ce qui reste, clavier compris", () => {
+    expect(availableHeight({ viewportHeight: 664, keyboardInset: 0, navigationHeight: 36 })).toBe(
+      628,
+    );
+    expect(availableHeight({ viewportHeight: 664, keyboardInset: 336, navigationHeight: 36 })).toBe(
+      292,
+    );
+  });
+
+  test("le budget C reste entier sous elle, et ne le resterait pas sous 44 px", () => {
+    // Block 856,32 at a 1152 px column: 900 − 36 = 864 holds it, 900 − 44 = 856 does not.
+    expect(fitsWholeBlock({ ...desktop, navigationHeight: NAV_BAR })).toBe(true);
+    expect(fitsWholeBlock({ ...desktop, navigationHeight: RAIL_HEADER })).toBe(false);
+  });
+
+  test("1600×900 se replie de nouveau : le plateau de 879,68 dépasse 864", () => {
+    const wide: ViewportFit = { ...desktop, viewportWidth: 1600, columnWidth: 1600 - 288 };
+    expect(fitsWholeBlock(wide)).toBe(true);
+    expect(fitsWholeBlock({ ...wide, navigationHeight: NAV_BAR })).toBe(false);
+  });
+
+  test("sous B2 elle coûte aussi MIN_RAIL, car elle n'est pas rejetable", () => {
+    const column = 390;
+    const exact = chartBlockHeight(column) + MIN_RAIL + NAV_BAR;
+    const phone: ViewportFit = {
+      viewportWidth: column,
+      viewportHeight: exact,
+      keyboardInset: 0,
+      columnWidth: column,
+      navigationHeight: NAV_BAR,
+    };
+    expect(fitsWholeBlock(phone)).toBe(true);
+    expect(fitsWholeBlock({ ...phone, viewportHeight: exact - 1 })).toBe(false);
+    // The strip, at the same height, is still tolerated out of the Rail.
+    expect(
+      fitsWholeBlock({
+        ...phone,
+        viewportHeight: exact - NAV_BAR,
+        navigationHeight: 0,
+        chromeHeight: NAV_BAR,
+      }),
+    ).toBe(true);
+  });
+
+  test("la rangée compacte se déclenche 36 px plus tôt", () => {
+    const at = (viewportHeight: number) =>
+      compactRequired({ viewportHeight, keyboardInset: 0, navigationHeight: NAV_BAR });
+    expect(at(456)).toBe(false);
+    expect(at(455)).toBe(true);
   });
 });
 

@@ -595,8 +595,9 @@ const SHIPPED_BY_FAMILY: Readonly<
 };
 
 /**
- * § 9's first-run link, which « Copier le lien » produces from the shipped defaults. The address
- * bar itself stays **bare** on first run: `/` *means* « restore the Session », so it is never
+ * § 9's first-run link onto `/`, the path every link shared before the Pages pointed at; « Copier
+ * le lien » produces the same search on the Page it is pressed on (ADR-0002). The address bar
+ * itself stays **bare** on first run: a bare Page *means* « restore the Session », so it is never
  * rewritten on load.
  *
  * **142 characters, measured against the installed router** — 137 before `gm` (2026-09-23).
@@ -610,4 +611,4 @@ const SHIPPED_BY_FAMILY: Readonly<
  * exists to lock is unchanged: the key table, the canonical order, and the two absence meanings
  * (`reg`, `mbf`/`ea`/`mu`).
  */
-export const FIRST_RUN_LINK: string = canonicalLink(FIRST_RUN_SEARCH);
+export const FIRST_RUN_LINK: string = canonicalLink(FIRST_RUN_SEARCH, "/");

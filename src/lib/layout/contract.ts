@@ -114,8 +114,16 @@ export const CELL_WRAP_PX = 624;
 /** B2 — « an aspect-legal profile cannot coexist with the rail », in **viewport** width. */
 export const RAIL_REFLOW_PX = 768;
 
-/** The Rail Header's height, and the height of the app bar `__root.tsx` therefore cannot afford. */
+/** The Rail Header's height. */
 export const RAIL_HEADER = 44;
+
+/**
+ * The navigation bar above every app Page (ADR-0002): one row of the app's 28 px controls inside
+ * `py-1`, the same 36 px as a Rail row. **Not 44 like the Rail Header**: budget C's letterbox is
+ * 43,68 px, so a 44 px bar would pin the Chart Block on § 5's own reference desktop. It is paid at
+ * every width and never dismissed — voir `ViewportFit.navigationHeight` in `./collapse.ts`.
+ */
+export const NAV_BAR = 36;
 
 /** The floor the resting rail must clear. Measured slack at 390×664 is 124 px, which is not this. */
 export const MIN_RAIL = 120;

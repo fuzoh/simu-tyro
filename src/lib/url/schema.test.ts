@@ -101,8 +101,15 @@ describe("the key table and canonical order", () => {
   test("a bag built out of order is emitted in the key table's order", () => {
     // `qss.encode()` iterates `for (const key in obj)`, so insertion order *is* the query string:
     // two links to the same Scenario are string-identical only if the bag is canonicalised.
-    const link = canonicalLink({ x: 120, L: 250, v: 1, h: -40 });
+    const link = canonicalLink({ x: 120, L: 250, v: 1, h: -40 }, "/");
     expect(link).toBe("/?v=1&L=250&h=-40&x=120");
+  });
+
+  test("two Pages' links to one Scenario differ by the path alone", () => {
+    // One schema for every Page (ADR-0002), so the query is the Scenario and the path is the Page.
+    const search: ValidatedSearch = { x: 120, L: 250, v: 1, h: -40 };
+    expect(canonicalLink(search, "/avance")).toBe("/avance?v=1&L=250&h=-40&x=120");
+    expect(canonicalLink({}, "/avance")).toBe("/avance");
   });
 });
 
@@ -182,7 +189,7 @@ describe("the three refusal classes come back as a marker, never as a throw", ()
     // somehow reached it would produce a bare `/`, never `?refused=…`. The router's own writer is
     // the other half, and it is asserted against a real router below — this assertion alone is
     // vacuous with respect to the path that actually 307s.
-    expect(canonicalLink(validateSearch(parse("?v=3&L=250")))).toBe("/");
+    expect(canonicalLink(validateSearch(parse("?v=3&L=250")), "/")).toBe("/");
   });
 
   test("the marker survives a second pass, because the router validates its own merge", () => {

@@ -34,9 +34,11 @@ import {
 export type WriteEffects = {
   /** `siteOrigin()` — read at write time, since the link budget is on the whole href. */
   readonly origin: () => string;
+  /** The current Page's router path — the address bar is written onto it, so it is budgeted too. */
+  readonly page: () => string;
   /** `browserStorage()` — `null` where the origin refuses `localStorage` outright. */
   readonly storage: () => SessionStorage | null;
-  /** A `replace: true` navigation to `/` with exactly this search. */
+  /** A `replace: true` navigation onto the current Page with exactly this search. */
   readonly navigate: (search: ValidatedSearch) => void;
 };
 
@@ -77,7 +79,7 @@ export function armAddressBarWrite({
   if (suspended) return undefined;
   const timer = setTimeout(() => {
     // Built inside the timer, so a burst of keystrokes serialises once rather than once per frame.
-    perform(addressBarWrites(read(), effects.origin()), effects);
+    perform(addressBarWrites(read(), effects.origin(), effects.page()), effects);
   }, URL_WRITE_DEBOUNCE_MS);
   return () => clearTimeout(timer);
 }

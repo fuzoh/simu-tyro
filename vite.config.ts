@@ -6,6 +6,8 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+import { APP_PAGES } from "./src/lib/app/pages.ts";
+
 /**
  * Where the built app will be *served* from — `/` in dev and on any root-domain host, `/simu-tyro/`
  * on a GitHub Pages **project** site. It is an env var and not a constant because it is a property
@@ -24,30 +26,41 @@ const config = defineConfig({
     tailwindcss(),
     tanstackStart({
       /**
-       * **SPA mode — the app ships as static files.** Nothing here needs a server: the one route
-       * already sets `ssr: false`, there is no `createServerFn` and no server route, and terrain
-       * never crosses a network boundary. The build gains a prerender step that renders the root
-       * route with the index route's `pendingComponent` — the Skeleton — into a single HTML file;
-       * `dist/server/` is still emitted and is simply not deployed.
+       * **SPA mode — the app ships as static files.** Nothing here needs a server: every app Page
+       * sets `ssr: false`, there is no `createServerFn` and no server route, and computation never
+       * crosses a network boundary. The build gains a prerender step that renders the root route
+       * with its first child's `pendingComponent` — the app layout's, i.e. Avancé's frame — into a
+       * single HTML file; `dist/server/` is still emitted and is simply not deployed.
        *
        * `outputPath: "/index"` instead of the default `/_shell`: a static host serves `index.html`
        * at a directory URL, and GitHub Pages runs Jekyll, which would drop an `_`-prefixed file
        * outright. `public/.nojekyll` covers `assets/`; this covers the shell.
        *
-       * `maskPath` stays at its default `/` — the shell is prerendered *as* the one route, which is
-       * why the Skeleton lands in the HTML rather than an empty `<body>`.
+       * `maskPath` stays at its default `/` — the shell is prerendered *as* `/`, which is why a
+       * Skeleton lands in the HTML rather than an empty `<body>`.
        */
       spa: { enabled: true, prerender: { outputPath: "/index" } },
       /**
        * **The documentation pages are prerendered as full HTML**, unlike the app. `/docs/*`
        * renders markdown from the repository with no client state and no `ResizeObserver`, so the
-       * provenance argument that puts `ssr: false` on `/` does not apply, and a shared
+       * provenance argument that puts `ssr: false` on the app Pages does not apply, and a shared
        * `/docs/modele#s-10-4` should land on the text with a **200** rather than on `404.html`.
        * `autoStaticPathsDiscovery` stays off: `/` must remain the SPA shell, and `$slug` is not a
-       * static path — the five pages are listed here, from the same registry the router uses.
+       * static path — the documentation pages are listed here by hand, the app Pages from their
+       * table.
        */
       prerender: { enabled: true, autoStaticPathsDiscovery: false, crawlLinks: false },
       pages: [
+        /**
+         * **Every app Page is prerendered with its own Skeleton** (ADR-0002), so a direct
+         * `/avance?…` on GitHub Pages lands with a **200** on Avancé's frame — not with a 404 on
+         * `404.html`, which carries the shell's. The search never reaches a static host, so one
+         * file per Page serves every Scenario.
+         */
+        ...APP_PAGES.map(({ path }) => ({
+          path,
+          prerender: { enabled: true, outputPath: `${path}/index.html` },
+        })),
         { path: "/docs", prerender: { enabled: true, outputPath: "/docs/index.html" } },
         ...["modele", "algorithme", "simulation", "cable", "corde"].map((slug) => ({
           path: `/docs/${slug}`,

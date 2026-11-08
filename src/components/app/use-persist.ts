@@ -52,9 +52,12 @@ export function browserStorage(): SessionStorage | null {
 
 export function usePersist({
   state,
+  page,
   suspended = false,
 }: {
   state: AppState;
+  /** The current Page's router path — the address bar is written onto it, and budgeted with it. */
+  page: string;
   /**
    * « Saisie en cours » — a required field is empty and holds focus. Both writes stop, together,
    * for as long as it lasts. A11 wires it; until then the app is never in that state.
@@ -78,23 +81,24 @@ export function usePersist({
   useEffect(() => {
     if (seed.current === null) seed.current = scenario;
     if (seed.current === scenario) return;
-    return armAddressBarWrite({ read, suspended, effects: browserEffects(navigate) });
-  }, [scenario, suspended, navigate]);
+    return armAddressBarWrite({ read, suspended, effects: browserEffects(navigate, page) });
+  }, [scenario, suspended, navigate, page]);
 
   useEffect(
-    () => armSessionWrite({ state, suspended, effects: browserEffects(navigate) }),
-    [state, suspended, navigate],
+    () => armSessionWrite({ state, suspended, effects: browserEffects(navigate, page) }),
+    [state, suspended, navigate, page],
   );
 }
 
-/** The write side's three effects, against the real browser and router. */
-function browserEffects(navigate: ReturnType<typeof useNavigate>): WriteEffects {
+/** The write side's four effects, against the real browser and router. */
+function browserEffects(navigate: ReturnType<typeof useNavigate>, page: string): WriteEffects {
   return {
     origin: siteOrigin,
+    page: () => page,
     storage: browserStorage,
     // `replace: true`, never `push` — see the header. The search is a **plain object**, never a
     // function and never a spread of `useSearch()`: `applyNext` hands a non-function updater to the
-    // location verbatim, so this bag replaces the whole search.
-    navigate: (search) => void navigate({ replace: true, search, to: "/" }),
+    // location verbatim, so this bag replaces the whole search. `to: "."` stays on the current Page.
+    navigate: (search) => void navigate({ replace: true, search, to: "." }),
   };
 }

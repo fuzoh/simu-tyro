@@ -7,14 +7,14 @@
  * the refusal arrived at **200**, and § 7's copy (« nothing failed to load and the status line
  * agrees ») rests on that. On the pinned tree a thrown `validateSearch` now answers **500** — so
  * amendment E dropped the throw and kept the status: `validateSearch` salvages the refusal into
- * `search.refused`, and the index route renders this when the marker is set. Nothing fails, no
+ * `search.refused`, and each app Page renders this when the marker is set. Nothing fails, no
  * match errors, the status stays 200. The route may still declare an `errorComponent`; no refusal
  * reaches it.
  *
  * **It renders inside the Shell, and it suppresses rather than merges.** On the root it would
  * replace the shell and leave no way back into the app; beside the Rail's five sections it would be
  * a partial read of a link that refused whole. So the shell and its header stand, the five sections
- * do not, and the one action is a `<Link to="/" search={{}} replace>` onto the same route — there
+ * do not, and the one action is a `<Link to="." search={{}} replace>` onto the same Page — there
  * is no `/refuse` route and there is nothing to go back *from*.
  */
 
@@ -49,7 +49,7 @@ export function LinkRefusalSurface({ refusal }: { refusal: LinkRefusal }) {
               stops announcing itself as a link, which this control *is*: it navigates. What the
               ticket actually asked for — the app's one 28 px height instead of the variants'
               32 px default — is `size: "sm"`, and it costs no semantics. */}
-          <Link className={buttonVariants({ size: "sm" })} replace search={{}} to="/">
+          <Link className={buttonVariants({ size: "sm" })} replace search={{}} to=".">
             {REFUSAL_ACTION}
           </Link>
         </div>

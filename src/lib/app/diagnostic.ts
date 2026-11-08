@@ -34,8 +34,10 @@ export type DiagnosticContext = {
   readonly at: string;
   /** The build identifier the header carries. */
   readonly build: string;
-  /** The page's own origin — the link budget is on the **whole** URL. */
+  /** The site's origin and base path — the link budget is on the **whole** URL. */
   readonly origin: string;
+  /** The router path of the Page the diagnostic was copied from — the link opens that Page. */
+  readonly page: string;
 };
 
 /**
@@ -50,11 +52,12 @@ export function buildDiagnostic({
   at,
   build,
   origin,
+  page,
 }: DiagnosticContext): string | null {
   const { failure, material, span, solve } = deduced;
   if (failure === null || failure.error === null) return null;
 
-  const link = copyLink({ scenario, trace, origin });
+  const link = copyLink({ scenario, trace, origin, page });
   const { strength, EA, w } = material;
 
   return diagnosticPayload({

@@ -1,18 +1,19 @@
 # Routing & app shell
 
 TanStack Start with the file-based router (`@tanstack/router-plugin` in `vite.config.ts`).
-**SSR is on for the document and off for the app**: `__root.tsx`'s `shellComponent` is
-server-rendered, and `src/routes/index.tsx` — the only real route — sets `ssr: false`. In
-production that render happens **once at build time** and ships as a static file (*Static hosting*
-below); under `bun run dev` it happens per request. Same output either way — which is the point.
+**SSR is on for the document and off for the app**: `__root.tsx`'s `shellComponent` and the app
+layout's navigation bar are server-rendered, and every app Page sets `ssr: false`. In production
+that render happens **once at build time** and ships as a static file (*Static hosting* below);
+under `bun run dev` it happens per request. Same output either way — which is the point.
 
 - Routes are files under `src/routes/`. Each exports a route created with `createFileRoute`.
-  **The simulator is exactly one route**, `/`; a second *app* route would re-declare the same
-  ~30-key `validateSearch`. The `/docs` routes (below) are not app routes: they declare no
+  **One route per app Page, one Scenario in the URL** — [ADR-0002](../adr/0002-one-page-per-route-one-scenario-in-the-url.md)
+  and *The app Pages* below. The `/docs` routes are not app Pages: they declare no
   `validateSearch`, read no Session and write no URL state.
 - `src/routes/__root.tsx` is the **document**, not chrome: `<html lang="fr">`, head, stylesheet,
-  `HeadContent`/`Scripts`, `notFoundComponent`. No header, no app bar, no root `component`, no
-  print stylesheet. `src/router.tsx` builds the router.
+  `HeadContent`/`Scripts`, `notFoundComponent`. No header, no navigation bar, no root `component`,
+  no print stylesheet — the navigation bar is the app layout's, so `/docs` and the not-found page
+  never carry it. `src/router.tsx` builds the router.
 - `src/routeTree.gen.ts` is **generated** — never edit it. It regenerates when the dev server runs
   or the Vite plugin builds. If it looks stale, run `bun run dev`.
 - `rsc: false` — no React Server Components. Everything is a normal React 19 component.
@@ -48,7 +49,7 @@ repository's own markdown — `docs/simulation-theory.md` and four reports under
 through `react-markdown` (+ `remark-gfm`, `remark-math`, `rehype-katex`). The registry is
 `src/lib/docs/pages.ts`; the bytes are `src/lib/docs/sources.ts`, raw `?raw` imports.
 
-- **They are SSR and prerendered, unlike `/`.** `vite.config.ts` lists the six paths under
+- **They are SSR and prerendered, unlike the app Pages.** `vite.config.ts` lists the six paths under
   `pages` with `prerender.enabled`, so the build emits `dist/client/docs/<slug>/index.html` as full
   HTML and a shared `/docs/modele#s-10-4` lands with a **200**. `autoStaticPathsDiscovery` is
   **off** so `/` stays the SPA shell. Under `bun run dev`, SPA mode serves the shell for every path
@@ -65,15 +66,74 @@ through `react-markdown` (+ `remark-gfm`, `remark-math`, `rehype-katex`). The re
 - Add a page by adding an entry to `DOC_PAGES`, its raw import to `sources.ts`, and its path to
   `pages` in `vite.config.ts`. Nothing else knows the list.
 
+## The app Pages — one route per Page, one Scenario in the URL
+
+Added 2026-11-08 with [ADR-0002](../adr/0002-one-page-per-route-one-scenario-in-the-url.md), which
+retires v1's « the simulator is exactly one route ». The reason that rule existed — a second app
+route re-declaring the ~30-key `validateSearch` — is kept by putting the declaration on a route
+every Page shares rather than by having one Page.
+
+- **The schema is declared once, on the pathless layout `src/routes/_app.tsx`.** `validateSearch`
+  and `keepRefusalOutOfTheAddressBar` live there and nowhere else. A Page under it reads
+  `Route.useSearch().refused` from the merge, because `matchRoutes` validates down the branch.
+  `src/lib/app/pages.test.ts` holds the shape: one route in the tree declares the schema, every
+  route under it is in `APP_PAGES` (or is `/`), and each Page refuses two Tightness Drivers with
+  its URL written back unchanged.
+- **Each app Page sets `ssr: false` and its own `pendingComponent`.** The layout keeps SSR on, so
+  in dev and in a Page's prerender the server renders the bar and then the Page's Skeleton under
+  it. `ssr: false` on the layout would have rendered *its* `pendingComponent` for every Page.
+- **The navigation bar is the layout's, and it is text until hydration.** `useHydrated()` is false
+  on the server and on the first client render, so the prerendered bar names the Pages without
+  linking them. A link there would be present and wrong: the HTML was built with no search, and
+  pressing it before hydration would drop a shared Scenario for the Session. After hydration each
+  `<Link>` gets `search={location.search}`, the **raw** parse. With `search: true` the router hands
+  over the validated bag, `refused` included, and `/docs` is off the branch whose middleware strips
+  it. Measured: `buildLocation({ to: "/docs", search: true })` from a refused `/avance` link emits
+  `refused=…`.
+- **The bar is `NAV_BAR` = 36 px, paid out of every Page's height.** `PageFrame` is `h-dvh`, and
+  the shell under it is `h-full`. The collapse rule reads it as `ViewportFit.navigationHeight` on
+  both arms: unlike § 8's strip it is never dismissed, so `MIN_RAIL` is owed under it below B2.
+  At 44 px it would pin budget C, whose letterbox is 43,68 px.
+- **`/` redirects to `/avance` in `beforeLoad`, with `location.search` and `replace: true`.** Under
+  `ssr: false` the server skips `beforeLoad`, so dev answers `/?…` with a 200 and a Skeleton and
+  the client redirects. The raw search keeps key order and unknown keys, so the strip still names
+  them on `/avance`. The router re-stringifies it, which is byte-identical for every link the app
+  or a fixture writes.
+- **Writes stay on the current Page.** The load-time rewrite, the debounced address bar and the
+  Rail's resets navigate `to: "."`, so a future Page that hosts the store never jumps to Avancé.
+- **GitHub Pages answers `/avance?…` with a 301 to `/avance/?…`**, keeping the query — measured on
+  the live site for `/docs`. The router's mount-time canonicalisation then replaces `/avance/?…`
+  with `/avance?…`. A bare `/avance/` compares equal after `trimPathRight` and is left alone.
+
+Measured on the installed tree on 2026-11-08 (`react-router` 1.170.46, `router-core` 1.171.39,
+`react-start` 1.169.4, `start-server-core` 1.169.45, `router-plugin` 1.168.48), with `agent-browser`
+against a production build served the way GitHub Pages serves it:
+
+| Request | Result |
+| --- | --- |
+| `/?<fixture>`, each of the 26 golden links | lands on `/avance?<fixture>`; same page text and field values as opening `/avance?<fixture>` directly |
+| `/avance?fl=6&lo=151.64` (static host) | 301 → `/avance/?…` → **200**, refusal surface, URL intact |
+| `/avance?fl=6&lo=151.64`, `/?fl=6&lo=151.64`, `/avance?v=3` (dev) | **200**, no 307 |
+| `/avance?L=250&junk=zz` | strip names « junk », then the rewrite stays on `/avance` |
+| bare `/avance`, bare `/` | Session restored, URL stays bare |
+| « Copier le lien » on `/avance` | `<origin>/simu-tyro/avance?v=1&…`, which reopens the same Scenario |
+| `/nope` | **404**, `notFoundComponent`, no navigation bar |
+
 ## Static hosting
 
 The app ships as static files — the v1 spec recorded `spa: {}` as the migration path and said it
 must not be enabled speculatively; a GitHub Pages deploy is the ask that spends it.
 
 - `vite.config.ts` sets `spa: { enabled: true, prerender: { outputPath: "/index" } }`. The build
-  gains a prerender pass that renders the root route with the index route's `pendingComponent`, so
-  the shipped HTML **is the Skeleton** — the same frame the dev server returns, not an empty
-  `<body>`. `maskPath` stays at its default `/`, which is why.
+  gains a prerender pass that server-renders **the root alone** — shell mode gives every other
+  match `ssr: false` — so the root's first child paints its `pendingComponent`. That child is the
+  app layout `_app.tsx`, whose `pendingComponent` is Avancé's frame: the navigation bar as text
+  over Avancé's Skeleton, the same frame `/` shows in dev, not an empty `<body>`. `maskPath` stays
+  at its default `/`. **When a Page takes `/`, that `pendingComponent` becomes its Skeleton.**
+- **Every app Page is also prerendered on its own**, from `APP_PAGES` in `src/lib/app/pages.ts`
+  (`pages` in `vite.config.ts`, `outputPath: "/<page>/index.html"`). That is not shell mode: the
+  layout renders its bar and the Page its own Skeleton, so a direct `/avance?…` lands with a
+  **200** on Avancé's frame rather than with a 404 on `404.html`.
 - `outputPath: "/index"` and not the default `/_shell`: a static host serves `index.html` at a
   directory URL, and GitHub Pages runs Jekyll, which drops `_`-prefixed paths outright.
   `public/.nojekyll` covers `assets/` — **do not delete it**, the whole site goes unstyled.
@@ -84,11 +144,13 @@ must not be enabled speculatively; a GitHub Pages deploy is the ask that spends 
 - `BASE_PATH` is a build-time env var, not a constant: unset (`/`) in dev and on a custom domain,
   `/simu-tyro/` on the project site. `.github/workflows/deploy.yml` reads it off
   `actions/configure-pages`, so attaching a domain needs no code change.
-- **Every URL the app writes goes through the router** — `navigate({ to: "/" })` in `store.tsx`,
-  `use-persist.ts` and `inputs.tsx` — so `basepath` is applied for free. « Copier le lien » is the
-  one exception, because `copyLink` builds an *absolute* href by hand against § 7's whole-URL
-  budget: its `origin` argument comes from `siteOrigin()` in `src/lib/app/site.ts`, which is origin
-  + `BASE_URL`. A new absolute-URL writer must use it too, or it ships links that 404.
+- **Every URL the app writes goes through the router** — `navigate({ to: "." })` in `store.tsx`,
+  `use-persist.ts` and `inputs.tsx`, onto the current Page; the navigation bar's `<Link>`s — so
+  `basepath` is applied for free. « Copier le lien » is the one exception, because `copyLink`
+  builds an *absolute* href by hand against § 7's whole-URL budget: its `origin` argument comes
+  from `siteOrigin()` in `src/lib/app/site.ts`, which is origin + `BASE_URL`, and its `page` is the
+  Page's router path (`Route.fullPath`). A new absolute-URL writer must use both, or it ships links
+  that 404 or open the wrong Page.
 - Only `dist/client/` is published. `dist/server/` is still emitted by Start — SPA mode does not
   suppress it — and is deliberately not deployed.
 - The site is published **per release**, not per push: merging the release-please PR tags `main`,
@@ -98,9 +160,13 @@ must not be enabled speculatively; a GitHub Pages deploy is the ask that spends 
 
 | File | Carries |
 | --- | --- |
-| `src/routes/__root.tsx` | the document only — `lang="fr"`, the French `<title>`, the viewport meta with `interactive-widget=resizes-content`, the French `notFoundComponent`, the unguarded devtools block. **No root `component`, no app bar.** |
-| `src/routes/index.tsx` | the one route: `ssr: false`, `validateSearch`, `search.middlewares`, `pendingComponent`, and an `errorComponent` for **genuine load failures only** |
-| `src/components/app/skeleton.tsx` | the `pendingComponent` — the only thing the server renders below the document |
+| `src/routes/__root.tsx` | the document only — `lang="fr"`, the French `<title>`, the viewport meta with `interactive-widget=resizes-content`, the French `notFoundComponent`, the unguarded devtools block. **No root `component`, no navigation bar.** |
+| `src/routes/_app.tsx` | the app Pages' pathless layout, server-rendered: `validateSearch` and `search.middlewares`, **declared once**; the navigation bar; the SPA shell's `pendingComponent` |
+| `src/routes/_app.avance.tsx` | the Page Avancé: `ssr: false`, `pendingComponent`, and an `errorComponent` for **genuine load failures only** |
+| `src/routes/_app.index.tsx` | `/`: `ssr: false` and a client-side `beforeLoad` redirect to `/avance` with the search as it came |
+| `src/lib/app/pages.ts` | `APP_PAGES`, the table the navigation bar and the prerender list both read |
+| `src/components/app/navigation-bar.tsx` | `PageFrame` — the bar above, the Page's shell below, one viewport tall |
+| `src/components/app/skeleton.tsx` | Avancé's `pendingComponent` — what the server renders under the navigation bar |
 | `src/components/app/shell.tsx` | the one layout the Skeleton and the live app both render, with § 5's band heights as CSS custom properties over container-query units |
 | `src/components/app/refusal.tsx` | the refusal surface, an **ordinary component** driven by `search.refused` |
 | `src/components/app/store.tsx` | the React-context store, its lazy Session read and the rewrite mount effect |
@@ -112,7 +178,8 @@ Three rules that only become visible once the shell exists:
   Session, any recognised scenario key then wins **wholesale**, and the mount effect diffs the raw
   keys to produce both the strip's evidence and the rewrite.
 - **The rewrite fires on content, never on order.** Same keys in another order is left exactly as
-  typed, and a bare `/` is never rewritten — bare `/` *means* « restore the Session ». **`?junk=zz`
+  typed, and a bare Page (`/avance`, or `/` before its redirect) is never rewritten — bare *means*
+  « restore the Session ». **`?junk=zz`
   is not bare**: no recognised key survived, so the Session is restored like a bare `/`, but
   something *was* dropped — the strip still names the key and the rewrite still fires, onto the
   salvaged bag (at most `v`) and never onto the completed defaults, which would turn a session
@@ -193,8 +260,8 @@ one. So `/?v=3` rebuilds as `/?v=3&refused=%7B%22kind%22…` and 307s there. `se
 gate this — it is unset (probe 5) and the middleware path runs regardless.
 
 **The rule: a `validateSearch` may return keys it received; a key it invents lands in the address
-bar.** Amendment E's `refused` marker is the app's one synthesised key, and the index route removes
+bar.** Amendment E's `refused` marker is the app's one synthesised key, and the app layout removes
 it from the merge with `search.middlewares: [keepRefusalOutOfTheAddressBar]`
-(`src/lib/url/schema.ts`). Installing it is not optional. It costs the refusal surface nothing:
+(`src/lib/url/schema.ts`), on the branch every app Page shares. Installing it is not optional. It costs the refusal surface nothing:
 `matchRoutes` does **not** run search middlewares, so `Route.useSearch().refused` still carries the
 marker while the href stays exactly the one the sender wrote.

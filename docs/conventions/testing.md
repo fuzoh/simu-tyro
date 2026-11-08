@@ -151,7 +151,7 @@ the real app in a real browser instead
 **A state nobody scripts there is a state nobody checks** — that is the deliberate trade.
 
 - **Four DOM-shape states**: the Skeleton's content (five Rail headings, both chart frames, no
-  control / no value / no « — »), the refusal rendered on the _index_ route at 200 — as ordinary
+  control / no value / no « — »), the refusal rendered on an app Page at 200 — as ordinary
   validated state, **not** as a thrown `errorComponent`, [voir amendement E](../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md) —
   « Saisie en cours », and « Aucun résultat ».
 - **Five measurements a layout engine has to make**: the three pixel budgets (390×664 · 768×1024 ·

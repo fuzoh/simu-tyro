@@ -423,7 +423,7 @@ describe("the first-run link", () => {
   test("round-trips: parsing it back yields the same bag, and re-emitting the same string", () => {
     const search = validateSearch(parse(FIRST_RUN_LINK.slice(1)));
     expect(search).toEqual(scenarioToSearch(FIRST_RUN_SCENARIO));
-    expect(canonicalLink(search)).toBe(FIRST_RUN_LINK);
+    expect(canonicalLink(search, "/")).toBe(FIRST_RUN_LINK);
     expect(complete(FIRST_RUN_LINK.slice(1)).completed).toEqual([]);
   });
 });
@@ -519,7 +519,7 @@ describe("scenarioToSearch — the write side", () => {
       // The consequence, stated where a reader will look for it: « Copier le lien » builds its href
       // with `canonicalLink`, the address bar gets this bag as-is, and § 7 requires the two strings
       // to be identical (« two links to the same Scenario are then string-identical »).
-      expect(`/${defaultStringifySearch(search)}`).toBe(canonicalLink(search));
+      expect(`/${defaultStringifySearch(search)}`).toBe(canonicalLink(search, "/"));
     }
   });
 });

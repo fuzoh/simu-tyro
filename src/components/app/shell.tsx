@@ -54,7 +54,7 @@ import {
 } from "@/lib/layout/contract.ts";
 import { cn } from "@/lib/utils.ts";
 
-/** The Rail Header's static text. `__root.tsx` carries no app bar — this is the app's only name. */
+/** The Rail Header's static text — the navigation bar names Pages, not the app. */
 export const APP_NAME = "Scoutech";
 
 /** § 9's five Rail sections, in order. The Skeleton reproduces the headings and nothing under them. */
@@ -148,7 +148,8 @@ const LAYOUT_VARS = {
 // the value is simply absent until a keyboard is up.
 
 /**
- * The shell: a fixed-height box with internal scrollers, never a document scroll. **A document
+ * The shell: a fixed-height box with internal scrollers, never a document scroll — the height
+ * `PageFrame` leaves under the navigation bar (`@/components/app/navigation-bar.tsx`). **A document
  * scroll was rejected** because the Chart Block's collapse trigger would then have to read
  * `window.scrollY` *and* survive iOS's document-scroll-under-keyboard behaviour, where a fixed
  * shell plus `interactive-widget=resizes-content` gives the same result with one known scroller.
@@ -241,7 +242,7 @@ export function Shell({
   return (
     <div
       aria-busy={busy || undefined}
-      className="bg-background text-foreground flex h-dvh flex-col overflow-hidden"
+      className="bg-background text-foreground flex h-full flex-col overflow-hidden"
       data-collapse={collapse}
       data-fit={tight ? "tight" : "roomy"}
       // The clearance § 7's jump primitive reserves, in the shell's own inline properties so it
@@ -348,7 +349,7 @@ export function Shell({
   );
 }
 
-/** The Rail Header — the app's name plus the controls `__root.tsx` has no app bar for. */
+/** The Rail Header — the app's name plus the Rail's own controls. */
 export function RailHeader({ children }: { children?: ReactNode }) {
   return (
     <header className="flex h-[var(--rail-header)] shrink-0 items-center gap-2 px-3">

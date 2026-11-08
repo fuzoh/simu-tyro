@@ -81,18 +81,20 @@ export type Unpublishable = "incomplete" | "oversize";
 
 /**
  * The one gate both link writers pass — « Copier le lien » and the address bar — and the only
- * caller of {@link fitsLinkBudget}. The budget is on the **whole** href, origin and base path
- * included, so `origin` is the one `siteOrigin()` returns.
+ * caller of {@link fitsLinkBudget}. The budget is on the **whole** href, origin, base path and Page
+ * included, so `origin` is the one `siteOrigin()` returns and `page` the Page's router path: both
+ * writers land on the Page the user is on, and must agree about what fits there.
  */
 export function publishable(
   draft: ScenarioDraft,
   origin: string,
+  page: string,
 ):
   | { readonly ok: true; readonly href: string; readonly search: ValidatedSearch }
   | { readonly ok: false; readonly reason: Unpublishable } {
   const search = publishedSearch(draft);
   if (search === null) return { ok: false, reason: "incomplete" };
-  const href = `${origin}${canonicalLink(search)}`;
+  const href = `${origin}${canonicalLink(search, page)}`;
   if (!fitsLinkBudget(href)) return { ok: false, reason: "oversize" };
   return { ok: true, href, search };
 }
@@ -125,8 +127,8 @@ export type Write =
  * reads `/` while storage holds an older Session; the ≈1 s write still runs, and overwrites it with
  * the same content.
  */
-export function addressBarWrites(state: AppState, origin: string): readonly Write[] {
-  const link = publishable(state.scenario, origin);
+export function addressBarWrites(state: AppState, origin: string, page: string): readonly Write[] {
+  const link = publishable(state.scenario, origin, page);
   if (link.ok) return [{ to: "address-bar", search: link.search }];
   if (link.reason === "incomplete") return [];
   const bare: Write = { to: "address-bar", search: {} };
@@ -176,20 +178,23 @@ export const COPY_INCOMPLETE = "Complétez les champs vides pour partager ce lie
  * the link is built from the Scenario the app holds *now*, so a copy one frame after a keystroke
  * carries that keystroke.
  *
- * @param origin the page's own origin — the budget is on the **whole** URL, and the copy button
- *   puts an absolute one on the clipboard.
+ * @param origin the site's origin and base path — the budget is on the **whole** URL, and the copy
+ *   button puts an absolute one on the clipboard.
+ * @param page the router path of the Page the button was pressed on — the link opens that Page.
  * @param trace the cached profile, read only to count its points in the refusal sentence.
  */
 export function copyLink({
   scenario,
   trace,
   origin,
+  page,
 }: {
   scenario: ScenarioDraft;
   trace: Trace | null;
   origin: string;
+  page: string;
 }): CopyLink {
-  const link = publishable(scenario, origin);
+  const link = publishable(scenario, origin, page);
   if (link.ok) return { ok: true, href: link.href };
   if (link.reason === "incomplete") return { ok: false, message: COPY_INCOMPLETE };
 

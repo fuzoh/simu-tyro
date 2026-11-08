@@ -30,6 +30,7 @@ import {
 import { armAddressBarWrite, armSessionWrite } from "./write-side.ts";
 
 const ORIGIN = "https://scoutech.example";
+const PAGE = "/avance";
 
 /** The app's state around a Scenario — every field a link never carries, at its shipped value. */
 function appState(scenario: ScenarioDraft, trace: Trace | null = null): AppState {
@@ -91,6 +92,7 @@ function mount({ storage }: { storage: SessionStorage | null }) {
   const navigations: Navigation[] = [];
   const effects: WriteEffects = {
     origin: () => ORIGIN,
+    page: () => PAGE,
     storage: () => storage,
     navigate: (search) => {
       navigations.push({
@@ -137,7 +139,7 @@ describe("an oversize edit — the Session is stored before the address bar read
     const storage = memoryStorage();
     const app = mount({ storage });
     const oversize = imported(600);
-    expect(publishable(oversize.scenario, ORIGIN)).toEqual({ ok: false, reason: "oversize" });
+    expect(publishable(oversize.scenario, ORIGIN, PAGE)).toEqual({ ok: false, reason: "oversize" });
 
     // The Session *before* the edit — what a reload used to restore silently.
     app.edit(appState(firstRunDefaults()));
@@ -203,7 +205,7 @@ describe("an in-budget edit — both writes keep their own timing", () => {
     const storage = memoryStorage();
     const app = mount({ storage });
     const fitting = imported(200);
-    const link = publishable(fitting.scenario, ORIGIN);
+    const link = publishable(fitting.scenario, ORIGIN, PAGE);
     expect(link.ok).toBe(true);
     app.edit(fitting);
 

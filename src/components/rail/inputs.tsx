@@ -865,8 +865,11 @@ export function RailHeaderControls({
    * copying the last complete Scenario under a screen that no longer shows it.
    */
   incomplete = false,
+  page,
 }: {
   incomplete?: boolean;
+  /** The router path of the Page the Rail is on — the copied link opens that Page. */
+  page: string;
 }) {
   const state = useAppState();
   const dispatch = useAppDispatch();
@@ -883,6 +886,7 @@ export function RailHeaderControls({
       scenario: state.scenario,
       trace: state.trace,
       origin: siteOrigin(),
+      page,
     });
     if (!result.ok) {
       // **Refuse rather than degrade**: a terrain-less link of an imported scenario is not a weaker
@@ -946,10 +950,10 @@ export function RailHeaderControls({
             className="h-auto w-full flex-col items-start gap-1 py-1 text-left whitespace-normal"
             onClick={() => {
               dispatch({ type: "scénario/réinitialisé" });
-              // Back to a **bare** `/`, with `replace` — never `push`: a pushed entry would make
+              // Back to this Page **bare**, with `replace` — never `push`: a pushed entry would make
               // Back a near-undo of the reset, and « near » is exactly the problem, since writes
               // are debounced and suspended under « Saisie en cours ».
-              void navigate({ replace: true, search: {}, to: "/" });
+              void navigate({ replace: true, search: {}, to: "." });
             }}
             size="sm"
             type="button"

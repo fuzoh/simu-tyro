@@ -174,10 +174,18 @@ export type ViewportFit = {
    * `overflow-hidden` with nothing to scroll to reach it.
    */
   readonly chromeHeight?: number;
+  /**
+   * The navigation bar above the shell, px — `NAV_BAR` on every app Page (ADR-0002), `0` for a
+   * shell that stands alone. **Paid on both arms**, unlike {@link chromeHeight}: below B2 the strip
+   * is tolerated out of the Rail only because it is dismissable, and the navigation bar never is,
+   * so `MIN_RAIL` is owed under it like under anything else.
+   */
+  readonly navigationHeight?: number;
 };
 
 /**
- * What is left of the viewport once the soft keyboard has taken its share.
+ * What is left of the viewport for the shell once the navigation bar and the soft keyboard have
+ * taken their share.
  *
  * **The two platforms meet here and the arithmetic is the same on both.** Where
  * `interactive-widget=resizes-content` is honoured the layout viewport itself shrank, so
@@ -188,8 +196,9 @@ export type ViewportFit = {
 export function availableHeight({
   viewportHeight,
   keyboardInset,
-}: Pick<ViewportFit, "keyboardInset" | "viewportHeight">): number {
-  return Math.max(0, viewportHeight - keyboardInset);
+  navigationHeight = 0,
+}: Pick<ViewportFit, "keyboardInset" | "navigationHeight" | "viewportHeight">): number {
+  return Math.max(0, viewportHeight - navigationHeight - keyboardInset);
 }
 
 /**
@@ -228,10 +237,11 @@ export function fitsWholeBlock({
   keyboardInset,
   columnWidth,
   chromeHeight = 0,
+  navigationHeight = 0,
 }: ViewportFit): boolean {
   if (columnWidth === null) return true;
   const railBelow = viewportWidth < RAIL_REFLOW_PX;
-  const available = availableHeight({ viewportHeight, keyboardInset });
+  const available = availableHeight({ viewportHeight, keyboardInset, navigationHeight });
   return chartBlockHeight(columnWidth) <= available - (railBelow ? MIN_RAIL : chromeHeight);
 }
 
@@ -247,9 +257,11 @@ export function fitsWholeBlock({
 export function compactRequired({
   viewportHeight,
   keyboardInset,
-}: Pick<ViewportFit, "keyboardInset" | "viewportHeight">): boolean {
+  navigationHeight = 0,
+}: Pick<ViewportFit, "keyboardInset" | "navigationHeight" | "viewportHeight">): boolean {
   return (
-    keyboardInset > 0 || availableHeight({ viewportHeight, keyboardInset }) < COMPACT_HEIGHT_PX
+    keyboardInset > 0 ||
+    availableHeight({ viewportHeight, keyboardInset, navigationHeight }) < COMPACT_HEIGHT_PX
   );
 }
 
