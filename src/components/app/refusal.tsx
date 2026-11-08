@@ -30,7 +30,7 @@ import { RailHeader, Shell } from "./shell.tsx";
 export function LinkRefusalSurface({ refusal }: { refusal: LinkRefusal }) {
   return (
     <Shell
-      rail={<RailHeader />}
+      left={<RailHeader />}
       chart={
         <div className="flex flex-col items-start gap-3 py-16" role="alert">
           {/* `text-lg`, the largest the app has: three DOM sizes, and **the error screens are not

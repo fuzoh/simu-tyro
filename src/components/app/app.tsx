@@ -98,47 +98,58 @@ function Live({ page }: { page: string }) {
   const { cause, clearance, frame, occupant, results, saisie, solved } = surfaces;
 
   return (
-    <Shell
-      chartRef={ref}
-      collapse={collapse.state}
-      onRailFocus={collapse.onRailFocus}
-      onRailScroll={collapse.onRailScroll}
-      tight={collapse.tight}
-      strip={<LinkStripNotice bandRef={chrome.ref} strip={strip} />}
-      rail={
-        <>
-          <RailHeader>
-            {/* « Copier le lien » is disabled under « Saisie en cours », on the same condition that
-                suspends both writes: the button and the address bar have to agree about what the
-                app is currently able to publish. */}
-            <RailHeaderControls incomplete={saisie !== null} page={page} />
-          </RailHeader>
-          <RailInputs cause={cause} deduced={deduced} rail={rail} />
-          <RailOutputs cause={cause} deduced={deduced} results={results} />
-        </>
-      }
-      chart={
-        <ChartBlock
-          banner={<Banner occupant={occupant} onDiagnostic={copyDiagnostic} />}
-          cause={cause}
-          // A Clearance Gate breach removes **la garde au sol et la courbe de garde seules**: the
-          // cable still draws and every tension row stands. A printed `Garde min` under a banner
-          // reading « garde au sol indisponible » is one copy contradicting the screen.
-          clearance={clearance}
-          frame={frame}
-          // **Scrubbing goes inert under « Saisie en cours »**, pointer and typed `x` alike: the
-          // Sweep on screen is stale by definition, so scrubbing would let the user *generate* new
-          // stale numbers rather than read the ones already there.
-          inert={saisie !== null}
-          onPositionFocus={collapse.onPositionFocus}
-          onReveal={collapse.reveal}
-          // Under either height constraint the reveal cannot be granted, so the chevron publishes
-          // that instead of offering a press that changes nothing — voir `revealGrantable`.
-          revealGrantable={collapse.revealGrantable}
-          solved={solved}
-          width={width}
+    // `RailInputs` owns the Rail's field rows and hands back the two sections they live in, so the
+    // shell can stand them in different columns without the rows losing their one context.
+    <RailInputs cause={cause} deduced={deduced} rail={rail}>
+      {(sections) => (
+        <Shell
+          chartRef={ref}
+          collapse={collapse.state}
+          onRailFocus={collapse.onRailFocus}
+          onRailScroll={collapse.onRailScroll}
+          tight={collapse.tight}
+          strip={<LinkStripNotice bandRef={chrome.ref} strip={strip} />}
+          left={
+            <>
+              <RailHeader>
+                {/* « Copier le lien » is disabled under « Saisie en cours », on the same condition that
+                    suspends both writes: the button and the address bar have to agree about what the
+                    app is currently able to publish. */}
+                <RailHeaderControls incomplete={saisie !== null} page={page} />
+              </RailHeader>
+              {sections.parameters}
+            </>
+          }
+          right={
+            <>
+              {sections.deduced}
+              <RailOutputs cause={cause} deduced={deduced} results={results} />
+            </>
+          }
+          chart={
+            <ChartBlock
+              banner={<Banner occupant={occupant} onDiagnostic={copyDiagnostic} />}
+              cause={cause}
+              // A Clearance Gate breach removes **la garde au sol et la courbe de garde seules**: the
+              // cable still draws and every tension row stands. A printed `Garde min` under a banner
+              // reading « garde au sol indisponible » is one copy contradicting the screen.
+              clearance={clearance}
+              frame={frame}
+              // **Scrubbing goes inert under « Saisie en cours »**, pointer and typed `x` alike: the
+              // Sweep on screen is stale by definition, so scrubbing would let the user *generate* new
+              // stale numbers rather than read the ones already there.
+              inert={saisie !== null}
+              onPositionFocus={collapse.onPositionFocus}
+              onReveal={collapse.reveal}
+              // Under either height constraint the reveal cannot be granted, so the chevron publishes
+              // that instead of offering a press that changes nothing — voir `revealGrantable`.
+              revealGrantable={collapse.revealGrantable}
+              solved={solved}
+              width={width}
+            />
+          }
         />
-      }
-    />
+      )}
+    </RailInputs>
   );
 }

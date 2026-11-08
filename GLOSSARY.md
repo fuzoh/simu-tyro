@@ -308,16 +308,21 @@ not carry it. French: **barre de navigation**.
 _Avoid_: app bar, header, menu, tabs, Rail Header
 
 **Rail**:
-The app's one scrolling column: Rail Header, then `Paramètres → Valeurs déduites →
-Résultats → Provenance → Ce que cet outil ne calcule pas`. Its upper sections take input
-and its lower sections report, but **there is no results panel and no second column** —
-a right-hand column was rejected because it steals the width a 1500 m span needs, and a
-region under the read-out cells was rejected for pushing them below the fold. Five
-sections, fixed order, one scroll.
-_Avoid_: results panel, output half as a place, sidebar, right column, form
+A layout a Page may use, historical now that Avancé is its only user: Rail Header, then
+`Paramètres → Valeurs déduites → Résultats → Provenance → Ce que cet outil ne calcule pas`.
+Five sections, fixed order. Its upper sections take input and its lower sections report, but
+there is no results panel. From the three-column width (1024 px) Avancé stands the sections
+in two columns either side of the Chart Block — `Paramètres` on the left, the four that
+report on the right; below it they stack into one scroll, Chart Block first, the Rail's
+sections after it in their own order. A right-hand column was once rejected because it steals
+the width a 1500 m span needs; 1024 px is the narrowest landscape tablet, where stacking would
+cost the chart its whole profile; the middle column is then 448 px, and the shell's cap keeps
+it at 1152 px beyond.
+_Avoid_: results panel, output half as a place, sidebar, form
 
 **Rail Header**:
-The single action row at the top of the Rail, above `Paramètres` and scrolling with it:
+The single action row at the top of the Rail — the left column's top from the three-column
+width — above `Paramètres` and scrolling with it:
 the app's name, the force-unit selector, « Copier le lien », and an overflow menu
 holding « Réinitialiser le scénario » and « Effacer la session ». Not a sixth section —
 it holds no parameter, no read-out and no disclosure — and not the Navigation Bar: it
@@ -327,9 +332,10 @@ _Avoid_: app bar, toolbar, navbar, page header, chrome
 
 **Chart Block**:
 The banner slot, profile chart, clearance strip, View Strip and five read-out cells as
-one co-visible unit sharing a single x scale and a single gutter constant. It reflows
-and collapses as a whole; no member is ever hidden or occluded on its own.
-_Avoid_: chart area, main pane, right column, canvas
+one co-visible unit sharing a single x scale and a single gutter constant. On Avancé it is
+the middle column between the Rail's two. It reflows and collapses as a whole; no member is
+ever hidden or occluded on its own.
+_Avoid_: chart area, main pane, canvas
 
 **View Strip**:
 The one control row inside the Chart Block, below the clearance strip and above the
@@ -366,7 +372,8 @@ _Avoid_: chart ratio, plot proportions, flex ratio, aspect ratio
 **Skeleton**:
 The frame the server renders below the document, and the only thing it renders: the
 Navigation Bar's reserved height with the Page names as plain text, then the Page's own
-frame. On Avancé that frame is the Rail's five section headings in order, the app's name,
+frame. On Avancé that frame is the Rail's five section headings in order (`Paramètres` in
+the left column, the other four in the right), the app's name,
 two empty chart frames at final proportions, and the read-out cells' labels; on Statique it
 is the field groups' headings, the output tiles' labels, the coupe's empty bands and the vue
 de dessus's frame, and on Dynamique the field groups' headings, both rides' tile labels and the coupe's and the curve's empty bands. Each app Page ships its own. It carries no number, no Verdict, no spinner, no « — » and no live control

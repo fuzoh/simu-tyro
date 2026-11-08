@@ -111,8 +111,21 @@ export const PINNED_CELL = 44;
  */
 export const CELL_WRAP_PX = 624;
 
-/** B2 — « an aspect-legal profile cannot coexist with the rail », in **viewport** width. */
-export const RAIL_REFLOW_PX = 768;
+/**
+ * B2 — the **viewport** width from which Avancé stands on three columns, and below which they
+ * stack into one (the Chart Block first, then the Rail's sections in their own order).
+ *
+ * **1024, because that is the narrowest width a landscape tablet has**, and a stacked block is
+ * sized from the *whole* viewport width while owing {@link MIN_RAIL} under it. At 1024 × 768 the
+ * three columns leave a 448 px middle column and a 616 px block against 732 px of height, so the
+ * profile stays; stacked, the same screen would owe a 782 px block plus the Rail's floor, and open
+ * on the Pinned Safety Header alone. A 1280 switch did exactly that to 1180 × 820 and 1194 × 834
+ * too. **What it costs**: the middle column is 448 px at the switch — a three-line banner and the
+ * short View Strip labels (under B1 and under 768) — and it clears B1 (624) only from 1200.
+ * The three columns need `3 × 288 = 864` at the least. It replaced the 768 px at which the Rail
+ * alone stood beside the block.
+ */
+export const THREE_COLUMN_PX = 1024;
 
 /** The Rail Header's height. */
 export const RAIL_HEADER = 44;
@@ -136,13 +149,39 @@ export const MIN_RAIL = 120;
  */
 export const COMPACT_HEIGHT_PX = 420;
 
-/** `w-72`, and it is **288 px, not 280** — every narrow-screen symptom is downstream of it. */
+/**
+ * The left column — `Paramètres` under the Rail Header. `w-72`, and it is **288 px, not 280** —
+ * every narrow-screen symptom is downstream of it.
+ */
 export const RAIL_WIDTH = 288;
+
+/** The right column — `Valeurs déduites`, `Résultats`, `Provenance`, `Ce que cet outil ne calcule pas`. */
+export const RIGHT_COLUMN_WIDTH = 288;
+
+/**
+ * The shell's cap, px: past it the three columns stay centred rather than stretching the x scale
+ * edge to edge. `1728 − 288 − 288 = 1152` is {@link REFERENCE_COLUMN_PX}, so the middle column
+ * never outgrows the plot's own ceiling.
+ */
+export const SHELL_MAX_PX = 1728;
+
+/**
+ * **The chart column's inline size at a viewport width** — the middle column from
+ * {@link THREE_COLUMN_PX}, the whole shell below it. The shell measures its own column with a
+ * `ResizeObserver`; this is the same number from the contract's constants, for the budgets and
+ * tests that have no DOM. It ignores the two hairline pixels of the shell's border past the cap.
+ */
+export function chartColumnWidth(viewportWidth: number): number {
+  const shell = Math.min(viewportWidth, SHELL_MAX_PX);
+  return viewportWidth < THREE_COLUMN_PX ? shell : shell - RAIL_WIDTH - RIGHT_COLUMN_WIDTH;
+}
 
 /**
  * § 5's **reference desktop** — the viewport budget C is written for, and now also the width at
  * which the plot stops growing (**amendment F**, `../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md`).
  * It is a width and never a height: what budget C contributes here is its *column*, not its 900 px.
+ * With one column beside the chart that column is reached at 1440; with Avancé's two, at
+ * {@link SHELL_MAX_PX}.
  */
 export const REFERENCE_DESKTOP_PX = 1440;
 
@@ -184,10 +223,16 @@ export const PROFILE_PLOT_MAX: number = PROFILE_ASPECT * innerWidth(REFERENCE_CO
 export const BANNER = { oneLine: 44, twoLines: 60, threeLines: 76 } as const;
 
 /**
+ * The chart column under which the banner's sentence takes three lines rather than two. It is where
+ * the text wraps, not where the layout does: it was `768 − 288`, the column the old Rail reflow
+ * produced, and the number stayed when B2 moved.
+ */
+export const BANNER_TWO_LINES_PX = 480;
+
+/**
  * **The banner slot's height as a function of width, like every other band** — § 5's budget table
  * read down its own column: 76 px at a 390 px column, 60 px at 480, 44 px at 1152. The two
- * thresholds are constants this module already has: B1, and the column width B2 itself produces
- * (`768 − 288`). No new breakpoint, and no line-counting.
+ * thresholds are B1 and {@link BANNER_TWO_LINES_PX}. No line-counting.
  *
  * It exists because {@link chartBlockHeight} needs a *budget* for the slot and the two ways of
  * getting one are both worse. Measuring the rendered occupant would make the collapse a function of
@@ -199,7 +244,7 @@ export const BANNER = { oneLine: 44, twoLines: 60, threeLines: 76 } as const;
  */
 export function bannerBudget(columnWidth: number): number {
   if (columnWidth >= CELL_WRAP_PX) return BANNER.oneLine;
-  return columnWidth >= RAIL_REFLOW_PX - RAIL_WIDTH ? BANNER.twoLines : BANNER.threeLines;
+  return columnWidth >= BANNER_TWO_LINES_PX ? BANNER.twoLines : BANNER.threeLines;
 }
 
 /** The chart column's inner width — the one input every band height is a function of. */

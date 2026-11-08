@@ -16,12 +16,14 @@ import { formatValue } from "@/lib/format/quantity.ts";
 
 import {
   BANNER,
+  BANNER_TWO_LINES_PX,
   bannerBudget,
   CELL_BASIS_PX,
   CELL_ROW,
   CELL_WRAP_PX,
   cellRows,
   chartBlockHeight,
+  chartColumnWidth,
   CLEARANCE_EMPTY,
   clearanceDomain,
   clearanceTickLabel,
@@ -40,13 +42,15 @@ import {
   PROFILE_CHROME_HEIGHT,
   profilePlotHeight,
   PROFILE_PLOT_MAX,
-  RAIL_REFLOW_PX,
   RAIL_WIDTH,
   READ_OUT_SPANS,
   REFERENCE_COLUMN_PX,
   REFERENCE_DESKTOP_PX,
+  RIGHT_COLUMN_WIDTH,
+  SHELL_MAX_PX,
   STRIP,
   STRIP_POLICY_BAND,
+  THREE_COLUMN_PX,
   stripOuterHeight,
   VE_BAND,
   veBadgeLabel,
@@ -55,7 +59,11 @@ import {
   Z_MARGIN,
 } from "./contract.ts";
 
-/** § 5, *The three pixel budgets, each summing to the viewport*. */
+/**
+ * § 5, *The three pixel budgets, each summing to the viewport*. The columns are the budgets' own:
+ * B and C were written with one Rail beside the chart, and in Avancé's three columns they are
+ * reached at 480 px and 1728 px of viewport (`chartColumnWidth`), not at 768 and 1440.
+ */
 const BUDGETS = [
   {
     name: "A · 390×664",
@@ -215,11 +223,13 @@ describe("§ 5 — the layout contract", () => {
     expect(CELL_BASIS_PX * 5).toBeLessThanOrEqual(CELL_WRAP_PX);
     expect(READ_OUT_SPANS).toHaveLength(7);
     expect(READ_OUT_SPANS.reduce((sum, span) => sum + span, 0)).toBe(8);
-    // Eight units are a 1280 px laptop's chart column, to the pixel: that laptop keeps one line.
-    expect(CELL_BASIS_PX * 8).toBe(1280 - RAIL_WIDTH);
-    expect(cellRows(1280 - RAIL_WIDTH)).toBe(1);
-    expect(cellRows(1280 - RAIL_WIDTH - 1)).toBe(2);
+    // Eight units are 992 px, to the pixel. That was a 1280 px laptop's chart column beside one Rail;
+    // in Avancé's three columns it is the shell's cap that reaches it, and 1280 gets two lines.
+    expect(CELL_BASIS_PX * 8).toBe(992);
+    expect(cellRows(992)).toBe(1);
+    expect(cellRows(991)).toBe(2);
     expect(cellRows(REFERENCE_COLUMN_PX)).toBe(1);
+    expect(cellRows(chartColumnWidth(1280))).toBe(2);
     // « Garde min. ligne » and the two tensions fill the first line from 496 px.
     expect(cellRows(4 * CELL_BASIS_PX)).toBe(2);
     expect(cellRows(4 * CELL_BASIS_PX - 1)).toBe(3);
@@ -354,13 +364,12 @@ describe("amendment F — the plot's ceiling at wide widths", () => {
     expect(900 - chartBlockHeight(REFERENCE_COLUMN_PX)).toBeCloseTo(43.68, 9);
   });
 
-  it("the cap cannot reach below B2, so the narrow budgets are untouchable by construction", () => {
-    // Below B2 the chart column *is* the viewport, so the widest column that arm can produce is 767
-    // px — 719 of `W_inner`, a 302 px plot. The cap is 161 px above anything narrow can ask for.
-    expect(profilePlotHeight(innerWidth(RAIL_REFLOW_PX - 1))).toBeLessThan(PROFILE_PLOT_MAX);
-    expect(profilePlotHeight(innerWidth(RAIL_REFLOW_PX - 1))).toBe(
-      PROFILE_ASPECT * innerWidth(RAIL_REFLOW_PX - 1),
-    );
+  it("the cap cannot reach a phone's column, so the narrow budgets are untouchable by construction", () => {
+    // A phone's chart column *is* the viewport — 767 px at most — which is 719 of `W_inner` and a
+    // 302 px plot, 161 px under the cap. (Stacked tablets up to 1279 px do reach it; they are not
+    // the narrow budgets.)
+    expect(profilePlotHeight(innerWidth(767))).toBeLessThan(PROFILE_PLOT_MAX);
+    expect(profilePlotHeight(innerWidth(767))).toBe(PROFILE_ASPECT * innerWidth(767));
     for (const column of [320, 390, 480, 600, 767]) {
       expect(chartBlockHeight(column)).toBe(uncappedBlock(column));
     }
@@ -501,6 +510,60 @@ const SCENARIOS = [
 
 /** « mou profond — hors des sept »: 200 m at `L₀` 400 m, `k` 0,972 ⇒ auto-fit ×0,41 at every aspect. */
 const DEEP_SLACK = { L: 200, zSpan: 182.5, k: 0.972 } as const;
+
+describe("Avancé's three columns — the middle column is the chart column", () => {
+  it("the switch is at 1024, the narrowest landscape tablet, and 1280 is three columns", () => {
+    expect(THREE_COLUMN_PX).toBe(1024);
+    expect(RAIL_WIDTH).toBe(288);
+    expect(RIGHT_COLUMN_WIDTH).toBe(288);
+    expect(chartColumnWidth(THREE_COLUMN_PX)).toBe(1024 - 288 - 288);
+    expect(chartColumnWidth(1280)).toBe(1280 - 288 - 288);
+    expect(chartColumnWidth(1280)).toBeGreaterThanOrEqual(CELL_WRAP_PX);
+    // The cost of the switch, stated: at it the middle column is under B1, and it clears B1 only
+    // from `CELL_WRAP_PX + 576`.
+    expect(chartColumnWidth(THREE_COLUMN_PX)).toBeLessThan(CELL_WRAP_PX);
+    expect(chartColumnWidth(CELL_WRAP_PX + RAIL_WIDTH + RIGHT_COLUMN_WIDTH)).toBe(CELL_WRAP_PX);
+  });
+
+  it("below the switch the columns stack, and the chart column is the whole viewport", () => {
+    expect(chartColumnWidth(THREE_COLUMN_PX - 1)).toBe(THREE_COLUMN_PX - 1);
+    expect(chartColumnWidth(390)).toBe(390);
+    expect(chartColumnWidth(768)).toBe(768);
+  });
+
+  it("the shell's cap leaves exactly the reference column, so the plot never outgrows its ceiling", () => {
+    expect(SHELL_MAX_PX - RAIL_WIDTH - RIGHT_COLUMN_WIDTH).toBe(REFERENCE_COLUMN_PX);
+    for (const viewport of [1728, 1920, 2560, 3440]) {
+      expect(chartColumnWidth(viewport)).toBe(REFERENCE_COLUMN_PX);
+    }
+  });
+
+  it("the Plot Aspect Band holds in the chart column at every viewport width, stacked or in three columns", () => {
+    // From 768, so the stacked widths — where the column is the whole viewport — are walked too.
+    for (let viewport = 768; viewport <= 3440; viewport += 8) {
+      const aspect = plotAspect(innerWidth(chartColumnWidth(viewport)));
+      expect({
+        viewport,
+        ok: aspect >= PLOT_ASPECT_BAND.min && aspect <= PLOT_ASPECT_BAND.max,
+      }).toStrictEqual({ viewport, ok: true });
+    }
+  });
+
+  it("the shell spells the contract's numbers, and styles.css gates on the same B2", () => {
+    const root = fileURLToPath(new URL("../../..", import.meta.url));
+    const shell = readFileSync(join(root, "src/components/app/shell.tsx"), "utf8");
+    const styles = readFileSync(join(root, "src/styles.css"), "utf8");
+    const wide = `min-[${THREE_COLUMN_PX}px]:`;
+    // `w-72` is 18 rem: the two columns' 288 px, written as a Tailwind step.
+    expect(RAIL_WIDTH).toBe(18 * 16);
+    expect(RIGHT_COLUMN_WIDTH).toBe(18 * 16);
+    for (const cls of ["flex-row", "contents", "w-72", "order-first", "order-last", "flex-1"]) {
+      expect(shell).toContain(`${wide}${cls}`);
+    }
+    expect(shell).toContain(`max-w-[${SHELL_MAX_PX}px]`);
+    expect(styles).toContain(`@media (width < ${THREE_COLUMN_PX}px)`);
+  });
+});
 
 /** `VE = plot aspect × (x span / z span)` at a given aspect, for one row of the table. */
 function veAt(aspect: number, scenario: { L: number; zSpan: number }) {
@@ -1159,16 +1222,14 @@ describe("§ 5 — the two mechanisms the layout may not use", () => {
     expect(shell).toContain('"--banner": `${BANNER.oneLine}px`');
     expect(shell).toContain('"--banner-two-lines": `${BANNER.twoLines}px`');
     expect(shell).toContain('"--banner-three-lines": `${BANNER.threeLines}px`');
-    // And the two container queries are B1 and the column B2 produces — **no third breakpoint**.
+    // And the two container queries are B1 and the banner's own wrap width — **no third breakpoint**.
     // Tailwind emits `@max-[N]` as `(width < N)` and `@min-[N]` as `(width >= N)`, which is exactly
     // where `bannerBudget` steps, so the rendered band and (c)'s term cannot disagree by a pixel.
-    const twoLines = `@min-[${RAIL_REFLOW_PX - RAIL_WIDTH}px]:@max-[${CELL_WRAP_PX}px]:[--banner:var(--banner-two-lines)]`;
+    const twoLines = `@min-[${BANNER_TWO_LINES_PX}px]:@max-[${CELL_WRAP_PX}px]:[--banner:var(--banner-two-lines)]`;
     expect(shell).toContain(twoLines);
-    expect(shell).toContain(
-      `@max-[${RAIL_REFLOW_PX - RAIL_WIDTH}px]:[--banner:var(--banner-three-lines)]`,
-    );
-    expect(bannerBudget(RAIL_REFLOW_PX - RAIL_WIDTH - 1)).toBe(BANNER.threeLines);
-    expect(bannerBudget(RAIL_REFLOW_PX - RAIL_WIDTH)).toBe(BANNER.twoLines);
+    expect(shell).toContain(`@max-[${BANNER_TWO_LINES_PX}px]:[--banner:var(--banner-three-lines)]`);
+    expect(bannerBudget(BANNER_TWO_LINES_PX - 1)).toBe(BANNER.threeLines);
+    expect(bannerBudget(BANNER_TWO_LINES_PX)).toBe(BANNER.twoLines);
     expect(bannerBudget(CELL_WRAP_PX - 1)).toBe(BANNER.twoLines);
     expect(bannerBudget(CELL_WRAP_PX)).toBe(BANNER.oneLine);
   });
@@ -1195,6 +1256,13 @@ describe("§ 5 — the two mechanisms the layout may not use", () => {
       padding: tokens.has("pb-[var(--kb,0px)]"),
       scrollPadding: tokens.has("scroll-pb-[var(--kb,0px)]"),
     }).toStrictEqual({ padding: true, scrollPadding: true });
+    // From B2 up the wrapper is `display: contents` and each column is its own scroller, so each
+    // spends the same pair on itself.
+    const wide = `min-[${THREE_COLUMN_PX}px]:`;
+    expect(tokens.has(`${wide}contents`)).toBe(true);
+    for (const token of ["pb-[var(--kb,0px)]", "scroll-pb-[var(--kb,0px)]", "overflow-y-auto"]) {
+      expect(shell.split(`${wide}${token}`).length - 1).toBe(2);
+    }
     // And no second scroll mechanism was added to pay for it: piece 3 is still one centring call
     // with `behavior` left at `auto`, and the Rail's own scroll is still nobody's to set.
     expect(shell).toContain("target.scrollIntoView(CENTRE_IN_RAIL)");

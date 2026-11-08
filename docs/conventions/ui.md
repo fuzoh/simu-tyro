@@ -180,6 +180,40 @@ Vue 3D drapes `ch.swisstopo.pixelkarte-grau`, the grey national map — light, n
 A–B legible on it. `DRAPED` in `src/lib/map/vue-3d.ts` is the table; the orthophoto and the carte
 nationale drape the very tiles the vue de dessus shows.
 
+## Avancé's three columns
+
+The Page Avancé (`/avance`) stands on **three columns from 1024 px of viewport** and on one below
+it. The numbers are `THREE_COLUMN_PX`, `RAIL_WIDTH` (left), `RIGHT_COLUMN_WIDTH` and
+`SHELL_MAX_PX` in `src/lib/layout/contract.ts`; the classes spell them as `min-[1024px]:` and
+`w-72`, and `contract.test.ts` holds the two together.
+
+- **Left** — the Rail Header and `Paramètres`. **Middle** — the Chart Block. **Right** — `Valeurs
+  déduites`, `Résultats`, `Provenance`, `Ce que cet outil ne calcule pas`. Both side columns are
+  288 px and each scrolls on its own.
+- **Why 1024.** A stacked block is sized from the *whole* viewport width and owes `MIN_RAIL` under
+  it, so stacking costs the chart its profile on any screen that is not tall: at 1024 × 768 it is a
+  782 px block against 612 px left, and Avancé opens on « Garde min. ligne » alone (measured at the
+  built `/avance`, with 1180 × 820 and 1194 × 834 the same). In three columns the same screens keep
+  everything: 1024 × 768 is a 448 px middle column, a 616 px block and 732 px of height. **What it
+  costs**: at the switch the middle column is under B1 (`CELL_WRAP_PX`, 624) and under 768, so the
+  banner takes three lines and the View Strip its short labels (« à vide », « A–B »); the column
+  clears B1 from 1200.
+- **Stacked below 1024 and short**: the whole block plus `MIN_RAIL` and the navigation bar need
+  `block + 156` px of height — 842 px at 768 wide, 938 px at 1023. Portrait tablets (768 × 1024,
+  810 × 1080, 820 × 1180, 834 × 1194) clear it; a narrow desktop window such as 1000 × 900 does not
+  and opens on the Pinned Safety Header alone until the window is taller. That is the collapse the
+  ticket keeps (« le Pinned Safety Header reste »), accepted rather than capped around.
+- **Why the cap.** The shell stops at 1728 px, and `1728 − 576 = 1152` is `REFERENCE_COLUMN_PX`:
+  the middle column never outgrows the plot's ceiling, so the Plot Aspect Band holds at every
+  width (`contract.test.ts` walks it).
+- **Stacked, the order is the Chart Block, then the Rail's sections in their own order** — the
+  Pinned Safety Header and its collapse are unchanged, and now apply below 1024 instead of below 768
+  (the `width < 1024px` arm in `src/styles.css`). The one scroller is a wrapper that is
+  `display: contents` from 1024 up: both columns become the chart's flex siblings, and a focus
+  inside either still bubbles to the wrapper's handlers.
+- **`Valeurs déduites` holds editable rows**, so it shares `Paramètres`' field-row context: `RailInputs`
+  owns the context and hands the two sections back through a render prop.
+
 ## Charts
 
 **Hand-rolled SVG in React with `d3-shape` for the paths, and one hand-written affine scale per

@@ -305,6 +305,7 @@ export function RailInputs({
   cause,
   deduced,
   rail,
+  children,
 }: {
   /**
    * « Aucun résultat — portée invalide. », echoed into `Valeurs déduites`'s solve-dependent rows.
@@ -313,6 +314,13 @@ export function RailInputs({
   cause: string | null;
   deduced: Deduced;
   rail: RailFormState;
+  /**
+   * Where the two sections go. `Paramètres` and `Valeurs déduites` share one field-row context —
+   * `Valeurs déduites` holds the three override fields — but stand in different columns of the
+   * page, so the context's owner cannot also be their parent. It hands them over instead, and
+   * renders what the caller builds from them **inside** the provider.
+   */
+  children: (sections: { parameters: ReactNode; deduced: ReactNode }) => ReactNode;
 }) {
   const state = useAppState();
   const { scenario, trace } = state;
@@ -368,316 +376,322 @@ export function RailInputs({
   const provenance = textileSpec === null ? {} : presetProvenance(textileSpec);
   const driver = drivingField(scenario);
 
-  return (
-    <RailRow.Provider value={row}>
-      <RailSection title="Paramètres">
-        <div className="mt-2 flex flex-col gap-3">
-          <Group title="Installation et régime">
-            <UsageRow />
-            <RegimeRow />
-          </Group>
+  const parameters = (
+    <RailSection title="Paramètres">
+      <div className="mt-2 flex flex-col gap-3">
+        <Group title="Installation et régime">
+          <UsageRow />
+          <RegimeRow />
+        </Group>
 
-          <Group title="Géométrie">
-            {/* An imported profil is taken whole, so its `Portée` and `Dénivelé` are read-outs. */}
-            {scenario.geometry.source === "manual" && (
-              <>
-                <NumericRow hint="m" id="L" />
-                <NumericRow hint="m" id="h" />
-              </>
-            )}
-            <NumericRow hint="m" id="zA" />
-            <NumericRow hint="m" id="zB" />
-            <ProfileImport />
-          </Group>
-
-          <Group title="Ligne">
-            <FamilyRow />
-            <CarryingLinesRow />
-
-            {steelSpec !== null ? (
-              <>
-                <NumericRow hint="mm" id="d" />
-                <Row
-                  control={
-                    <Picker
-                      id="rail-r0"
-                      onChange={(value) =>
-                        patch({
-                          ...scenario,
-                          material: { ...steelSpec, R0: Number(value) as 1770 | 1960 },
-                        })
-                      }
-                      options={[
-                        { value: "1770", label: "1770" },
-                        { value: "1960", label: "1960" },
-                      ]}
-                      value={String(steelSpec.R0)}
-                    />
-                  }
-                  help={FIELD_HELP.R0}
-                  hint="N/mm²"
-                  htmlFor="rail-r0"
-                  label={FIELDS.R0.label}
-                />
-                <Row
-                  control={
-                    <Picker
-                      id="rail-cst"
-                      onChange={(construction) =>
-                        patch({ ...scenario, material: { ...steelSpec, construction } })
-                      }
-                      options={CONSTRUCTION_OPTIONS}
-                      value={steelSpec.construction}
-                    />
-                  }
-                  help={FIELD_HELP.cst}
-                  htmlFor="rail-cst"
-                  label={FIELDS.cst.label}
-                />
-              </>
-            ) : (
-              <>
-                <PresetRow />
-                <Row
-                  chip={presetChip(provenance.cls)}
-                  control={
-                    <Picker
-                      id="rail-cls"
-                      onChange={(ropeClass) => patch(applyRopeClass(scenario, ropeClass))}
-                      options={ROPE_CLASS_OPTIONS}
-                      value={textileSpec?.ropeClass ?? "hmpe"}
-                    />
-                  }
-                  help={FIELD_HELP.cls}
-                  htmlFor="rail-cls"
-                  label={FIELDS.cls.label}
-                />
-                <NumericRow chip={presetChip(provenance.MBL)} hint={unit} id="MBL" />
-                <NumericRow chip={presetChip(provenance.muTextile)} hint="kg/m" id="muTextile" />
-                <NumericRow chip={presetChip(provenance.dTextile)} hint="mm" id="dTextile" />
-                <NumericRow
-                  chip={presetChip(provenance.k)}
-                  id="k"
-                  // The **ambient** tier: plain status text, **no ⚠**. It fires on every textile
-                  // line — a tyrolienne never enters §13.2's 10–30 % MBL band — so an alarm here
-                  // would be permanent and therefore mute.
-                  note={<AmbientNote text={rung("k")} />}
-                />
-              </>
-            )}
-
-            <TerminationRow
-              end="A"
-              family={scenario.material.family}
-              onPick={(id) =>
-                patch({
-                  ...scenario,
-                  terminations: {
-                    ...scenario.terminations,
-                    A: { id, eta: TERMINATIONS[id].eta },
-                  },
-                })
-              }
-              ropeClass={textileSpec?.ropeClass ?? null}
-              selected={scenario.terminations.A.id}
-            />
-            <NumericRow id="etaA" label={`${FIELDS.etaA.label}_A`} />
-            <TerminationRow
-              end="B"
-              family={scenario.material.family}
-              onPick={(id) =>
-                patch({
-                  ...scenario,
-                  terminations: {
-                    ...scenario.terminations,
-                    B: { id, eta: TERMINATIONS[id].eta },
-                  },
-                })
-              }
-              ropeClass={textileSpec?.ropeClass ?? null}
-              selected={scenario.terminations.B.id}
-            />
-            <NumericRow id="etaB" label={`${FIELDS.etaB.label}_B`} />
-          </Group>
-
-          <Group title="Tension de la ligne">
-            <TensioningDeviceRow warning={rung("tensioningDevice")} />
-            {/* Where the prétension is read — whatever drives, since its read-out reads there too. */}
-            <TensioningSideRow />
-            {/* Exactly one field is editable; the other four appear under `Valeurs déduites`.
-                Switching mode **pre-fills the new field from its read-out**. */}
-            <div className="flex items-center gap-1 py-1">
-              <span className="text-muted-foreground text-xs">Pilote</span>
-              <InfoTip label="Pilote de tension" text={TIGHTNESS_HELP} />
-            </div>
-            <Segmented
-              onChange={(mode) =>
-                patch(switchTightness(scenario, mode, deduced, lastGoodSolve.current))
-              }
-              options={[
-                { value: "sag", label: "Flèche" },
-                { value: "anchor", label: "Prétension" },
-                { value: "tension", label: "H" },
-                { value: "length", label: "Longueur" },
-                { value: "ratio", label: "Rapport V" },
-              ]}
-              value={scenario.tightness.mode}
-            />
-            {driver === "D_target" && <NumericRow hint="m" id="D_target" />}
-            {driver === "T_target" && (
-              <NumericRow hint={unit} id="T_target" warning={rung("pretension")} />
-            )}
-            {driver === "H_target" && <NumericRow hint={unit} id="H_target" />}
-            {driver === "L0" && <NumericRow hint="m" id="L0" />}
-            {/* `P / H` — the passenger's design load over the tension horizontale. It resolves to
-                a `H_target` from `m_p`, so the resulting `Tension horizontale` shows under
-                `Valeurs déduites` like any other mode's. */}
-            {driver === "vRatio" && (
-              <NumericRow
-                hint="P/H"
-                id="vRatio"
-                note={
-                  <AmbientNote text="P / H : poids du passager sur la tension horizontale — plus il est grand, plus la ligne forme un V sous le passager." />
-                }
-              />
-            )}
-          </Group>
-
-          <Group title="Passager">
-            <NumericRow hint="kg" id="mp" />
-            <NumericRow hint="m" id="hRider" />
-            {/* The threshold the clearance read-outs are judged against (2026-09-23). Beside the
-                envelope because both are clearance inputs; a Clearance Gate field like it. */}
-            <NumericRow hint="m" id="hClearMin" />
-            <NumericRow
-              chip={<Chip detail={PROVENANCE.DAF} label="§8.2" tone="neutral" />}
-              id="DAF"
-              // The second half of one condition: below 3 % of flèche / portée the line is outside
-              // the regime the 1,2 ceiling was measured in. It is **not** a duplicate of the row on
-              // `Flèche / portée`, and deleting either half hides half the finding.
-              warning={rung("DAF")}
-            />
-            <NumericRow
-              hint="m"
-              id="xD"
-              note={<ClampNote className="text-muted-foreground block text-xs" event={clamped} />}
-            />
-          </Group>
-
-          {/* The Vent (#87): descriptive for now — no statics, clearance or Verdict reads it. */}
-          <Group title={heading("wind", "exact")}>
-            <NumericRow hint="km/h" id="windSpeed" />
-            <NumericRow hint="°" id="windDirection" />
-          </Group>
-
-          {/* The Positions (#90): typed in WGS84, read in LV95. The statics never read them; the
-              profil geo.admin is loaded between them (#103). */}
-          <Group title={heading("position", "exact")}>
-            {(["A", "B"] as const).map((end) => {
-              const note = positionPairNote(text, end);
-              const position = scenario.positions[end];
-              return (
-                <Fragment key={end}>
-                  <NumericRow
-                    hint="°"
-                    id={POSITION_FIELDS[end][0]}
-                    warning={text[POSITION_FIELDS[end][0]].trim() === "" ? note : null}
-                  />
-                  <NumericRow
-                    hint="°"
-                    id={POSITION_FIELDS[end][1]}
-                    warning={text[POSITION_FIELDS[end][1]].trim() === "" ? note : null}
-                  />
-                  {position !== null && (
-                    <ReadOut
-                      help={LV95_HELP}
-                      label={`${label("lv95", "exact")} ${end} (${label("approximate", "exact")})`}
-                      value={
-                        inLv95Domain(position)
-                          ? formatLv95(lv95FromWgs84(position))
-                          : "hors du domaine suisse"
-                      }
-                    />
-                  )}
-                </Fragment>
-              );
-            })}
-            <GeoadminControls />
-          </Group>
-        </div>
-      </RailSection>
-
-      <RailSection title="Valeurs déduites">
-        <div className="mt-2">
-          {readOuts
-            .filter((row) => row.group === "placement")
-            .map((row) => (
-              <DeducedReadOut key={row.id} row={row} />
-            ))}
-
-          {steelSpec !== null && (
+        <Group title="Géométrie">
+          {/* An imported profil is taken whole, so its `Portée` and `Dénivelé` are read-outs. */}
+          {scenario.geometry.source === "manual" && (
             <>
-              <DerivedRow
-                chip={
-                  deduced.material.overridden.MBF ? (
-                    <Chip
-                      detail="Valeur saisie : elle entre dans la liste des valeurs sans référence normative confirmée."
-                      label="valeur saisie"
-                      tone="neutral"
-                    />
-                  ) : (
-                    <Chip detail={PROVENANCE.MBF} label="[STD-ATTESTED]" tone="neutral" />
-                  )
+              <NumericRow hint="m" id="L" />
+              <NumericRow hint="m" id="h" />
+            </>
+          )}
+          <NumericRow hint="m" id="zA" />
+          <NumericRow hint="m" id="zB" />
+          <ProfileImport />
+        </Group>
+
+        <Group title="Ligne">
+          <FamilyRow />
+          <CarryingLinesRow />
+
+          {steelSpec !== null ? (
+            <>
+              <NumericRow hint="mm" id="d" />
+              <Row
+                control={
+                  <Picker
+                    id="rail-r0"
+                    onChange={(value) =>
+                      patch({
+                        ...scenario,
+                        material: { ...steelSpec, R0: Number(value) as 1770 | 1960 },
+                      })
+                    }
+                    options={[
+                      { value: "1770", label: "1770" },
+                      { value: "1960", label: "1960" },
+                    ]}
+                    value={String(steelSpec.R0)}
+                  />
                 }
-                formula={deduced.material.formula?.MBF ?? null}
-                id="mbfOverride"
-                label={FIELDS.mbfOverride.label}
-                onRecalculate={() => patch(clearOverride(scenario, "MBF"))}
-                quantity="MBF"
-                stale={deduced.material.stale.MBF}
-                unit={unit}
-              >
-                <NumericRow hint={unit} id="mbfOverride" />
-              </DerivedRow>
-              <DerivedRow
-                formula={deduced.material.formula?.EA ?? null}
-                id="eaOverride"
-                label={FIELDS.eaOverride.label}
-                onRecalculate={() => patch(clearOverride(scenario, "EA"))}
-                quantity="EA"
-                stale={deduced.material.stale.EA}
-                unit={unit}
-              >
-                <NumericRow hint="MN" id="eaOverride" />
-              </DerivedRow>
-              <DerivedRow
-                formula={deduced.material.formula?.mu ?? null}
-                id="muOverride"
-                label={FIELDS.muOverride.label}
-                onRecalculate={() => patch(clearOverride(scenario, "mu"))}
-                quantity="mu"
-                stale={deduced.material.stale.mu}
-                unit={unit}
-              >
-                <NumericRow hint="kg/m" id="muOverride" />
-              </DerivedRow>
+                help={FIELD_HELP.R0}
+                hint="N/mm²"
+                htmlFor="rail-r0"
+                label={FIELDS.R0.label}
+              />
+              <Row
+                control={
+                  <Picker
+                    id="rail-cst"
+                    onChange={(construction) =>
+                      patch({ ...scenario, material: { ...steelSpec, construction } })
+                    }
+                    options={CONSTRUCTION_OPTIONS}
+                    value={steelSpec.construction}
+                  />
+                }
+                help={FIELD_HELP.cst}
+                htmlFor="rail-cst"
+                label={FIELDS.cst.label}
+              />
+            </>
+          ) : (
+            <>
+              <PresetRow />
+              <Row
+                chip={presetChip(provenance.cls)}
+                control={
+                  <Picker
+                    id="rail-cls"
+                    onChange={(ropeClass) => patch(applyRopeClass(scenario, ropeClass))}
+                    options={ROPE_CLASS_OPTIONS}
+                    value={textileSpec?.ropeClass ?? "hmpe"}
+                  />
+                }
+                help={FIELD_HELP.cls}
+                htmlFor="rail-cls"
+                label={FIELDS.cls.label}
+              />
+              <NumericRow chip={presetChip(provenance.MBL)} hint={unit} id="MBL" />
+              <NumericRow chip={presetChip(provenance.muTextile)} hint="kg/m" id="muTextile" />
+              <NumericRow chip={presetChip(provenance.dTextile)} hint="mm" id="dTextile" />
+              <NumericRow
+                chip={presetChip(provenance.k)}
+                id="k"
+                // The **ambient** tier: plain status text, **no ⚠**. It fires on every textile
+                // line — a tyrolienne never enters §13.2's 10–30 % MBL band — so an alarm here
+                // would be permanent and therefore mute.
+                note={<AmbientNote text={rung("k")} />}
+              />
             </>
           )}
 
-          {readOuts
-            .filter((row) => row.group === "line")
-            .map((row) => (
-              <DeducedReadOut key={row.id} row={row} />
-            ))}
+          <TerminationRow
+            end="A"
+            family={scenario.material.family}
+            onPick={(id) =>
+              patch({
+                ...scenario,
+                terminations: {
+                  ...scenario.terminations,
+                  A: { id, eta: TERMINATIONS[id].eta },
+                },
+              })
+            }
+            ropeClass={textileSpec?.ropeClass ?? null}
+            selected={scenario.terminations.A.id}
+          />
+          <NumericRow id="etaA" label={`${FIELDS.etaA.label}_A`} />
+          <TerminationRow
+            end="B"
+            family={scenario.material.family}
+            onPick={(id) =>
+              patch({
+                ...scenario,
+                terminations: {
+                  ...scenario.terminations,
+                  B: { id, eta: TERMINATIONS[id].eta },
+                },
+              })
+            }
+            ropeClass={textileSpec?.ropeClass ?? null}
+            selected={scenario.terminations.B.id}
+          />
+          <NumericRow id="etaB" label={`${FIELDS.etaB.label}_B`} />
+        </Group>
 
-          {/* § 7's third echo. The cause sentence is written **once** and repeated in each
+        <Group title="Tension de la ligne">
+          <TensioningDeviceRow warning={rung("tensioningDevice")} />
+          {/* Where the prétension is read — whatever drives, since its read-out reads there too. */}
+          <TensioningSideRow />
+          {/* Exactly one field is editable; the other four appear under `Valeurs déduites`.
+                Switching mode **pre-fills the new field from its read-out**. */}
+          <div className="flex items-center gap-1 py-1">
+            <span className="text-muted-foreground text-xs">Pilote</span>
+            <InfoTip label="Pilote de tension" text={TIGHTNESS_HELP} />
+          </div>
+          <Segmented
+            onChange={(mode) =>
+              patch(switchTightness(scenario, mode, deduced, lastGoodSolve.current))
+            }
+            options={[
+              { value: "sag", label: "Flèche" },
+              { value: "anchor", label: "Prétension" },
+              { value: "tension", label: "H" },
+              { value: "length", label: "Longueur" },
+              { value: "ratio", label: "Rapport V" },
+            ]}
+            value={scenario.tightness.mode}
+          />
+          {driver === "D_target" && <NumericRow hint="m" id="D_target" />}
+          {driver === "T_target" && (
+            <NumericRow hint={unit} id="T_target" warning={rung("pretension")} />
+          )}
+          {driver === "H_target" && <NumericRow hint={unit} id="H_target" />}
+          {driver === "L0" && <NumericRow hint="m" id="L0" />}
+          {/* `P / H` — the passenger's design load over the tension horizontale. It resolves to
+                a `H_target` from `m_p`, so the resulting `Tension horizontale` shows under
+                `Valeurs déduites` like any other mode's. */}
+          {driver === "vRatio" && (
+            <NumericRow
+              hint="P/H"
+              id="vRatio"
+              note={
+                <AmbientNote text="P / H : poids du passager sur la tension horizontale — plus il est grand, plus la ligne forme un V sous le passager." />
+              }
+            />
+          )}
+        </Group>
+
+        <Group title="Passager">
+          <NumericRow hint="kg" id="mp" />
+          <NumericRow hint="m" id="hRider" />
+          {/* The threshold the clearance read-outs are judged against (2026-09-23). Beside the
+                envelope because both are clearance inputs; a Clearance Gate field like it. */}
+          <NumericRow hint="m" id="hClearMin" />
+          <NumericRow
+            chip={<Chip detail={PROVENANCE.DAF} label="§8.2" tone="neutral" />}
+            id="DAF"
+            // The second half of one condition: below 3 % of flèche / portée the line is outside
+            // the regime the 1,2 ceiling was measured in. It is **not** a duplicate of the row on
+            // `Flèche / portée`, and deleting either half hides half the finding.
+            warning={rung("DAF")}
+          />
+          <NumericRow
+            hint="m"
+            id="xD"
+            note={<ClampNote className="text-muted-foreground block text-xs" event={clamped} />}
+          />
+        </Group>
+
+        {/* The Vent (#87): descriptive for now — no statics, clearance or Verdict reads it. */}
+        <Group title={heading("wind", "exact")}>
+          <NumericRow hint="km/h" id="windSpeed" />
+          <NumericRow hint="°" id="windDirection" />
+        </Group>
+
+        {/* The Positions (#90): typed in WGS84, read in LV95. The statics never read them; the
+              profil geo.admin is loaded between them (#103). */}
+        <Group title={heading("position", "exact")}>
+          {(["A", "B"] as const).map((end) => {
+            const note = positionPairNote(text, end);
+            const position = scenario.positions[end];
+            return (
+              <Fragment key={end}>
+                <NumericRow
+                  hint="°"
+                  id={POSITION_FIELDS[end][0]}
+                  warning={text[POSITION_FIELDS[end][0]].trim() === "" ? note : null}
+                />
+                <NumericRow
+                  hint="°"
+                  id={POSITION_FIELDS[end][1]}
+                  warning={text[POSITION_FIELDS[end][1]].trim() === "" ? note : null}
+                />
+                {position !== null && (
+                  <ReadOut
+                    help={LV95_HELP}
+                    label={`${label("lv95", "exact")} ${end} (${label("approximate", "exact")})`}
+                    value={
+                      inLv95Domain(position)
+                        ? formatLv95(lv95FromWgs84(position))
+                        : "hors du domaine suisse"
+                    }
+                  />
+                )}
+              </Fragment>
+            );
+          })}
+          <GeoadminControls />
+        </Group>
+      </div>
+    </RailSection>
+  );
+
+  const deducedSection = (
+    <RailSection title="Valeurs déduites">
+      <div className="mt-2">
+        {readOuts
+          .filter((row) => row.group === "placement")
+          .map((row) => (
+            <DeducedReadOut key={row.id} row={row} />
+          ))}
+
+        {steelSpec !== null && (
+          <>
+            <DerivedRow
+              chip={
+                deduced.material.overridden.MBF ? (
+                  <Chip
+                    detail="Valeur saisie : elle entre dans la liste des valeurs sans référence normative confirmée."
+                    label="valeur saisie"
+                    tone="neutral"
+                  />
+                ) : (
+                  <Chip detail={PROVENANCE.MBF} label="[STD-ATTESTED]" tone="neutral" />
+                )
+              }
+              formula={deduced.material.formula?.MBF ?? null}
+              id="mbfOverride"
+              label={FIELDS.mbfOverride.label}
+              onRecalculate={() => patch(clearOverride(scenario, "MBF"))}
+              quantity="MBF"
+              stale={deduced.material.stale.MBF}
+              unit={unit}
+            >
+              <NumericRow hint={unit} id="mbfOverride" />
+            </DerivedRow>
+            <DerivedRow
+              formula={deduced.material.formula?.EA ?? null}
+              id="eaOverride"
+              label={FIELDS.eaOverride.label}
+              onRecalculate={() => patch(clearOverride(scenario, "EA"))}
+              quantity="EA"
+              stale={deduced.material.stale.EA}
+              unit={unit}
+            >
+              <NumericRow hint="MN" id="eaOverride" />
+            </DerivedRow>
+            <DerivedRow
+              formula={deduced.material.formula?.mu ?? null}
+              id="muOverride"
+              label={FIELDS.muOverride.label}
+              onRecalculate={() => patch(clearOverride(scenario, "mu"))}
+              quantity="mu"
+              stale={deduced.material.stale.mu}
+              unit={unit}
+            >
+              <NumericRow hint="kg/m" id="muOverride" />
+            </DerivedRow>
+          </>
+        )}
+
+        {readOuts
+          .filter((row) => row.group === "line")
+          .map((row) => (
+            <DeducedReadOut key={row.id} row={row} />
+          ))}
+
+        {/* § 7's third echo. The cause sentence is written **once** and repeated in each
               suppressed region, because the Rail is one scrolling column and a rail reader may
               never have the banner in view. It replaces the five solve-dependent rows — `L₀`,
               `H à vide`, la flèche à vide, `flèche / portée`, la tension à vide — and never
               `ligne A–B` or `w`, which are independent of a solve and stay above it. */}
-          {cause !== null && <p className="text-muted-foreground mt-1 text-xs">{cause}</p>}
-        </div>
-      </RailSection>
+        {cause !== null && <p className="text-muted-foreground mt-1 text-xs">{cause}</p>}
+      </div>
+    </RailSection>
+  );
+
+  return (
+    <RailRow.Provider value={row}>
+      {children({ parameters, deduced: deducedSection })}
     </RailRow.Provider>
   );
 }

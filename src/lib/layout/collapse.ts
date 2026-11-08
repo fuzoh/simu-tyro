@@ -41,7 +41,7 @@ import {
   COMPACT_HEIGHT_PX,
   MIN_RAIL,
   PINNED_CELL,
-  RAIL_REFLOW_PX,
+  THREE_COLUMN_PX,
   VIEW_STRIP,
 } from "./contract.ts";
 
@@ -120,11 +120,11 @@ export const PROFILE_BAND_LABEL = "Profil";
  * `compact` rule are the two constraints, and this is the one thing the *width* scoping cannot
  * cover: (a) and (b) are narrow-screen behaviour — above B2 the Rail sits beside the block and a
  * focused field must cost the chart nothing — while a block that does not fit does not fit at any
- * width. **Landscape is exactly that case and needs no rule of its own**: an 844 × 390 phone is
- * above B2, so only this makes the Pinned Safety Header appear there.
+ * width. **A short desktop window is exactly that case and needs no rule of its own**: three
+ * columns at 1440 × 500 are above B2, so only this makes the Pinned Safety Header appear there.
  *
- * The shell publishes it as `data-fit`, and `src/styles.css` gates the same bands on it that
- * `max-md:` gates on B2 — voir the `pinned` variant.
+ * The shell publishes it as `data-fit`, and `src/styles.css` gates the same bands on it that its
+ * `width < 1024px` arm gates on B2 — voir the `pinned` variant.
  */
 export function heightConstrained({ fits, compact }: Pick<CollapseInputs, "compact" | "fits">) {
   return !fits || compact;
@@ -217,7 +217,7 @@ export function availableHeight({
  *   the Rail is a full-height column *beside* the block and owes it nothing, so the block's own
  *   height is the whole test. **That comparison is not a layout branch**: the tree, the bands and
  *   every band height are identical either way — it names which of § 5's two budget shapes is in
- *   force, on the same {@link RAIL_REFLOW_PX} the shell's one `md:` uses.
+ *   force, on the same {@link THREE_COLUMN_PX} the shell's `min-[1024px]:` classes use.
  * - **{@link ViewportFit.chromeHeight} is owed on the *other* arm of that same branch, and for the
  *   mirror-image reason.** Above B2 the block lives in a height-bounded `overflow-hidden` column,
  *   so every pixel the « clés ignorées » strip takes above it is a pixel the block's last band is
@@ -240,7 +240,7 @@ export function fitsWholeBlock({
   navigationHeight = 0,
 }: ViewportFit): boolean {
   if (columnWidth === null) return true;
-  const railBelow = viewportWidth < RAIL_REFLOW_PX;
+  const railBelow = viewportWidth < THREE_COLUMN_PX;
   const available = availableHeight({ viewportHeight, keyboardInset, navigationHeight });
   return chartBlockHeight(columnWidth) <= available - (railBelow ? MIN_RAIL : chromeHeight);
 }
