@@ -36,9 +36,10 @@ unstretched length before anything is computed.
 _Avoid_: tension mode, pretension setting, parameterisation mode
 
 **Tightness Driver**:
-Which one of the three tightness quantities is the editable one. Exactly one is the
-driver and the other two are read-outs derived from it, so the driver is state: it is
-encoded by *which key is present* (`fl` / `te` / `lo`), never by a mode key beside a
+Which one of the four tightness quantities — target sag, tension, unstressed length and
+V ratio — is the editable one. Exactly one is the driver and the other three are
+read-outs derived from it, so the driver is state: it is encoded by *which key is
+present* (`fl` / `te` / `lo` / `vr`), never by a mode key beside a
 value. Two drivers arriving at once is a contradiction, not a preference, and the link
 is refused whole.
 _Avoid_: tightness mode, active field, `tm`, parameterisation mode
