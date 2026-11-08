@@ -80,7 +80,7 @@ empty `ui/`.
 `--radius: 0`, which is what the installed `base-lyra` style already assumes — its `button` and
 `native-select` are `rounded-none` in every size variant. So a freshly-added component needs no
 patch, forever. `rounded-full` survives for **circular marks only** (status dots, the rider grab
-handle, the vue de dessus's anchor markers and the rose des vents's handle): a dot is a shape, not a corner radius. `rounded-md`, `rounded-sm` and bare `rounded`
+handle, the vue de dessus's anchor markers, its hover point and the rose des vents's handle): a dot is a shape, not a corner radius. `rounded-md`, `rounded-sm` and bare `rounded`
 appear nowhere.
 
 ### One control height: 28 px

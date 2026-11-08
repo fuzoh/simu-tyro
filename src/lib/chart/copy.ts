@@ -35,3 +35,18 @@ export const LAYER_LABEL: Record<keyof LayerToggles, { full: string; short: stri
   trajectory: { full: label("trajectory", "exact"), short: "trajet" },
   riderTip: { full: "distances", short: "dist." },
 };
+
+/**
+ * What the coupe's and the vue de dessus's hover says beside the distance and the garde au sol, whose
+ * words are `label("distance")` and `label("groundClearance")`. A manual line has no altitude of its
+ * own, so its heights are counted from A's foot and the hover says so once, on a line of its own.
+ * « chargée » because GLOSSARY's bare « ligne » is the Span. The hover prints these and the two
+ * labels in the `terrain` register everywhere: they are `same()` in both registers, so the register
+ * only matters here through `label()`.
+ */
+export const COUPE_HOVER = {
+  ground: { absolute: "altitude du sol", fromFoot: "hauteur du sol" },
+  line: { absolute: "altitude de la ligne chargée", fromFoot: "hauteur de la ligne chargée" },
+  lineGap: "écart ligne – sol",
+  fromFoot: "hauteurs depuis le pied de A",
+} as const;

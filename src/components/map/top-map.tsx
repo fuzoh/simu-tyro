@@ -39,6 +39,8 @@ import { Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl } from "map
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import type { Px } from "@/lib/chart/hover-gesture.ts";
+import type { HoverLine } from "@/lib/chart/hover.ts";
 import type { SceneBase, SceneFrame } from "@/lib/chart/scene.ts";
 import type { Fond, MapDisplay } from "@/lib/map/display.ts";
 import type { Anchor, MapEvent, MapGesture } from "@/lib/map/gesture.ts";
@@ -49,11 +51,13 @@ import type { Position, Positions } from "@/lib/scenario/types.ts";
 import type { Fetch } from "@/lib/terrain/geoadmin.ts";
 
 import { useAppDispatch, useAppState } from "@/components/app/store.tsx";
-import { plainDrawing, TopViewFrame } from "@/components/statique/top-view.tsx";
+import { useHover } from "@/components/chart/use-hover.ts";
+import { plainDrawing, TOP_VIEW_BOX, TopViewFrame } from "@/components/statique/top-view.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.tsx";
 import { Toggle } from "@/components/ui/toggle.tsx";
+import { coupeLines, coupeReading } from "@/lib/chart/hover.ts";
 import { placeRider } from "@/lib/chart/scene.ts";
 import { bananeAcross } from "@/lib/map/banane.ts";
 import {
@@ -70,6 +74,7 @@ import {
 } from "@/lib/map/copy.ts";
 import { FONDS } from "@/lib/map/display.ts";
 import { clickTarget, drawnPositions, IDLE, stepGesture } from "@/lib/map/gesture.ts";
+import { type LineEnds, type LinePick, pointerOnLine, profilRunsBetween } from "@/lib/map/hover.ts";
 import {
   BANANE_SOURCE,
   bananeData,
@@ -139,6 +144,44 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
   const reference =
     plain !== null && plain.unoriented !== null ? LEVEL_REFERENCE : roseReference(drawn);
   const rose = useRef<HTMLDivElement>(null);
+  const [project, setProject] = useState<Project | null>(null);
+  // The line is read under the pointer only while nothing else is using the pointer on the map.
+  // The line the map draws is the portée's own only where the coupe's profil runs between its ends.
+  const reads =
+    !shows3d &&
+    !measuring &&
+    gesture.kind === "idle" &&
+    frame !== null &&
+    profilRunsBetween(drawn, scenario.geometry.source === "trace" ? trace : null);
+  const { at: hovered, bind, clear: clearHover } = useHover<LinePick>();
+  const hover = bind((event) => {
+    // A control over the line — a toggle, the rose and its handle — is not the line's to read. Not
+    // `hasPointerCapture`: a finger is captured by whatever it lands on, the map's canvas included.
+    const holder = event.target instanceof Element ? event.target : null;
+    if (!reads || holder?.closest("button, [data-rose]")) return null;
+    const ends: LineEnds | null =
+      plain !== null
+        ? { kind: "drawing", A: plain.ends.A, B: plain.ends.B, view: TOP_VIEW_BOX }
+        : project === null || drawn.A === null || drawn.B === null
+          ? null
+          : { kind: "projected", A: project(drawn.A), B: project(drawn.B) };
+    const box = event.currentTarget.getBoundingClientRect();
+    return pointerOnLine(ends, box, { x: event.clientX - box.left, y: event.clientY - box.top });
+  });
+  const read =
+    reads && hovered !== null
+      ? {
+          at: hovered.at,
+          reading: coupeReading({
+            frame,
+            cable: null,
+            rider: null,
+            metres: hovered.t * frame.L,
+            reach: 0,
+            clearance: true,
+          }),
+        }
+      : null;
   const unavailable = failed || fondUnavailable(health, drawn);
   // The Banane is on screen when there is a cross wind and a line for it to bow: the map's, or the
   // Ligne à vide the Vue 3D drew — which it does not while an anchor follows the pointer.
@@ -211,7 +254,7 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
             <Attribution text={drapedAttribution(display.fond)} />
           </>
         ) : (
-          <>
+          <div className="absolute inset-0" {...hover}>
             {plain === null ? (
               <>
                 <MapCanvas
@@ -224,6 +267,10 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
                   across={across}
                   measure={measure.points}
                   measuring={measuring}
+                  // A function is a state updater to `setState`, so the projection goes in wrapped.
+                  onProject={(next) => setProject(() => next)}
+                  // The line moved under a still pointer: what was read is stale.
+                  onMove={clearHover}
                   rose={rose}
                   send={send}
                   target={target}
@@ -273,7 +320,10 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
               wind={scenario.wind}
             />
             <Attribution text={fondAttribution(display.fond)} />
-          </>
+            {read !== null && read.reading !== null && (
+              <HoverReadout at={read.at} lines={coupeLines(read.reading, "terrain")} />
+            )}
+          </div>
         )
       }
     />
@@ -293,6 +343,35 @@ function MeasureReadout({ reading }: { reading: MeasureReading }) {
         <span key={line}>{line}</span>
       ))}
     </div>
+  );
+}
+
+/** Where the map draws a Position in its own box, px. */
+type Project = (position: Position) => Px;
+
+/**
+ * What the line says under the pointer, over the map's bottom-left corner so the caption's height
+ * never moves, and a dot on the line where it was read.
+ */
+function HoverReadout({ at, lines }: { at: Px; lines: readonly HoverLine[] }) {
+  return (
+    <>
+      <span
+        className="bg-foreground pointer-events-none absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+        style={{ left: at.x, top: at.y }}
+      />
+      <div
+        aria-hidden
+        className="bg-background/90 text-foreground pointer-events-none absolute bottom-6 left-2 flex flex-col px-1 text-xs"
+      >
+        {lines.map((line) => (
+          <span key={line.label}>
+            <span className="text-muted-foreground">{line.label}</span>
+            {line.value !== "" && <span className="font-mono"> {line.value}</span>}
+          </span>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -534,6 +613,8 @@ function MapCanvas({
   across,
   measure,
   measuring,
+  onProject,
+  onMove,
   rose,
   send,
   onClick,
@@ -551,6 +632,10 @@ function MapCanvas({
   onClick: (at: Position) => void;
   /** The wind's cross component, m/s: the Banane's only input. */
   across: number;
+  /** Hands over the map's projection while the map lives: where a Position stands in its box. */
+  onProject: (project: Project | null) => void;
+  /** The view moved, by the user or by the line. */
+  onMove: () => void;
   /** The rose's host: the map keeps it on the line's midpoint as the view moves. */
   rose: RefObject<HTMLDivElement | null>;
   send: (event: MapEvent) => void;
@@ -569,9 +654,11 @@ function MapCanvas({
   const bow = useRef(across);
   const ruler = useRef(measure);
   const clicked = useRef(onClick);
+  const moved = useRef(onMove);
   useLayoutEffect(() => {
     clicked.current = onClick;
-  }, [onClick]);
+    moved.current = onMove;
+  }, [onClick, onMove]);
 
   // The rose follows the line's midpoint through every pan and zoom: it runs on every frame, so it
   // moves the host's style rather than render.
@@ -613,6 +700,7 @@ function MapCanvas({
     created.touchZoomRotate.disableRotation();
     created.addControl(new NavigationControl({ showCompass: false }), "top-right");
     created.on("move", placeRose);
+    created.on("move", () => moved.current());
     created.on("resize", placeRose);
     created.on("click", (event) =>
       clicked.current({ lat: event.lngLat.lat, lon: event.lngLat.lng }),
@@ -629,11 +717,13 @@ function MapCanvas({
       }
     });
     map.current = created;
+    onProject(({ lat, lon }) => created.project([lon, lat]));
     placeRose();
     applied.current = styleKey(display, vector.current);
     return () => {
       created.remove();
       map.current = null;
+      onProject(null);
       markers.current = { A: null, B: null };
     };
     // Mounted once: the effects below follow the display and the drawing.

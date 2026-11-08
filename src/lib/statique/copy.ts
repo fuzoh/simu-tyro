@@ -11,7 +11,7 @@ import { ASSUMED_NOTE, AVANCE_NOTICE } from "@/lib/app/avance-copy.ts";
 import { CHOOSE_REGIME_BY_REGISTER, JUMP_LABEL } from "@/lib/app/banner.ts";
 import { DISMISS_LABEL } from "@/lib/app/link-strip.ts";
 import { DIAGNOSTIC_ACTION } from "@/lib/app/refusals.ts";
-import { LAYER_LABEL, NO_SPAN_LINE, PEEK_LABEL } from "@/lib/chart/copy.ts";
+import { COUPE_HOVER, LAYER_LABEL, NO_SPAN_LINE, PEEK_LABEL } from "@/lib/chart/copy.ts";
 import { peekBadgeLabel, veBadgeLabel } from "@/lib/layout/contract.ts";
 import { mapLabelTable } from "@/lib/map/copy.ts";
 import { cellLabel, cellsOf, READ_OUT_SCOPE } from "@/lib/rail/cells.ts";
@@ -147,6 +147,12 @@ export function statiqueLabelTable(): readonly string[] {
     READ_OUT_SCOPE,
     ...Object.values(LAYER_LABEL).flatMap(({ full, short }) => [full, short]),
     ...Object.values(PEEK_LABEL).flatMap(({ full, short }) => [full, short]),
+    ...Object.values(COUPE_HOVER.ground),
+    ...Object.values(COUPE_HOVER.line),
+    COUPE_HOVER.lineGap,
+    COUPE_HOVER.fromFoot,
+    label("distance", "terrain"),
+    label("groundClearance", "terrain"),
     veBadgeLabel({ state: "auto", ve: 4.7 }),
     veBadgeLabel({ state: "true-scale", ve: 1 }),
     veBadgeLabel({ state: "true-scale-clipped", ve: 1 }),

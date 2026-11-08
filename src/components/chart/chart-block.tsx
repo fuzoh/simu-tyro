@@ -318,6 +318,7 @@ export function ChartBlock({
           layers={state.layers}
           onScrub={scrub}
           plot={{ top: PROFILE_CHROME.badge, height: plotHeight }}
+          register={register}
           scene={scene}
           wide={wide}
           x={x}

@@ -78,6 +78,11 @@ export type CoupeScene = {
   readonly ground: PxPath;
   /** One loaded line per Brin porteur, a few pixels apart — `null` without a solved line. */
   readonly members: readonly { readonly offsetPx: number; readonly path: PxPath }[] | null;
+  /**
+   * The loaded line in metres with the passager hanging on it at rest, for the hover to read —
+   * `null` where `members` is.
+   */
+  readonly rest: ChartScene["rider"] | null;
   /** The loaded trajectory of the passager, one path per run of solved steps. */
   readonly trajectory: readonly PxPath[];
   /** Each anchor's tower, clipped to the plot. */
@@ -198,6 +203,7 @@ export function dynamiqueScene({
         solved === null || rest === null
           ? null
           : solved.base.members.map(({ offsetPx }) => ({ offsetPx, path: inPx(rest.cable) })),
+      rest,
       trajectory: solved === null ? [] : solved.base.trajectory.map(inPx),
       anchors: [
         tower(0, 0, -frame.anchors.zA),

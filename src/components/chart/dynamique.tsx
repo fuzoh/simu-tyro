@@ -10,13 +10,11 @@
  * No handle, no scrub and no animation: the passager is a path here, not a thing that moves.
  */
 
-import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { area, line } from "d3-shape";
-import { useState } from "react";
 
 import type { SceneFrame } from "@/lib/chart/scene.ts";
-import type { HoverLine } from "@/lib/dynamique/hover.ts";
 import type {
   CoupeScene,
   CurveScene,
@@ -28,13 +26,15 @@ import type {
 import type { SharedX } from "@/lib/layout/contract.ts";
 
 import { BannerSlot, ProfileBand, StripBand } from "@/components/app/shell.tsx";
+import { HoverRule, HoverTip } from "@/components/chart/hover.tsx";
 import { xTicks } from "@/components/chart/profile.tsx";
+import { type HoverHandlers, metresOn, useHover } from "@/components/chart/use-hover.ts";
 import { NO_SPAN_LINE } from "@/lib/chart/copy.ts";
+import { type CoupeReading, coupeLines, coupeReading, RIDER_REACH_PX } from "@/lib/chart/hover.ts";
 import { CHART_TITLE, CURVE_CAPTION } from "@/lib/dynamique/copy.ts";
-import { coupeHover, curveHover } from "@/lib/dynamique/hover.ts";
+import { curveHover } from "@/lib/dynamique/hover.ts";
 import { dynamiqueScene } from "@/lib/dynamique/scene.ts";
 import { CELL_WRAP_PX } from "@/lib/layout/contract.ts";
-import { clampX } from "@/lib/scenario/geometry.ts";
 import { cn } from "@/lib/utils.ts";
 
 /** A path through pixel points, `null` for none. */
@@ -54,23 +54,27 @@ function pathOf(points: PxPath): string | undefined {
  * @param frame the input half, or `null` for « l'exception géométrique »: no shared x domain.
  * @param solved the solved line and its rides, `null` for « Aucun résultat »; the rides alone are
  *   `null` for an incomplete traverse, which still draws the line and the trajectory.
+ * @param clearance `false` under a Clearance Gate breach: the coupe's hover withholds every gap.
  * @param cause what is said in the curve's frame where the curve would be: « Aucun résultat — … »,
  *   or the incomplete traverse.
  */
 export function DynamiqueCharts({
   banner,
   cause,
+  clearance,
   frame,
   solved,
   width,
 }: {
   banner?: ReactNode;
   cause: string | null;
+  /** May the gaps to the ground be shown? False on a Clearance Gate breach, as on Statique. */
+  clearance: boolean;
   frame: SceneFrame | null;
   solved: DynamiqueSolved | null;
   width: number | null;
 }) {
-  const [hover, setHover] = useState<number | null>(null);
+  const { at: hover, bind } = useHover<number>();
 
   if (width === null) {
     return (
@@ -96,7 +100,20 @@ export function DynamiqueCharts({
 
   const scene = dynamiqueScene({ width, frame, solved });
   const wide = width >= CELL_WRAP_PX;
-  const at = hover === null ? null : clampX(hover, frame.L);
+  const pointer = bind(metresOn(scene.x));
+  // One authority for « on the span »: the coupe's reading is `null` past A or B, and so is the curve's.
+  const reading =
+    hover === null
+      ? null
+      : coupeReading({
+          frame,
+          cable: scene.coupe.rest?.cable ?? null,
+          rider: scene.coupe.rest,
+          metres: hover,
+          reach: RIDER_REACH_PX / scene.x.pxPerM,
+          clearance,
+        });
+  const at = reading?.distance ?? null;
 
   return (
     <>
@@ -104,8 +121,8 @@ export function DynamiqueCharts({
       <ProfileBand>
         <Coupe
           frame={frame}
-          hover={at}
-          onHover={setHover}
+          reading={reading}
+          pointer={pointer}
           scene={scene.coupe}
           wide={wide}
           x={scene.x}
@@ -115,7 +132,7 @@ export function DynamiqueCharts({
         {scene.curve !== null && solved?.rides != null ? (
           <Curve
             hover={at}
-            onHover={setHover}
+            pointer={pointer}
             rides={solved.rides}
             scene={scene.curve}
             wide={wide}
@@ -139,31 +156,17 @@ function Line({ text }: { text: string }) {
   );
 }
 
-/** The pointer's abscissa on a frame, or the pointer leaving it — one handler pair for both. */
-function pointer(x: SharedX, onHover: (metres: number | null) => void) {
-  const read = (event: ReactPointerEvent<SVGElement>) => {
-    const rect = event.currentTarget.ownerSVGElement?.getBoundingClientRect();
-    if (rect !== undefined) onHover(x.toMetres(event.clientX, rect.left));
-  };
-  return {
-    onPointerDown: read,
-    onPointerMove: read,
-    onPointerLeave: () => onHover(null),
-    onPointerCancel: () => onHover(null),
-  };
-}
-
 function Coupe({
   frame,
-  hover,
-  onHover,
+  reading,
+  pointer,
   scene,
   wide,
   x,
 }: {
   frame: SceneFrame;
-  hover: number | null;
-  onHover: (metres: number | null) => void;
+  reading: CoupeReading | null;
+  pointer: HoverHandlers;
   scene: CoupeScene;
   wide: boolean;
   x: SharedX;
@@ -232,14 +235,8 @@ function Coupe({
           <MarkerRule bottom={plotBottom} key={marker.id} marker={marker} top={plot.top} />
         ))}
 
-        {hover !== null && (
-          <line
-            className="stroke-foreground/40"
-            x1={x.x(hover)}
-            x2={x.x(hover)}
-            y1={plot.top}
-            y2={plotBottom}
-          />
+        {reading !== null && (
+          <HoverRule at={x.x(reading.distance)} bottom={plotBottom} top={plot.top} />
         )}
       </g>
 
@@ -271,11 +268,11 @@ function Coupe({
         ))}
       </g>
 
-      {hover !== null && (
+      {reading !== null && (
         <HoverTip
-          at={x.x(hover)}
+          at={x.x(reading.distance)}
           bottom={plotBottom}
-          lines={coupeHover(frame, hover)}
+          lines={coupeLines(reading, "terrain")}
           top={plot.top}
           width={x.width}
         />
@@ -284,7 +281,7 @@ function Coupe({
       {/* The plot is the pointer surface; `touch-pan-y` keeps a vertical drag scrolling the Page. */}
       <rect
         className="fill-transparent"
-        {...pointer(x, onHover)}
+        {...pointer}
         height={plot.height}
         width={x.width}
         x={0}
@@ -296,14 +293,14 @@ function Coupe({
 
 function Curve({
   hover,
-  onHover,
+  pointer,
   rides,
   scene,
   wide,
   x,
 }: {
   hover: number | null;
-  onHover: (metres: number | null) => void;
+  pointer: HoverHandlers;
   rides: Rides;
   scene: CurveScene;
   wide: boolean;
@@ -373,15 +370,7 @@ function Curve({
         <MarkerRule bottom={plot.bottom} key={marker.id} marker={marker} top={plot.top} />
       ))}
 
-      {hover !== null && (
-        <line
-          className="stroke-foreground/40"
-          x1={x.x(hover)}
-          x2={x.x(hover)}
-          y1={plot.top}
-          y2={plot.bottom}
-        />
-      )}
+      {hover !== null && <HoverRule at={x.x(hover)} bottom={plot.bottom} top={plot.top} />}
 
       {hover !== null && (
         <HoverTip
@@ -395,7 +384,7 @@ function Curve({
 
       <rect
         className="fill-transparent"
-        {...pointer(x, onHover)}
+        {...pointer}
         height={plot.bottom - plot.top}
         width={x.width}
         x={0}
@@ -469,48 +458,6 @@ function MarkerLabel({
       y={top + 11 + 12 * marker.row}
     >
       {marker.label}
-    </text>
-  );
-}
-
-/** The tip's rough width, SVG user units — enough to decide which side of the rule it goes. */
-const TIP_WIDTH = 200;
-
-/**
- * The hover's lines, beside the rule and above the plot's bottom edge, flipped left near the right
- * edge. `pointer-events-none`, so the tip is never a hole in the pointer surface.
- */
-function HoverTip({
-  at,
-  bottom,
-  lines,
-  top,
-  width,
-}: {
-  at: number;
-  bottom: number;
-  lines: readonly HoverLine[];
-  top: number;
-  width: number;
-}) {
-  const left = at + 8 + TIP_WIDTH > width;
-  const tx = left ? at - 8 : at + 8;
-  // Anchored to the bottom edge, but never above the plot: a long tip runs down past it instead.
-  const first = Math.max(top + 10, bottom - 6 - 13 * (lines.length - 1));
-  return (
-    <text
-      className="fill-foreground stroke-background pointer-events-none text-[11px]"
-      paintOrder="stroke"
-      strokeLinejoin="round"
-      strokeWidth={5}
-      textAnchor={left ? "end" : "start"}
-    >
-      {lines.map((one, index) => (
-        <tspan key={one.label} x={tx} y={first + 13 * index}>
-          <tspan className="fill-muted-foreground">{one.label}</tspan>
-          {one.value !== "" && <tspan className="font-mono"> {one.value}</tspan>}
-        </tspan>
-      ))}
     </text>
   );
 }

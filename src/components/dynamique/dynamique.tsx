@@ -47,7 +47,7 @@ function Live({ page }: { page: string }) {
   // Read for its side effect alone: it writes `--kb`, the iOS keyboard inset the frame pads by.
   useViewport();
   const { state, strip, rail, surfaces, copyDiagnostic } = usePage({ page, register: "terrain" });
-  const { cause, frame, refusal, saisie, solved } = surfaces;
+  const { cause, clearance, frame, refusal, saisie, solved } = surfaces;
   // The Verdict, and the request for a marge exigée that asks for one, are not this Page's: only
   // what stops the computation reaches the banner here.
   const occupant = useMemo(
@@ -103,6 +103,7 @@ function Live({ page }: { page: string }) {
         <DynamiqueCharts
           banner={<Banner occupant={occupant} onDiagnostic={copyDiagnostic} onJump={jump} />}
           cause={said}
+          clearance={clearance}
           frame={frame}
           solved={dynamicSolved}
           width={width}

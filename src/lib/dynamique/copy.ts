@@ -11,7 +11,7 @@ import type { DynamicsWarningId } from "@/lib/scenario/dynamics.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 
 import { ASSUMED_NOTE, AVANCE_NOTICE } from "@/lib/app/avance-copy.ts";
-import { NO_SPAN_LINE } from "@/lib/chart/copy.ts";
+import { COUPE_HOVER, NO_SPAN_LINE } from "@/lib/chart/copy.ts";
 import { fieldLabel } from "@/lib/rail/fields.ts";
 import { heading, label } from "@/lib/vocabulary/labels.ts";
 
@@ -97,12 +97,9 @@ export const CHART_TITLE = {
   curve: `Vitesse et accélération du ${label("passenger", "terrain")} le long de la ${label("line", "terrain")}`,
 } as const;
 
-/** The hover's words, on the coupe and on the curve. */
+/** The curve's hover words; the coupe's are `COUPE_HOVER`'s, shared with every coupe. */
 export const HOVER_LABEL = {
-  distance: "x",
-  altitude: "altitude",
-  /** A manual line has no altitude of its own: the height is counted from A's foot. */
-  heightAboveA: "hauteur depuis le pied de A",
+  distance: label("distance", "terrain"),
   speed: "vitesse",
   acceleration: "accélération",
 } as const;
@@ -143,6 +140,10 @@ export function dynamiqueLabelTable(): readonly string[] {
     ...Object.values(CURVE_CAPTION),
     ...Object.values(CHART_TITLE),
     ...Object.values(HOVER_LABEL),
+    ...Object.values(COUPE_HOVER.ground),
+    ...Object.values(COUPE_HOVER.line),
+    COUPE_HOVER.lineGap,
+    COUPE_HOVER.fromFoot,
     ...Object.values(CONSTANTS_NOTE),
     ...Object.values(WARNING_COPY).filter((text) => text !== null),
     NO_SPAN_LINE,

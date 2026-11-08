@@ -1,23 +1,20 @@
 import { describe, expect, test } from "vitest";
 
+import { groundAt } from "@/lib/chart/hover.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 
 import { ON_PROFIL, PROFIL, ridesUnder } from "./__fixtures__/rides.ts";
-import { HOVER_LABEL } from "./copy.ts";
-import { coupeHover, curveHover, groundAt, sampleNear } from "./hover.ts";
+import { curveHover, sampleNear } from "./hover.ts";
 
 const HEAD = ridesUnder(50, 0);
 const CALM = ridesUnder(0, 0);
 const IMPORTED = ridesUnder(0, 0, ON_PROFIL, PROFIL);
 
-describe("the coupe's hover — the abscissa and the altitude", () => {
+describe("the ground under the coupe's hover", () => {
   test("on a manual line the height is counted from A's foot, and is the anchor's height at A", () => {
     const at = groundAt(CALM.frame, 0);
     expect(at.absolute).toBe(false);
     expect(at.altitude).toBeCloseTo(0, 9);
-    const [x, height] = coupeHover(CALM.frame, 75);
-    expect(x).toEqual({ label: "x", value: "75,0 m" });
-    expect(height.label).toBe(HOVER_LABEL.heightAboveA);
   });
 
   test("the ground along the straight line between the bases falls with the dénivelé", () => {
@@ -26,22 +23,14 @@ describe("the coupe's hover — the abscissa and the altitude", () => {
     expect(groundAt(CALM.frame, L).altitude).toBeCloseTo(h, 9);
     expect(groundAt(CALM.frame, L / 2).altitude).toBeCloseTo(h / 2, 9);
   });
-});
 
-describe("the coupe's hover on an imported profil — the altitude is the file's", () => {
-  test("reads the profil's own samples at the abscissae it has them", () => {
+  test("on an imported profil, reads the file's own samples at the abscissae it has them", () => {
     const { L } = IMPORTED.frame;
     const lastZ = PROFIL.z[PROFIL.z.length - 1];
     expect(groundAt(IMPORTED.frame, 0).altitude).toBeCloseTo(PROFIL.z[0], 9);
     expect(groundAt(IMPORTED.frame, 50).altitude).toBeCloseTo(PROFIL.z[1], 9);
     expect(groundAt(IMPORTED.frame, L).altitude).toBeCloseTo(lastZ, 9);
     expect(groundAt(IMPORTED.frame, 0).absolute).toBe(true);
-  });
-
-  test("names the line an altitude, not a height above A's foot", () => {
-    const [, altitude] = coupeHover(IMPORTED.frame, 50);
-    expect(altitude.label).toBe(HOVER_LABEL.altitude);
-    expect(altitude.value).toBe(formatQuantity("zBase", PROFIL.z[1]));
   });
 });
 
@@ -50,7 +39,12 @@ describe("the curve's hover — the speed and the acceleration at the point", ()
     const lines = curveHover(CALM.reading, CALM.outputs, 75);
     const sample = sampleNear(CALM.reading.windy, 75);
     if (sample === null) throw new Error("the ride is read at its own abscissa");
-    expect(lines.map((line) => line.label)).toEqual(["x", "vitesse", "accélération", "estimation"]);
+    expect(lines.map((line) => line.label)).toEqual([
+      "distance",
+      "vitesse",
+      "accélération",
+      "estimation",
+    ]);
     expect(lines[1].value).toBe(formatQuantity("speed", sample.v));
     expect(lines[2].value).toBe(formatQuantity("acceleration", sample.a));
   });
@@ -59,7 +53,7 @@ describe("the curve's hover — the speed and the acceleration at the point", ()
     const lines = curveHover(HEAD.reading, HEAD.outputs, 40);
     // Every row keeps the name of its quantity beside the name of its ride.
     expect(lines.map((line) => line.label)).toEqual([
-      "x",
+      "distance",
       "vitesse sans vent",
       "vitesse avec vent",
       "accélération sans vent",
@@ -83,7 +77,7 @@ describe("the curve's hover — the speed and the acceleration at the point", ()
     expect(sampleNear(HEAD.reading.windy, past)).toBeNull();
     const lines = curveHover(HEAD.reading, HEAD.outputs, past);
     expect(lines.map((line) => line.label)).toEqual([
-      "x",
+      "distance",
       "vitesse sans vent",
       "accélération sans vent",
       "estimation",

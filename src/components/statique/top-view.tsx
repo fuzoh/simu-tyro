@@ -39,6 +39,8 @@ export function plainDrawing(
 ): {
   figure: ReactNode;
   unoriented: string | null;
+  /** The two anchors in the drawing's own units, for what reads the line under a pointer. */
+  ends: { A: TopViewPoint; B: TopViewPoint };
 } {
   const { A, B, unoriented } = topView(positions, TOP_VIEW_BOX);
   const { width, height } = TOP_VIEW_BOX;
@@ -48,6 +50,7 @@ export function plainDrawing(
   ] as const;
   return {
     unoriented: unoriented === null ? null : UNORIENTED[unoriented],
+    ends: { A, B },
     figure: (
       <>
         <svg

@@ -90,6 +90,7 @@ export function WindRose({
     <div
       aria-label={MAP_COPY.rose}
       className="pointer-events-none absolute top-1/2 left-1/2 size-0 text-xs"
+      data-rose
       ref={hostRef}
       role="group"
     >

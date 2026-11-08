@@ -36,10 +36,15 @@ import { area, line } from "d3-shape";
 import type { ChartScene, Polyline, SceneFrame, SceneRider } from "@/lib/chart/scene.ts";
 import type { SharedX, ZScale } from "@/lib/layout/contract.ts";
 import type { LayerToggles } from "@/lib/session/session.ts";
+import type { Register } from "@/lib/vocabulary/labels.ts";
 
+import { coupeLines, coupeReading, RIDER_REACH_PX } from "@/lib/chart/hover.ts";
 import { polylineAt } from "@/lib/chart/scene.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { cn } from "@/lib/utils.ts";
+
+import { HoverRule, HoverTip } from "./hover.tsx";
+import { metresOn, useHover } from "./use-hover.ts";
 
 /** A path through a `(xs, zs)` polyline, in SVG user units. `null` for an empty polyline. */
 function pathOf(points: Polyline, x: SharedX, z: ZScale): string | null {
@@ -64,6 +69,7 @@ export function Profile({
   bandHeight,
   badge,
   layers,
+  register,
   wide,
   onScrub,
 }: {
@@ -92,6 +98,8 @@ export function Profile({
   /** What the VE badge says about **what is drawn** — the peek included. */
   badge: { label: string; emphasised: boolean };
   layers: LayerToggles;
+  /** The Page's vocabulary: what the hover calls what it reads. */
+  register: Register;
   /** Chart-column width ≥ B1 — the same threshold the read-out row wraps at, no new breakpoint. */
   wide: boolean;
   /** A pointer landed at this many metres; the caller snaps it to a sweep step. */
@@ -120,13 +128,30 @@ export function Profile({
     onScrub(x.toMetres(event.clientX, rect.left));
   }
 
+  // A mouse reads the coupe wherever it is; a finger, once held still. A press still moves the rider.
+  const { at: hovered, bind } = useHover<number>();
+  const reading =
+    hovered === null
+      ? null
+      : coupeReading({
+          frame,
+          cable: rider?.cable ?? null,
+          rider,
+          metres: hovered,
+          reach: RIDER_REACH_PX / x.pxPerM,
+          clearance,
+        });
+  const hover = bind(metresOn(x));
   const drag = {
+    ...hover,
     onPointerDown(event: ReactPointerEvent<SVGElement>) {
       event.currentTarget.setPointerCapture(event.pointerId);
       scrub(event);
+      hover.onPointerDown(event);
     },
     onPointerMove(event: ReactPointerEvent<SVGElement>) {
       if (event.currentTarget.hasPointerCapture(event.pointerId)) scrub(event);
+      hover.onPointerMove(event);
     },
   };
 
@@ -353,6 +378,10 @@ export function Profile({
             />
           </>
         )}
+
+        {reading !== null && (
+          <HoverRule at={x.x(reading.distance)} bottom={plotBottom} top={plot.top} />
+        )}
       </g>
 
       {/* « distances » — outside the clip, so a rider near the frame's top keeps its numbers. */}
@@ -365,6 +394,16 @@ export function Profile({
           width={x.width}
           x={x.x(rider.step.xD)}
           y={z.y(rider.step.zD)}
+        />
+      )}
+
+      {reading !== null && (
+        <HoverTip
+          at={x.x(reading.distance)}
+          bottom={plotBottom}
+          lines={coupeLines(reading, register)}
+          top={plot.top}
+          width={x.width}
         />
       )}
 
