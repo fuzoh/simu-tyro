@@ -54,3 +54,25 @@ Arithmétique, **non publiée par Courant** : une variation de charge de 100 kgf
 - 41 %/59 % pour le Bandit : aucune source Courant (34 % de gaine).
 - Glissement de gaine 0,1 % et nouabilité 0,6 pour le Bandit : aucune source Courant.
 - Page produit Courant du Bandit sur `mycourant.com` : non lue (certificat TLS non vérifiable depuis cet environnement). Si cette page existe, elle peut contenir une fiche plus récente que A ; à vérifier depuis un navigateur.
+
+## Addendum : page produit et fiche officielle sur mycourant.com (2026-11-08)
+
+Lecture faite depuis un navigateur (le certificat du site ne présente pas son intermédiaire, d'où l'échec de `curl` et de WebFetch ; le navigateur l'accepte). Le Bandit **existe toujours** au catalogue en ligne, en 10,5, 11 et 12,5 mm.
+
+| Id | Document | URL | Date |
+| --- | --- | --- | --- |
+| D | Page produit « Bandit 11 mm », onglet « Informations techniques », réf. ML400BEC040 | https://www.mycourant.com/fr/cordes/cordes-semi-statiques/bandit-11-mm | page lue le 2026-11-08, non datée |
+| E | Fiche technique « FR-COURANT-FT-CORDE BANDIT 11 MM », 1 page, réf. ML4+++++, onglet « Documents » de D | https://www.mycourant.com/media/34321/1/0/1/FR-COURANT-FT-CORDE+BANDIT+11+MM.pdf | publiée le 12/09/2022 |
+| F | Déclaration UE de conformité ML4 Bandit 11 | https://www.mycourant.com/media/43985/1/0/1/UE-DECLARATION-CONFORMITY-ML4+-+BANDIT+11.pdf | 30/08/2024 |
+
+Le site propose aussi la notice générale cordes (`COURANT-NOTICE-CORDES.pdf`, 12/09/2022) et une déclaration de 2021, non lues.
+
+**Le tableau de la page D reproduit mot pour mot la fiche terrain de #68** : EN 1891:1998 type A, polyamide, rupture 3000 daN, couture 2600 daN, nœud de 8 2300 daN, 73 g/m, gaine 41 % / âme 59 %, glissement de gaine 0,1 %, allongement 50/150 kg 3,5 %, nouabilité 0,6, rétraction à l'eau 2,5 %. La fiche terrain vient donc de cette page, et n'a rien inversé.
+
+**La fiche E, hébergée sur la même page, dit autre chose** et rejoint les fiches A (2024) et B (2020) : rupture 3100 daN, couture 2600 daN, 73 g/m, gaine 34 % / âme 76 % (même coquille à 110 % que A), allongement 50/150 kg **2,5 %**, nouabilité 1, rétraction à l'eau **3,5 %** ; pas de ligne nœud de 8 ni glissement de gaine.
+
+Conclusion révisée :
+
+- La divergence est **interne à Courant** : son tableau web (D) contre ses trois fiches techniques datées (B 2020, E 2022, A 2024). Les fiches sont cohérentes entre elles sur l'allongement (2,5 %), la rétraction (3,5 %), la gaine (34 %) et la nouabilité (1) ; le tableau web est seul à porter 41/59, 0,1 % et 0,6, valeurs qui correspondent à d'autres cordes du catalogue (voir plus haut). L'hypothèse du mélange de lignes reste une hypothèse, mais elle porte sur le tableau web de Courant, pas sur la fiche terrain.
+- Pour la spec : **73 g/m** est confirmé partout. Pour l'allongement 50/150 kg, retenir **2,5 %** avec l'étiquette « fiche technique Courant du 12/09/2022 (E), confirmée par les fiches 2020 et 2024 », et consigner que la page produit (D) affiche 3,5 %. La déduction `EA ≈ 39 kN` qui en découle reste une déduction, pas une donnée Courant.
+- Rupture : 3100 daN (E, A, B) ; la page D dit 3000 daN. Couture : 2600 daN (D, E, B) ; A dit 2300 daN.
