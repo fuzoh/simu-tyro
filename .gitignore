@@ -13,3 +13,7 @@ todos.json
 
 # typescript
 *.tsbuildinfo
+
+# notebooks (docs/mesures dynamometre)
+.venv/
+.ipynb_checkpoints/
