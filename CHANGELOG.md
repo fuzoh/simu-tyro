@@ -1,5 +1,64 @@
 # Changelog
 
+## [1.0.1](https://github.com/fuzoh/simu-tyro/compare/v1.0.0...v1.0.1) (2026-11-08)
+
+
+### Bug Fixes
+
+* **app:** store the session before the address bar reads bare / ([d5f575b](https://github.com/fuzoh/simu-tyro/commit/d5f575b34beced2f0ca8e1b9999ed63bd7fd9359)), closes [#57](https://github.com/fuzoh/simu-tyro/issues/57)
+* **persist:** gate the address bar on `publishable` and write a bare / on oversize ([9ed97e4](https://github.com/fuzoh/simu-tyro/commit/9ed97e4896b979f5b9c742edcd9a13cec8302285))
+* **persist:** publish a bare / when the trace exceeds the link budget ([930398c](https://github.com/fuzoh/simu-tyro/commit/930398c94933c5d8abd00b3f7910da29680f6e68))
+* **rail:** clamp x_D through clampX alone on geometry and typed paths ([20a58be](https://github.com/fuzoh/simu-tyro/commit/20a58be03b4c560612f8359ef4f21560ccd24504)), closes [#58](https://github.com/fuzoh/simu-tyro/issues/58)
+* **rail:** gate a knot on HMPE with the passer-a-la-terminaison-de-depart Fix Action ([62d08b0](https://github.com/fuzoh/simu-tyro/commit/62d08b005e7c81f311dd9416a971f3fe8f16a5d0))
+* **rail:** keep an emptied View Strip x field from sending the rider to 0 m ([87480f3](https://github.com/fuzoh/simu-tyro/commit/87480f3c2ae09d15313a1d14fd2d05150a2251da))
+* **rail:** keep the gate report and results through an x_D scrub ([893bdea](https://github.com/fuzoh/simu-tyro/commit/893bdea1e4abce13fe16b4d8dd274c821c8420d9))
+* **rail:** key the report and results memos on traverseInputs ([8b83d4f](https://github.com/fuzoh/simu-tyro/commit/8b83d4f30f4bc7176f1a5ed1e1b7474160225b3f))
+* **rail:** key useDeduced on rider.mp and unit, useResults on hClearMin ([0884f66](https://github.com/fuzoh/simu-tyro/commit/0884f661cf6cc1bd2fd6ffbd3302c5557762b312))
+* **rail:** list every read field in the deduced and results memos ([e16a7e9](https://github.com/fuzoh/simu-tyro/commit/e16a7e9e0f4a220b80d5c76ca458292d29a023d5))
+* **rail:** name every missed clause in the régime-unavailable error ([aeb8b06](https://github.com/fuzoh/simu-tyro/commit/aeb8b06b991e3d720725f1498e134149f9f51328))
+* **rail:** raise an end the line cannot use as a Verdict-gate blocking error ([c4a3331](https://github.com/fuzoh/simu-tyro/commit/c4a3331c82cc59745a7b21125a3cb35aa3427ada))
+* **rail:** read and write every numeric field through FIELD_ACCESS ([8ac09c4](https://github.com/fuzoh/simu-tyro/commit/8ac09c4ea903563045375515c2eb1c77eb0bc914))
+* **rail:** read and write every numeric field through one lens ([7f4133d](https://github.com/fuzoh/simu-tyro/commit/7f4133d9b9cf800448a11ce5a79f97e78cba714e)), closes [#25](https://github.com/fuzoh/simu-tyro/issues/25)
+* **rail:** stop an emptied View Strip x field from sending the rider to 0 m ([acb8ea0](https://github.com/fuzoh/simu-tyro/commit/acb8ea035c2ddf8bdb7de6f6277c128596cbcba1))
+* **scenario:** merge clampToSpan into clampX with one non-finite rule ([9247133](https://github.com/fuzoh/simu-tyro/commit/92471330f03858a6151bd17a0f6a522a3a182fc4)), closes [#58](https://github.com/fuzoh/simu-tyro/issues/58)
+* **url:** apply the review round to the codec move ([53bd7e5](https://github.com/fuzoh/simu-tyro/commit/53bd7e57b6ea3ae156def06e6e0da910326007b9))
+* **url:** complete a missing η from the decoded end and a missing k from its class ([401a110](https://github.com/fuzoh/simu-tyro/commit/401a1101da72272d5eba5df5061a8d6d3a3ea137))
+* **url:** complete a trace link's absent stations to the trace's ends ([de72b9c](https://github.com/fuzoh/simu-tyro/commit/de72b9ce4d5dfb5870b9c9ef02832333282c8219)), closes [#55](https://github.com/fuzoh/simu-tyro/issues/55)
+* **url:** complete from the active family and drop the decoder's fallbacks ([de426a0](https://github.com/fuzoh/simu-tyro/commit/de426a0181f841269e102916c2d267e1a535075d))
+* **url:** complete links into a CompletedSearch from the active family ([a6d7d8a](https://github.com/fuzoh/simu-tyro/commit/a6d7d8aed7131894fa1d61fa34a7ee737d096ed2))
+* **url:** derive cls and cst tokens from ROPE_CLASS_TOKEN_BY_ID and CONSTRUCTION_TOKEN_BY_ID ([57cfbf6](https://github.com/fuzoh/simu-tyro/commit/57cfbf6fe157859346b9982889be35e75eeb3936))
+* **url:** derive cls and cst tokens from total tables and name a completed rope class ([009605e](https://github.com/fuzoh/simu-tyro/commit/009605efd2b3d8c2566d5904c00a7f22830aab6c))
+* **url:** make the link strip's key table total and derive ValidatedSearch ([7cf3c83](https://github.com/fuzoh/simu-tyro/commit/7cf3c83c96a163dc85d65776d23ffa8ef0e1536a))
+* **url:** make the link strip's KEYS total and derive ValidatedSearch ([95d21c5](https://github.com/fuzoh/simu-tyro/commit/95d21c58e07bf1e07b25a1ab5af245e71136fa8d))
+
+
+### Tests
+
+* **url:** pin golden canonical links for every encoding branch ([b6befe1](https://github.com/fuzoh/simu-tyro/commit/b6befe1de128001db9096a14128dcf12342248ad))
+* **url:** pin golden canonical links for every encoding branch ([d43182c](https://github.com/fuzoh/simu-tyro/commit/d43182c403316e0ddc56857813052e65cf8cfcec))
+
+
+### Documentation
+
+* add ADR-0001 on faithful invalid state and blocking gates ([e74d4e9](https://github.com/fuzoh/simu-tyro/commit/e74d4e923abfc93295305e5b1271b2176dcdf978))
+* add ADR-0001 on faithful invalid state and blocking gates ([0c50f5f](https://github.com/fuzoh/simu-tyro/commit/0c50f5f4905ee82c73aac87b22133c588ec661a1))
+* **glossary:** list vr among the Tightness Driver keys ([417a91f](https://github.com/fuzoh/simu-tyro/commit/417a91fc7b0f667906f3c1e66e2be8d1305f50df)), closes [#56](https://github.com/fuzoh/simu-tyro/issues/56)
+* **glossary:** list vr among the Tightness Driver keys ([#59](https://github.com/fuzoh/simu-tyro/issues/59)) ([3954cc9](https://github.com/fuzoh/simu-tyro/commit/3954cc906d7be98211ead647327fe50ac1a2f562)), closes [#56](https://github.com/fuzoh/simu-tyro/issues/56)
+* **url:** count vr among the tightness drivers in the spec and schema notes ([4ff99db](https://github.com/fuzoh/simu-tyro/commit/4ff99dbdd3102992bb6e5ec55eb70528664d1818)), closes [#56](https://github.com/fuzoh/simu-tyro/issues/56)
+
+
+### Refactors
+
+* **app:** place an import's stations through one traceEnds ([d32a910](https://github.com/fuzoh/simu-tyro/commit/d32a910ff01af54a4bd4a589d81f634c17a76f3a)), closes [#55](https://github.com/fuzoh/simu-tyro/issues/55)
+* **rail:** move deduced rows, read-out cells and option labels out of JSX ([5ef8782](https://github.com/fuzoh/simu-tyro/commit/5ef87822fb99d77f83e221aa476637571e4a0dfd))
+* **rail:** move deducedRows, readOutCells and option labels out of JSX ([a8467f8](https://github.com/fuzoh/simu-tyro/commit/a8467f89b4060bd066125e7842afa64bade58428))
+* **rail:** type the read-out cells' rider without lib/chart ([53f8529](https://github.com/fuzoh/simu-tyro/commit/53f8529fa9330689c0437b64a0b460493b4f5797)), closes [#58](https://github.com/fuzoh/simu-tyro/issues/58)
+* **scenario:** derive the unloaded line once for deduced values and scene ([7f7afd8](https://github.com/fuzoh/simu-tyro/commit/7f7afd8fd22c04f9dca3c2cf3a206e5602c6a102))
+* **scenario:** derive the unloaded line once with deriveUnloaded ([4cc11c5](https://github.com/fuzoh/simu-tyro/commit/4cc11c52ffdc7ac8ba1172b3feea1509cf6e4d03))
+* **sim:** own the warning thresholds in lineWarnings, the copy in the app ([fdcfc4f](https://github.com/fuzoh/simu-tyro/commit/fdcfc4ff97dd1b6e7fe256cd8f68cbcb5c1c432f))
+* **sim:** own the warning thresholds in the engine, the copy in the app ([02b450a](https://github.com/fuzoh/simu-tyro/commit/02b450a32cbf252e814eb1fb1e07de092424aea5))
+* **url:** move the search decoder next to the encoder ([a4cee05](https://github.com/fuzoh/simu-tyro/commit/a4cee05d0ce608158a863e7470756e12b6414ad6))
+
 ## 1.0.0 (2026-11-06)
 
 
