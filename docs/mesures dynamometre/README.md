@@ -56,5 +56,6 @@ et de la météo de [#67](https://github.com/fuzoh/simu-tyro/issues/67).
   test du moteur : on figerait un partage entre lignes qui n'est pas validé.
 
 Le tracé de la ligne cité dans l'introduction du notebook est le profil de cadrage (415,9 m) ; le
-tracé vérifié (435,2 m, départ au point haut, point bas 1 368,1 m) est joint à
-[#68](https://github.com/fuzoh/simu-tyro/issues/68).
+tracé vérifié (435,2 m, départ au point haut, point bas 1 368,1 m, azimut ≈312°) est
+`trace-geoadmin-2026-11-08.csv` dans ce dossier, export map.geo.admin.ch du 2026-11-08 au format
+d'import de l'application, aussi joint à [#68](https://github.com/fuzoh/simu-tyro/issues/68).
