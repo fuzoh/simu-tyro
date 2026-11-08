@@ -209,6 +209,9 @@ describe("applyField — one committed field, written back", () => {
     });
     expect(applyField(inverted, "xD", 400).rider.xD).toBe(400);
     expect(applyField(inverted, "sb", 100).rider.xD).toBe(75);
+    // Below 0 too: `clampX`'s rule, the one the reducer's terrain path applies to the same `x_D`.
+    expect(applyField(inverted, "xD", -5).rider.xD).toBe(-5);
+    expect(applyField(inverted, "xD", Number.NaN).rider.xD).toBe(0);
   });
 
   test("writing the driving tightness field keeps the driver it belongs to", () => {

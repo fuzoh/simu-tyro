@@ -6,8 +6,8 @@
  * the help table are records over the same id, so a renamed label cannot leave a lookup behind.
  */
 
-import type { SceneRider } from "@/lib/chart/scene.ts";
 import type { ForceUnit } from "@/lib/scenario/types.ts";
+import type { SweepStep } from "@/lib/sim";
 
 import { formatAtX, formatQuantity } from "@/lib/format/quantity.ts";
 
@@ -61,6 +61,24 @@ export type Cell = {
 };
 
 /**
+ * The placed rider {@link readOutCells} prints — the fields of the chart's `SceneRider` it reads,
+ * typed here so `lib/rail` does not depend on `lib/chart`.
+ */
+export type PlacedRider = {
+  readonly step: Pick<SweepStep, "TA" | "TB" | "theta">;
+  /** §11's inner minimum at this rider position, and where it sits. */
+  readonly worst: { readonly hClear: number; readonly atX: number };
+  /** Is {@link worst} far enough from the rider that the cell names where it is? */
+  readonly relabel: boolean;
+  /** The passenger's own garde, at `x_D`. */
+  readonly underRider: number;
+  /** The loaded cable's drop below the unloaded one, at `x_D`. */
+  readonly belowUnloaded: number;
+  /** « Flèche » at this position: the drop below the A–B chord, m. */
+  readonly sagAtRider: number;
+};
+
+/**
  * Every cell for a placed rider.
  *
  * @param clearance `false` under a Clearance Gate breach: the two garde cells then say why, rather
@@ -68,7 +86,7 @@ export type Cell = {
  *   `Indéterminé`'s glyph and not this state.
  */
 export function readOutCells(
-  rider: SceneRider,
+  rider: PlacedRider,
   {
     clearance,
     hClearMin,

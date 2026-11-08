@@ -8,8 +8,9 @@
  * load-time seed, and what « Copier le lien » puts on the clipboard.
  *
  * Everything here is pure, and that is what makes it a `node` test with no router, no clipboard and
- * no `localStorage` in the room (amendment A). `@/components/app/use-persist.ts` owns the two
- * timers and the two side effects, and nothing else.
+ * no `localStorage` in the room (amendment A). This module decides **which writes happen, in which
+ * order**; `./write-side.ts` owns the two timers and performs those writes, and
+ * `@/components/app/use-persist.ts` only arms and disarms them.
  *
  * Rules this module exists to keep:
  *
@@ -25,6 +26,8 @@
  *   side. The budget is the **whole URL**, so the origin is a parameter here rather than a
  *   `window` read. Both link writers pass {@link publishable}; the address bar answers oversize
  *   with a bare `/` (the Session carries the Trace) where the copy button refuses.
+ * - **A bare `/` is never ahead of the Session.** It *means* « restore the Session », so the
+ *   oversize address-bar write stores the Session first, in the same tick ({@link addressBarWrites}).
  * - **The Session is strictly larger than the link**: it carries the retained inactive Material
  *   Spec, the retained manual geometry, the cached Trace and the two layer toggles, none of which a
  *   link may ever hold. The Session is *your session*; the URL is *this line*.
@@ -95,17 +98,48 @@ export function publishable(
 }
 
 /**
- * What the address-bar writer puts in the search, or `null` to leave the address bar alone.
+ * One side effect of the write side: store a Session, or replace the address bar's search.
  *
- * An oversize draft writes a **bare `/`**, not the last publishable search: a link always wins over
- * the Session on load, so the last search would reopen the pre-import span on reload, while a
- * bare `/` means « restore the Session », which holds the Trace. Writing the oversize search
- * instead is what made a reload refuse the user's own import.
+ * `search` is the **whole** search, never a patch: the address bar holds exactly the state the app
+ * holds, so the bag replaces whatever the location carried.
  */
-export function addressBarSearch(draft: ScenarioDraft, origin: string): ValidatedSearch | null {
-  const result = publishable(draft, origin);
-  if (result.ok) return result.search;
-  return result.reason === "oversize" ? {} : null;
+export type Write =
+  | { readonly to: "session"; readonly session: Session }
+  | { readonly to: "address-bar"; readonly search: ValidatedSearch };
+
+/**
+ * What the ≈400 ms address-bar timer writes, **in order** — empty to leave the address bar alone.
+ *
+ * - A publishable draft writes its canonical search, and nothing else: the Session keeps its own
+ *   ≈1 s timer.
+ * - A draft with § 9's blanks writes nothing, which holds the address bar at the last complete
+ *   Scenario — the same rule « Saisie en cours » applies.
+ * - An oversize draft writes a **bare `/`**, not the last publishable search: a link always wins
+ *   over the Session on load, so the last search would reopen the pre-import span on reload, while
+ *   a bare `/` means « restore the Session », which holds the Trace. Writing the oversize search
+ *   instead is what made a reload refuse the user's own import.
+ *
+ * And because a bare `/` *means* the Session, **the Session goes first** (#57). Left to its own
+ * ≈1 s timer, a reload between the two writes read `/` and silently restored the Session from
+ * *before* the edit. Written first, in the same tick, there is no moment where the address bar
+ * reads `/` while storage holds an older Session; the ≈1 s write still runs, and overwrites it with
+ * the same content.
+ */
+export function addressBarWrites(state: AppState, origin: string): readonly Write[] {
+  const link = publishable(state.scenario, origin);
+  if (link.ok) return [{ to: "address-bar", search: link.search }];
+  if (link.reason === "incomplete") return [];
+  const bare: Write = { to: "address-bar", search: {} };
+  // Oversize implies complete — `publishable` refuses § 9's blanks first — so `session` is never
+  // `null` here. The guard is for the type, and it keeps the address-bar write unconditional.
+  const session = sessionOf(state);
+  return session === null ? [bare] : [{ to: "session", session }, bare];
+}
+
+/** What the ≈1 s Session timer writes: the Session, or nothing while § 9's blanks stand. */
+export function sessionWrites(state: AppState): readonly Write[] {
+  const session = sessionOf(state);
+  return session === null ? [] : [{ to: "session", session }];
 }
 
 /**

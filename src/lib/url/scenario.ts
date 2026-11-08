@@ -29,11 +29,13 @@ import type {
   TightnessDraft,
 } from "@/lib/scenario/types.ts";
 import type { SteelSpec, TerminationId, TextileSpec } from "@/lib/sim";
+import type { TraceEnds } from "@/lib/terrain/trace.ts";
 
 import { tightnessDriver } from "@/lib/rail/values.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 import { clampX } from "@/lib/scenario/geometry.ts";
 import { TERMINATIONS, TEXTILE } from "@/lib/sim";
+import { traceEnds } from "@/lib/terrain/trace.ts";
 
 import type {
   AcceptedSearch,
@@ -46,6 +48,7 @@ import type {
   TightnessKey,
 } from "./schema.ts";
 
+import { decodeP1, P1Error } from "./p1.ts";
 import { CANONICAL_KEYS, canonicalLink, TIGHTNESS_KEYS } from "./schema.ts";
 
 /** The write-side direction of `cst`. Total over the engine's constructions. */
@@ -231,8 +234,10 @@ const TIGHTNESS_KEY_SET: ReadonlySet<SearchKey> = new Set<SearchKey>(TIGHTNESS_K
 const DEFAULT_FAMILY: FamilyToken = FIRST_RUN_SCENARIO.material.family === "steel" ? "ac" : "tx";
 
 /**
- * Where an imported link with no `sa` starts: the file's own origin. With the shipped span after
- * it, a trace link missing its stations still describes a line, and both stations are named.
+ * Where an imported link with no `sa` starts **when its `tr` cannot be decoded**: the file's own
+ * origin, with the shipped span after it. A decodable `tr` completes from the Trace's own ends —
+ * voir {@link importedTerrain}; this is the pre-#55 rule, kept only for the payload that never
+ * yields a Trace.
  */
 const FILE_ORIGIN = 0;
 
@@ -268,8 +273,10 @@ export type Completion = {
  *    are dropped rather than completed; `tr` absent ⇒ manual, and `sa`/`sb` never appear.
  * 3. The **inactive** family's keys, dropped the same way.
  *
- * Some keys complete from the link rather than from a constant. An imported link's `sa`
- * completes to {@link FILE_ORIGIN} and its `sb` to `sa` plus the shipped span. `x` completes to
+ * Some keys complete from the link rather than from a constant. An imported link's `sa` completes
+ * to the Trace's first distance and its `sb` to its last — where « tracé/importé » places them, both
+ * read through `traceEnds` — so a completed station never lands off the Trace. A station the link
+ * gives is kept as given, off the Trace included (ADR-0001). `x` completes to
  * half the *completed* span — 125,0 m for `?L=250&h=-40` rather than the constant 75,0 — because
  * it selects a **view**, and a viewpoint off the end of the span is worse than a moved viewpoint.
  * `na`/`nb` complete to the decoded end's own `η`, so `?ta=huit` is judged on the knot's 0,60 and
@@ -315,11 +322,10 @@ export function completeFromDefaults(search: AcceptedSearch): Completion {
 function completionValues(search: AcceptedSearch, family: FamilyToken): AcceptedSearch {
   const shipped = SHIPPED_BY_FAMILY[family];
   const firstRun = FIRST_RUN_SCENARIO.geometry;
-  const sa = search.sa ?? FILE_ORIGIN;
   const terrain: CompletedTerrain =
     search.tr === undefined
       ? { L: search.L ?? firstRun.L, h: search.h ?? firstRun.h }
-      : { tr: search.tr, sa, sb: search.sb ?? sa + firstRun.L };
+      : importedTerrain(search.tr, search.sa, search.sb);
   const lineFamily = family === "tx" ? "textile" : "steel";
   const eta = (token: TerminationToken) =>
     TERMINATIONS[terminationIdFromToken(token, lineFamily)].eta;
@@ -333,6 +339,41 @@ function completionValues(search: AcceptedSearch, family: FamilyToken): Accepted
     ...(k === null ? {} : { k }),
     x: spanOf(terrain) / 2,
   };
+}
+
+/**
+ * An imported link's stations. Each one the link gives is kept **as given** — ADR-0001: off the
+ * Trace it still raises « Station hors du tracé », and `sb ≤ sa` is still the blocked placement
+ * « Inverser A et B » repairs. Each absent one completes to the Trace's own end on its side, which
+ * is where an in-app import places it, read through the same {@link traceEnds}.
+ *
+ * The Trace is decoded only when a station is missing. A `tr` that does not decode keeps the
+ * pre-#55 rule — {@link FILE_ORIGIN}, then `sa` plus the shipped span — because how a bad payload
+ * is handled is the refusal's business, not completion's. An accepted bag cannot carry one: the
+ * validator walked it with the same structural check `decodeP1` runs first.
+ */
+function importedTerrain(
+  tr: string,
+  sa: number | undefined,
+  sb: number | undefined,
+): CompletedTerrain {
+  if (sa !== undefined && sb !== undefined) return { tr, sa, sb };
+  const ends = decodedEnds(tr);
+  if (ends === null) {
+    const start = sa ?? FILE_ORIGIN;
+    return { tr, sa: start, sb: sb ?? start + FIRST_RUN_SCENARIO.geometry.L };
+  }
+  return { tr, sa: sa ?? ends.start, sb: sb ?? ends.end };
+}
+
+/** The ends of the Trace a `tr` encodes, or `null` when the payload does not decode. */
+function decodedEnds(tr: string): TraceEnds | null {
+  try {
+    return traceEnds(decodeP1(tr));
+  } catch (error) {
+    if (error instanceof P1Error) return null;
+    throw error;
+  }
 }
 
 /**

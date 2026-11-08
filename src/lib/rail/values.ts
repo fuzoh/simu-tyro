@@ -352,11 +352,12 @@ export function applyGeometry(scenario: ScenarioDraft, geometry: Geometry): Scen
   };
 }
 
-/** `x_D` clamps on every path, and it is the one field that does. */
+/**
+ * `x_D` clamps on every path, and it is the one field that does — through `clampX`'s one rule, so
+ * a placement that is no span leaves `x_D` exactly as the reducer's terrain path does.
+ */
 function clampRider(x: number, geometry: Geometry): number {
-  if (!Number.isFinite(x)) return 0;
-  const L = spanOf(geometry);
-  return L === null ? Math.max(x, 0) : clampX(x, L);
+  return clampX(x, spanOfGeometry(geometry));
 }
 
 /** Typing into a derived field flips it to « valeur saisie ». Steel only, and per value. */

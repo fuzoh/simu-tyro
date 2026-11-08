@@ -31,8 +31,8 @@ _Avoid_: montage, terminaison, ancrage
 
 **Tightness Spec**:
 The user's chosen way of saying how tight the line is: unstretched length directly, a
-target installed tension, or a target unloaded sag. Whichever is chosen, it resolves to an
-unstretched length before anything is computed.
+target installed tension, a target unloaded sag, or a target V ratio. Whichever is chosen,
+it resolves to an unstretched length before anything is computed.
 _Avoid_: tension mode, pretension setting, parameterisation mode
 
 **Tightness Driver**:

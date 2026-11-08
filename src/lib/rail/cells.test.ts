@@ -2,17 +2,68 @@ import { describe, expect, test } from "vitest";
 
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 
-import { buildScene } from "@/lib/chart/scene.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
+import { clampX } from "@/lib/scenario/geometry.ts";
+import { sweepRider } from "@/lib/scenario/traverse.ts";
+import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
+import {
+  evaluateClearance,
+  sampleCable,
+  solveAtHorizontalPosition,
+  sweepStep,
+  zGroundAt,
+} from "@/lib/sim";
+
+import type { PlacedRider } from "./cells.ts";
 
 import { readOutCells } from "./cells.ts";
 
-function riderOf(patch: (draft: ScenarioDraft) => void = () => {}) {
+/** The chart's drawn-cable resolution — `CABLE_SAMPLES`, which `belowUnloaded` is read off. */
+const CABLE_SAMPLES = 240;
+
+/** An interleaved `x, z` polyline's height at `at`, held at the ends — the chart's `polylineAt`. */
+function interleavedAt(xz: Float64Array, at: number): number {
+  const last = xz.length / 2 - 1;
+  if (at <= xz[0]) return xz[1];
+  if (at >= xz[2 * last]) return xz[2 * last + 1];
+  let i = 0;
+  while (xz[2 * (i + 1)] <= at) i++;
+  const [x0, z0, x1, z1] = [xz[2 * i], xz[2 * i + 1], xz[2 * i + 2], xz[2 * i + 3]];
+  return z0 + ((at - x0) / (x1 - x0)) * (z1 - z0);
+}
+
+/**
+ * The rider the chart places, built from the same `lib/scenario` and `lib/sim` calls `buildScene`
+ * and `placeRider` make — `lib/rail` may not import `lib/chart`.
+ */
+function riderOf(patch: (draft: ScenarioDraft) => void = () => {}): PlacedRider {
   const draft = firstRunDefaults() as ScenarioDraft;
   patch(draft);
-  const scene = buildScene({ scenario: draft, trace: null });
-  if (scene === null) throw new Error("expected a drawable scene");
-  return scene.rider;
+  const unloaded = deriveUnloaded(unloadedInputs(draft, null));
+  if (!unloaded.ok) throw new Error("expected the line to solve");
+  const swept = sweepRider(unloaded, draft.rider);
+  if (swept === null) throw new Error("expected the traverse to solve");
+  const { input, state, span } = unloaded;
+  const { L, h, terrain } = span;
+  const { P } = swept;
+  const { hRider } = draft.rider;
+
+  const exact = solveAtHorizontalPosition(input, P, clampX(draft.rider.xD, L));
+  const sP = exact.ok ? exact.state.loads[0]?.s : undefined;
+  if (!exact.ok || sP === undefined) throw new Error("expected the rider to solve");
+  const resolved = sweepStep(input, P, sP, { H: exact.state.H, V0: exact.state.V0 });
+  if (!resolved.ok) throw new Error("expected the rider's step to solve");
+  const { step } = resolved;
+  const at = evaluateClearance(input, P, [step], terrain, hRider);
+  const worst = { hClear: at.perStep[0], atX: at.perStepX[0] };
+  return {
+    step,
+    worst,
+    relabel: Math.abs(worst.atX - step.xD) > Math.max(1, 0.01 * L),
+    underRider: step.zD - zGroundAt(terrain, step.xD) - hRider,
+    belowUnloaded: interleavedAt(sampleCable(state, CABLE_SAMPLES), step.xD) - step.zD,
+    sagAtRider: (h * step.xD) / L - step.zD,
+  };
 }
 
 describe("`readOutCells` — every cell by id, as the chart block printed it", () => {

@@ -80,12 +80,17 @@ export function placeSpan(
 }
 
 /**
- * § 7's `x` clamp. Silent here only in the sense that this function does not render: the caller
- * compares its own `search.x` against the result and owns the transient inline note
+ * The one `x_D` clamp: it applies on **every** path — geometry change, link arrival, typed input,
+ * pointer — because `x_D` selects a view. Rule, in order: a non-finite `xD` is `0`; with no span to
+ * clamp to (`L` non-finite or ≤ 0) `xD` is returned as is; otherwise `xD` is clamped into `[0, L]`.
+ *
+ * Silent here only in the sense that this function does not render: the caller compares its own
+ * input against the result and owns the transient inline note when the clamp moved a link's `x`
  * (« position ramenée à la portée : 0 – 150,0 m »), because discarding sender state with no trace
  * is the thing the clamp was elected *against*.
  */
 export function clampX(xD: number, L: number): number {
+  if (!Number.isFinite(xD)) return 0;
   if (!Number.isFinite(L) || L <= 0) return xD;
   if (xD < 0) return 0;
   return xD > L ? L : xD;
