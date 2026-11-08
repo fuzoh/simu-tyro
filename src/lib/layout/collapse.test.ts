@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import type { FieldId } from "@/lib/rail/fields.ts";
 
+import { DEFAULT_MAP_DISPLAY } from "@/lib/map/display.ts";
 import { FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 import { DEFAULT_LAYERS, SESSION_KEY, writeSession } from "@/lib/session/session.ts";
 import { scenarioToSearch } from "@/lib/url/scenario.ts";
@@ -740,6 +741,7 @@ describe("le repli n'est ni dans le Scénario, ni dans la Session, ni dans l'URL
       trace: null,
       retainedCsv: null,
       layers: DEFAULT_LAYERS,
+      map: DEFAULT_MAP_DISPLAY,
     });
     const written = map.get(SESSION_KEY) ?? "";
     expect(written.length).toBeGreaterThan(0);

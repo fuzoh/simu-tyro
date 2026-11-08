@@ -169,6 +169,7 @@ export function sessionOf(state: AppState): Session | null {
     trace: state.trace,
     retainedCsv: state.retainedCsv,
     layers: state.layers,
+    map: state.map,
   };
 }
 

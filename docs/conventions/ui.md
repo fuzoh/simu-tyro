@@ -80,7 +80,7 @@ empty `ui/`.
 `--radius: 0`, which is what the installed `base-lyra` style already assumes — its `button` and
 `native-select` are `rounded-none` in every size variant. So a freshly-added component needs no
 patch, forever. `rounded-full` survives for **circular marks only** (status dots, the rider grab
-handle): a dot is a shape, not a corner radius. `rounded-md`, `rounded-sm` and bare `rounded`
+handle, the vue de dessus's anchor markers): a dot is a shape, not a corner radius. `rounded-md`, `rounded-sm` and bare `rounded`
 appear nowhere.
 
 ### One control height: 28 px
@@ -144,7 +144,7 @@ that are decisions rather than defaults:
   `FieldLegend` `text-xs` (`FieldDescription` already ships at `text-xs` in `base-lyra` — the
   `text-sm` figure circulating in ticket 40 is `new-york`'s).
 
-**Two customisations in `ui/` that a re-`add` will silently undo.** Both are load-bearing; re-check
+**Three customisations in `ui/` that a re-`add` will silently undo.** All are load-bearing; re-check
 them after any `bunx shadcn@latest add`:
 
 - **`ui/input.tsx` must not carry `md:text-xs`.** `base-lyra` ships `text-xs md:text-xs`, where the
@@ -157,6 +157,16 @@ them after any `bunx shadcn@latest add`:
 - **`ui/input.tsx` is `h-7`, not `h-8`.** It is the only added component with no size variant, so
   its single height is the app's height. A future 32 px input is a new decision and gets
   `native-select`'s `data-size` pattern, not an invented variant API.
+- **`ui/checkbox.tsx` imports `cn` from `@/lib/utils`.** The registry item (added for the Couche
+  pentes, #93) arrives importing it from `"cn"`, a module this app does not have.
+
+### The map paints in literals
+
+MapLibre's paint properties take colours, not CSS custom properties, so the vue de dessus's plain
+background and the ligne A–B are hex literals in `src/lib/map/style.ts` — the only ones in the
+app's code, and the only place that may hold them. Everything around the canvas — the anchor
+markers, « Placer A / B », the attribution — is HTML over it and takes the tokens as everywhere
+else.
 
 ## Charts
 

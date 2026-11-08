@@ -159,6 +159,8 @@ function browserEffects(navigate: ReturnType<typeof useNavigate>, page: string):
     // `replace: true`, never `push` — see the header. The search is a **plain object**, never a
     // function and never a spread of `useSearch()`: `applyNext` hands a non-function updater to the
     // location verbatim, so this bag replaces the whole search. `to: "."` stays on the current Page.
-    navigate: (search) => void navigate({ replace: true, search, to: "." }),
+    // `resetScroll: false`: the router's default would jump the reader to the top on every edit —
+    // between the two clicks that place A then B on the map, too.
+    navigate: (search) => void navigate({ replace: true, resetScroll: false, search, to: "." }),
   };
 }

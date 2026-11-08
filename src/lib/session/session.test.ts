@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import type { Scenario } from "@/lib/scenario/types.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
+import { DEFAULT_MAP_DISPLAY } from "@/lib/map/display.ts";
 import { evaluateGates } from "@/lib/rail/gates.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { encodeP1, URL_BUDGET_CHARS } from "@/lib/url/p1.ts";
@@ -100,6 +101,7 @@ function bareSession(): Session {
     trace: null,
     retainedCsv: null,
     layers: DEFAULT_LAYERS,
+    map: DEFAULT_MAP_DISPLAY,
   };
 }
 
@@ -112,6 +114,7 @@ function fullSession(): Session {
     trace: TRACE,
     retainedCsv: null,
     layers: { unloadedLine: true, chordAB: false, riderTip: false, trajectory: true },
+    map: { fond: "carte-nationale", pentes: true },
   };
 }
 
@@ -826,6 +829,32 @@ describe("the Positions in the Session (#90)", () => {
     const scenario = blob.scenario as Record<string, unknown>;
     const positions = { A: { lat: "46,84", lon: 6.5 }, B: null };
     storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: { ...scenario, positions } }));
+    expect(readSession(storage)).toBeNull();
+  });
+});
+
+describe("the vue de dessus's Fond de carte and Couche pentes in the Session (#93)", () => {
+  test("the orthophoto under the Couche pentes survives a write and a read", () => {
+    const storage = memoryStorage();
+    const map = { fond: "orthophoto", pentes: true } as const;
+    writeSession(storage, { ...bareSession(), map });
+    expect(readSession(storage)?.map).toEqual(map);
+  });
+
+  test("a Session stored before the key is kept, and reads the carte claire alone", () => {
+    const storage = memoryStorage();
+    const { map: _map, ...older } = storedBlob(fullSession());
+    storage.setItem(SESSION_KEY, JSON.stringify(older));
+
+    const restored = readSession(storage);
+    expect(restored?.trace).not.toBeNull();
+    expect(restored?.map).toEqual({ fond: "carte-claire", pentes: false });
+  });
+
+  test("a Fond the app does not know is not a Session — the blob is discarded whole", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, map: { fond: "osm", pentes: false } }));
     expect(readSession(storage)).toBeNull();
   });
 });

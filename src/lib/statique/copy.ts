@@ -13,6 +13,7 @@ import { DISMISS_LABEL } from "@/lib/app/link-strip.ts";
 import { DIAGNOSTIC_ACTION } from "@/lib/app/refusals.ts";
 import { LAYER_LABEL, NO_SPAN_LINE, PEEK_LABEL } from "@/lib/chart/copy.ts";
 import { peekBadgeLabel, veBadgeLabel } from "@/lib/layout/contract.ts";
+import { mapLabelTable } from "@/lib/map/copy.ts";
 import { cellLabel, cellsOf, READ_OUT_SCOPE } from "@/lib/rail/cells.ts";
 import {
   AVANCE_SETTING,
@@ -79,9 +80,11 @@ export const SECTION = {
   topView: "Vue de dessus",
 } as const;
 
-/** The vue de dessus's own words (#91). The map background is a later ticket's. */
+/**
+ * The plain drawing's own words (#91) — what the vue de dessus shows where no map can start. The
+ * map's are `@/lib/map/copy.ts`'s.
+ */
 export const TOP_VIEW = {
-  unavailable: "fond de carte indisponible",
   north: "N",
   /** The `<svg>`'s accessible name. */
   title: `Vue de dessus de la ${label("anchorLine", "terrain")}`,
@@ -98,9 +101,11 @@ export const UNORIENTED = {
  * The fixed strings the Page prints: the strings above; the shared rows' — the field names and
  * options, the preset's chips on the two rows that carry them, the profil's controls, the names it
  * gives a profil and its terrain disclosure; the banner's actions and the gates' consequences; the
- * « clé ignorée » strip's dismiss control; and the Chart Block's chrome — the read-out cells and
+ * « clé ignorée » strip's dismiss control; the Chart Block's chrome — the read-out cells and
  * their scope, the View Strip's labels in both lengths, the vertical scale's badge in each of its
- * states and the empty plots' line. That is what `./copy.test.ts` holds to the terrain register.
+ * states and the empty plots' line; and the vue de dessus's map — its Fonds, the Couche pentes, the
+ * placing controls, its attributions and its hints. That is what `./copy.test.ts` holds to the
+ * terrain register.
  *
  * Not in it: sentences built from a Scenario (a gate's message, the Verdict's reason, a profil's
  * disclosure, the « clé ignorée » strip's sentences), which tests hold in the terrain register on
@@ -161,6 +166,7 @@ export function statiqueLabelTable(): readonly string[] {
     ...Object.values(SECTION),
     ...Object.values(TOP_VIEW),
     ...Object.values(UNORIENTED),
+    ...mapLabelTable(),
     ...Object.values(AVANCE_NOTICE),
     ASSUMED_NOTE,
     NO_REGIME_BANNER_BY_REGISTER.terrain,

@@ -14,6 +14,7 @@ import type { Session, SessionStorage } from "@/lib/session/session.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 import type { ValidatedSearch } from "@/lib/url/schema.ts";
 
+import { DEFAULT_MAP_DISPLAY } from "@/lib/map/display.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { DEFAULT_LAYERS, readSession } from "@/lib/session/session.ts";
 import { encodeP1 } from "@/lib/url/p1.ts";
@@ -41,6 +42,7 @@ function appState(scenario: ScenarioDraft, trace: Trace | null = null): AppState
     trace,
     retainedCsv: null,
     layers: DEFAULT_LAYERS,
+    map: DEFAULT_MAP_DISPLAY,
     link: { refused: null, dropped: [], completed: [], xClamped: false, rewrite: null },
   };
 }

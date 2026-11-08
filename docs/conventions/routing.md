@@ -35,9 +35,10 @@ under `bun run dev` it happens per request. Same output either way — which is 
 - No service worker and no PWA manifest. Since the
   [network policy](https://github.com/fuzoh/simu-tyro/issues/13) every computation and every Page
   work with no network after load; the connected functions — the profil geo.admin
-  (`src/lib/terrain/geoadmin.ts`) and, later, the Fond de carte and the Vue 3D — call swisstopo
-  with the native `fetch`, passed in as a parameter, and degrade to an ambient message rather than
-  an error. A link carries the profil's points, so it opens offline.
+  (`src/lib/terrain/geoadmin.ts`), the Fond de carte (`src/lib/map/style.ts`, #93) and, later, the
+  Vue 3D — call swisstopo with the native `fetch`, passed in as a parameter, and degrade to an
+  ambient message rather than an error. A link carries the profil's points, so it opens offline;
+  the Fond de carte and the Couche pentes are the Session's, never the link's.
 - **The router's `basepath` is read, never written.** `src/router.tsx` sets
   `basepath: import.meta.env.BASE_URL`, which Vite fills from `base` in `vite.config.ts` — `/` in
   dev, `/simu-tyro/` on the GitHub Pages project site. Route code stays written against `/`; the
@@ -104,6 +105,10 @@ every Page shares rather than by having one Page.
   between the two Pages unchanged. Its `Link` is `exact`, or it would be active on every path.
 - **Writes stay on the current Page.** The load-time rewrite, the debounced address bar and the
   Rail's resets navigate `to: "."`, so a future Page that hosts the store never jumps to Avancé.
+- **The address bar's write keeps the scroll (`resetScroll: false`, #93).** The router's default
+  resets the window to the top after every navigation, a `replace` of the same Page included, so
+  each edit jumped the reader to the top — on the vue de dessus, between the click that places A
+  and the one that places B. The load-time rewrite and the Rail's reset keep the default.
 - **A link that leaves a Page flushes its pending writes first.** Each Page mounts its own store,
   which reads the URL before the Session, and the address bar trails the store by ≈400 ms — so a
   link pressed inside the debounce would carry the Scenario from before the last edit. `PageLink`
@@ -125,6 +130,7 @@ against a production build served the way GitHub Pages serves it:
 | `/?…` → « Avancé » → « Statique » (#91, dev, 2026-11-08) | Statique on the link's Scenario; each Page switch keeps the search byte for byte, and Statique's link is the only one active on `/` |
 | `/dynamique?ws=50&wd=0` → « Avancé » → « Dynamique » (#92, build, 2026-11-08) | Dynamique on the link's Scenario at 1440 and 390 px (no horizontal overflow at 390); each switch keeps `ws=50`, and Dynamique's link is the only one active on `/dynamique`. A head wind of 50 km/h: « sans vent » arrive au bout, « avec le vent saisi » stops at 112,3 m, one marker on the coupe and one on the curve in the same column; hovering either frame draws the rule on both with x, altitude / vitesse, accélération. `?L=0`: « Aucun résultat », the Verdict never appears |
 | `/dynamique/index.html` (build) | prerendered with its Skeleton: both rides' headings and tile labels, `aria-busy`, no value |
+| `/` on a blank Scenario → the vue de dessus (#93, dev, `maplibre-gl` 6.16.0, 2026-11-08) | the carte claire over Switzerland, « © swisstopo » bottom-right, « Cliquez sur la carte pour placer A. ». Two clicks near Les Petites Roches: A, then B and « profil geo.admin · 200 points », a Verdict (« Hors limites ») once a Marge exigée is chosen. Dragging B over ten pointer moves: B's reading follows, the line follows, « Placer A / B » greyed, **no geo.admin call**; at the release, three calls (two REFRAME, one `profile.json`) and the engine's new figures. Orthophoto, carte nationale and the Couche pentes each switch under the line and both anchors; a reload keeps carte nationale + pentes (Session `map`), and the URL holds no Fond key. Offline (`set offline on`): a Fond switch leaves the line on the plain background with « fond de carte indisponible »; a drag of B snaps back with « profil geo.admin indisponible », same figures, same Verdict. An imported CSV far from the view: the map moves to its two Positions; a drag then makes « profil geo.admin » active with « CSV en mémoire : … (non utilisé) ». A Latitude B typed on Avancé moves B on Statique. 390 px: the control row and the attribution fit, no horizontal overflow; the scroll stays put across a placement |
 | `/avance?fl=6&lo=151.64` (static host) | 301 → `/avance/?…` → **200**, refusal surface, URL intact |
 | `/avance?fl=6&lo=151.64`, `/?fl=6&lo=151.64`, `/avance?v=3` (dev) | **200**, no 307 |
 | `/avance?L=250&junk=zz` | strip names « junk », then the rewrite stays on `/avance` |
@@ -181,7 +187,9 @@ must not be enabled speculatively; a GitHub Pages deploy is the ask that spends 
 | `src/routes/_app.index.tsx` | `/`, the Page Statique: `ssr: false`, its Skeleton as `pendingComponent`, the shared `errorComponent` |
 | `src/routes/_app.dynamique.tsx` | `/dynamique`, the Page Dynamique (#92): `ssr: false`, its Skeleton as `pendingComponent`, the shared `errorComponent` |
 | `src/components/dynamique/` | Dynamique's frame and Skeleton, fields and output tiles (its two SVG frames are `src/components/chart/dynamique.tsx`) — over the same store, form and writer as Avancé (`usePage`), in Statique's two-column layout |
-| `src/components/statique/` | Statique's frame and Skeleton (`frame.tsx`), its fields, outputs and vue de dessus — over the same store, form and writer as Avancé (`usePage`) |
+| `src/components/statique/` | Statique's frame and Skeleton (`frame.tsx`), its fields, outputs and vue de dessus's frame — over the same store, form and writer as Avancé (`usePage`) |
+| `src/components/map/top-map.tsx` | the vue de dessus as a MapLibre map (#93): the Fond de carte and Couche pentes controls, the anchors as markers, « Placer A / B », the attribution; the plain drawing where WebGL is missing |
+| `src/lib/map/` | the map's pure halves: the style builder and « fond de carte indisponible » (`style.ts`), the click-and-drag state machine that asks for a profil only at a release (`gesture.ts`), the Session's display choice (`display.ts`), its copy (`copy.ts`) |
 | `src/components/app/load-failure.tsx` | every app Page's `errorComponent`, for **genuine load failures only** |
 | `src/lib/app/pages.ts` | `APP_PAGES`, the table the navigation bar and the prerender list both read |
 | `src/components/app/navigation-bar.tsx` | `PageFrame` — the bar above, the Page's shell below, one viewport tall |
@@ -228,6 +236,7 @@ re-probe below attached**.
 | `@tanstack/devtools-vite` | 0.8.3 | no — dev only |
 | `@tanstack/react-form` | 1.33.5 | no — form state, no router surface |
 | `valibot` | 1.4.2 | no — boundary validation only |
+| `maplibre-gl` | 6.16.0 | no — the vue de dessus (#93); the style it is handed is built and tested in `src/lib/map/style.ts` |
 
 Transitives, **recorded rather than pinned** — what `bun install` resolved on 2026-08-13:
 `@tanstack/router-core` **1.171.22**, `@tanstack/start-server-core` **1.169.26**

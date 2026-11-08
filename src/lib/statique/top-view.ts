@@ -1,6 +1,7 @@
 /**
- * The vue de dessus's geometry (#91): the ligne A–B seen from above, on a plain background — the
- * map behind it is a later ticket's, so the Page says « fond de carte indisponible ».
+ * The vue de dessus's plain drawing (#91): the ligne A–B seen from above, on a plain background.
+ * Since #93 the vue de dessus is a map; this drawing is what it falls back to where no map can
+ * start (no WebGL), so the Page still shows the line and says « fond de carte indisponible ».
  *
  * **North is drawn only when it is known**: both Positions set and inside the domain swisstopo's
  * approximate LV95 formulas hold for (`@/lib/terrain/lv95.ts`, which this module reads and never

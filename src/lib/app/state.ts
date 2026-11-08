@@ -37,6 +37,7 @@
  *   app-level guarantee rather than a router one.
  */
 
+import type { MapDisplay } from "@/lib/map/display.ts";
 import type { Positions, ScenarioDraft } from "@/lib/scenario/types.ts";
 import type {
   LayerToggles,
@@ -47,6 +48,7 @@ import type {
 import type { Trace, TraceEnds } from "@/lib/terrain/trace.ts";
 import type { DroppedKey, LinkRefusal, SearchKey, ValidatedSearch } from "@/lib/url/schema.ts";
 
+import { DEFAULT_MAP_DISPLAY } from "@/lib/map/display.ts";
 import {
   FIRST_RUN_RETAINED_TEXTILE,
   FIRST_RUN_SCENARIO,
@@ -119,6 +121,8 @@ export type AppState = {
   readonly retainedCsv: Trace | null;
   /** § 5's two toggles: Session-only, never in the URL. */
   readonly layers: LayerToggles;
+  /** The vue de dessus's Fond de carte and Couche pentes (#93): Session-only, never in the URL. */
+  readonly map: MapDisplay;
   /** What this page load's link did. Fixed at first render. */
   readonly link: LinkArrival;
 };
@@ -136,6 +140,8 @@ export type AppAction =
   | { readonly type: "scénario/modifié"; readonly patch: Partial<ScenarioDraft> }
   /** § 5's two toggles — Session-only display preferences. */
   | { readonly type: "calques/basculés"; readonly layers: LayerToggles }
+  /** The Fond de carte or the Couche pentes (#93) — a display preference, like the toggles. */
+  | { readonly type: "carte/affichée"; readonly map: MapDisplay }
   /**
    * § 9's « Réinitialiser le scénario ». It returns the **active configuration** to the shipped
    * defaults, **terrain source included**, while the cached Trace, the retained inactive Material
@@ -168,6 +174,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, scenario: { ...state.scenario, ...action.patch } };
     case "calques/basculés":
       return { ...state, layers: action.layers };
+    case "carte/affichée":
+      return { ...state, map: action.map };
 
     case "scénario/réinitialisé":
       return {
@@ -343,8 +351,8 @@ export function initialAppState(input: MountInput): AppState {
 
   return {
     ...base,
-    // Wholesale: the link's Scenario, and the Session's own extras — the retained alternate and the
-    // layer toggles are things a link never carries.
+    // Wholesale: the link's Scenario, and the Session's own extras — the retained alternate, the
+    // layer toggles and the Fond de carte are things a link never carries.
     scenario,
     // The one Session extra a link *can* speak for: `tr` **is** a profile, so an arriving one is
     // decoded here rather than left to the Session to happen to have.
@@ -413,6 +421,7 @@ function sessionState(session: Session | null): Omit<AppState, "link"> {
       trace: session.trace,
       retainedCsv: session.retainedCsv,
       layers: session.layers,
+      map: session.map,
     };
   }
   return {
@@ -423,6 +432,7 @@ function sessionState(session: Session | null): Omit<AppState, "link"> {
     trace: null,
     retainedCsv: null,
     layers: DEFAULT_LAYERS,
+    map: DEFAULT_MAP_DISPLAY,
   };
 }
 

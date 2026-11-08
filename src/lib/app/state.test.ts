@@ -17,7 +17,7 @@ import { evaluateGates } from "@/lib/rail/gates.ts";
 import { deriveResults } from "@/lib/rail/results.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { placeSpan } from "@/lib/scenario/geometry.ts";
-import { DEFAULT_LAYERS } from "@/lib/session/session.ts";
+import { DEFAULT_LAYERS, readSession, writeSession } from "@/lib/session/session.ts";
 import { replayTrial, TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
 import { parseProfileCsv } from "@/lib/terrain/csv.ts";
 import { loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
@@ -57,6 +57,7 @@ function storedSession(): Session {
     trace: null,
     retainedCsv: null,
     layers: { unloadedLine: true, chordAB: false, riderTip: false, trajectory: true },
+    map: { fond: "orthophoto", pentes: true },
   };
 }
 
@@ -588,6 +589,7 @@ describe("#90's Positions — they follow the profil, end to end", () => {
       trace: imported.trace,
       retainedCsv: imported.retainedCsv,
       layers: imported.layers,
+      map: imported.map,
     };
     const arrived = initialAppState({ query, session });
     expect(arrived.scenario.positions).toEqual(retyped);
@@ -730,5 +732,52 @@ describe("#103's profil geo.admin — loaded between the two Positions, a third 
     const verdict = verdictOf(loaded);
     expect(verdict).not.toBeNull();
     expect(verdictOf(pressed)).toEqual(verdict);
+  });
+});
+
+describe("#93's Fond de carte and Couche pentes — the Session's, never the link's", () => {
+  const ORIGIN = "https://scoutech.example";
+  const CHOSEN = { fond: "orthophoto", pentes: true } as const;
+
+  /** A page load with `query` on whatever the last one stored. */
+  function reload(storage: Map<string, string>, state: AppState, query = ""): AppState {
+    const stub = {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => void storage.set(key, value),
+      removeItem: (key: string) => void storage.delete(key),
+    };
+    const session = sessionOf(state);
+    if (session === null) throw new Error("a complete Scenario has a Session");
+    writeSession(stub, session);
+    return initialAppState({ query, session: readSession(stub) });
+  }
+
+  const opened = initialAppState({ query: "", session: null });
+  const switched = appReducer(opened, { type: "carte/affichée", map: CHOSEN });
+
+  it("opens on the carte claire with no Couche pentes, and a switch moves no part of the Scenario", () => {
+    expect(opened.map).toEqual({ fond: "carte-claire", pentes: false });
+    expect(switched.map).toEqual(CHOSEN);
+    expect(switched.scenario).toBe(opened.scenario);
+  });
+
+  it("survives a reload", () => {
+    expect(reload(new Map(), switched).map).toEqual(CHOSEN);
+  });
+
+  it("is not in the link, and a link arriving leaves the recipient's own choice", () => {
+    const link = (state: AppState) =>
+      copyLink({ scenario: state.scenario, trace: state.trace, origin: ORIGIN, page: "/" });
+    const shared = link(switched);
+    if (!shared.ok) throw new Error(shared.message);
+    expect(shared).toEqual(link(opened));
+    expect(shared.href).not.toMatch(/orthophoto|pentes|carte/);
+
+    const arrived = reload(new Map(), switched, shared.href.slice(shared.href.indexOf("?")));
+    expect(arrived.map).toEqual(CHOSEN);
+  });
+
+  it("« Réinitialiser le scénario » leaves it as chosen", () => {
+    expect(appReducer(switched, { type: "scénario/réinitialisé" }).map).toEqual(CHOSEN);
   });
 });

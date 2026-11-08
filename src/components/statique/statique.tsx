@@ -19,13 +19,13 @@ import { usePage } from "@/components/app/use-page.ts";
 import { useViewport } from "@/components/app/use-viewport.ts";
 import { ChartBlock } from "@/components/chart/chart-block.tsx";
 import { useChartWidth } from "@/components/chart/use-chart-width.ts";
+import { TopMap } from "@/components/map/top-map.tsx";
 import { shownOnStatique } from "@/lib/statique/fields.ts";
 import { statiqueOutputs } from "@/lib/statique/outputs.ts";
 
 import { StatiqueFields } from "./fields.tsx";
 import { StatiqueFrame } from "./frame.tsx";
 import { StatiqueOutputTiles } from "./outputs.tsx";
-import { TopViewFigure } from "./top-view.tsx";
 
 /** @param page the router path of the Page — every link it writes opens it. */
 export function Statique({ page }: { page: string }) {
@@ -73,7 +73,7 @@ function Live({ page }: { page: string }) {
       }
       sectionRef={ref}
       strip={<LinkStripNotice strip={strip} />}
-      topView={<TopViewFigure positions={state.scenario.positions} />}
+      topView={<TopMap />}
     />
   );
 }

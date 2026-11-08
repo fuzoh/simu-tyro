@@ -52,10 +52,12 @@
 
 import * as v from "valibot";
 
+import type { MapDisplay } from "@/lib/map/display.ts";
 import type { EndTermination, ForceUnit, Scenario, TextileDraft } from "@/lib/scenario/types.ts";
 import type { MaterialSpec, RegimeId, SteelSpec, TerminationId } from "@/lib/sim";
 import type { Trace, TraceEnds, TraceOrigin } from "@/lib/terrain/trace.ts";
 
+import { DEFAULT_MAP_DISPLAY, FONDS } from "@/lib/map/display.ts";
 import { FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 import { REGIMES, TERMINATIONS } from "@/lib/sim";
 import { P1Error, validateP1Structure } from "@/lib/url/p1.ts";
@@ -154,6 +156,8 @@ export type Session = {
   /** § 5's two toggles. The other display preferences — `u`, the active tightness mode — are the
    * Scenario's own fields, so they persist with it rather than beside it. */
   readonly layers: LayerToggles;
+  /** The vue de dessus's Fond de carte and Couche pentes (#93) — never in a link. */
+  readonly map: MapDisplay;
 };
 
 /**
@@ -392,6 +396,10 @@ const STORED_SESSION: v.GenericSchema<unknown, StoredSession> = v.object({
     riderTip: v.optional(v.boolean(), DEFAULT_LAYERS.riderTip),
     trajectory: v.optional(v.boolean(), DEFAULT_LAYERS.trajectory),
   }),
+  // Added with #93, optional with the carte claire for the same reason as the later layers.
+  map: v.optional(v.object({ fond: v.picklist(FONDS), pentes: v.boolean() }), () => ({
+    ...DEFAULT_MAP_DISPLAY,
+  })),
 });
 
 /**
@@ -507,6 +515,7 @@ function dehydrate(session: Session): StoredSession {
     trace: session.trace === null ? null : storedTrace(session.trace),
     retainedCsv: session.retainedCsv === null ? null : storedTrace(session.retainedCsv),
     layers: session.layers,
+    map: session.map,
   };
 }
 
@@ -519,6 +528,7 @@ function hydrate(stored: StoredSession): Session {
     trace: stored.trace === null ? null : heldTrace(stored.trace),
     retainedCsv: stored.retainedCsv === null ? null : heldTrace(stored.retainedCsv),
     layers: stored.layers,
+    map: stored.map,
   };
 }
 

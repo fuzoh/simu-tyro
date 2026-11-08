@@ -1,0 +1,247 @@
+/**
+ * The vue de dessus's map style (#93): the three Fonds de carte and the Couche pentes switch under
+ * a ligne A–B that every style keeps, and a Fond that cannot arrive leaves that line on a plain
+ * background. The expected URLs and zoom ranges are swisstopo's WMTS capabilities for EPSG:3857,
+ * read on 2026-11-08; the Couche pentes' opacity is geo.admin's `layersConfig`.
+ */
+
+import { describe, expect, test } from "vitest";
+
+import type { Positions } from "@/lib/scenario/types.ts";
+import type { Fetch } from "@/lib/terrain/geoadmin.ts";
+
+import { TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
+
+import type { MapDisplay } from "./display.ts";
+import type { MapStyle } from "./style.ts";
+
+import { DEFAULT_MAP_DISPLAY, FONDS } from "./display.ts";
+import {
+  fondAttribution,
+  fondUnavailable,
+  freshHealth,
+  isFondSource,
+  LINE_SOURCE,
+  lineData,
+  loadVectorStyle,
+  mapStyle,
+  PENTES_SOURCE,
+  VECTOR_STYLE_URL,
+} from "./style.ts";
+
+/** Enough of swisstopo's light base map to stand for it: its background, a source, two layers. */
+const VECTOR: MapStyle = {
+  version: 8,
+  glyphs: "https://vectortiles.geo.admin.ch/fonts/{fontstack}/{range}.pbf",
+  sprite:
+    "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.lightbasemap.vt/v1.26.0/sprite/sprite",
+  center: [8.2, 46.8],
+  zoom: 7,
+  sources: {
+    "base_v1.0.0": {
+      type: "vector",
+      url: "https://vectortiles.geo.admin.ch/tiles/ch.swisstopo.base.vt/v1.0.0/tiles.json",
+    },
+  },
+  layers: [
+    {
+      id: "background",
+      type: "background",
+      paint: { "background-color": "rgba(252, 252, 252, 1)" },
+    },
+    { id: "landcover", type: "fill", source: "base_v1.0.0", "source-layer": "landcover" },
+  ],
+};
+
+const DISPLAYS: readonly MapDisplay[] = FONDS.flatMap((fond) =>
+  [false, true].map((pentes) => ({ fond, pentes })),
+);
+
+function rasterTiles(style: MapStyle, source: string): readonly string[] {
+  const spec = style.sources[source];
+  if (spec?.type !== "raster" || spec.tiles === undefined)
+    throw new Error(`${source} is no raster`);
+  return spec.tiles;
+}
+
+describe("every Fond and the Couche pentes keep the ligne A–B", () => {
+  test.each(
+    DISPLAYS.flatMap(
+      (display) =>
+        [
+          [display, VECTOR],
+          [display, null],
+        ] as const,
+    ),
+  )("%o, vector style %#", (display, vector) => {
+    const style = mapStyle({ display, vector, positions: TRIAL_ENDS });
+    const ids = style.layers.map((layer) => layer.id);
+
+    // Plain background first — what shows wherever no tile does.
+    expect(style.layers[0]).toEqual(expect.objectContaining({ type: "background" }));
+    // The line last, from the one source that holds it, at the anchors' Positions.
+    expect(style.layers.slice(-2).map((layer) => "source" in layer && layer.source)).toEqual([
+      LINE_SOURCE,
+      LINE_SOURCE,
+    ]);
+    expect(style.sources[LINE_SOURCE]).toEqual({
+      type: "geojson",
+      data: lineData(TRIAL_ENDS),
+    });
+    // The Couche pentes right under it when asked for, absent otherwise.
+    expect(ids.indexOf(PENTES_SOURCE)).toBe(display.pentes ? ids.length - 3 : -1);
+  });
+});
+
+describe("the three Fonds de carte", () => {
+  test("the carte claire is swisstopo's light vector map, under its own glyphs and sprite", () => {
+    const style = mapStyle({ display: DEFAULT_MAP_DISPLAY, vector: VECTOR, positions: TRIAL_ENDS });
+    expect(DEFAULT_MAP_DISPLAY.fond).toBe("carte-claire");
+    expect(style.sources["base_v1.0.0"]).toEqual(VECTOR.sources["base_v1.0.0"]);
+    expect(style.layers.map((layer) => layer.id)).toContain("landcover");
+    expect(style.glyphs).toBe(VECTOR.glyphs);
+    expect(style.sprite).toBe(VECTOR.sprite);
+    // Its own background would cover the plain one; its camera would move the map on a switch.
+    expect(style.layers.filter((layer) => layer.type === "background")).toHaveLength(1);
+    expect(style.center).toBeUndefined();
+    expect(style.zoom).toBeUndefined();
+  });
+
+  test("the carte claire without its style is the plain background and the line alone", () => {
+    const style = mapStyle({ display: DEFAULT_MAP_DISPLAY, vector: null, positions: TRIAL_ENDS });
+    expect(Object.keys(style.sources)).toEqual([LINE_SOURCE]);
+    expect(style.layers.map((layer) => layer.type)).toEqual(["background", "line", "line"]);
+  });
+
+  test.each([
+    ["orthophoto", "ch.swisstopo.swissimage", "jpeg", 20],
+    ["carte-nationale", "ch.swisstopo.pixelkarte-farbe", "jpeg", 19],
+  ] as const)("%s is swisstopo's WMTS layer %s in EPSG:3857", (fond, layer, format, maxzoom) => {
+    const style = mapStyle({
+      display: { fond, pentes: false },
+      vector: VECTOR,
+      positions: TRIAL_ENDS,
+    });
+    expect(rasterTiles(style, "fond")).toEqual([
+      `https://wmts.geo.admin.ch/1.0.0/${layer}/default/current/3857/{z}/{x}/{y}.${format}`,
+    ]);
+    expect(style.sources.fond).toEqual(expect.objectContaining({ maxzoom, tileSize: 256 }));
+    expect(style.layers.map((drawn) => drawn.id)).toEqual([
+      "fond-uni",
+      "fond",
+      "ligne-ab-halo",
+      "ligne-ab",
+    ]);
+    // A raster Fond takes nothing from the vector style.
+    expect(style.sources["base_v1.0.0"]).toBeUndefined();
+  });
+
+  test("the Couche pentes is « pentes supérieures à 30° », at geo.admin's 40 %", () => {
+    const style = mapStyle({
+      display: { fond: "orthophoto", pentes: true },
+      vector: null,
+      positions: TRIAL_ENDS,
+    });
+    expect(rasterTiles(style, PENTES_SOURCE)).toEqual([
+      "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.hangneigung-ueber_30/default/current/3857/{z}/{x}/{y}.png",
+    ]);
+    expect(style.layers.find((layer) => layer.id === PENTES_SOURCE)).toEqual(
+      expect.objectContaining({ paint: { "raster-opacity": 0.4 } }),
+    );
+    // An overlay: its tiles never decide whether the Fond arrived.
+    expect(isFondSource(PENTES_SOURCE)).toBe(false);
+    expect(isFondSource(LINE_SOURCE)).toBe(false);
+    expect(isFondSource("fond")).toBe(true);
+  });
+
+  test("every Fond names swisstopo in its attribution", () => {
+    for (const fond of FONDS) expect(fondAttribution(fond)).toMatch(/^© .*swisstopo/);
+    expect(fondAttribution("orthophoto")).toBe("© CNES, Spot Image, swisstopo, NPOC");
+  });
+});
+
+describe("the ligne A–B as the map draws it", () => {
+  test("is one segment from A to B, longitude first", () => {
+    expect(lineData(TRIAL_ENDS)).toEqual({
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "LineString",
+            coordinates: [
+              [6.525035, 46.843556],
+              [6.520783, 46.846166],
+            ],
+          },
+        },
+      ],
+    });
+  });
+
+  test("is nothing until both ends are known", () => {
+    const empty = { type: "FeatureCollection", features: [] };
+    expect(lineData({ A: null, B: null })).toEqual(empty);
+    expect(lineData({ A: TRIAL_ENDS.A, B: null })).toEqual(empty);
+  });
+});
+
+describe("the carte claire's style, fetched", () => {
+  const answering =
+    (body: string, status = 200): Fetch =>
+    async () =>
+      new Response(body, { status });
+
+  test("is asked for at swisstopo's URL and handed over as it came", async () => {
+    const asked: string[] = [];
+    const style = await loadVectorStyle(async (url) => {
+      asked.push(url);
+      return new Response(JSON.stringify(VECTOR));
+    });
+    expect(asked).toEqual([
+      "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.lightbasemap.vt/style.json",
+    ]);
+    expect(VECTOR_STYLE_URL).toBe(asked[0]);
+    expect(style).toEqual(VECTOR);
+  });
+
+  test.each([
+    [
+      "no network",
+      (async () => {
+        throw new TypeError("Failed to fetch");
+      }) as Fetch,
+    ],
+    ["an HTTP error", answering("Service Unavailable", 503)],
+    ["a body that is not JSON", answering("<html>maintenance</html>")],
+    ["JSON that is not a style", answering('{"version": 7, "layers": []}')],
+  ])("%s: no style, never a throw", async (_name, fetch) => {
+    await expect(loadVectorStyle(fetch)).resolves.toBeNull();
+  });
+});
+
+describe("« fond de carte indisponible »", () => {
+  const SWISS: Positions = TRIAL_ENDS;
+
+  test("not while the Fond is just chosen, nor once its tiles arrive", () => {
+    for (const fond of FONDS) expect(fondUnavailable(freshHealth(fond), SWISS)).toBe(false);
+    const arrived = { ...freshHealth("orthophoto"), tilesLoaded: true, tilesFailed: true };
+    expect(fondUnavailable(arrived, SWISS)).toBe(false);
+  });
+
+  test("when the carte claire's style could not be read", () => {
+    expect(fondUnavailable({ ...freshHealth("carte-claire"), style: "failed" }, SWISS)).toBe(true);
+  });
+
+  test("when its tiles fail and none arrives — no network", () => {
+    const offline = { ...freshHealth("carte-nationale"), tilesFailed: true };
+    expect(fondUnavailable(offline, SWISS)).toBe(true);
+  });
+
+  test("when an anchor stands outside swisstopo's coverage, where no tile is asked for", () => {
+    const paris = { lat: 48.85, lon: 2.35 };
+    expect(fondUnavailable(freshHealth("orthophoto"), { A: paris, B: null })).toBe(true);
+    expect(fondUnavailable(freshHealth("orthophoto"), { A: TRIAL_ENDS.A, B: paris })).toBe(true);
+  });
+});
