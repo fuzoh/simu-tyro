@@ -14,20 +14,36 @@ table is FR↔EN and binding: French for the UI, English identifiers for code.
 
 **Span**:
 One zip line, anchor to anchor. Always exactly one span — there are no intermediate
-supports and no multi-span lines.
-_Avoid_: line, cable run, section
+supports and no multi-span lines. French, unqualified: **ligne**. **Ligne A–B** is that
+span drawn straight between the anchors, not the sagging member and not a corde.
+_Avoid_: line, cable run, section, corde (for the chord), droite A–B
 
 **Brins porteurs**:
 How many load-bearing members one Span carries: one or two. Two means both carry the
 rider and the trolley splits the load; on textile that is the usual redundant rig, both
-tensioned similarly. Not a second Span, and not an unloaded spare.
-_Avoid_: montage, double tyrolienne, redondance (when that means a slack backup), twin span
+tensioned similarly. Not a second Span, and not an unloaded spare. Daily speech does not
+say brin for a member: one member is a ligne, two are **ligne du haut** and **ligne du bas**. A **brin** is a metallic strand inside a câble.
+_Avoid_: montage, brin (for a member), double tyrolienne, redondance (when that means a slack backup), twin span
 
 **Mise en tension**:
 The device that tensions the line and holds it. A Maestro is a progress-capture pulley
 used in place of a mouflage. Distinct from a termination: it does not set termination
 efficiency.
+Montage is the act of installing the line (« on va monter »), not this device and not a catalogue of rigs. The point and its height are an ancrage. The manufactured end of the corde or câble is a terminaison, and it is not this device.
 _Avoid_: montage, terminaison, ancrage
+
+**Tension de pose**:
+The tension wanted on the unloaded line. The same quantity as prétension. Simplified Pages
+say tension de pose; Avancé says prétension.
+_Avoid_: tension cible, tension permanente, pretension setting
+
+**Majoration au départ**:
+The multiplier on the passager's extra tension because a controlled step-off sets the passager in motion. Not the static supplement the weight already produces, and not a limit. Default 1,2. Simplified Pages assume it and do not ask. Avancé names the field majoration au départ.
+_Avoid_: coefficient dynamique, DAF, limite, marge
+
+**Rapport V**:
+A way to ask for the unloaded tension: passenger weight divided by horizontal tension de pose. Not the measured depth of the V. A larger rapport V asks for a slacker line, and the deep V under the passager is the consequence. Named only on Avancé.
+_Avoid_: poids / tension, creux, flèche
 
 **Tightness Spec**:
 The user's chosen way of saying how tight the line is: unstretched length directly, a
@@ -47,8 +63,8 @@ _Avoid_: tightness mode, active field, `tm`, parameterisation mode
 **Material Spec**:
 The description of what the line is made of — steel wire rope or textile rope — from which
 weight per unit length, axial stiffness and breaking strength are derived. Steel and
-textile are separate specs, never variants of one.
-_Avoid_: cable spec, rope config, product
+textile are separate specs, never variants of one. French, on every Page: a textile member is a **corde**, a metallic member is a **câble**. On a corde, gaine and âme are both fibre, and neither is a field. On a câble, the two constructions are **6×19** and **6×19 métallique** — no âme, no gaine.
+_Avoid_: cable spec, rope config, product, textile, acier, âme, gaine
 
 **Terrain**:
 The ground beneath the line. One concept with two sources: a straight ground line joining the
@@ -58,19 +74,20 @@ _Avoid_: ground profile, elevation data, topography
 
 **Trace**:
 A ground profile the app *received* rather than computed: distance and altitude samples
-along a line drawn on a map. It enters two ways — an imported CSV, which keeps its
-filename and its own coordinates, or « tracé reçu par lien », which arrives with **no
+along a line drawn on a map. French: **profil** — the cut of the ground under the line,
+altitudes side by side. The cut view uses the same word. It enters two ways — an imported CSV, which keeps its
+filename and its own coordinates, or « profil reçu par lien », which arrives with **no
 file and no filename** and carries straightness as one scalar `dev` instead of
 coordinates. Either way it is held exactly as received and never resampled or smoothed,
 so point count and sample spacing are disclosed properties and Terrain is derived from
 it. A Trace can sit cached in the Session while not being the active terrain source.
-_Avoid_: track, GPX, elevation profile, path, uploaded file
+_Avoid_: tracé, track, GPX, path, uploaded file
 
 **Station**:
-A distance along the Trace, measured from the Trace's own start. Distinct from `x`, which is
-horizontal distance from Anchor A — converting between them is the one translation the import
+A distance along the profil, measured from the profil's own start. French: **distance**.
+Distinct from `x`, which is horizontal distance from Anchor A — converting between them is the one translation the import
 performs.
-_Avoid_: offset, position, distance along track
+_Avoid_: station (as the spoken word), offset, position, distance along track
 
 **Anchor Placement**:
 Where an anchor sits on a Trace: a Station plus an Anchor Height above the profile at that
@@ -81,7 +98,8 @@ _Avoid_: anchor position, pin, marker
 **Anchor Height**:
 How far an anchor stands above the ground beneath it. Feeds the Terrain only, never the
 statics — the solve takes span and elevation difference, which are measured anchor to anchor.
-_Avoid_: pole height, tower height, offset
+French: ancrage. An amarrage would be heard as the termination.
+_Avoid_: pole height, tower height, offset, amarrage
 
 ### What is saved and shared
 
@@ -141,7 +159,7 @@ Verdict only ever judges Traverse scope.** Every number states its scope three t
 over — section header, row label and a parenthetical — because a reader who takes a
 Position number for the traverse worst case signs off a line that fails 20 m further
 along.
-_Avoid_: envelope vs instant, global vs local, min vs current, worst case
+_Avoid_: descente, envelope vs instant, global vs local, min vs current, worst case
 
 ### Safety
 
@@ -153,19 +171,52 @@ _Avoid_: check, validation, safety result
 
 **Verdict State**:
 Which of five the Verdict is in: « Dans les limites », « Marge faible »,
-« Hors limites », « Refusé — usage interdit », « Indéterminé ». Five because each maps to
-a *different user action*, not because severity has five levels — a regulator's
-prohibition survives an ample margin, and an incomplete traverse suppresses the
-judgement rather than qualifying it. The banner is one sentence naming the governing
-criterion and the chosen regime, never « conforme ». « — » belongs to « Indéterminé »
-alone.
-_Avoid_: status, severity, pass/fail, rating, compliance
+« Hors limites », « Interdit », « Indéterminé ». Five because each maps to
+a *different user action*, not because severity has five levels — a prohibition survives an
+ample margin, and an incomplete traverse suppresses the judgement rather than qualifying it.
+The banner names why it is Interdit. Never « conforme », never « hors norme ».
+« — » belongs to « Indéterminé » alone.
+_Avoid_: usage interdit, hors norme, status, severity, pass/fail, rating, compliance
+
+**Terminaison**:
+The manufactured end of a corde or a câble — sewn eye, splice, knot, clamps. It sets termination efficiency. Not an ancrage, which is the point and its height. Named only on Avancé.
+_Avoid_: ancrage, amarrage, montage
+
+**Longueur à vide**:
+The unstretched length. Simplified Pages say longueur à vide; Avancé says longueur non tendue.
+_Avoid_: longueur de corde, longueur de corde à vide
+
+**Flèche**:
+The sag. Unqualified, the unloaded sag wanted on the line. **Flèche chargée** is the sag with the passager on the line. Avancé says flèche à vide for the unloaded one.
+_Avoid_: cible, flèche cible
+
+**Installation**:
+Whether the line is built to stay: **installation permanente** or **installation temporaire**. A corde in a permanent installation is refused. Not a usage.
+_Avoid_: usage, type d'usage
+
+**Facteur de sécurité**:
+The ratio of available strength to the judged tension, compared with the marge exigée. Simplified Pages spell it out. Avancé may write FS. Not a percentage.
+_Avoid_: coeff, coefficient, pourcentage
+
+**Ligne à vide**:
+The unloaded line, drawn. Not the longueur à vide, which is a length.
+_Avoid_: câble à vide, corde à vide
+
+**Banane**:
+The lateral bow of the unloaded line in a cross-wind, seen from above. Qualitative. Not a distance the app states in metres.
+_Avoid_: déport, drift, flèche latérale
+
+**Marge exigée**:
+The margin the chosen Safety Regime demands. Not the margin the line actually has — that
+result is Marge faible, or a number.
+_Avoid_: marge de sécurité, norme, régime (as the simplified label)
 
 **Safety Regime**:
 A named, provenance-labelled set of safety rules the user selects between (EN 15567,
-WorkSafe QLD, challenge-course practice, rescue-textile practice). Regimes are never
-blended and never silently defaulted.
-_Avoid_: safety factor, coefficient, standard
+WorkSafe QLD, challenge-course practice, rescue on a corde). Regimes are never
+blended and never silently defaulted. Avancé calls the selector régime de sécurité;
+simplified Pages call it marge exigée.
+_Avoid_: safety factor, coefficient, standard, marge de sécurité
 
 **Résultats sans régime**:
 The shape `Résultats` takes while no Safety Regime is chosen — the app's own opening
@@ -175,10 +226,29 @@ prompt with no colour and no icon. Colouring the absence of a judgement would be
 judgement, and a screenshot of it must not read as a pass.
 _Avoid_: no verdict, pending verdict, unrated, empty results
 
+**Passager**:
+The person travelling on the line. A load magnitude on a line or a fitting is a charge, not a passager.
+_Avoid_: personne, charge
+
 **Rider Envelope**:
-The vertical space the rider occupies below the cable — lanyard plus body. Subtracted in
-full when clearance is measured.
-_Avoid_: rider height, lanyard length, offset
+The vertical space the rider occupies below the cable — pulley, lanyard and body. Subtracted in
+full when clearance is measured. French, on every Page: **gabarit du passager**.
+_Avoid_: empreinte, hauteur du passager, enveloppe, maître-couple, rider height, lanyard length, offset
+
+**Garde au sol**:
+The distance from the passager to the ground. The minimum is where, over the traverse, the
+passager comes closest to the ground. At the passager's position it is the same quantity,
+not a second name. The maximum is the inverse and is not a shown value.
+_Avoid_: garde sous le passager, garde passager
+
+**Garde exigée**:
+The garde au sol the user refuses to go under. Not the computed garde.
+_Avoid_: garde min. admise, garde minimale
+
+**Garde min. ligne**:
+The closest the loaded line comes to the ground along the span at one passager position.
+It may sit away from the passager. Not a garde au sol.
+_Avoid_: garde au sol, garde passager
 
 **Rider Contact**:
 Clearance has gone negative: the rider would strike the ground, though the cable itself is
@@ -324,7 +394,7 @@ _Avoid_: badge, tag, trust level, tooltip, asterisk
 **Warning Tier**:
 Which of three registers a warning speaks in: *ambiant* (plain state text beside the
 value, no ⚠), *avertissement* (⚠ inline on the row it qualifies), or *verdict* (the
-banner, state « Refusé — usage interdit »). The tier follows from what the reader must
+banner, state « Interdit »). The tier follows from what the reader must
 do about it, never from how bad it sounds — a condition that fires always is ambient,
 because an alarm that fires always means nothing.
 _Avoid_: severity, warning level, alert, notice, info
