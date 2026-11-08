@@ -14,8 +14,8 @@
  * route: `defaultSsr` in `src/router.tsx` is a measured **silent no-op**.
  */
 
-import interLatin from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
-import manropeLatin from "@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2?url";
+import charonMonoLatin from "@fontsource/iosevka-charon-mono/files/iosevka-charon-mono-latin-400-normal.woff2?url";
+import charonLatin from "@fontsource/iosevka-charon/files/iosevka-charon-latin-400-normal.woff2?url";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { createRootRoute, HeadContent, Link, Scripts } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
@@ -25,15 +25,16 @@ import { buttonVariants } from "@/components/ui/button.tsx";
 import appCss from "../styles.css?url";
 
 /**
- * The two faces the prerendered Skeleton paints with — Inter for the body, Manrope for the Rail
- * Header's app name. Without a preload the browser only discovers them after parsing `appCss`, one
+ * The two faces the prerendered Skeleton paints with — Iosevka Charon for the body and headings,
+ * Iosevka Charon Mono for the read-out values. Only the regular weight: 500 and 700 are discovered
+ * from the stylesheet like any other. Without a preload the browser only discovers them after parsing `appCss`, one
  * round-trip late, and `font-display: swap` shows that round-trip as a reflow. Only the `latin`
  * subset: the others are fetched on demand by `unicode-range`, which is what they are for. The
  * `?url` resolves to the very asset the `@font-face` rules point at, so the preload is not a second
  * download. `crossOrigin` is required — fonts are always fetched in CORS mode, and a preload
  * without it is discarded and fetched again.
  */
-const fontPreloads = [interLatin, manropeLatin].map((href) => ({
+const fontPreloads = [charonLatin, charonMonoLatin].map((href) => ({
   as: "font",
   crossOrigin: "anonymous" as const,
   href,

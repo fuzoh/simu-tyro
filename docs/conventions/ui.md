@@ -22,8 +22,9 @@ Use `cn()` from `@/lib/utils` (clsx + tailwind-merge) to merge classes. Variants
 through `cva` (`class-variance-authority`). oxfmt sorts Tailwind classes inside
 `cn`, `clsx` and `cva` — don't hand-order them.
 
-Animations: `tw-animate-css` is available. Fonts: Inter (`--font-sans`) and Manrope
-(`--font-heading`) via `@fontsource-variable/*`; `--font-mono` ships no face at all — see
+Animations: `tw-animate-css` is available. Fonts: Iosevka Charon (`--font-sans` and
+`--font-heading`) and Iosevka Charon Mono (`--font-mono`) via `@fontsource/*`, static weights
+400 · 500 · 700 only (no variable build exists; `font-semibold` resolves to 700) — see
 *Design defaults* below.
 
 ## Design defaults
@@ -54,11 +55,10 @@ empty `ui/`.
 
 ### Numbers are mono, everything else is sans
 
-- **`--font-mono: ui-monospace, monospace`**, declared in `@theme inline` beside `--font-sans` and
-  `--font-heading`. **No mono face is bundled**: digits therefore differ by platform, which is a
-  choice, and `CELL_WRAP_PX` budgets for it rather than pretending otherwise. An absent declaration
-  reads identical to the bug, so the declaration is mandatory even though it is close to Tailwind's
-  default.
+- **`--font-mono: "Iosevka Charon Mono", ui-monospace, monospace`**, declared in `@theme inline`
+  beside `--font-sans` and `--font-heading`. Since 2026-11-08 the mono face **is** bundled (it
+  replaced amendment L's unbound `ui-monospace`); its 0,50 em advance sits inside the 0,62 em
+  `CELL_WRAP_PX` budgets, so those constants were not retuned and still cover the fallback faces.
 - The call-site rule: **every computed quantity is `font-mono`; every label and every prose string
   is sans.** « Is this a number the engine produced? » must be answerable without knowing the
   layout.

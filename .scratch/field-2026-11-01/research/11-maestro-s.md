@@ -30,7 +30,7 @@ Le MAESTRO est un **descendeur** avec poulie bloqueuse intégrée (« Descender 
 | Charge d'utilisation maxi (EN 341) | 180 kg | Petzl DURALINE 10,5 mm et Petzl AXIS 11 mm, descente maxi 200 m | notice p. 2 |
 | Charge de rupture | « 18 kN x 2 = 36 kN » | libellé tel quel sur la fiche ; la fiche ne dit pas à quoi se rapportent les deux 18 kN | fiche produit |
 | Diamètres de corde admis | 10,5 mm min, 11,5 mm max | plage de la fiche ; corde EN 1891 type A au pictogramme de la notice | fiche produit ; notice p. 2 |
-| Charge minimale | 30 kg | | notice §8 (liste EN 341) |
+| Charge minimale | 30 kg | | notice, liste EN 341 de la section « Field of application » |
 | Rendement, rendement de hissage | 86 % ; F = 1,16 M | mesuré avec la corde de plus petit diamètre admise | notice §7 |
 | Normes | CE EN 12841 type C, CE EN 341, NFPA 2500 General Use et Technical Use, ANSI Z359.9, ANSI Z459.1 | | fiche produit |
 | Masse | 1100 g | | fiche produit |
