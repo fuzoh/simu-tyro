@@ -311,6 +311,12 @@ const SCENARIO: v.GenericSchema<unknown, Scenario> = v.object({
   }),
   // Added with #87, optional with no wind: a Session written before it had no wind to carry.
   wind: v.optional(v.object({ speedKmh: FINITE, directionDeg: FINITE }), FIRST_RUN_SCENARIO.wind),
+  // Added with #89, optional for the same reason: a Session written before it rode on §12.2's
+  // defaults. A function, so a restored Session never shares the shipped object.
+  dynamics: v.optional(
+    v.object({ CdA: FINITE, rho: v.nullable(FINITE), F0: FINITE, kv: FINITE, mu: FINITE }),
+    () => ({ ...FIRST_RUN_SCENARIO.dynamics }),
+  ),
 });
 
 /**

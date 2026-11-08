@@ -111,6 +111,11 @@ export type TermId =
   | "wind"
   | "windSpeed"
   | "windDirection"
+  | "dragArea"
+  | "trolleyConstantFriction"
+  | "trolleySpeedFriction"
+  | "trolleyFrictionRatio"
+  | "airDensity"
   | "estimate"
   | "traverse"
   | "unloadedLine"
@@ -235,6 +240,12 @@ export const LABELS = {
   wind: same("vent"),
   windSpeed: same("vitesse du vent"),
   windDirection: same("direction du vent"),
+  // The ride's constants (#89) are set on Avancé only, in the SSF page's own words where it has some.
+  dragArea: exactOnly("surface de traînée C_dA"),
+  trolleyConstantFriction: exactOnly("frottement constant de la poulie F₀"),
+  trolleySpeedFriction: exactOnly("frottement de la poulie proportionnel à la vitesse k_v"),
+  trolleyFrictionRatio: exactOnly("frottement de la poulie μ"),
+  airDensity: exactOnly("masse volumique de l'air ρ"),
   estimate: same("estimation"),
   traverse: same("traversée"),
   unloadedLine: same("ligne à vide"),

@@ -55,6 +55,7 @@ import {
   TENSIONING_SIDE_TOKEN_BY_ID,
   terminationIdFromToken,
 } from "@/lib/url/scenario.ts";
+import { heading } from "@/lib/vocabulary/labels.ts";
 
 /** The three sentences, each `null` when this arrival has nothing to say with it. */
 export type LinkStrip = {
@@ -133,6 +134,12 @@ const KEYS: Record<StripKey, KeyRow> = {
   daf: fromField("DAF", "f"),
   ws: fromField("windSpeed", "f"),
   wd: fromField("windDirection", "f"),
+  // The ride's constants have no Rail field yet (#89): their rows name them from the registry.
+  cda: { label: heading("dragArea", "exact"), genre: "f", quantity: "CdA" },
+  f0: { label: heading("trolleyConstantFriction", "exact"), genre: "m", quantity: "F0", daN: true },
+  kv: { label: heading("trolleySpeedFriction", "exact"), genre: "m", quantity: "kv" },
+  mur: { label: heading("trolleyFrictionRatio", "exact"), genre: "m", quantity: "trolleyMu" },
+  rho: { label: heading("airDensity", "exact"), genre: "f", quantity: "rho" },
   x: fromField("xD", "f"),
   tr: { label: "Profil", genre: "m", quantity: null },
   // `v` is deliberately absent: it is the schema version, not a champ of the scenario, and naming
@@ -198,6 +205,11 @@ const TOKENS: Record<StripKey, Readonly<Record<string, string>> | null> = {
   daf: null,
   ws: null,
   wd: null,
+  cda: null,
+  f0: null,
+  kv: null,
+  mur: null,
+  rho: null,
   x: null,
   tr: null,
 };

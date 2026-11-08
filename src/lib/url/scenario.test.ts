@@ -535,6 +535,51 @@ describe("searchToScenario — the read side of § 7's key table", () => {
     expect(decode("?L=250&ws=-5").wind.speedKmh).toBe(-5);
   });
 
+  it("reads the ride's keys absent as §12.2's defaults — and neither completes nor names them (#89)", () => {
+    for (const fam of ["ac", "tx"] as const) {
+      const { search, completed } = complete(`?L=250&fam=${fam}`);
+      for (const key of ["cda", "f0", "kv", "mur", "rho"] as const) {
+        expect(search[key]).toBeUndefined();
+        expect(completed).not.toContain(key);
+      }
+      expect(decode(`?L=250&fam=${fam}`).dynamics).toEqual({
+        CdA: 0.45,
+        rho: null,
+        F0: 15,
+        kv: 1.5,
+        mu: 0.015,
+      });
+    }
+  });
+
+  it("reads `f0` in daN, and each trolley key only under its own family", () => {
+    expect(decode("?L=250&fam=tx&f0=2.5&kv=2").dynamics).toMatchObject({ F0: 25, kv: 2 });
+    expect(decode("?L=250&fam=ac&mur=0.02").dynamics.mu).toBe(0.02);
+    // The other family's keys are out of the active configuration, so they are not read.
+    expect(decode("?L=250&fam=ac&f0=2.5&kv=2").dynamics).toMatchObject({ F0: 15, kv: 1.5 });
+    expect(decode("?L=250&fam=tx&mur=0.02").dynamics.mu).toBe(0.015);
+  });
+
+  it("writes only the active family's trolley: a câble's `μ` held on a corde stays out of the link", () => {
+    const cable = firstRunDefaults();
+    const corde: Scenario = {
+      ...cable,
+      usage: "TEMPORAIRE",
+      material: { family: "textile", ropeClass: "hmpe", MBL: 300000, mu: 0.16, k: 22 },
+      terminations: structuredClone(FIRST_RUN_RETAINED_TEXTILE.terminations),
+    };
+    const onCorde = scenarioToSearch({ ...corde, dynamics: { ...corde.dynamics, mu: 0.02 } });
+    expect(onCorde).not.toHaveProperty("mur");
+    const onCable = scenarioToSearch({ ...cable, dynamics: { ...cable.dynamics, F0: 20, kv: 2 } });
+    expect(onCable).not.toHaveProperty("f0");
+    expect(onCable).not.toHaveProperty("kv");
+  });
+
+  it("keeps a typed ρ, and a non-positive C_dA as it arrived (ADR-0001)", () => {
+    expect(decode("?L=250&rho=1.069").dynamics.rho).toBe(1.069);
+    expect(decode("?L=250&cda=-0.1").dynamics.CdA).toBe(-0.1);
+  });
+
   it("keeps a Maestro that arrives beside a câble, as given (ADR-0001)", () => {
     const scenario = decode("?L=250&fam=ac&d=12&r0=1770&cst=iwrc&mt=ms");
     expect(scenario.material.family).toBe("steel");

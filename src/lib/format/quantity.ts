@@ -93,6 +93,12 @@ type UnitKind =
   | "km/h"
   /** Degrees of arc — the wind's bearing. */
   | "°"
+  /** Square metres — the passager's `C_dA`. */
+  | "m²"
+  /** Kilograms per second — the trolley's speed-proportional friction `k_v`, as the SSF writes it. */
+  | "kg/s"
+  /** Kilograms per cubic metre — the air's density. */
+  | "kg/m³"
   /** Linear mass, kg/m — a mass, so the force selector does not touch it. */
   | "kg/m"
   /** A force: **newtons canonical** — § 3's SI storage — displayed in the selected unit. */
@@ -197,6 +203,19 @@ export const QUANTITIES = {
   windSpeed: { unit: "km/h", decimals: 0 },
   /** `Direction du vent`, ° — « 45 à 55° » is how the field trial reported it: whole degrees. */
   windDirection: { unit: "°", decimals: 0 },
+  /** `C_dA`, m² — §12.2's 0,45 and its 0,30–0,60 band are two-decimal figures. */
+  CdA: { unit: "m²", decimals: 2 },
+  /**
+   * `F₀`, daN — the SSF's 15 N is 1,5 daN: one decimal is its own 1 N grain, and a typed 15 N
+   * survives the selector's round trip.
+   */
+  F0: { unit: "force", decimals: 1 },
+  /** `k_v`, kg/s — the SSF's 1,5; 0,01 kg/s is 0,2 N at 20 m/s, under `F₀`'s 1 N grain. */
+  kv: { unit: "kg/s", decimals: 2 },
+  /** Trolley `μ` — §12.2's 0,015 and [ALGO §10.3]'s 0,015–0,02 need three decimals. */
+  trolleyMu: { unit: "", decimals: 3 },
+  /** `ρ`, kg/m³ — §12.2 prints 1,225, and the ISA density moves the third decimal every ~10 m. */
+  rho: { unit: "kg/m³", decimals: 3 },
   /**
    * `Charge de rupture` `MBF`, daN — **consumed by the Override badge**: the formula gives
    * 9073,98 where a freshly prefilled override holds 9074, and float equality would badge it.

@@ -666,6 +666,42 @@ describe("the Vent in the Session (#87)", () => {
   });
 });
 
+describe("the ride's constants in the Session (#89)", () => {
+  test("typed constants survive a write and a read, `ρ` included", () => {
+    const storage = memoryStorage();
+    const dynamics = { CdA: 0.5, rho: 1.069, F0: 20, kv: 2, mu: 0.02 };
+    writeSession(storage, { ...bareSession(), scenario: { ...firstRunDefaults(), dynamics } });
+    expect(readSession(storage)?.scenario.dynamics).toEqual(dynamics);
+  });
+
+  test("a Session stored before the key is kept, and rides on §12.2's defaults", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const older = { ...(blob.scenario as Record<string, unknown>) };
+    delete older.dynamics;
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: older }));
+
+    const restored = readSession(storage);
+    expect(restored?.trace).not.toBeNull();
+    expect(restored?.scenario.dynamics).toEqual({
+      CdA: 0.45,
+      rho: null,
+      F0: 15,
+      kv: 1.5,
+      mu: 0.015,
+    });
+  });
+
+  test("a constant that is not a number is not a Session — the blob is discarded whole", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const scenario = blob.scenario as Record<string, unknown>;
+    const dynamics = { ...(scenario.dynamics as Record<string, unknown>), CdA: "0,45" };
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: { ...scenario, dynamics } }));
+    expect(readSession(storage)).toBeNull();
+  });
+});
+
 describe("ADR-0001 — a restored Session is kept as given, and the gates judge it", () => {
   test("a knot on HMPE comes back unchanged and blocks the verdict on Terminaison A", () => {
     const knotted: Scenario = {

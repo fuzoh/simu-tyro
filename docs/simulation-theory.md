@@ -569,31 +569,65 @@ travelling waves, parametric resonance [both]. Empirical support: SSF Vercors re
 
 ### 12.2 Equation of motion
 
-Along the frozen trajectory `z_D(x_D)` with local slope `θ` [ALGO §10]:
+Along the frozen trajectory `z_D(x_D)` with local slope `θ` [ALGO §10], a point mass: statics
+first, then the rider as a concentrated mass on that trajectory, integrated as an ODE. Two open
+publications make the same split independently of the SSF — Vladić, Jojić, Đokić 2020
+(DOI 10.5937/imk2004089v, §4.2) and Jojić, Vladić, Đokić 2025 (DOI 10.46793/til2025.193j,
+eq. 18) — read in research #8 (`07-vitesse-passager.md`):
 
 ```
 m·dv/dt = m·g·sinθ − F_friction − F_drag ∓ F_brake
-F_drag = ½·ρ·C_dA·(v ± v_wind)²
-F_friction = F₀ + k_v·v          (trolley, see below)
+F_drag = ½·ρ·C_dA·v_rel·|v_rel|,   v_rel = v − u_∥·cosθ
+F_friction = F₀ + k_v·v          (textile, see below)
+F_friction = μ·N,  N = m·g·cosθ  (steel fallback, see below)
 F_c = m·v²/R,  R = (1+z'²)^{3/2}/|z''|   (usually < 2 % — include optionally [ALGO §10.4])
 ```
 
-Constants:
+`θ` is taken positive downhill here, and friction and drag oppose the motion. **Wind enters as a
+vector projected on the tangent** (research #8): `u_∥` is the horizontal wind's component along
+the line's plan direction (tail wind positive) and `u_∥·cosθ` its projection on the tangent. The
+published `(v ± v_wind)²` is the collinear special case; putting the whole entered wind speed in the
+`±` overstates the longitudinal drag, and the cross component changes the line's geometry, not the
+rider's speed — another physics, out of this equation (§16 item 13).
 
-- **`C_dA = 0.45 m²` default** (range 0.30–0.60 configurable) — SSF back-fit on the
-  instrumented 1109 m line `[FIELD:SSF]` [R2 C6]. ⚠ [R1 C6]'s posture table (supine
-  0.08–0.12 m²) **contradicts the SSF measurement for a supine caver** and is
-  `[UNVERIFIED:R1]` (§14). Posture-dependence: keep as a configurable multiplier, not
-  R1's numbers.
-- **Trolley friction `F ≈ 15 N + 1.5·v`** (v in m/s) — SSF measured fit, Petzl Tandem
-  Speed on textile `[FIELD:SSF]` [R2 B14]. Alternative constant-μ model
-  `μ = μ₀·d/D + 2f/D ≈ 0.015–0.02` [ALGO §10.3] as fallback for steel; [R1 B14]'s
-  per-product μ table is `[UNVERIFIED:R1]`. Steel-vs-textile and sheave-diameter
-  dependence: not found [R2 B14] — open (§16).
+Outputs, once the trajectory and the constants are given (research #8): speed and acceleration
+along the span, the **Point d'arrêt** — where the speed returns to zero and the local slope, wind
+included, no longer overcomes the trolley's friction at rest — the arrival speed when B is reached
+(no braking), and the duration. The rider **starts from rest at A** (controlled departure). The
+Point d'arrêt is computed first without wind, then with the entered wind. Not outputs: lateral
+deflection, dynamic cable tension, braking. With two Brins porteurs the trajectory is that of one
+member loaded at `P/2` (§6.1), and the mass that rides it is the whole `m`. All of it is an
+**estimation**, and is labelled so; §12.1's `v/c` check runs over every ride.
+
+Constants — every one editable and labelled, none silent:
+
+- **`C_dA = 0.45 m²` default** — SSF back-fit on the instrumented 1109 m line `[FIELD:SSF]`
+  [R2 C6], read on the SSF « Instrumentation » page via research #8: one campaign, a harnessed
+  caver, a textile rope, an unnamed pulley — not a seated park rider, not a steel cable. The
+  range 0.30–0.60 is not on the SSF page: it bounds the editable field and is `[CONVENTION]`, not a
+  measurement. ⚠ [R1 C6]'s posture table (supine 0.08–0.12 m²) **contradicts the SSF measurement
+  for a supine caver** and is `[UNVERIFIED:R1]` (§14). Posture-dependence: keep as a configurable
+  multiplier, not R1's numbers.
+- **Trolley friction on textile: `F ≈ 15 N + 1.5·v`** (`F₀ = 15 N`, `k_v = 1.5 kg/s`, v in m/s)
+  — SSF measured fit on textile `[FIELD:SSF]` [R2 B14], weight-independent in its published form.
+  The SSF page names no pulley model (research #8): an earlier attribution of this fit to a
+  named pulley, inherited from [R2], is withdrawn. One trolley's `F₀` is applied whatever the
+  number of Brins porteurs; whether two sheaves add two `F₀` is not established (research #8).
+- **Trolley friction on steel: `F = μ·N`, `N = m·g·cosθ`, `μ = 0.015`** — no open figure separates
+  steel from textile, so steel does not share the SSF law (research #8). It takes the constant-μ
+  fallback `μ = μ₀·d/D + 2f/D ≈ 0.015–0.02` [ALGO §10.3] at its low end; that formula has no open
+  primary source, so the value is `[CONVENTION]` and an Unconfirmed Default with its warning.
+  Jojić 2025 publishes the same `f·N` form (with the centrifugal term in `N`, omitted here as in
+  the `F_c` line) without a value of `f`. [R1 B14]'s per-product μ table is `[UNVERIFIED:R1]`.
+  Steel-vs-textile and sheave-diameter dependence: not found [R2 B14] — open (§16).
 - **Air density**: ISA model `ρ = p/(R_s·T)`,
-  `p = 101325·(1 − 2.25577×10⁻⁵·h_alt)^5.2559 Pa`, `R_s = 287.05 J/(kg·K)`;
+  `p = 101325·(1 − 2.25577×10⁻⁵·h_alt)^5.2559 Pa`, `T = 288.15 − 0.0065·h_alt K`,
+  `R_s = 287.05 J/(kg·K)`;
   ρ = 1.225 (sea level) / ≈1.06 (1500 m) / ≈0.96 kg/m³ (2500 m) [R1 §3, R2 §3 agree —
-  standard atmosphere, safe to hard-code].
+  standard atmosphere, safe to hard-code]. Read at the imported profile's mean altitude; 1.225
+  without a profile; shown, and editable.
+- **Not shipped**: a 95 % trolley efficiency as a speed loss, and the local reports' `C_w` and `μ`
+  tables (research #8).
 
 ### 12.3 Braking (B13)
 

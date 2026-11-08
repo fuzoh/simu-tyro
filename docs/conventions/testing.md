@@ -35,13 +35,13 @@ Decided in the wayfinder ticket _Engine API, execution model and module layout_.
 - **One test file per source file**, same basename. **No `tests/` directory, and no suite file
   spanning several modules.** This survives every app layer unchanged — `first-run.test.ts` beside
   `first-run.ts`, `p1.test.ts` beside `p1.ts`; no exception was needed to keep it.
-- **Physics fixtures live in one place**: `src/lib/sim/__fixtures__/theory-15.ts`, exporting `F1`
-  and `Z1`–`Z6` from `docs/simulation-theory.md` §15 as typed consts. Every fixture carries
+- **Physics fixtures live in one place**: `src/lib/sim/__fixtures__/theory-15.ts`, exporting `F1`,
+  `Z1`–`Z6` and `Z8` from `docs/simulation-theory.md` §15 as typed consts. Every fixture carries
   a `source` field naming its § (e.g. `"simulation-theory.md §15 Z4"`). The golden canonical
   links of the URL codec live in `src/lib/url/__fixtures__/canonical-links.ts`, tagged
   `[MEASURED]`.
-- **`Z7` (thermal) and `Z8` (dynamics) are deliberately absent** — their physics is out of
-  scope for v1. Add them with the feature, not before.
+- **`Z7` (thermal) is deliberately absent** — its physics is out of scope for v1. Add it with the
+  feature, not before, as `Z8` arrived with the passager's ride (#89).
 - Benches are `*.bench.ts`, colocated too — see [Benches](#benches).
 
 ## Fixture rules

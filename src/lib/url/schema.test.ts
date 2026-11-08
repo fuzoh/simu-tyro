@@ -96,6 +96,11 @@ describe("the key table and canonical order", () => {
       "daf",
       "ws",
       "wd",
+      "cda",
+      "f0",
+      "kv",
+      "mur",
+      "rho",
       "x",
       "tr",
     ]);

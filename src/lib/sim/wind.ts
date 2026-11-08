@@ -2,8 +2,8 @@
  * The wind seen from the line — decision of #6 (*Effets du vent*) and the research « Modèles de
  * vitesse du passager » (#8), whose rule is that wind enters `F_drag = ½·ρ·C_dA·(v ± v_wind)²`
  * (`docs/simulation-theory.md` §12.2) as a **vector projected on the tangent**, never as a whole
- * collinear `±`. This module does the projection and nothing else: no drag, no deflection, and no
- * coefficient, because none of those has a source yet.
+ * collinear `±`. This module does the projection and nothing else: the drag is the ride's
+ * (`./dynamics.ts`, #89), and the line's lateral deflection has no source yet.
  *
  * The direction is where the wind comes **from**, relative to the travel A → B, in degrees
  * clockwise seen from above: 0° head wind, 90° from the right, 180° tail wind, 270° from the left.

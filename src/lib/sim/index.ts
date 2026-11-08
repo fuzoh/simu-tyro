@@ -155,3 +155,16 @@ export { TEXTILE, deriveTextile } from "./materials/textile.ts";
 // —— wind.ts — the wind projected on the line, per #6 and the speed-model research (#8) ——————
 export type { WindComponents } from "./wind.ts";
 export { kmhToMs, windComponents } from "./wind.ts";
+
+// —— dynamics.ts — §12.2's point mass along the frozen trajectory, §12.1's validity (#89) ——————
+// `DYNAMICS` because the app ships its defaults and labels them, and §12.1's threshold is its.
+export type {
+  QuasiStatic,
+  Ride,
+  RideEnd,
+  RideInput,
+  RidePath,
+  RideSample,
+  TrolleyFriction,
+} from "./dynamics.ts";
+export { airDensity, DYNAMICS, quasiStaticRatio, ride, ridePath } from "./dynamics.ts";

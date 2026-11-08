@@ -37,7 +37,7 @@
  *   is where those figures are locked.
  */
 
-import { TEXTILE } from "@/lib/sim";
+import { DYNAMICS, TEXTILE } from "@/lib/sim";
 
 import type { EndTermination, Scenario, TextileDraft } from "./types.ts";
 
@@ -102,6 +102,19 @@ export const FIRST_RUN_SCENARIO = {
   rider: { mp: 120, hRider: 2.1, hClearMin: 1, DAF: 1.2, xD: 75 },
   /** No wind, which is `ws` and `wd` **absent**: the shipped link did not change either. */
   wind: { speedKmh: 0, directionDeg: 0 },
+  /**
+   * §12.2's defaults, which is the ride's keys **absent**: `C_dA` 0,45 m² `[FIELD:SSF]`, the
+   * corde's SSF fit `F₀` 15 N and `k_v` 1,5 kg/s `[FIELD:SSF]`, the câble's constant `μ` 0,015 — an
+   * Unconfirmed Default — and `ρ` derived, 1,225 on this manual line, which has no profil to read an
+   * altitude from.
+   */
+  dynamics: {
+    CdA: DYNAMICS.CdA,
+    rho: null,
+    F0: DYNAMICS.textile.F0,
+    kv: DYNAMICS.textile.kv,
+    mu: DYNAMICS.steel.mu,
+  },
 } as const satisfies Scenario;
 
 /**

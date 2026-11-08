@@ -11,8 +11,8 @@
  *   worked examples are fabricated — R1's `z(L₀) = 24.84`, its two-segment and sweep examples,
  *   its pycatenary and SSF tables, and R2's transcribed MoorPy pairs. §15's own « Excluded
  *   fixtures » list is never ported.
- * - **`Z7` (thermal, §9) and `Z8` (dynamics, §12) are absent on purpose** — that physics is out
- *   of v1 scope. Add them with the feature, not before.
+ * - **`Z7` (thermal, §9) is absent on purpose** — that physics is out of scope. Add it with the
+ *   feature, not before, as `Z8` (dynamics, §12) arrived with the passager's ride (#89).
  * - **Provenance is a field, not a comment.** `FixtureSource` keeps the two classes apart at the
  *   type level: a `simulation-theory.md §15 …` row is MoorPy-cross-validated physics, a
  *   `[MEASURED] …` row is this app's own output at a moment in time. They assert at different
@@ -270,6 +270,23 @@ export const Z6 = {
     D: 5.1164,
     /** m — §7's closed-form seed: a valid seed, not the answer. */
     closedFormSeed: 100.669,
+  },
+} as const satisfies Fixture;
+
+/**
+ * Z8 — terminal velocity on a constant 10° slope with the SSF constants (§12.2): where
+ * `m·g·sin θ` meets `F₀ + k_v·v + ½·ρ·C_dA·v²`.
+ */
+export const Z8 = {
+  source: "simulation-theory.md §15 Z8",
+  in: { thetaDeg: 10, m: 90, g: 9.81, rho: 1.225, CdA: 0.45, F0: 15, kv: 1.5 },
+  out: {
+    /** N — the drive, `m·g·sin θ`. */
+    drive: 153.314,
+    /** m/s — the root of `0,275625·v² + 1,5·v + 15 = 153,314`. */
+    vt: 19.8449,
+    /** km/h — the same speed, as §15 prints it beside. */
+    vtKmh: 71.44,
   },
 } as const satisfies Fixture;
 

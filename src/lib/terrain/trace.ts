@@ -67,6 +67,21 @@ export function traceExtent(trace: Pick<Trace, "d">): number {
 }
 
 /**
+ * The profil's mean ground altitude, m — weighted by distance, so samples bunched on one slope do
+ * not pull the mean toward it. §12.2's ISA air density is read at this altitude (#89).
+ *
+ * @returns the one sample's altitude for a one-point trace, which has no extent to average over.
+ */
+export function meanAltitude(trace: Pick<Trace, "d" | "z">): number {
+  const { d, z } = trace;
+  const extent = traceExtent(trace);
+  if (!(extent > 0)) return z[0];
+  let area = 0;
+  for (let i = 1; i < d.length; i++) area += ((z[i] + z[i - 1]) / 2) * (d[i] - d[i - 1]);
+  return area / extent;
+}
+
+/**
  * The **measured** max spacing between consecutive samples, m — always disclosed, warning or not
  * (§ 6). The geoportal emits a fixed 200 points and not a fixed pitch, so this is `length/199`
  * in practice: 0,92 m at 183 m, 5,0 m at ≈995 m, 7,5 m at 1500 m.

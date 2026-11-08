@@ -150,13 +150,38 @@ export type TensioningDevice = "pulley" | "maestro-s" | "maestro-l";
  * The **Vent** (#87): how fast, and from where relative to the travel A → B — `direction` is
  * degrees clockwise seen from above, 0 head wind, 90 from the right, 180 tail wind, 270 from the
  * left. Relative to the line so a Scenario needs no Position. `ws` / `wd` in a link, **both absent
- * for no wind**. Nothing reads it yet: statics and the Verdict are unchanged.
+ * for no wind**. Only the passager's ride reads it (#89): statics and the Verdict are unchanged.
  */
 export type Wind = {
   /** Wind speed, km/h (≥ 0). */
   speedKmh: number;
   /** Where the wind comes from, degrees. */
   directionDeg: number;
+};
+
+/**
+ * The constants of the passager's ride (#89) — §12.2's, every one editable and each **absent from a
+ * link at its default**: `cda`, `rho`, `f0`, `kv` and `mur`. Only the ride reads them: statics and
+ * the Verdict are unchanged.
+ *
+ * Both trolley laws are held, and the family picks one: the SSF fit on a corde, a constant `μ` on a
+ * câble. A family flip therefore cannot pair a law with the wrong material, and a link carries only
+ * the active family's keys.
+ */
+export type DynamicsConstants = {
+  /** `C_dA`, m². */
+  CdA: number;
+  /**
+   * `ρ`, kg/m³. `null` **is** the default, which is derived rather than shipped: §12.2's ISA
+   * density at the profil's mean altitude, 1,225 without a profil.
+   */
+  rho: number | null;
+  /** The corde's trolley: the SSF fit's constant term `F₀`, N. */
+  F0: number;
+  /** The corde's trolley: the SSF fit's speed term `k_v`, kg/s. */
+  kv: number;
+  /** The câble's trolley: §12.2's constant friction ratio `μ`, `F = μ·N`. */
+  mu: number;
 };
 
 /** § 7's Scenario: everything a link transports, and nothing the Session keeps on the side. */
@@ -183,6 +208,7 @@ export type Scenario = {
   terminations: { A: EndTermination; B: EndTermination };
   rider: Rider;
   wind: Wind;
+  dynamics: DynamicsConstants;
 };
 
 /**

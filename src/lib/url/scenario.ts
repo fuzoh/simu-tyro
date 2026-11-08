@@ -10,8 +10,8 @@
  * - **Both directions read the same tables.** {@link scenarioToSearch} and {@link searchToScenario}
  *   sit side by side so a token, a unit or a key cannot be taught to one direction only.
  * - **The URL's daN become the state's newtons here, and nowhere else.** § 3's « SI internally,
- *   always » governs the state object; `te`, `tp`, `mbf`, `ea` and `mbl` are the forces a link
- *   carries.
+ *   always » governs the state object; `te`, `tp`, `mbf`, `ea`, `mbl` and `f0` are the forces a
+ *   link carries.
  * - **A blank is `null`, never a number nobody typed.** `?fam=tx` with no `mbl`/`mu` is § 9's
  *   « vides et requis » — the correct arrival state, and two blocking errors rather than an
  *   invented rope. Hence a {@link ScenarioDraft} rather than a `Scenario` on the way in.
@@ -24,6 +24,7 @@
 
 import type { TightnessFieldId } from "@/lib/rail/fields.ts";
 import type {
+  DynamicsConstants,
   Scenario,
   ScenarioDraft,
   TensioningDevice,
@@ -36,7 +37,7 @@ import type { SteelSpec, TerminationId, TextileSpec } from "@/lib/sim";
 import { tightnessDriver } from "@/lib/rail/values.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 import { clampX } from "@/lib/scenario/geometry.ts";
-import { TERMINATIONS, TEXTILE } from "@/lib/sim";
+import { DYNAMICS, TERMINATIONS, TEXTILE } from "@/lib/sim";
 import { traceExtent } from "@/lib/terrain/trace.ts";
 
 import type {
@@ -214,18 +215,22 @@ type CompletedDriver = {
   [D in TightnessKey]: Pick<SearchValues, D> & Absent<Exclude<TightnessKey, D>>;
 }[TightnessKey];
 
-/** The steel keys, Overrides optional because their absence is « non surchargée ». */
+/**
+ * The steel keys, Overrides optional because their absence is « non surchargée », and the câble's
+ * trolley `μ` because its absence is §12.2's default.
+ */
 type CompletedSteel = { readonly fam: "ac" } & Pick<SearchValues, "d" | "r0" | "cst"> &
-  Partial<Pick<SearchValues, "mbf" | "ea" | "mu">> &
-  Absent<"cls" | "mbl" | "k">;
+  Partial<Pick<SearchValues, "mbf" | "ea" | "mu" | "mur">> &
+  Absent<"cls" | "mbl" | "k" | "f0" | "kv">;
 
 /**
  * The textile keys, `mbl`/`mu` optional because a rope nobody typed is § 9's blanks, `k`
- * because polyester ships it blank, and `d` because a diameter nobody typed is simply absent.
+ * because polyester ships it blank, `d` because a diameter nobody typed is simply absent, and the
+ * corde's trolley `f0`/`kv` because their absence is the SSF fit.
  */
 type CompletedTextile = { readonly fam: "tx" } & Pick<SearchValues, "cls"> &
-  Partial<Pick<SearchValues, "mbl" | "mu" | "k" | "d">> &
-  Absent<"r0" | "cst" | "mbf" | "ea">;
+  Partial<Pick<SearchValues, "mbl" | "mu" | "k" | "d" | "f0" | "kv">> &
+  Absent<"r0" | "cst" | "mbf" | "ea" | "mur">;
 
 /**
  * A bag {@link completeFromDefaults} returned: every key the active configuration needs is present,
@@ -236,7 +241,7 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
   SearchValues,
   "v" | "u" | "use" | "za" | "zb" | "ta" | "tb" | "na" | "nb" | "mp" | "hr" | "gm" | "daf" | "x"
 > &
-  Partial<Pick<SearchValues, "reg" | "bp" | "cp" | "mt" | "ws" | "wd">> &
+  Partial<Pick<SearchValues, "reg" | "bp" | "cp" | "mt" | "ws" | "wd" | "cda" | "rho">> &
   CompletedTerrain &
   CompletedDriver &
   (CompletedSteel | CompletedTextile);
@@ -245,9 +250,9 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
  * The keys whose **absence is meaning**, never completed. `reg` absent is « — choisir — »,
  * `mbf`/`ea`/`mu` absent is « non surchargée », which differs from « equal to the formula value »,
  * `mbl` absent — with `mu`, under `fam=tx` — is § 9's rope nobody typed, `bp` absent is one
- * Brin porteur, `cp` absent is the Mise en tension at A, `mt` absent is the mouflage and `ws` / `wd`
- * absent is no wind: completing any would rewrite, and name in the strip, every link older than the
- * key.
+ * Brin porteur, `cp` absent is the Mise en tension at A, `mt` absent is the mouflage, `ws` / `wd`
+ * absent is no wind and `cda` / `f0` / `kv` / `mur` / `rho` absent is §12.2's default for the ride:
+ * completing any would rewrite, and name in the strip, every link older than the key.
  */
 const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>([
   "reg",
@@ -256,6 +261,11 @@ const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>([
   "mt",
   "ws",
   "wd",
+  "cda",
+  "f0",
+  "kv",
+  "mur",
+  "rho",
   "mbf",
   "ea",
   "mu",
@@ -296,7 +306,8 @@ export type Completion = {
  *
  * Three groups are exempt, all of them § 7's meanings of absence:
  *
- * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, `cp`, `mt`, `ws`, `wd`, the Overrides and the textile blanks. Under `fam=tx`
+ * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, `cp`, `mt`, `ws`, `wd`, the ride's constants, the Overrides
+ *    and the textile blanks. Under `fam=tx`
  *    **no rope is invented**: § 9 ships `MBL` and `μ` « vides et requis », because one made-up
  *    `MBL` decides the verdict, and those two blocking errors are the correct arrival state.
  *    Polyester's `k` stays blank too, because §13.2 publishes none.
@@ -390,10 +401,13 @@ function inActiveConfiguration(key: SearchKey, imported: boolean, family: Family
     case "cst":
     case "mbf":
     case "ea":
+    case "mur":
       return family === "ac";
     case "cls":
     case "mbl":
     case "k":
+    case "f0":
+    case "kv":
       return family === "tx";
     default:
       // `mu` and `d` are deliberately not scoped: the same physical quantities in both families.
@@ -503,6 +517,22 @@ export function searchToScenario(search: CompletedSearch): ScenarioDraft {
     },
     // Absent **is** no wind, each key on its own: a link may state a direction before any speed.
     wind: { speedKmh: search.ws ?? 0, directionDeg: search.wd ?? 0 },
+    dynamics: dynamics(search),
+  };
+}
+
+/**
+ * The ride's constants (#89): each key absent **is** §12.2's default, on its own. `ρ` absent stays
+ * `null`, the derived default. The other family's trolley keys never reach a completed bag, so its
+ * law reads its defaults.
+ */
+function dynamics(search: CompletedSearch): DynamicsConstants {
+  return {
+    CdA: search.cda ?? DYNAMICS.CdA,
+    rho: search.rho ?? null,
+    F0: search.f0 === undefined ? DYNAMICS.textile.F0 : newtonsFromDaN(search.f0),
+    kv: search.kv ?? DYNAMICS.textile.kv,
+    mu: search.mur ?? DYNAMICS.steel.mu,
   };
 }
 
@@ -581,6 +611,17 @@ export function scenarioToSearch(scenario: Scenario): CompletedSearch {
   // Each is written only off its default, because no wind is both keys **absent**.
   if (scenario.wind.speedKmh !== 0) out.ws = scenario.wind.speedKmh;
   if (scenario.wind.directionDeg !== 0) out.wd = scenario.wind.directionDeg;
+  // Likewise the ride's constants: §12.2's defaults are the keys **absent**, `F₀` in daN, and only
+  // the active family's trolley travels.
+  const { CdA, rho, F0, kv, mu } = scenario.dynamics;
+  if (CdA !== DYNAMICS.CdA) out.cda = CdA;
+  if (material.family === "textile") {
+    if (F0 !== DYNAMICS.textile.F0) out.f0 = daNFromNewtons(F0);
+    if (kv !== DYNAMICS.textile.kv) out.kv = kv;
+  } else if (mu !== DYNAMICS.steel.mu) {
+    out.mur = mu;
+  }
+  if (rho !== null) out.rho = rho;
   out.x = rider.xD;
 
   if (geometry.source === "trace") out.tr = geometry.trace;

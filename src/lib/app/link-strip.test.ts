@@ -133,6 +133,23 @@ describe("§ 8's second sentence — the completion names the values", () => {
     expect(sentence).not.toContain("Mise en tension");
     // `ws` and `wd` absent are no wind (#87), likewise.
     expect(sentence).not.toContain("vent");
+    // The ride's keys absent are §12.2's defaults (#89), likewise — on a câble and on a corde.
+    for (const ride of [sentence, strip("?fam=tx&L=250")?.completed ?? ""]) {
+      expect(ride).not.toContain("traînée");
+      expect(ride).not.toContain("poulie");
+      expect(ride).not.toContain("masse volumique");
+    }
+  });
+
+  test("an unreadable ride constant is named by its own label (#89)", () => {
+    expect(strip("?L=250&cda=x")?.ignored).toBe(
+      "Une partie du lien a été ignorée : « cda » n'était pas un nombre " +
+        "(surface de traînée C_dA ignorée).",
+    );
+    expect(strip("?fam=tx&L=250&f0=x")?.ignored).toBe(
+      "Une partie du lien a été ignorée : « f0 » n'était pas un nombre " +
+        "(frottement constant de la poulie F₀ ignoré).",
+    );
   });
 });
 

@@ -56,6 +56,11 @@ export const BRANCHES = [
   "wind-direction-only",
   "wind-explicit-zero",
   "trace-stations-retired",
+  "dynamics-absent",
+  "dynamics-steel",
+  "dynamics-textile",
+  "dynamics-explicit-defaults",
+  "dynamics-foreign-family",
 ] as const;
 
 export type Branch = (typeof BRANCHES)[number];
@@ -70,7 +75,8 @@ export type CanonicalLinkFixture = {
     | typeof MEASURED_85
     | typeof MEASURED_86
     | typeof MEASURED_87
-    | typeof MEASURED_88;
+    | typeof MEASURED_88
+    | typeof MEASURED_89;
   covers: readonly Branch[];
   scenario: Scenario;
   link: string;
@@ -91,7 +97,8 @@ export type DecodeOnlyFixture = {
     | typeof MEASURED_85
     | typeof MEASURED_86
     | typeof MEASURED_87
-    | typeof MEASURED_88;
+    | typeof MEASURED_88
+    | typeof MEASURED_89;
   covers: readonly Branch[];
   link: string;
 } & ({ scenario: Scenario; canonical: string } | { scenario: ScenarioDraft; canonical: null });
@@ -103,6 +110,7 @@ const MEASURED_85 = "[MEASURED] issue #85, codec as of 2026-11-08";
 const MEASURED_86 = "[MEASURED] issue #86, codec as of 2026-11-08";
 const MEASURED_87 = "[MEASURED] issue #87, codec as of 2026-11-08";
 const MEASURED_88 = "[MEASURED] issue #88, codec as of 2026-11-08";
+const MEASURED_89 = "[MEASURED] issue #89, codec as of 2026-11-08";
 
 /** Three samples `(0,0) (50,-4) (100,-9)`, as `encodeP1` writes them — a 100 m profil. */
 export const TRACE_P1 = "p1.AwCQTpBOAJ8G5wcA";
@@ -124,6 +132,7 @@ const STEEL: Scenario = {
   },
   rider: { mp: 120, hRider: 2.1, hClearMin: 1, DAF: 1.2, xD: 75 },
   wind: { speedKmh: 0, directionDeg: 0 },
+  dynamics: { CdA: 0.45, rho: null, F0: 15, kv: 1.5, mu: 0.015 },
 };
 
 const TEXTILE: Scenario = {
@@ -135,6 +144,10 @@ const TEXTILE: Scenario = {
     B: { id: "epissure-longue-hmpe", eta: 0.85 },
   },
 };
+
+/** The textile baseline's keys from `fam` through `daf`, between which the ride's keys never sit. */
+const TEXTILE_BODY =
+  "fam=tx&mu=0.16&cls=hmpe&mbl=30000&k=22&ta=oeil&tb=epissure&na=0.9&nb=0.85&mp=120&hr=2.1&gm=1&daf=1.2";
 
 /** What follows `za=12&zb=12&` through `fam=ac&d=12&r0=1770&cst=iwrc` on the steel baseline. */
 const TAIL = "ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=75";
@@ -151,8 +164,8 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
   {
     name: "first-run: steel, manual, sag driver, perm, no regime",
     source: MEASURED,
-    // No `bp`, `cp`, `mt`, `ws` or `wd`, as before the keys existed: one Brin porteur, Mise en
-    // tension at A, by mouflage, no wind.
+    // No `bp`, `cp`, `mt`, `ws`, `wd` or ride key, as before the keys existed: one Brin porteur,
+    // Mise en tension at A, by mouflage, no wind, §12.2's constants.
     covers: [
       "steel",
       "manual",
@@ -162,6 +175,7 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
       "tensioning-side-absent",
       "tensioning-device-absent",
       "wind-absent",
+      "dynamics-absent",
     ],
     scenario: STEEL,
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
@@ -255,6 +269,40 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
     link:
       `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
       "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&wd=270&x=75",
+  },
+  {
+    name: "ride constants on a câble: `cda`, `mur`, `rho` after the wind, before `x`",
+    source: MEASURED_89,
+    covers: ["dynamics-steel"],
+    scenario: {
+      ...STEEL,
+      wind: { speedKmh: 50, directionDeg: 45 },
+      dynamics: { ...STEEL.dynamics, CdA: 0.5, rho: 1.069, mu: 0.02 },
+    },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&ws=50&wd=45" +
+      "&cda=0.5&mur=0.02&rho=1.069&x=75",
+  },
+  {
+    name: "ride constants on a corde: `f0` in daN and `kv`, each alone off its default",
+    source: MEASURED_89,
+    covers: ["dynamics-textile"],
+    scenario: {
+      ...TEXTILE,
+      dynamics: { ...TEXTILE.dynamics, F0: 20 },
+    },
+    link: `/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&${TEXTILE_BODY}&f0=2&x=75`,
+  },
+  {
+    name: "the corde's `kv` without its `f0`",
+    source: MEASURED_89,
+    covers: ["dynamics-textile"],
+    scenario: {
+      ...TEXTILE,
+      dynamics: { ...TEXTILE.dynamics, kv: 2.25 },
+    },
+    link: `/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&${TEXTILE_BODY}&kv=2.25&x=75`,
   },
   {
     name: "ratio driver, kgf display",
@@ -499,6 +547,26 @@ export const DECODE_ONLY_LINKS: readonly DecodeOnlyFixture[] = [
     link:
       `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
       "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&ws=0&wd=0&x=75",
+    scenario: STEEL,
+    canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "§12.2's constants typed out are the defaults, and the canonical link omits them",
+    source: MEASURED_89,
+    covers: ["dynamics-explicit-defaults"],
+    link:
+      `/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&${TEXTILE_BODY}` +
+      "&cda=0.45&f0=1.5&kv=1.5&x=75",
+    scenario: TEXTILE,
+    canonical: `/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&${TEXTILE_BODY}&x=75`,
+  },
+  {
+    name: "a corde's `f0` beside a câble is out of the active configuration, and leaves",
+    source: MEASURED_89,
+    covers: ["dynamics-foreign-family"],
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&f0=2&kv=3&x=75",
     scenario: STEEL,
     canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
   },

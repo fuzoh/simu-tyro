@@ -83,6 +83,12 @@ const ROWS: ReadonlyArray<{ id: QuantityId; value: number; expected: string }> =
   // The Vent (#87): whole km/h and whole degrees, in state exactly as typed.
   { id: "windSpeed", value: 50, expected: "50 km/h" },
   { id: "windDirection", value: 45, expected: "45 °" },
+  // The ride's constants (#89) at §12.2's defaults — `F₀` 15 N is a force, so daN like the rest.
+  { id: "CdA", value: 0.45, expected: "0,45 m²" },
+  { id: "F0", value: 15, expected: "1,5 daN" },
+  { id: "kv", value: 1.5, expected: "1,50 kg/s" },
+  { id: "trolleyMu", value: 0.015, expected: "0,015" },
+  { id: "rho", value: 1.225, expected: "1,225 kg/m³" },
   // The badge's own row: the formula value, not the override, so the padding is what rounds it.
   { id: "MBF", value: 90_739.8, expected: "9074 daN" },
   // 6,897 MN in canonical newtons — the declared carve-out renders MN under every setting.
@@ -257,11 +263,12 @@ describe("« le changement d'unité n'écrit jamais dans l'état ; daN→X→daN
     return kind === "force" || kind === "force/m";
   });
 
-  test("the ten force rows are the ones the selector moves", () => {
+  test("the eleven force rows are the ones the selector moves", () => {
     expect(FORCE_IDS).toEqual([
       "T_target",
       "H_target",
       "MBL",
+      "F0",
       "MBF",
       "w",
       "Tstatic",

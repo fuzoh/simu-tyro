@@ -4,7 +4,7 @@ import { zGroundAt } from "@/lib/sim";
 
 import type { Trace } from "./trace.ts";
 
-import { deriveSpan, deriveTerrain, maxSpacing, traceExtent } from "./trace.ts";
+import { deriveSpan, deriveTerrain, maxSpacing, meanAltitude, traceExtent } from "./trace.ts";
 
 /**
  * The Trace and its one seam — « v1 build spec » § 4 (*La Trace est immuable ; le `Terrain` est
@@ -36,6 +36,23 @@ describe("traceExtent and maxSpacing", () => {
 
   test("a one-point trace has no spacing to report", () => {
     expect(maxSpacing(trace([12], [500]))).toBe(0);
+  });
+});
+
+describe("meanAltitude — where §12.2's air density is read (#89)", () => {
+  test("weighs each stretch by its length, not each sample alike", () => {
+    // (1000 + 1200)/2 · 100 + 1200 · 300 = 470 000 over 400 m: 1175 m, where the three samples
+    // averaged alike would say 1133,3 m.
+    expect(meanAltitude(trace([0, 100, 400], [1000, 1200, 1200]))).toBeCloseTo(1175, 9);
+  });
+
+  test("is the midpoint of a straight ramp, wherever its first sample sits", () => {
+    expect(meanAltitude(RAMP)).toBeCloseTo(570, 9);
+    expect(meanAltitude(trace([12.5, 40, 112.5], [500, 500, 500]))).toBeCloseTo(500, 9);
+  });
+
+  test("a one-point trace is its own altitude", () => {
+    expect(meanAltitude(trace([12], [1360.9]))).toBe(1360.9);
   });
 });
 

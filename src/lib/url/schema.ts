@@ -55,12 +55,13 @@
  * - **Forces are daN in the URL, always**, whatever `u` says. `u` is display-only, so hand-editing
  *   `u=daN` → `u=kN` must not make the line 100× tighter. The engine holds newtons; `./scenario.ts`
  *   is the one place the ÷10 happens, in both directions.
- * - **Absence carries exactly seven meanings and never an eighth.** `reg` absent is « — choisir — »,
+ * - **Absence carries exactly eight meanings and never a ninth.** `reg` absent is « — choisir — »,
  *   `mbf`/`ea`/`mu` absent is « non surchargée », `bp` absent is one Brin porteur, `cp` absent is
  *   the Mise en tension at A, `mt` absent is the mouflage, `ws`/`wd` absent is no wind (speed 0,
- *   direction 0), and a family- or terrain-scoped key absent means that configuration is not the
- *   active one. So `stripSearchParams` is rejected, every other key with a value is stated even at
- *   its default, and `./scenario.ts`'s completion exempts the first six.
+ *   direction 0), `cda`/`f0`/`kv`/`mur`/`rho` absent is §12.2's default for the passager's ride (#89)
+ *   — `ρ`'s being derived from the profil — and a family- or terrain-scoped key absent means that
+ *   configuration is not the active one. So `stripSearchParams` is rejected, every other key with a
+ *   value is stated even at its default, and `./scenario.ts`'s completion exempts the first seven.
  * - **The dropped-keys reporter takes the raw query string as a parameter**
  *   ({@link reportDroppedKeys}), never reading `window.location` — amendment A removed the jsdom
  *   environment that would otherwise be needed, and as a pure function this is a plain unit test.
@@ -123,6 +124,11 @@ export const CANONICAL_KEYS = [
   "daf",
   "ws",
   "wd",
+  "cda",
+  "f0",
+  "kv",
+  "mur",
+  "rho",
   "x",
   "tr",
 ] as const;
@@ -302,6 +308,12 @@ const KEY_SCHEMAS = {
   // The Vent (#87). Absent **is** no wind, so a link older than the keys reads none.
   ws: FINITE, // Vitesse du vent, km/h.
   wd: FINITE, // Direction du vent, degrés — d'où il vient, relativement au sens A → B.
+  // The passager's ride (#89). Absent **is** §12.2's default, so a link older than the keys reads it.
+  cda: FINITE, // `C_dA` du passager, m².
+  f0: FINITE, // Frottement constant de la poulie `F₀`, **daN** — corde.
+  kv: FINITE, // Frottement de la poulie proportionnel à la vitesse `k_v`, kg/s — corde.
+  mur: FINITE, // Frottement de la poulie `μ`, sans unité — câble.
+  rho: FINITE, // Masse volumique de l'air `ρ`, kg/m³. Absent = déduite du profil, 1,225 sans profil.
   x: FINITE, // Position du passager, m — clamped to the span by `searchToScenario`, **never here**.
   // `tr` is validated **structurally** by the codec, not by valibot: sentinel, base64url alphabet,
   // varint walk, declared `n` against bytes consumed, character budget. A structural failure is a

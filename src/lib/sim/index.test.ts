@@ -161,7 +161,7 @@ describe("the public surface", () => {
   });
 });
 
-describe("§ 2's module layout — eleven modules by concept, plus the two material files", () => {
+describe("§ 2's module layout — eleven modules by concept, the ride (#89) and the two material files", () => {
   const modules = [
     "index.ts",
     "types.ts",
@@ -174,6 +174,7 @@ describe("§ 2's module layout — eleven modules by concept, plus the two mater
     "terrain.ts",
     "clearance.ts",
     "verdict.ts",
+    "dynamics.ts",
     "materials/steel.ts",
     "materials/textile.ts",
   ];
