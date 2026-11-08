@@ -90,6 +90,7 @@ describe("what each Fond de carte drapes", () => {
         vector: null,
         positions: TRIAL_ENDS,
         across: 0,
+        measure: [],
       });
       const source = style.sources.fond;
       expect(source?.type === "raster" ? source.tiles : null).toEqual([wmtsTiles(DRAPED[fond])]);

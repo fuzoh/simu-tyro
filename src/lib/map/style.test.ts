@@ -24,6 +24,8 @@ import {
   bananeData,
   isFondSource,
   LINE_SOURCE,
+  MEASURE_SOURCE,
+  measureData,
   lineData,
   loadVectorStyle,
   mapStyle,
@@ -66,7 +68,7 @@ function rasterTiles(style: MapStyle, source: string): readonly string[] {
   return spec.tiles;
 }
 
-describe("every Fond and the Couche pentes keep the ligne A–B and the Banane", () => {
+describe("every Fond and the Couche pentes keep the ligne A–B, the Banane and the Mesure", () => {
   test.each(
     DISPLAYS.flatMap(
       (display) =>
@@ -76,24 +78,27 @@ describe("every Fond and the Couche pentes keep the ligne A–B and the Banane",
         ] as const,
     ),
   )("%o, vector style %#", (display, vector) => {
-    const style = mapStyle({ display, vector, positions: TRIAL_ENDS, across: 0 });
+    const style = mapStyle({ display, vector, positions: TRIAL_ENDS, across: 0, measure: [] });
     const ids = style.layers.map((layer) => layer.id);
 
     // Plain background first — what shows wherever no tile does.
     expect(style.layers[0]).toEqual(expect.objectContaining({ type: "background" }));
-    // The line then the Banane last, each from the one source that holds it.
-    expect(style.layers.slice(-4).map((layer) => "source" in layer && layer.source)).toEqual([
+    // The line, the Banane, then the Mesure last, each from the one source that holds it.
+    expect(style.layers.slice(-7).map((layer) => "source" in layer && layer.source)).toEqual([
       LINE_SOURCE,
       LINE_SOURCE,
       BANANE_SOURCE,
       BANANE_SOURCE,
+      MEASURE_SOURCE,
+      MEASURE_SOURCE,
+      MEASURE_SOURCE,
     ]);
     expect(style.sources[LINE_SOURCE]).toEqual({
       type: "geojson",
       data: lineData(TRIAL_ENDS),
     });
     // The Couche pentes right under them when asked for, absent otherwise.
-    expect(ids.indexOf(PENTES_SOURCE)).toBe(display.pentes ? ids.length - 5 : -1);
+    expect(ids.indexOf(PENTES_SOURCE)).toBe(display.pentes ? ids.length - 8 : -1);
   });
 });
 
@@ -106,6 +111,7 @@ describe("the Banane's source", () => {
       vector: null,
       positions: TRIAL_ENDS,
       across: 8,
+      measure: [],
     });
     expect(style.sources[BANANE_SOURCE]).toEqual({ type: "geojson", data });
   });
@@ -126,6 +132,7 @@ describe("the three Fonds de carte", () => {
       vector: VECTOR,
       positions: TRIAL_ENDS,
       across: 0,
+      measure: [],
     });
     expect(DEFAULT_MAP_DISPLAY.fond).toBe("carte-claire");
     expect(style.sources["base_v1.0.0"]).toEqual(VECTOR.sources["base_v1.0.0"]);
@@ -144,14 +151,18 @@ describe("the three Fonds de carte", () => {
       vector: null,
       positions: TRIAL_ENDS,
       across: 0,
+      measure: [],
     });
-    expect(Object.keys(style.sources)).toEqual([LINE_SOURCE, BANANE_SOURCE]);
+    expect(Object.keys(style.sources)).toEqual([LINE_SOURCE, BANANE_SOURCE, MEASURE_SOURCE]);
     expect(style.layers.map((layer) => layer.type)).toEqual([
       "background",
       "line",
       "line",
       "line",
       "line",
+      "line",
+      "line",
+      "circle",
     ]);
   });
 
@@ -164,6 +175,7 @@ describe("the three Fonds de carte", () => {
       vector: VECTOR,
       positions: TRIAL_ENDS,
       across: 0,
+      measure: [],
     });
     expect(rasterTiles(style, "fond")).toEqual([
       `https://wmts.geo.admin.ch/1.0.0/${layer}/default/current/3857/{z}/{x}/{y}.${format}`,
@@ -176,6 +188,9 @@ describe("the three Fonds de carte", () => {
       "ligne-ab",
       "banane-halo",
       "banane",
+      "mesure-croix",
+      "mesure-ligne",
+      "mesure-points",
     ]);
     // A raster Fond takes nothing from the vector style.
     expect(style.sources["base_v1.0.0"]).toBeUndefined();
@@ -187,6 +202,7 @@ describe("the three Fonds de carte", () => {
       vector: null,
       positions: TRIAL_ENDS,
       across: 0,
+      measure: [],
     });
     expect(rasterTiles(style, PENTES_SOURCE)).toEqual([
       "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.hangneigung-ueber_30/default/current/3857/{z}/{x}/{y}.png",
@@ -198,6 +214,7 @@ describe("the three Fonds de carte", () => {
     expect(isFondSource(PENTES_SOURCE)).toBe(false);
     expect(isFondSource(LINE_SOURCE)).toBe(false);
     expect(isFondSource(BANANE_SOURCE)).toBe(false);
+    expect(isFondSource(MEASURE_SOURCE)).toBe(false);
     expect(isFondSource("fond")).toBe(true);
   });
 
@@ -231,6 +248,39 @@ describe("the ligne A–B as the map draws it", () => {
     const empty = { type: "FeatureCollection", features: [] };
     expect(lineData({ A: null, B: null })).toEqual(empty);
     expect(lineData({ A: TRIAL_ENDS.A, B: null })).toEqual(empty);
+  });
+});
+
+describe("the Mesure as the map draws it", () => {
+  const kinds = (points: Parameters<typeof measureData>[0]) =>
+    measureData(points).features.map((feature) => feature.properties.kind);
+
+  test("is nothing before the first click", () => {
+    expect(kinds([])).toEqual([]);
+  });
+
+  test("is a point and its two dotted crosses per click", () => {
+    expect(kinds([TRIAL_ENDS.A])).toEqual(["point", "croix", "croix"]);
+  });
+
+  test("is the line between two points, and a cross at each", () => {
+    expect(kinds([TRIAL_ENDS.A, TRIAL_ENDS.B]).sort()).toEqual(
+      ["croix", "croix", "croix", "croix", "ligne", "point", "point"].sort(),
+    );
+  });
+
+  test("a cross is a north-south line and an east-west line through the point", () => {
+    const [, ...crosses] = measureData([TRIAL_ENDS.A]).features;
+    const [northSouth, eastWest] = crosses.map(({ geometry }) => {
+      if (geometry.type !== "LineString") throw new Error("a cross is made of lines");
+      return geometry.coordinates;
+    });
+    expect(northSouth.map(([lon]) => lon)).toEqual([TRIAL_ENDS.A.lon, TRIAL_ENDS.A.lon]);
+    expect(northSouth[0][1]).toBeLessThan(TRIAL_ENDS.A.lat);
+    expect(northSouth[1][1]).toBeGreaterThan(TRIAL_ENDS.A.lat);
+    expect(eastWest.map(([, lat]) => lat)).toEqual([TRIAL_ENDS.A.lat, TRIAL_ENDS.A.lat]);
+    expect(eastWest[0][0]).toBeLessThan(TRIAL_ENDS.A.lon);
+    expect(eastWest[1][0]).toBeGreaterThan(TRIAL_ENDS.A.lon);
   });
 });
 

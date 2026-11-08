@@ -163,8 +163,8 @@ them after any `bunx shadcn@latest add`:
 ### The map paints in literals
 
 MapLibre's paint properties take colours, not CSS custom properties, so the vue de dessus's plain
-background and the ligne A–B are hex literals in `src/lib/map/style.ts` — the only ones in the
-app's code, and the only place that may hold them. Everything around the canvas — the anchor
+background, the ligne A–B and the Mesure (`MEASURE_INK`, a burnt orange that never reads as the
+line) are hex literals in `src/lib/map/style.ts` — the only ones in the app's code, and the only place that may hold them. Everything around the canvas — the anchor
 markers, « Placer A / B », the attribution — is HTML over it and takes the tokens as everywhere
 else.
 

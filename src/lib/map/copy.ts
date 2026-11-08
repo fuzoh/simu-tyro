@@ -12,6 +12,7 @@ import { label } from "@/lib/vocabulary/labels.ts";
 
 import type { Fond } from "./display.ts";
 import type { Anchor } from "./gesture.ts";
+import type { MeasurePoints, MeasureReading } from "./measure.ts";
 import type { Vue3dBlock } from "./vue-3d.ts";
 import type { RoseReference } from "./wind-rose.ts";
 
@@ -51,6 +52,80 @@ export const MAP_COPY = {
   /** No network, no WebGL: the vue de dessus is back, and this says why. */
   vue3dUnavailable: "Vue 3D indisponible",
 } as const;
+
+/** The Mesure's words (#98). */
+export const MEASURE_COPY = {
+  /** The button that enters the tool. */
+  enter: "Mesure",
+  /** The same button, once the tool is on: it quits. */
+  quit: "Quitter la mesure",
+  /** The readout's accessible name. */
+  title: "Mesure",
+  horizontal: "Distance horizontale",
+  direct: "Distance directe",
+  ground: "Distance au sol",
+  loading: "calcul du profil…",
+  /** Offline, and the profil in memory does not hold both points. */
+  offline: "indisponible hors réseau",
+  /** The service has no terrain there, so no network would help. */
+  outOfCoverage: "indisponible hors couverture swisstopo",
+  /** What the next click does, by how many points are down. */
+  hintFirst: "Mesure : cliquez sur le premier point.",
+  hintSecond: "Mesure : cliquez sur le second point.",
+  hintAgain: "Mesure : un nouveau clic recommence.",
+} as const;
+
+/** What the next click does while the Mesure is on, said under the map. */
+export function measureHint(points: MeasurePoints): string {
+  switch (points.length) {
+    case 0:
+      return MEASURE_COPY.hintFirst;
+    case 1:
+      return MEASURE_COPY.hintSecond;
+    default:
+      return MEASURE_COPY.hintAgain;
+  }
+}
+
+/**
+ * The Mesure's readout, one line per distance. The direct one carries the difference of altitude
+ * it is made of; the distance au sol is absent offline, and the direct distance then says why it
+ * has no value rather than print « — », which is *Indéterminé*'s.
+ */
+export function measureLines(reading: MeasureReading): readonly string[] {
+  const horizontal = `${MEASURE_COPY.horizontal} : ${formatQuantity("L", reading.horizontalM)}`;
+  switch (reading.status) {
+    case "loading":
+      return [
+        horizontal,
+        `${MEASURE_COPY.direct} : ${MEASURE_COPY.loading}`,
+        `${MEASURE_COPY.ground} : ${MEASURE_COPY.loading}`,
+      ];
+    case "online":
+      return [
+        horizontal,
+        `${MEASURE_COPY.direct} : ${directReading(reading.directM, reading.dz)}`,
+        `${MEASURE_COPY.ground} : ${formatQuantity("L", reading.groundM)}`,
+      ];
+    case "offline": {
+      const missing =
+        reading.failure === "hors-couverture" ? MEASURE_COPY.outOfCoverage : MEASURE_COPY.offline;
+      return [
+        horizontal,
+        `${MEASURE_COPY.direct} : ${
+          reading.directM === null || reading.dz === null
+            ? missing
+            : directReading(reading.directM, reading.dz)
+        }`,
+      ];
+    }
+  }
+}
+
+function directReading(directM: number, dz: number): string {
+  const sign = dz < 0 ? "−" : "+";
+  return `${formatQuantity("L", directM)} (Δz ${sign}${formatQuantity("h", Math.abs(dz))})`;
+}
 
 /**
  * What the Banane is, on hover: drawn rather than computed, its amplitude a `[CONVENTION]` — a
@@ -136,6 +211,7 @@ export function mapLabelTable(): readonly string[] {
     ...Object.values(FOND_LABEL),
     ...Object.values(MAP_COPY),
     ...Object.values(VUE_3D_BLOCKED),
+    ...Object.values(MEASURE_COPY),
     BANANE_HELP,
     ...[0, 90, 180, 270, 45, 108].map(describeRelative),
     ...new Set([...FONDS.map(fondAttribution), ...FONDS.map(drapedAttribution)]),

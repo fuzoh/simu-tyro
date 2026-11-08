@@ -17,8 +17,11 @@ import {
   describeRelative,
   MAP_COPY,
   mapLabelTable,
+  measureHint,
+  measureLines,
   windReading,
 } from "./copy.ts";
+import { horizontalDistance } from "./measure.ts";
 import { roseReference } from "./wind-rose.ts";
 
 const PARIS = { lat: 48.85, lon: 2.35 };
@@ -97,9 +100,80 @@ describe("the Banane's words", () => {
   });
 });
 
+const HORIZONTAL_M = horizontalDistance(TRIAL_ENDS.A, TRIAL_ENDS.B);
+const READINGS = {
+  loading: measureLines({ status: "loading", horizontalM: HORIZONTAL_M }),
+  online: measureLines({
+    status: "online",
+    horizontalM: HORIZONTAL_M,
+    dz: -15,
+    directM: Math.hypot(HORIZONTAL_M, 15),
+    groundM: 440.1,
+  }),
+  offline: measureLines({
+    status: "offline",
+    horizontalM: HORIZONTAL_M,
+    failure: "indisponible",
+    dz: null,
+    directM: null,
+  }),
+  outOfCoverage: measureLines({
+    status: "offline",
+    horizontalM: HORIZONTAL_M,
+    failure: "hors-couverture",
+    dz: null,
+    directM: null,
+  }),
+  offlineOnProfile: measureLines({
+    status: "offline",
+    horizontalM: HORIZONTAL_M,
+    failure: "indisponible",
+    dz: 15,
+    directM: 435.4,
+  }),
+};
+
+describe("the Mesure's readout", () => {
+  test("online: the horizontal, the direct with its Δz, and the distance au sol", () => {
+    expect(READINGS.online).toEqual([
+      "Distance horizontale : 435,2 m",
+      "Distance directe : 435,4 m (Δz −15,0 m)",
+      "Distance au sol : 440,1 m",
+    ]);
+  });
+
+  test("offline: no distance au sol, and « indisponible hors réseau » — never « — »", () => {
+    expect(READINGS.offline).toEqual([
+      "Distance horizontale : 435,2 m",
+      "Distance directe : indisponible hors réseau",
+    ]);
+    expect(Object.values(READINGS).flat().join("\n")).not.toContain("—");
+  });
+
+  test("offline with both points on the profil in memory: the direct distance, no distance au sol", () => {
+    expect(READINGS.offlineOnProfile).toEqual([
+      "Distance horizontale : 435,2 m",
+      "Distance directe : 435,4 m (Δz +15,0 m)",
+    ]);
+  });
+
+  test("outside swisstopo's coverage the reason is the coverage, not the network", () => {
+    expect(READINGS.outOfCoverage[1]).toBe(
+      "Distance directe : indisponible hors couverture swisstopo",
+    );
+  });
+
+  test("the hint says what the next click does", () => {
+    expect(measureHint([])).toBe("Mesure : cliquez sur le premier point.");
+    expect(measureHint([TRIAL_ENDS.A])).toBe("Mesure : cliquez sur le second point.");
+    expect(measureHint([TRIAL_ENDS.A, TRIAL_ENDS.B])).toBe("Mesure : un nouveau clic recommence.");
+  });
+});
+
 describe("every line the map prints stays in the terrain register", () => {
   const lines = [
     ...mapLabelTable(),
+    ...Object.values(READINGS).flat(),
     windReading({ speedKmh: 25, directionDeg: 108 }, roseReference(TRIAL_ENDS)),
     windReading({ speedKmh: 25, directionDeg: 108 }, roseReference({ A: null, B: null })),
     windReading({ speedKmh: 0, directionDeg: 0 }, roseReference({ A: null, B: null })),

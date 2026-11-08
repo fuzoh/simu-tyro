@@ -24,6 +24,9 @@
  *   renderer is fetched through `./load-vue-3d.ts` the first time it is chosen — never imported
  *   here. Whatever stops it (no network, no WebGL) brings the vue de dessus back with « Vue 3D
  *   indisponible »; without the two Positions or a profil the switch is off and says why.
+ * - **The Mesure is the map's own state** (#98): `./use-measure.ts` holds its points, which never
+ *   reach the store, the Session or the link. While it is on, a click on the map is a point of the
+ *   ruler and places no anchor; the Vue 3D has no Mesure.
  * - **One gesture machine for both views** (#97): an anchor dragged in the Vue 3D is sent to the
  *   same `send` as a marker, so its release is the same new line, recomputed by the same rule.
  */
@@ -39,6 +42,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { SceneBase, SceneFrame } from "@/lib/chart/scene.ts";
 import type { Fond, MapDisplay } from "@/lib/map/display.ts";
 import type { Anchor, MapEvent, MapGesture } from "@/lib/map/gesture.ts";
+import type { MeasurePoints, MeasureReading } from "@/lib/map/measure.ts";
 import type { FondHealth, MapStyle } from "@/lib/map/style.ts";
 import type { Vue3dBlock, Vue3dScene } from "@/lib/map/vue-3d.ts";
 import type { Position, Positions } from "@/lib/scenario/types.ts";
@@ -58,6 +62,9 @@ import {
   clickHint,
   FOND_LABEL,
   MAP_COPY,
+  MEASURE_COPY,
+  measureHint,
+  measureLines,
   VUE_3D_BLOCKED,
   windReading,
 } from "@/lib/map/copy.ts";
@@ -74,6 +81,8 @@ import {
   lineData,
   loadVectorStyle,
   mapStyle,
+  MEASURE_SOURCE,
+  measureData,
   SWISSTOPO_COVERAGE,
 } from "@/lib/map/style.ts";
 import { drapedAttribution, vue3dPlacement, vue3dScene } from "@/lib/map/vue-3d.ts";
@@ -83,6 +92,7 @@ import { geoadminNotice, loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
 import type { Vue3d } from "./vue-3d-renderer.ts";
 
 import { loadVue3d } from "./load-vue-3d.ts";
+import { useMeasure } from "./use-measure.ts";
 import { WindRose } from "./wind-rose.tsx";
 
 // MapLibre cannot find its worker inside a bundle; Vite hands over the file's URL.
@@ -99,7 +109,7 @@ const FIT = { padding: 48, maxZoom: 16 } as const;
  *   the Vue 3D draws the same line the coupe does, or none.
  */
 export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: SceneBase | null }) {
-  const { scenario, map: display } = useAppState();
+  const { scenario, map: display, trace } = useAppState();
   const dispatch = useAppDispatch();
   const { positions } = scenario;
   const { gesture, send } = useMapGesture(positions);
@@ -118,6 +128,13 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
   const scene3d = useVue3dScene(shows3d, frame, solved, across);
 
   const plain = failed ? plainDrawing(drawn, across) : null;
+  const measure = useMeasure(browserFetch, scenario.geometry.source === "trace" ? trace : null);
+  const measuring = measure.active && !shows3d && plain === null;
+  const { click: measureClick } = measure;
+  const clicked = useCallback(
+    (at: Position) => (measuring ? measureClick(at) : send({ type: "click", at })),
+    [measuring, measureClick, send],
+  );
   // The plain drawing orients itself by the LV95 domain, so the rose reads the line as it is drawn.
   const reference =
     plain !== null && plain.unoriented !== null ? LEVEL_REFERENCE : roseReference(drawn);
@@ -131,8 +148,9 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
       ? scene3d?.unloaded != null && gesture.kind === "idle"
       : drawn.A !== null && drawn.B !== null);
   // A release loads its profil the same way in both views, and says so under either.
-  const gestureLine =
-    gesture.kind === "loading"
+  const gestureLine = measuring
+    ? measureHint(measure.points)
+    : gesture.kind === "loading"
       ? MAP_COPY.loading
       : gesture.kind === "idle" && gesture.notice !== null
         ? geoadminNotice(gesture.notice)
@@ -200,9 +218,12 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
                   display={display}
                   drawn={drawn}
                   gesture={gesture}
+                  onClick={clicked}
                   onFailed={() => setFailed(true)}
                   onHealth={setHealth}
                   across={across}
+                  measure={measure.points}
+                  measuring={measuring}
                   rose={rose}
                   send={send}
                   target={target}
@@ -211,7 +232,7 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
                   {(["A", "B"] as const).map((anchor) => (
                     <Toggle
                       className="bg-background pointer-events-auto"
-                      disabled={gesture.kind !== "idle"}
+                      disabled={gesture.kind !== "idle" || measuring}
                       key={anchor}
                       onPressedChange={() => send({ type: "arm", anchor })}
                       pressed={gesture.kind === "idle" && gesture.armed === anchor}
@@ -221,7 +242,26 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
                       {anchor === "A" ? MAP_COPY.placeA : MAP_COPY.placeB}
                     </Toggle>
                   ))}
+                  <Toggle
+                    className="bg-background pointer-events-auto"
+                    disabled={!measuring && gesture.kind !== "idle"}
+                    onPressedChange={() => {
+                      // An armed « Placer » would silently resume once the Mesure is quit.
+                      if (!measuring && gesture.kind === "idle" && gesture.armed !== null) {
+                        send({ type: "arm", anchor: gesture.armed });
+                      }
+                      measure.toggle();
+                    }}
+                    pressed={measuring}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {measuring ? MEASURE_COPY.quit : MEASURE_COPY.enter}
+                  </Toggle>
                 </div>
+                {measuring && measure.reading !== null && (
+                  <MeasureReadout reading={measure.reading} />
+                )}
               </>
             ) : (
               plain.figure
@@ -237,6 +277,22 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
         )
       }
     />
+  );
+}
+
+/** The Mesure's distances, over the map's bottom-left corner so the caption's height never moves. */
+function MeasureReadout({ reading }: { reading: MeasureReading }) {
+  return (
+    <div
+      aria-label={MEASURE_COPY.title}
+      aria-live="polite"
+      className="bg-background/90 text-foreground pointer-events-none absolute bottom-6 left-2 flex flex-col px-1 text-xs"
+      role="status"
+    >
+      {measureLines(reading).map((line) => (
+        <span key={line}>{line}</span>
+      ))}
+    </div>
   );
 }
 
@@ -476,8 +532,11 @@ function MapCanvas({
   gesture,
   target,
   across,
+  measure,
+  measuring,
   rose,
   send,
+  onClick,
   onHealth,
   onFailed,
 }: {
@@ -485,6 +544,11 @@ function MapCanvas({
   drawn: Positions;
   gesture: MapGesture;
   target: Anchor | null;
+  /** The Mesure's points, drawn above the line. */
+  measure: MeasurePoints;
+  measuring: boolean;
+  /** What a click on the map does: place an anchor, or set a point of the Mesure. */
+  onClick: (at: Position) => void;
   /** The wind's cross component, m/s: the Banane's only input. */
   across: number;
   /** The rose's host: the map keeps it on the line's midpoint as the view moves. */
@@ -503,6 +567,11 @@ function MapCanvas({
   // What a style built later must draw: the line where it is **now**, not where it was at mount.
   const line = useRef(drawn);
   const bow = useRef(across);
+  const ruler = useRef(measure);
+  const clicked = useRef(onClick);
+  useLayoutEffect(() => {
+    clicked.current = onClick;
+  }, [onClick]);
 
   // The rose follows the line's midpoint through every pan and zoom: it runs on every frame, so it
   // moves the host's style rather than render.
@@ -524,6 +593,7 @@ function MapCanvas({
           vector: vector.current,
           positions: line.current,
           across: bow.current,
+          measure: ruler.current,
         }),
         attributionControl: false,
         // A vue de dessus: north stays up, so the drawing reads like the plan it is.
@@ -545,7 +615,7 @@ function MapCanvas({
     created.on("move", placeRose);
     created.on("resize", placeRose);
     created.on("click", (event) =>
-      send({ type: "click", at: { lat: event.lngLat.lat, lon: event.lngLat.lng } }),
+      clicked.current({ lat: event.lngLat.lat, lon: event.lngLat.lng }),
     );
     created.on("error", (event) => {
       const source: unknown = (event as { sourceId?: unknown }).sourceId;
@@ -585,6 +655,7 @@ function MapCanvas({
           vector: vector.current,
           positions: line.current,
           across: bow.current,
+          measure: ruler.current,
         }),
         { diff: true },
       );
@@ -609,7 +680,8 @@ function MapCanvas({
   }, [display.fond, display.pentes]);
 
   // The drawing follows the gesture: the line source and the two markers, nothing in the store.
-  const draggable = gesture.kind === "idle";
+  const idle = gesture.kind === "idle";
+  const draggable = idle && !measuring;
   useEffect(() => {
     line.current = drawn;
     const live = map.current;
@@ -628,7 +700,6 @@ function MapCanvas({
       } else {
         marker.setLngLat([position.lon, position.lat]);
       }
-      markers.current[anchor]?.setDraggable(draggable);
     }
     placeRose();
     // A line placed elsewhere — an imported CSV, a typed Position — may stand outside the view;
@@ -637,12 +708,23 @@ function MapCanvas({
     const outside = [drawn.A, drawn.B].some(
       (position) => position !== null && !shown.contains([position.lon, position.lat]),
     );
-    if (draggable && outside) {
+    if (idle && outside) {
       const view = camera(drawn);
       if (view.bounds !== undefined) live.fitBounds(view.bounds, FIT);
       else live.jumpTo(view);
     }
-  }, [drawn, draggable, send, placeRose]);
+  }, [drawn, idle, send, placeRose]);
+
+  // The Mesure takes the click that lands on an anchor, so A–B can be measured from A to B, and an
+  // anchor stays where it is while it is on. After the effect above, which creates the markers.
+  useEffect(() => {
+    for (const anchor of ["A", "B"] as const) {
+      const marker = markers.current[anchor];
+      if (marker === null) continue;
+      marker.setDraggable(draggable);
+      marker.getElement().style.pointerEvents = measuring ? "none" : "";
+    }
+  }, [drawn, draggable, measuring]);
 
   // The Banane follows the wind and the line: a source of its own, so a drag or a typed wind never
   // touches the camera.
@@ -651,11 +733,19 @@ function MapCanvas({
     void map.current?.getSource<GeoJSONSource>(BANANE_SOURCE)?.setData(bananeData(drawn, across));
   }, [drawn, across]);
 
-  // A crosshair while a click would place an anchor; MapLibre's own hand otherwise.
+  // The Mesure follows its clicks: a source of its own, in every style.
+  useEffect(() => {
+    ruler.current = measure;
+    void map.current?.getSource<GeoJSONSource>(MEASURE_SOURCE)?.setData(measureData(measure));
+  }, [measure]);
+
+  // A crosshair while a click would place an anchor or a point; MapLibre's own hand otherwise.
   useEffect(() => {
     const live = map.current;
-    if (live !== null) live.getCanvas().style.cursor = target === null ? "" : "crosshair";
-  }, [target]);
+    if (live !== null) {
+      live.getCanvas().style.cursor = target === null && !measuring ? "" : "crosshair";
+    }
+  }, [target, measuring]);
 
   // MapLibre makes its container `position: relative`, so the box that fills the frame is a wrapper.
   return (

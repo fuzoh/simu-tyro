@@ -25,8 +25,10 @@ import type { Position, Positions } from "@/lib/scenario/types.ts";
 import type { Fetch } from "@/lib/terrain/geoadmin.ts";
 
 import type { Fond, MapDisplay } from "./display.ts";
+import type { MeasurePoints } from "./measure.ts";
 
 import { bananePath } from "./banane.ts";
+import { crossLines } from "./measure.ts";
 
 /** A MapLibre style, as `Map.setStyle` takes it. */
 export type MapStyle = Exclude<Parameters<MapLibreMap["setStyle"]>[0], string | null>;
@@ -50,6 +52,9 @@ export const LINE_SOURCE = "ligne-ab";
 
 /** The source the Banane (#96) is drawn from: the Ligne à vide bowed by the wind. */
 export const BANANE_SOURCE = "banane";
+
+/** The source the Mesure (#98) is drawn from: its line, its two crosses and its points. */
+export const MEASURE_SOURCE = "mesure";
 
 /** The Couche pentes' source: an overlay, so its tiles never decide whether the Fond arrived. */
 export const PENTES_SOURCE = "pentes";
@@ -97,6 +102,9 @@ export const PLAIN = "#f1f3f4";
 export const LINE_CASING = "#ffffff";
 export const LINE_INK = "#16191b";
 
+/** The Mesure's own colour, so it never reads as the ligne A–B. */
+export const MEASURE_INK = "#c2410c";
+
 /** The attribution the map must show for the Fond on screen — a condition of swisstopo's terms. */
 export function fondAttribution(fond: Fond): string {
   return fond === "carte-claire" ? VECTOR_ATTRIBUTION : RASTER_FONDS[fond].attribution;
@@ -104,7 +112,9 @@ export function fondAttribution(fond: Fond): string {
 
 /** Is this source the Fond's own — the one whose tiles decide « fond de carte indisponible »? */
 export function isFondSource(id: string): boolean {
-  return id !== LINE_SOURCE && id !== PENTES_SOURCE && id !== BANANE_SOURCE;
+  return (
+    id !== LINE_SOURCE && id !== PENTES_SOURCE && id !== BANANE_SOURCE && id !== MEASURE_SOURCE
+  );
 }
 
 /** The ligne A–B as the line source holds it: one segment, or nothing until both ends are known. */
@@ -151,6 +161,54 @@ export function bananeData(positions: Positions, across: number): LineData {
   };
 }
 
+/** One feature of the Mesure's source, told apart by its `kind`. */
+export type MeasureFeature = {
+  readonly type: "Feature";
+  readonly properties: { readonly kind: "point" | "croix" | "ligne" };
+  readonly geometry:
+    | { readonly type: "Point"; readonly coordinates: number[] }
+    | { readonly type: "LineString"; readonly coordinates: number[][] };
+};
+
+export type MeasureCollection = {
+  readonly type: "FeatureCollection";
+  readonly features: MeasureFeature[];
+};
+
+/**
+ * The Mesure as its source holds it: a `point` per click, the `ligne` between two of them, and for
+ * each point its `croix` — the two lines, north-south and east-west, that cross the map.
+ */
+export function measureData(points: MeasurePoints): MeasureCollection {
+  const features: MeasureFeature[] = [];
+  for (const point of points) {
+    const [northSouth, eastWest] = crossLines(point);
+    features.push(
+      {
+        type: "Feature",
+        properties: { kind: "point" },
+        geometry: { type: "Point", coordinates: [point.lon, point.lat] },
+      },
+      ...[northSouth, eastWest].map(
+        (coordinates) =>
+          ({
+            type: "Feature",
+            properties: { kind: "croix" },
+            geometry: { type: "LineString", coordinates: coordinates.map((c) => [...c]) },
+          }) satisfies MeasureFeature,
+      ),
+    );
+  }
+  if (points.length === 2) {
+    features.push({
+      type: "Feature",
+      properties: { kind: "ligne" },
+      geometry: { type: "LineString", coordinates: points.map((p) => [p.lon, p.lat]) },
+    });
+  }
+  return { type: "FeatureCollection", features };
+}
+
 /**
  * The style for one display: plain background, the Fond, the Couche pentes if asked for, then the
  * ligne A–B and the Banane (dashed, as the Ligne à vide is) on top.
@@ -159,17 +217,20 @@ export function bananeData(positions: Positions, across: number): LineData {
  *   or unavailable. The carte claire then draws as the plain background alone.
  * @param positions where the line is drawn now.
  * @param across the wind's cross component, m/s, the Banane's only input.
+ * @param measure the Mesure's points, drawn above everything else.
  */
 export function mapStyle({
   display,
   vector,
   positions,
   across,
+  measure,
 }: {
   display: MapDisplay;
   vector: MapStyle | null;
   positions: Positions;
   across: number;
+  measure: MeasurePoints;
 }): MapStyle {
   const fond = fondStyle(display.fond, vector);
   const pentes: Record<string, StyleSource> = display.pentes
@@ -184,6 +245,7 @@ export function mapStyle({
       ...pentes,
       [LINE_SOURCE]: { type: "geojson", data: lineData(positions) },
       [BANANE_SOURCE]: { type: "geojson", data: bananeData(positions, across) },
+      [MEASURE_SOURCE]: { type: "geojson", data: measureData(measure) },
     },
     layers: [
       { id: "fond-uni", type: "background", paint: { "background-color": PLAIN } },
@@ -223,6 +285,33 @@ export function mapStyle({
         type: "line",
         source: BANANE_SOURCE,
         paint: { "line-color": LINE_INK, "line-width": 3, "line-dasharray": [2, 2] },
+      },
+      {
+        id: `${MEASURE_SOURCE}-croix`,
+        type: "line",
+        source: MEASURE_SOURCE,
+        filter: ["==", ["get", "kind"], "croix"],
+        paint: { "line-color": MEASURE_INK, "line-width": 1.5, "line-dasharray": [1, 2] },
+      },
+      {
+        id: `${MEASURE_SOURCE}-ligne`,
+        type: "line",
+        source: MEASURE_SOURCE,
+        filter: ["==", ["get", "kind"], "ligne"],
+        layout: { "line-cap": "round" },
+        paint: { "line-color": MEASURE_INK, "line-width": 3 },
+      },
+      {
+        id: `${MEASURE_SOURCE}-points`,
+        type: "circle",
+        source: MEASURE_SOURCE,
+        filter: ["==", ["get", "kind"], "point"],
+        paint: {
+          "circle-radius": 5,
+          "circle-color": LINE_CASING,
+          "circle-stroke-color": MEASURE_INK,
+          "circle-stroke-width": 2,
+        },
       },
     ],
   };
