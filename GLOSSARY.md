@@ -234,6 +234,12 @@ _Avoid_: no verdict, pending verdict, unrated, empty results
 The person travelling on the line. A load magnitude on a line or a fitting is a charge, not a passager.
 _Avoid_: personne, charge
 
+**Point d'arrêt**:
+Where the passager comes to rest on the line short of the arrival. Without wind it is the
+low point of the loaded line plus friction; wind only shifts it. Computed first without wind,
+then with the wind entered.
+_Avoid_: blocage, point mort, position finale, arrêt par le vent (as the only cause)
+
 **Rider Envelope**:
 The vertical space the rider occupies below the cable — pulley, lanyard and body. Subtracted in
 full when clearance is measured. French, on every Page: **gabarit du passager**.
