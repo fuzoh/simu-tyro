@@ -125,7 +125,8 @@ describe("an unknown rope class is ignored and the default class is named, never
   test("an imported link with no stations names the two it was given", () => {
     const query = `?tr=${TRACE_P1}`;
     expect(strip(query)?.completed).toContain("station A 0,0 m");
-    expect(strip(query)?.completed).toContain("station B 150,0 m");
+    // The Trace's own end — TRACE_P1 runs 0 → 100 m — and no longer « station A + 150 m » (#55).
+    expect(strip(query)?.completed).toContain("station B 100,0 m");
   });
 
   test("each token reads in the French of its domain value", () => {

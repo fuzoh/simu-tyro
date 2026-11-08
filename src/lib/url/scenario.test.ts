@@ -2,7 +2,9 @@ import { defaultStringifySearch } from "@tanstack/react-router";
 import { describe, expect, it, test } from "vitest";
 
 import type { Scenario } from "@/lib/scenario/types.ts";
+import type { Trace } from "@/lib/terrain/trace.ts";
 
+import { appReducer, initialAppState } from "@/lib/app/state.ts";
 import { evaluateGates } from "@/lib/rail/gates.ts";
 import { applyShippedTerminations } from "@/lib/rail/values.ts";
 import {
@@ -13,7 +15,7 @@ import {
 
 import type { SearchKey } from "./schema.ts";
 
-import { encodeP1 } from "./p1.ts";
+import { decodeP1, encodeP1 } from "./p1.ts";
 import {
   completeFromDefaults,
   CONSTRUCTION_ID_BY_TOKEN,
@@ -47,6 +49,13 @@ const parse = parseLinkSearch;
 const TRACE = encodeP1({
   d: Float64Array.from([0, 50, 100]),
   z: Float64Array.from([0, -4, -9]),
+  dev: null,
+});
+
+/** Three stations `(20,500) (70,496) (120,491)`: a Trace starting after 0, ending before 150 m. */
+const OFFSET_TRACE = encodeP1({
+  d: Float64Array.from([20, 70, 120]),
+  z: Float64Array.from([500, 496, 491]),
   dev: null,
 });
 
@@ -258,16 +267,16 @@ describe("completion follows the active family and names every key it fills", ()
     });
   });
 
-  test("an imported link with no stations completes them from the file's origin, and names them", () => {
-    // Station A at the origin of the file, station B the shipped 150 m further on.
+  test("an imported link with no stations completes them to the Trace's ends, and names them", () => {
+    // #55: the 100 m TRACE ends before the old « `sa` + 150 m », which put station B off the Trace.
     const { search, completed } = complete(`?tr=${TRACE}`);
-    expect(search).toMatchObject({ sa: 0, sb: 150 });
+    expect(search).toMatchObject({ sa: 0, sb: 100 });
     expect(completed).toEqual(expect.arrayContaining(["sa", "sb"]));
     expect(searchToScenario(search).geometry).toEqual({
       source: "trace",
       trace: TRACE,
       sa: 0,
-      sb: 150,
+      sb: 100,
     });
   });
 
@@ -293,13 +302,79 @@ describe("completion follows the active family and names every key it fills", ()
     { path: "manual, `L` completed to 150", query: "?h=-40", x: 75 },
     { path: "imported, stations 10 → 90", query: `?tr=${TRACE}&sa=10&sb=90`, x: 40 },
     { path: "imported, `sa` completed to 0 before 90", query: `?tr=${TRACE}&sb=90`, x: 45 },
-    { path: "imported, `sb` completed to 10 + 150", query: `?tr=${TRACE}&sa=10`, x: 75 },
-    { path: "imported, both stations completed", query: `?tr=${TRACE}`, x: 75 },
+    { path: "imported, `sb` completed to the Trace's end 100", query: `?tr=${TRACE}&sa=10`, x: 45 },
+    { path: "imported, both stations completed to 0 → 100", query: `?tr=${TRACE}`, x: 50 },
+    { path: "imported, both completed to 20 → 120", query: `?tr=${OFFSET_TRACE}`, x: 50 },
   ])("`x` completes to half the completed span — $path", ({ query, x }) => {
     const { search, completed } = complete(query);
     expect(search.x).toBe(x);
     expect(completed).toContain("x");
     expect(searchToScenario(search).rider.xD).toBe(x);
+  });
+});
+
+describe("an imported link's absent stations complete to the Trace's ends — #55", () => {
+  /** The Trace a link's `tr` names, as `initialAppState` decodes it beside the Scenario. */
+  const traceOf = (tr: string): Trace => ({ ...decodeP1(tr), fileName: null });
+
+  /** The gates' errors on a completed link, read with its Trace beside it. */
+  const errorsOf = (query: string, tr: string) =>
+    evaluateGates({ scenario: decode(query), trace: traceOf(tr) }).errors.map(
+      ({ field, message }) => ({ field, message }),
+    );
+
+  test("neither station given: `sa` and `sb` complete to the first and last Trace distance", () => {
+    // A Trace that starts after 0 and ends before 150 m: both of the old constants fell off it.
+    const { search, completed } = complete(`?tr=${OFFSET_TRACE}`);
+    expect(search).toMatchObject({ sa: 20, sb: 120 });
+    expect(completed).toEqual(expect.arrayContaining(["sa", "sb"]));
+    expect(errorsOf(`?tr=${OFFSET_TRACE}`, OFFSET_TRACE)).toEqual([]);
+  });
+
+  test("the completed stations are where an in-app import places them", () => {
+    const imported = appReducer(initialAppState({ query: "", session: null }), {
+      type: "tracé/importé",
+      trace: { ...traceOf(OFFSET_TRACE), fileName: "t.csv" },
+      tr: OFFSET_TRACE,
+    }).scenario.geometry;
+    expect(decode(`?tr=${OFFSET_TRACE}`).geometry).toEqual(imported);
+  });
+
+  test("a Trace shorter than 150 m with only `sa` inside it completes `sb` to its end", () => {
+    const { search, completed } = complete(`?tr=${OFFSET_TRACE}&sa=40`);
+    expect(search).toMatchObject({ sa: 40, sb: 120, x: 40 });
+    expect(completed).toContain("sb");
+    expect(completed).not.toContain("sa");
+    expect(errorsOf(`?tr=${OFFSET_TRACE}&sa=40`, OFFSET_TRACE)).toEqual([]);
+  });
+
+  test("an explicit `sb` past the Trace's end is kept as given and raises « Station hors du tracé »", () => {
+    // ADR-0001: a station the link carries is never moved back onto the Trace.
+    const { search, completed } = complete(`?tr=${OFFSET_TRACE}&sb=300`);
+    expect(search).toMatchObject({ sa: 20, sb: 300 });
+    expect(completed).not.toContain("sb");
+    expect(errorsOf(`?tr=${OFFSET_TRACE}&sb=300`, OFFSET_TRACE)).toEqual([
+      { field: "sb", message: "⛔ Station hors du tracé (20,0 – 120,0 m). Valeur : 300,0 m." },
+    ]);
+  });
+
+  test("the completed `x` is half of `sb − sa` for the completed stations", () => {
+    for (const query of [
+      `?tr=${OFFSET_TRACE}`,
+      `?tr=${OFFSET_TRACE}&sa=40`,
+      `?tr=${TRACE}&sb=60`,
+    ]) {
+      const { search } = complete(query);
+      if (search.tr === undefined) throw new Error(`${query} completed to a manual link`);
+      expect(search.x).toBe((search.sb - search.sa) / 2);
+    }
+  });
+
+  test("a `tr` that does not decode keeps the old completion — the file origin, then 150 m", () => {
+    // Unreachable through the validator, which refuses such a payload whole; completion still must
+    // not throw on one, and #55 does not change how a bad `tr` is handled.
+    const { search } = completeFromDefaults({ tr: "p1.AAAA" });
+    expect(search).toMatchObject({ sa: 0, sb: 150, x: 75 });
   });
 });
 
