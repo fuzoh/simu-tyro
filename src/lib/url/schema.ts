@@ -55,11 +55,12 @@
  * - **Forces are daN in the URL, always**, whatever `u` says. `u` is display-only, so hand-editing
  *   `u=daN` → `u=kN` must not make the line 100× tighter. The engine holds newtons; `./scenario.ts`
  *   is the one place the ÷10 happens, in both directions.
- * - **Absence carries exactly five meanings and never a sixth.** `reg` absent is « — choisir — »,
+ * - **Absence carries exactly six meanings and never a seventh.** `reg` absent is « — choisir — »,
  *   `mbf`/`ea`/`mu` absent is « non surchargée », `bp` absent is one Brin porteur, `cp` absent is
- *   the Mise en tension at A, and a family- or terrain-scoped key absent means that configuration
- *   is not the active one. So `stripSearchParams` is rejected, every other key with a value is
- *   stated even at its default, and `./scenario.ts`'s completion exempts the first four.
+ *   the Mise en tension at A, `mt` absent is the mouflage, and a family- or terrain-scoped key
+ *   absent means that configuration is not the active one. So `stripSearchParams` is rejected,
+ *   every other key with a value is stated even at its default, and `./scenario.ts`'s completion
+ *   exempts the first five.
  * - **The dropped-keys reporter takes the raw query string as a parameter**
  *   ({@link reportDroppedKeys}), never reading `window.location` — amendment A removed the jsdom
  *   environment that would otherwise be needed, and as a pure function this is a plain unit test.
@@ -103,6 +104,7 @@ export const CANONICAL_KEYS = [
   "tp",
   "cp",
   "bp",
+  "mt",
   "fam",
   "d",
   "r0",
@@ -154,6 +156,15 @@ export const TENSIONING_SIDE_TOKENS = ["a", "b"] as const;
 
 /** A `cp` token. */
 export type TensioningSideToken = (typeof TENSIONING_SIDE_TOKENS)[number];
+
+/**
+ * `mt` tokens — the Mise en tension device (#86). `mou` is the mouflage, the meaning of `mt`
+ * **absent**: it is read, and never written.
+ */
+export const TENSIONING_DEVICE_TOKENS = ["mou", "ms", "ml"] as const;
+
+/** An `mt` token. */
+export type TensioningDeviceToken = (typeof TENSIONING_DEVICE_TOKENS)[number];
 
 /** § 7's `fam` tokens — `ac` acier, `tx` textile. */
 export const FAMILY_TOKENS = ["ac", "tx"] as const;
@@ -269,6 +280,8 @@ const KEY_SCHEMAS = {
   cp: v.picklist(TENSIONING_SIDE_TOKENS),
   // Brins porteurs. Absent **is** one member, so a link older than the key reads as it always did.
   bp: v.picklist(CARRYING_LINES),
+  // The Mise en tension device. Absent **is** the mouflage, so a link older than the key reads it.
+  mt: v.picklist(TENSIONING_DEVICE_TOKENS),
   fam: v.picklist(FAMILY_TOKENS),
   d: FINITE, // Diamètre nominal, mm — acier (requis) *or* textile (optionnel); `fam` fixes which.
   r0: v.picklist(GRADES),

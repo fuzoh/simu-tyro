@@ -604,6 +604,37 @@ describe("the tensioning side and the prétension driver in the Session (#85)", 
   });
 });
 
+describe("the Mise en tension device in the Session (#86)", () => {
+  test("a Maestro survives a write and a read", () => {
+    const storage = memoryStorage();
+    writeSession(storage, {
+      ...bareSession(),
+      scenario: { ...firstRunDefaults(), tensioningDevice: "maestro-l" },
+    });
+    expect(readSession(storage)?.scenario.tensioningDevice).toBe("maestro-l");
+  });
+
+  test("a Session stored before the key is kept, and reads the mouflage", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const older = { ...(blob.scenario as Record<string, unknown>) };
+    delete older.tensioningDevice;
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: older }));
+
+    const restored = readSession(storage);
+    expect(restored?.trace).not.toBeNull();
+    expect(restored?.scenario.tensioningDevice).toBe("pulley");
+  });
+
+  test("an unknown device is not a Session — the blob is discarded whole", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const scenario = { ...(blob.scenario as Record<string, unknown>), tensioningDevice: "rig" };
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario }));
+    expect(readSession(storage)).toBeNull();
+  });
+});
+
 describe("ADR-0001 — a restored Session is kept as given, and the gates judge it", () => {
   test("a knot on HMPE comes back unchanged and blocks the verdict on Terminaison A", () => {
     const knotted: Scenario = {

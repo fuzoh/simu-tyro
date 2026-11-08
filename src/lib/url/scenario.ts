@@ -26,6 +26,7 @@ import type { TightnessFieldId } from "@/lib/rail/fields.ts";
 import type {
   Scenario,
   ScenarioDraft,
+  TensioningDevice,
   TensioningSide,
   TextileDraft,
   TightnessDraft,
@@ -46,6 +47,7 @@ import type {
   RopeClassToken,
   SearchKey,
   SearchValues,
+  TensioningDeviceToken,
   TensioningSideToken,
   TerminationToken,
   TightnessKey,
@@ -73,6 +75,13 @@ export const TENSIONING_SIDE_TOKEN_BY_ID = {
   B: "b",
 } as const satisfies Record<TensioningSide, TensioningSideToken>;
 
+/** The write-side direction of `mt`. `pulley` is `mt` absent, so its `mou` is only ever read. */
+export const TENSIONING_DEVICE_TOKEN_BY_ID = {
+  pulley: "mou",
+  "maestro-s": "ms",
+  "maestro-l": "ml",
+} as const satisfies Record<TensioningDevice, TensioningDeviceToken>;
+
 /** The key each Tightness Driver's field travels under. Total over the drivers and the keys. */
 const DRIVER_KEY = {
   D_target: "fl",
@@ -98,8 +107,9 @@ const TOKEN_TABLES_COVER_TUPLES: [
   Covers<ConstructionToken, typeof CONSTRUCTION_TOKEN_BY_ID>,
   Covers<RopeClassToken, typeof ROPE_CLASS_TOKEN_BY_ID>,
   Covers<TensioningSideToken, typeof TENSIONING_SIDE_TOKEN_BY_ID>,
+  Covers<TensioningDeviceToken, typeof TENSIONING_DEVICE_TOKEN_BY_ID>,
   Covers<TightnessKey, typeof DRIVER_KEY>,
-] = [true, true, true, true];
+] = [true, true, true, true, true];
 void TOKEN_TABLES_COVER_TUPLES;
 
 /**
@@ -124,6 +134,10 @@ export const ROPE_CLASS_ID_BY_TOKEN = invert<TextileSpec["ropeClass"], RopeClass
 
 const TENSIONING_SIDE_BY_TOKEN = invert<TensioningSide, TensioningSideToken>(
   TENSIONING_SIDE_TOKEN_BY_ID,
+);
+
+const TENSIONING_DEVICE_BY_TOKEN = invert<TensioningDevice, TensioningDeviceToken>(
+  TENSIONING_DEVICE_TOKEN_BY_ID,
 );
 
 /** N → daN. § 7: forces serialise in daN, **fixed**, and ×10 exactly, so the step is lossless. */
@@ -223,7 +237,7 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
   SearchValues,
   "v" | "u" | "use" | "za" | "zb" | "ta" | "tb" | "na" | "nb" | "mp" | "hr" | "gm" | "daf" | "x"
 > &
-  Partial<Pick<SearchValues, "reg" | "bp" | "cp">> &
+  Partial<Pick<SearchValues, "reg" | "bp" | "cp" | "mt">> &
   CompletedTerrain &
   CompletedDriver &
   (CompletedSteel | CompletedTextile);
@@ -232,13 +246,14 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
  * The keys whose **absence is meaning**, never completed. `reg` absent is « — choisir — »,
  * `mbf`/`ea`/`mu` absent is « non surchargée », which differs from « equal to the formula value »,
  * `mbl` absent — with `mu`, under `fam=tx` — is § 9's rope nobody typed, `bp` absent is one
- * Brin porteur and `cp` absent is the Mise en tension at A: completing either would rewrite, and
- * name in the strip, every link older than the key.
+ * Brin porteur, `cp` absent is the Mise en tension at A and `mt` absent is the mouflage:
+ * completing any would rewrite, and name in the strip, every link older than the key.
  */
 const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>([
   "reg",
   "bp",
   "cp",
+  "mt",
   "mbf",
   "ea",
   "mu",
@@ -287,7 +302,7 @@ export type Completion = {
  *
  * Three groups are exempt, all of them § 7's meanings of absence:
  *
- * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, `cp`, the Overrides and the textile blanks. Under `fam=tx`
+ * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, `cp`, `mt`, the Overrides and the textile blanks. Under `fam=tx`
  *    **no rope is invented**: § 9 ships `MBL` and `μ` « vides et requis », because one made-up
  *    `MBL` decides the verdict, and those two blocking errors are the correct arrival state.
  *    Polyester's `k` stays blank too, because §13.2 publishes none.
@@ -501,6 +516,8 @@ export function searchToScenario(search: CompletedSearch): ScenarioDraft {
     carryingLines: search.bp ?? 1,
     // Absent **is** A, likewise.
     tensioningSide: search.cp === undefined ? "A" : TENSIONING_SIDE_BY_TOKEN[search.cp],
+    // Absent **is** the mouflage, likewise — and a Maestro on a câble is kept as it arrived.
+    tensioningDevice: search.mt === undefined ? "pulley" : TENSIONING_DEVICE_BY_TOKEN[search.mt],
     tightness: tightness(search),
     material: search.fam === "tx" ? textile(search) : steel(search),
     terminations: {
@@ -550,10 +567,13 @@ export function scenarioToSearch(scenario: Scenario): CompletedSearch {
   const driverKey = DRIVER_KEY[driver.field];
   out[driverKey] = FORCE_DRIVER_KEYS.has(driverKey) ? daNFromNewtons(driver.value) : driver.value;
 
-  // A is `cp` **absent** and one member is `bp` **absent**, so the links written before either key
-  // stay string-identical.
+  // A is `cp` **absent**, one member is `bp` **absent** and the mouflage is `mt` **absent**, so the
+  // links written before any of the keys stay string-identical.
   if (scenario.tensioningSide === "B") out.cp = TENSIONING_SIDE_TOKEN_BY_ID.B;
   if (scenario.carryingLines === 2) out.bp = 2;
+  if (scenario.tensioningDevice !== "pulley") {
+    out.mt = TENSIONING_DEVICE_TOKEN_BY_ID[scenario.tensioningDevice];
+  }
 
   if (material.family === "steel") {
     out.fam = "ac";

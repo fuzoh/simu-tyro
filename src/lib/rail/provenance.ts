@@ -51,6 +51,7 @@ import type { StrengthSymbol } from "./fields.ts";
 
 import { strengthSymbol } from "./fields.ts";
 import { presetProvenance } from "./presets.ts";
+import { demandedPretension, deviceOnCableWarning, overLimitWarning } from "./tensioning.ts";
 
 /**
  * The popover copy, one entry per provenance surface. §0.2's fine-grained tag and the
@@ -302,7 +303,11 @@ export type LadderId =
   | "k-hors-bande"
   | VerdictWarningId
   | "terrain-grossier"
-  | "serre-cables-refuse";
+  | "serre-cables-refuse"
+  | TensioningRungId;
+
+/** The two rungs the Mise en tension adds (#86). Both are descriptive: neither touches a result. */
+export type TensioningRungId = "tension-sur-limite-du-dispositif" | "maestro-sur-cable";
 
 /** Which surface renders a rung — so nothing is rendered twice and nothing has no owner. */
 export type LadderOwner =
@@ -329,10 +334,21 @@ export const WARNING_LADDER: Record<LadderId, { tier: WarningTier; owner: Ladder
   "terrain-grossier": { tier: "avertissement", owner: "terrain" },
   // §10.2's `[REGULATOR]` prohibition. It survives an ample margin, so it cannot be a warning.
   "serre-cables-refuse": { tier: "verdict", owner: "banner" },
+  // Conditional on the device and the diameter the user chose. The limit is a charge d'utilisation,
+  // so it warns and never blocks: nothing downstream reads the device.
+  "tension-sur-limite-du-dispositif": { tier: "avertissement", owner: "rail-row" },
+  // A Maestro that arrived on a câble: kept as given (ADR-0001), said once, with a Fix Action.
+  "maestro-sur-cable": { tier: "avertissement", owner: "rail-row" },
 };
 
 /** Which Rail row a rung hangs on. */
-export type LadderRow = "k" | "standingTension" | "sagRatio" | "DAF";
+export type LadderRow =
+  | "k"
+  | "standingTension"
+  | "sagRatio"
+  | "DAF"
+  | "pretension"
+  | "tensioningDevice";
 
 /** One rung that is currently firing. */
 export type LadderWarning = {
@@ -392,6 +408,27 @@ export function warningLadder(scenario: ScenarioDraft, deduced: Deduced): readon
       tier: "ambiant",
       row: "k",
       text: "k publié pour 10–30 % MBL (§13.2) — une tyrolienne travaille sous cette bande : ≈ 0,6 % MBL au repos, ≈ 6,3 % chargée.",
+    });
+  }
+
+  // Before the solve guard: a Maestro on a câble is a fact of the Scenario, and a demanded
+  // prétension is a fact of the field even where the line does not solve.
+  const onCable = deviceOnCableWarning(scenario);
+  if (onCable !== null) {
+    warnings.push({
+      id: "maestro-sur-cable",
+      tier: WARNING_LADDER["maestro-sur-cable"].tier,
+      row: "tensioningDevice",
+      text: onCable,
+    });
+  }
+  const overLimit = overLimitWarning(scenario, demandedPretension(scenario, deduced.solve));
+  if (overLimit !== null) {
+    warnings.push({
+      id: "tension-sur-limite-du-dispositif",
+      tier: WARNING_LADDER["tension-sur-limite-du-dispositif"].tier,
+      row: "pretension",
+      text: overLimit,
     });
   }
 

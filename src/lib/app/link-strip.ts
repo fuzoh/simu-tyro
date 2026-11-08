@@ -43,6 +43,7 @@ import {
   FIELDS,
   lowerFirst,
   ROPE_CLASS_LABEL,
+  TENSIONING_DEVICE_LABEL,
   TENSIONING_SIDE_LABEL,
 } from "@/lib/rail/fields.ts";
 import { TERMINATIONS } from "@/lib/sim";
@@ -50,6 +51,7 @@ import {
   CONSTRUCTION_TOKEN_BY_ID,
   newtonsFromDaN,
   ROPE_CLASS_TOKEN_BY_ID,
+  TENSIONING_DEVICE_TOKEN_BY_ID,
   TENSIONING_SIDE_TOKEN_BY_ID,
   terminationIdFromToken,
 } from "@/lib/url/scenario.ts";
@@ -112,6 +114,7 @@ const KEYS: Record<StripKey, KeyRow> = {
   tp: fromField("T_target", "f", true),
   cp: fromField("tensioningSide", "m"),
   bp: fromField("carryingLines", "m"),
+  mt: fromField("tensioningDevice", "f"),
   fam: fromField("family", "f"),
   d: fromField("d", "m"),
   r0: fromField("R0", "m"),
@@ -176,6 +179,7 @@ const TOKENS: Record<StripKey, Readonly<Record<string, string>> | null> = {
   tp: null,
   cp: labelsByToken(TENSIONING_SIDE_TOKEN_BY_ID, TENSIONING_SIDE_LABEL),
   bp: null,
+  mt: labelsByToken(TENSIONING_DEVICE_TOKEN_BY_ID, TENSIONING_DEVICE_LABEL),
   fam: { ac: "acier", tx: "textile" },
   d: null,
   r0: null,

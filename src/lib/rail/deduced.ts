@@ -46,6 +46,7 @@ import { heading } from "@/lib/vocabulary/labels.ts";
 
 import { strengthSymbol, TIGHTNESS_FIELD } from "./fields.ts";
 import { warningLadder } from "./provenance.ts";
+import { pretensionOf } from "./tensioning.ts";
 
 /** Which of the three steel read-outs the user has typed over, and which of those have gone stale. */
 export type OverrideFlags = { readonly MBF: boolean; readonly EA: boolean; readonly mu: boolean };
@@ -104,18 +105,6 @@ export type DeducedSolve = {
    */
   readonly Tvide: { readonly TA: number; readonly TB: number };
 };
-
-/**
- * The prétension a solved line reads — its unloaded tension at the anchor carrying the Mise en
- * tension, per member. The one place the side picks an anchor, so the field's prefill and the
- * `Valeurs déduites` row cannot read different ends.
- */
-export function pretensionOf(
-  solve: Pick<DeducedSolve, "Tvide">,
-  { tensioningSide }: Pick<ScenarioDraft, "tensioningSide">,
-): number {
-  return tensioningSide === "A" ? solve.Tvide.TA : solve.Tvide.TB;
-}
 
 /** Everything § 3's `Valeurs déduites` block reports, plus why a row is missing when one is. */
 export type Deduced = {

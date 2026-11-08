@@ -139,6 +139,13 @@ export type CarryingLines = 1 | 2;
  */
 export type TensioningSide = AnchorSide;
 
+/**
+ * The **Mise en tension** device (#86): the mouflage, or one of the two Maestro. Descriptive only —
+ * no solve, sweep or verdict reads it; it selects the tension limit the prétension is judged
+ * against. A Maestro is a rope device, so on a câble it is kept as given (ADR-0001) and warned.
+ */
+export type TensioningDevice = "pulley" | "maestro-s" | "maestro-l";
+
 /** § 7's Scenario: everything a link transports, and nothing the Session keeps on the side. */
 export type Scenario = {
   unit: ForceUnit;
@@ -151,6 +158,8 @@ export type Scenario = {
   carryingLines: CarryingLines;
   /** `cp` in a link, and **absent there for A** — so links older than the key read A. */
   tensioningSide: TensioningSide;
+  /** `mt` in a link, and **absent there for the mouflage** — so links older than the key read it. */
+  tensioningDevice: TensioningDevice;
   /**
    * §7's presence-encoded Tightness Driver — exactly one of flèche / prétension / tension
    * horizontale / `L₀` / rapport V. The last is the app's, not the engine's: {@link TightnessDraft}.

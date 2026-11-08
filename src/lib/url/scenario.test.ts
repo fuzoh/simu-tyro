@@ -553,6 +553,22 @@ describe("searchToScenario — the read side of § 7's key table", () => {
     expect(decode("?L=250&cp=a").tensioningSide).toBe("A");
   });
 
+  it("reads `mt` absent as the mouflage — and neither completes nor names it (#86)", () => {
+    const { search, completed } = complete("?L=250&h=-40");
+    expect(searchToScenario(search).tensioningDevice).toBe("pulley");
+    expect(search.mt).toBeUndefined();
+    expect(completed).not.toContain("mt");
+    expect(decode("?L=250&mt=ms").tensioningDevice).toBe("maestro-s");
+    expect(decode("?L=250&mt=ml").tensioningDevice).toBe("maestro-l");
+    expect(decode("?L=250&mt=mou").tensioningDevice).toBe("pulley");
+  });
+
+  it("keeps a Maestro that arrives beside a câble, as given (ADR-0001)", () => {
+    const scenario = decode("?L=250&fam=ac&d=12&r0=1770&cst=iwrc&mt=ms");
+    expect(scenario.material.family).toBe("steel");
+    expect(scenario.tensioningDevice).toBe("maestro-s");
+  });
+
   it("turns the URL's daN back into the state's newtons — `te`, `tp` and `mbl`", () => {
     // A link written before #85 keeps meaning what it meant: `te` is still `H`.
     expect(decode("?te=253.5").tightness).toEqual({ mode: "tension", H_target: 2535 });

@@ -27,8 +27,10 @@ _Avoid_: montage, brin (for a member), double tyrolienne, redondance (when that 
 
 **Mise en tension**:
 The device that tensions the line and holds it. A Maestro is a progress-capture pulley
-used in place of a mouflage. Distinct from a termination: it does not set termination
-efficiency.
+used in place of a mouflage (the default); the Maestro S and L exist on a corde only. Distinct from
+a termination: it does not set termination efficiency. It is descriptive: it changes no result, and
+only selects the **limite de tension**, the working load Petzl publishes for that Maestro at the rope
+diameter typed — never the slip threshold, and slipping is not a fuse.
 Montage is the act of installing the line (« on va monter »), not this device and not a catalogue of rigs. The point and its height are an ancrage. The manufactured end of the corde or câble is a terminaison, and it is not this device.
 _Avoid_: montage, terminaison, ancrage
 

@@ -66,6 +66,8 @@ export const FIRST_RUN_SCENARIO = {
   carryingLines: 1,
   /** The Mise en tension at A, which is `cp` **absent**: the shipped link did not change either. */
   tensioningSide: "A",
+  /** The mouflage, which is `mt` **absent**: the shipped link did not change either. */
+  tensioningDevice: "pulley",
   /** `fl=6.0` — §7 mode 3, the only mode whose shipped value is exact at display precision. */
   tightness: { mode: "sag", D_target: 6 },
   /**

@@ -49,8 +49,9 @@ import { TEXTILE } from "@/lib/sim";
 import type { Deduced, DeducedMaterial, DeducedSolve } from "./deduced.ts";
 import type { FieldContext, FieldId, TightnessFieldId } from "./fields.ts";
 
-import { deduceValues, pretensionOf } from "./deduced.ts";
+import { deduceValues } from "./deduced.ts";
 import { displayField, FIELD_ORDER, FIELDS, TIGHTNESS_FIELD } from "./fields.ts";
+import { pretensionOf } from "./tensioning.ts";
 
 /**
  * The fields the form holds as **text**: the rows of `FIELDS` with a display-precision row. Every

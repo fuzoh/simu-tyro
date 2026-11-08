@@ -75,6 +75,7 @@ import {
   fieldSchema,
   parseDecimal,
   ROPE_CLASS_OPTIONS,
+  TENSIONING_DEVICE_OPTIONS,
   TENSIONING_SIDE_OPTIONS,
   warningFor,
 } from "@/lib/rail/fields.ts";
@@ -91,6 +92,7 @@ import {
   presetProvenance,
 } from "@/lib/rail/presets.ts";
 import { PROVENANCE_COPY, warningLadder } from "@/lib/rail/provenance.ts";
+import { MAESTRO_ROPE_ONLY, PASS_TO_PULLEY } from "@/lib/rail/tensioning.ts";
 import {
   applyField,
   applyGeometry,
@@ -667,6 +669,37 @@ export function RailInputs({
           </Group>
 
           <Group title="Tension de la ligne">
+            <Row
+              control={
+                <Picker
+                  id="rail-tensioning-device"
+                  onChange={(device) => patch({ ...scenario, tensioningDevice: device })}
+                  // A Maestro is a rope device: unavailable on a câble, though one that arrived
+                  // there is still the held value and keeps its entry (and its warning below).
+                  options={TENSIONING_DEVICE_OPTIONS.map((option) => ({
+                    ...option,
+                    disabled: option.value !== "pulley" && steelSpec !== null,
+                  }))}
+                  value={scenario.tensioningDevice}
+                />
+              }
+              help={FIELD_HELP.tensioningDevice}
+              htmlFor="rail-tensioning-device"
+              label={FIELDS.tensioningDevice.label}
+              note={
+                rung("tensioningDevice") !== null ? (
+                  <div className="flex flex-wrap gap-1">
+                    <FixButton
+                      label={PASS_TO_PULLEY}
+                      onClick={() => patch({ ...scenario, tensioningDevice: "pulley" })}
+                    />
+                  </div>
+                ) : steelSpec !== null ? (
+                  <DisabledReason reason={MAESTRO_ROPE_ONLY} />
+                ) : undefined
+              }
+              warning={rung("tensioningDevice")}
+            />
             {/* Where the prétension is read — whatever drives, since its read-out reads there too. */}
             <Row
               control={
@@ -700,7 +733,9 @@ export function RailInputs({
               value={scenario.tightness.mode}
             />
             {driver === "D_target" && <NumericRow hint="m" id="D_target" />}
-            {driver === "T_target" && <NumericRow hint={unit} id="T_target" />}
+            {driver === "T_target" && (
+              <NumericRow hint={unit} id="T_target" warning={rung("pretension")} />
+            )}
             {driver === "H_target" && <NumericRow hint={unit} id="H_target" />}
             {driver === "L0" && <NumericRow hint="m" id="L0" />}
             {/* `P / H` — the passenger's design load over the tension horizontale. It resolves to

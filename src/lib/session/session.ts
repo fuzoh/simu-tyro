@@ -292,6 +292,10 @@ const SCENARIO: v.GenericSchema<unknown, Scenario> = v.object({
   carryingLines: v.optional(v.picklist([1, 2]), FIRST_RUN_SCENARIO.carryingLines),
   // Added with #85, optional with the shipped side for the same reason.
   tensioningSide: v.optional(v.picklist(["A", "B"]), FIRST_RUN_SCENARIO.tensioningSide),
+  tensioningDevice: v.optional(
+    v.picklist(["pulley", "maestro-s", "maestro-l"]),
+    FIRST_RUN_SCENARIO.tensioningDevice,
+  ),
   tightness: TIGHTNESS,
   material: MATERIAL_SPEC,
   terminations: v.object({ A: END_TERMINATION, B: END_TERMINATION }),

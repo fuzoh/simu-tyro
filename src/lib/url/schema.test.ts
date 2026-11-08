@@ -77,6 +77,7 @@ describe("the key table and canonical order", () => {
       "tp",
       "cp",
       "bp",
+      "mt",
       "fam",
       "d",
       "r0",
@@ -381,6 +382,12 @@ describe("an unknown or unrepresentable key is ignored and named", () => {
       name: "a third anchor for the Mise en tension, which the schema does not publish",
       query: "?L=250&cp=c",
       dropped: [{ key: "cp", reason: "valeur-non-représentable" }],
+      kept: { L: 250 },
+    },
+    {
+      name: "a Mise en tension device the schema does not publish",
+      query: "?L=250&mt=mx",
+      dropped: [{ key: "mt", reason: "valeur-non-représentable" }],
       kept: { L: 250 },
     },
     {

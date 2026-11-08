@@ -44,6 +44,7 @@ import type { QuantityId } from "@/lib/format/quantity.ts";
 import type {
   CarryingLines,
   ForceUnit,
+  TensioningDevice,
   TensioningSide,
   TightnessDraft,
 } from "@/lib/scenario/types.ts";
@@ -87,6 +88,7 @@ export type FieldId =
   | "tb"
   | "etaA"
   | "etaB"
+  | "tensioningDevice"
   | "tensioningSide"
   | "D_target"
   | "T_target"
@@ -418,6 +420,16 @@ export const FIELDS = {
     warning: null,
     gate: "verdict",
   },
+  tensioningDevice: {
+    id: "tensioningDevice",
+    label: heading("tensioningDevice", "exact"),
+    errorLabel: heading("tensioningDevice", "exact"),
+    quantity: null,
+    rule: null,
+    warning: null,
+    // Descriptive: it crosses none of the three gates — see {@link TensioningDevice}.
+    gate: null,
+  },
   tensioningSide: {
     id: "tensioningSide",
     label: heading("tensioningSide", "exact"),
@@ -682,6 +694,13 @@ export const TENSIONING_SIDE_LABEL = {
   B: `${heading("anchor", "exact")} B`,
 } as const satisfies Record<TensioningSide, string>;
 
+/** `Mise en tension`'s three entries: the mouflage and the two Maestro. */
+export const TENSIONING_DEVICE_LABEL = {
+  pulley: heading("pulleySystem", "exact"),
+  "maestro-s": `${heading("maestro", "exact")} S`,
+  "maestro-l": `${heading("maestro", "exact")} L`,
+} as const satisfies Record<TensioningDevice, string>;
+
 /** One picker entry. */
 export type PickerOption<Id extends string> = { readonly value: Id; readonly label: string };
 
@@ -698,6 +717,8 @@ export const CARRYING_LINES_OPTIONS = [
 ] as const satisfies readonly PickerOption<`${CarryingLines}`>[];
 
 export const TENSIONING_SIDE_OPTIONS = pickerOptions(TENSIONING_SIDE_LABEL);
+
+export const TENSIONING_DEVICE_OPTIONS = pickerOptions(TENSIONING_DEVICE_LABEL);
 
 export const ROPE_CLASS_OPTIONS = pickerOptions(ROPE_CLASS_LABEL);
 

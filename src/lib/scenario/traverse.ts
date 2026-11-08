@@ -17,9 +17,10 @@ import type { UnloadedLine } from "./unloaded.ts";
 
 /**
  * The Scenario as every Traverse-scope number reads it: all of it but `x_D`, which selects a Sweep
- * Step and judges nothing.
+ * Step and judges nothing, and the Mise en tension device, which is descriptive (#86) — so a change
+ * of device cannot re-run the Sweep.
  */
-export type TraverseScenario = Omit<ScenarioDraft, "rider"> & {
+export type TraverseScenario = Omit<ScenarioDraft, "rider" | "tensioningDevice"> & {
   readonly rider: Omit<Rider, "xD">;
 };
 
@@ -27,7 +28,9 @@ export type TraverseScenario = Omit<ScenarioDraft, "rider"> & {
  * A {@link TraverseScenario}'s fields, flat — and therefore a memo's dependency list. Flat because a
  * memo compares its keys one level deep, and `rider` is a fresh object on every scrub.
  */
-export type TraverseInputs = Readonly<Omit<ScenarioDraft, "rider"> & Omit<Rider, "xD">>;
+export type TraverseInputs = Readonly<
+  Omit<ScenarioDraft, "rider" | "tensioningDevice"> & Omit<Rider, "xD">
+>;
 
 /**
  * A Scenario's Traverse-scope fields. Each is the Scenario's own reference or a number, so a patch

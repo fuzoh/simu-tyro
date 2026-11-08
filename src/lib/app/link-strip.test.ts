@@ -83,6 +83,13 @@ describe("§ 8's first sentence — the `vr` and `gm` keys are named like every 
         "(nombre de Brins porteurs ignoré).",
     );
   });
+
+  test("a Mise en tension the link cannot carry is named, in the feminine", () => {
+    expect(strip("?L=250&mt=mx")?.ignored).toBe(
+      "Une partie du lien a été ignorée : « mt » n'était pas une valeur reconnue " +
+        "(mise en tension ignorée).",
+    );
+  });
 });
 
 describe("§ 8's second sentence — the completion names the values", () => {
@@ -120,6 +127,8 @@ describe("§ 8's second sentence — the completion names the values", () => {
     expect(sentence).not.toContain("charge de rupture");
     // `bp` absent is one Brin porteur (#84): a link older than the key is not corrected for it.
     expect(sentence).not.toContain("Brins porteurs");
+    // `mt` absent is the mouflage (#86), likewise.
+    expect(sentence).not.toContain("Mise en tension");
     // `cp` absent is the Mise en tension at A (#85), likewise.
     expect(sentence).not.toContain("Mise en tension");
   });

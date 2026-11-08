@@ -172,6 +172,8 @@ describe("FIRST_RUN_SCENARIO — § 9's shipped inputs", () => {
     expect(FIRST_RUN_SCENARIO.carryingLines).toBe(1);
     // The Mise en tension at A — `cp` absent, likewise (#85).
     expect(FIRST_RUN_SCENARIO.tensioningSide).toBe("A");
+    // The mouflage — `mt` absent, likewise (#86).
+    expect(FIRST_RUN_SCENARIO.tensioningDevice).toBe("pulley");
   });
 
   test("Flèche is the active Tightness segment, at 6,0 m", () => {

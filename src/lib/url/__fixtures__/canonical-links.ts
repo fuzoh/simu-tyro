@@ -47,6 +47,10 @@ export const BRANCHES = [
   "tensioning-side-absent",
   "tensioning-side-b",
   "tensioning-side-a-explicit",
+  "tensioning-device-absent",
+  "tensioning-device-maestro-s",
+  "tensioning-device-maestro-l",
+  "tensioning-device-pulley-explicit",
 ] as const;
 
 export type Branch = (typeof BRANCHES)[number];
@@ -54,7 +58,12 @@ export type Branch = (typeof BRANCHES)[number];
 /** A Scenario and the one link that encodes it — asserted in both directions. */
 export type CanonicalLinkFixture = {
   name: string;
-  source: typeof MEASURED | typeof MEASURED_83 | typeof MEASURED_84 | typeof MEASURED_85;
+  source:
+    | typeof MEASURED
+    | typeof MEASURED_83
+    | typeof MEASURED_84
+    | typeof MEASURED_85
+    | typeof MEASURED_86;
   covers: readonly Branch[];
   scenario: Scenario;
   link: string;
@@ -68,7 +77,12 @@ export type CanonicalLinkFixture = {
  */
 export type DecodeOnlyFixture = {
   name: string;
-  source: typeof MEASURED | typeof MEASURED_83 | typeof MEASURED_84 | typeof MEASURED_85;
+  source:
+    | typeof MEASURED
+    | typeof MEASURED_83
+    | typeof MEASURED_84
+    | typeof MEASURED_85
+    | typeof MEASURED_86;
   covers: readonly Branch[];
   link: string;
 } & ({ scenario: Scenario; canonical: string } | { scenario: ScenarioDraft; canonical: null });
@@ -77,6 +91,7 @@ const MEASURED = "[MEASURED] issue #34, codec as of 2026-11-07";
 const MEASURED_83 = "[MEASURED] issue #83, codec as of 2026-11-08";
 const MEASURED_84 = "[MEASURED] issue #84, codec as of 2026-11-08";
 const MEASURED_85 = "[MEASURED] issue #85, codec as of 2026-11-08";
+const MEASURED_86 = "[MEASURED] issue #86, codec as of 2026-11-08";
 
 /** Three stations `(0,0) (50,-4) (100,-9)`, as `encodeP1` writes them. */
 export const TRACE_P1 = "p1.AwCQTpBOAJ8G5wcA";
@@ -89,6 +104,7 @@ const STEEL: Scenario = {
   anchors: { zA: 12, zB: 12 },
   carryingLines: 1,
   tensioningSide: "A",
+  tensioningDevice: "pulley",
   tightness: { mode: "sag", D_target: 6 },
   material: { family: "steel", d: 12, R0: 1770, construction: "iwrc" },
   terminations: {
@@ -123,7 +139,8 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
   {
     name: "first-run: steel, manual, sag driver, perm, no regime",
     source: MEASURED,
-    // No `bp` and no `cp`, as before either key existed: one Brin porteur, Mise en tension at A.
+    // No `bp`, `cp` or `mt`, as before the keys existed: one Brin porteur, Mise en tension at A,
+    // by mouflage.
     covers: [
       "steel",
       "manual",
@@ -131,6 +148,7 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
       "use-perm",
       "carrying-lines-absent",
       "tensioning-side-absent",
+      "tensioning-device-absent",
     ],
     scenario: STEEL,
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
@@ -174,6 +192,38 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
     covers: ["tensioning-side-b"],
     scenario: { ...STEEL, tensioningSide: "B" },
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&cp=b&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "Maestro S on a rope: `mt=ms` after `bp`, before the family",
+    source: MEASURED_86,
+    covers: ["textile", "textile-diameter", "tensioning-device-maestro-s"],
+    scenario: {
+      ...TEXTILE,
+      carryingLines: 2,
+      tensioningDevice: "maestro-s",
+      material: {
+        family: "textile",
+        ropeClass: "pa-en1891a",
+        MBL: 31000,
+        mu: 0.073,
+        k: 1.27,
+        d: 11,
+      },
+      terminations: {
+        A: { id: "noeud-de-huit", eta: 0.6 },
+        B: { id: "noeud-de-chaise", eta: 0.65 },
+      },
+    },
+    link:
+      "/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&bp=2&mt=ms&fam=tx&d=11&mu=0.073&cls=pa&mbl=3100&k=1.27" +
+      "&ta=huit&tb=chaise&na=0.6&nb=0.65&mp=120&hr=2.1&gm=1&daf=1.2&x=75",
+  },
+  {
+    name: "Maestro L on a câble arrives as it is: `mt=ml` beside a steel family",
+    source: MEASURED_86,
+    covers: ["steel", "tensioning-device-maestro-l"],
+    scenario: { ...STEEL, tensioningDevice: "maestro-l" },
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&mt=ml&${STEEL_HEAD}&${TAIL}`,
   },
   {
     name: "ratio driver, kgf display",
@@ -410,6 +460,14 @@ export const DECODE_ONLY_LINKS: readonly DecodeOnlyFixture[] = [
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&tp=260&cp=a&${STEEL_HEAD}&${TAIL}`,
     scenario: { ...STEEL, tightness: { mode: "anchor", T_target: 2600 } },
     canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&tp=260&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "`mt=mou` is the mouflage, and the canonical link says so by omitting it",
+    source: MEASURED_86,
+    covers: ["tensioning-device-pulley-explicit"],
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&mt=mou&${STEEL_HEAD}&${TAIL}`,
+    scenario: STEEL,
+    canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
   },
   {
     name: "textile with MBL and mu left blank",
