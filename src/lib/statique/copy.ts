@@ -7,6 +7,7 @@
 
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 
+import { ASSUMED_NOTE, AVANCE_NOTICE } from "@/lib/app/avance-copy.ts";
 import { CHOOSE_REGIME_BY_REGISTER, JUMP_LABEL } from "@/lib/app/banner.ts";
 import { DISMISS_LABEL } from "@/lib/app/link-strip.ts";
 import { DIAGNOSTIC_ACTION } from "@/lib/app/refusals.ts";
@@ -92,19 +93,6 @@ export const UNORIENTED = {
   outside: "orientation inconnue : positions des ancrages hors du domaine suisse",
   coincident: "orientation inconnue : positions des ancrages confondues",
 } as const satisfies Record<Unoriented, string>;
-
-/**
- * What the Page says when a value it does not show stops the computation — one Avancé still
- * holds, from a link or an earlier edit. The field is not named: its name is Avancé's.
- */
-export const AVANCE_NOTICE = {
-  text: "Une valeur réglée sur la Page Avancé bloque le calcul.",
-  action: "Ouvrir la Page Avancé",
-} as const;
-
-/** The line under the fields: what the Page does not ask for is kept, not reset. */
-export const ASSUMED_NOTE =
-  "Les autres valeurs restent celles de la Page Avancé, qui les affiche toutes.";
 
 /**
  * The fixed strings the Page prints: the strings above; the shared rows' — the field names and

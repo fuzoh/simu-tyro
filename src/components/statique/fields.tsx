@@ -19,7 +19,7 @@ import type { RailFormState } from "@/components/app/use-rail-form.ts";
 import type { Deduced } from "@/lib/rail/deduced.ts";
 import type { FieldId } from "@/lib/rail/fields.ts";
 
-import { PageLink } from "@/components/app/navigation-bar.tsx";
+import { AvanceNotice } from "@/components/app/avance-notice.tsx";
 import { useAppState } from "@/components/app/store.tsx";
 import { ReadOut } from "@/components/rail/controls.tsx";
 import {
@@ -41,26 +41,16 @@ import {
   useLastGoodSolve,
 } from "@/components/rail/inputs.tsx";
 import { TerrainDisclosure } from "@/components/rail/outputs.tsx";
-import { buttonVariants } from "@/components/ui/button.tsx";
+import { ASSUMED_NOTE } from "@/lib/app/avance-copy.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { fieldLabel } from "@/lib/rail/fields.ts";
 import { presetProvenance } from "@/lib/rail/presets.ts";
 import { warningLadder } from "@/lib/rail/provenance.ts";
 import { clearOverride, idleDriverText } from "@/lib/rail/values.ts";
-import {
-  ASSUMED_NOTE,
-  AVANCE_NOTICE,
-  DEVICE_LABEL,
-  pretensionWhere,
-  STATIQUE_GROUPS,
-} from "@/lib/statique/copy.ts";
+import { DEVICE_LABEL, pretensionWhere, STATIQUE_GROUPS } from "@/lib/statique/copy.ts";
 import { shownOnStatique } from "@/lib/statique/fields.ts";
 import { pretensionField } from "@/lib/statique/outputs.ts";
-import { cn } from "@/lib/utils.ts";
 import { heading } from "@/lib/vocabulary/labels.ts";
-
-/** The notice's link — where a jump lands when the first blocking field is not on this Page. */
-export const AVANCE_LINK_ID = "statique-avance";
 
 export function StatiqueFields({
   cause,
@@ -187,21 +177,5 @@ export function StatiqueFields({
         <p className="text-muted-foreground text-xs">{ASSUMED_NOTE}</p>
       </div>
     </RailRow.Provider>
-  );
-}
-
-/** The way out to the value this Page does not show. A link that looks like a button. */
-function AvanceNotice() {
-  return (
-    <div className="flex flex-col gap-1" role="status">
-      <p className="text-destructive text-xs">⛔ {AVANCE_NOTICE.text}</p>
-      <PageLink
-        className={cn(buttonVariants({ variant: "outline", size: "sm" }), "touch-44 self-start")}
-        id={AVANCE_LINK_ID}
-        to="/avance"
-      >
-        {AVANCE_NOTICE.action}
-      </PageLink>
-    </div>
   );
 }

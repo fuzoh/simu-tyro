@@ -11,6 +11,7 @@
 
 export const APP_PAGES = [
   { path: "/", label: "Statique" },
+  { path: "/dynamique", label: "Dynamique" },
   { path: "/avance", label: "Avancé" },
 ] as const;
 

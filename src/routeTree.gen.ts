@@ -13,6 +13,7 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as DocsRouteImport } from './routes/docs'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as AppAvanceRouteImport } from './routes/_app.avance'
+import { Route as AppDynamiqueRouteImport } from './routes/_app.dynamique'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as DocsSlugRouteImport } from './routes/docs.$slug'
 
@@ -35,6 +36,11 @@ const AppAvanceRoute = AppAvanceRouteImport.update({
   path: '/avance',
   getParentRoute: () => AppRoute,
 } as any)
+const AppDynamiqueRoute = AppDynamiqueRouteImport.update({
+  id: '/dynamique',
+  path: '/dynamique',
+  getParentRoute: () => AppRoute,
+} as any)
 const DocsIndexRoute = DocsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -50,11 +56,13 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/docs': typeof DocsRouteWithChildren
   '/avance': typeof AppAvanceRoute
+  '/dynamique': typeof AppDynamiqueRoute
   '/docs/$slug': typeof DocsSlugRoute
   '/docs/': typeof DocsIndexRoute
 }
 export interface FileRoutesByTo {
   '/avance': typeof AppAvanceRoute
+  '/dynamique': typeof AppDynamiqueRoute
   '/docs/$slug': typeof DocsSlugRoute
   '/': typeof AppIndexRoute
   '/docs': typeof DocsIndexRoute
@@ -64,20 +72,22 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/docs': typeof DocsRouteWithChildren
   '/_app/avance': typeof AppAvanceRoute
+  '/_app/dynamique': typeof AppDynamiqueRoute
   '/docs/$slug': typeof DocsSlugRoute
   '/_app/': typeof AppIndexRoute
   '/docs/': typeof DocsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/docs' | '/avance' | '/docs/$slug' | '/docs/'
+  fullPaths: '/' | '/docs' | '/avance' | '/dynamique' | '/docs/$slug' | '/docs/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/avance' | '/docs/$slug' | '/' | '/docs'
+  to: '/avance' | '/dynamique' | '/docs/$slug' | '/' | '/docs'
   id:
     | '__root__'
     | '/_app'
     | '/docs'
     | '/_app/avance'
+    | '/_app/dynamique'
     | '/docs/$slug'
     | '/_app/'
     | '/docs/'
@@ -118,6 +128,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAvanceRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/dynamique': {
+      id: '/_app/dynamique'
+      path: '/dynamique'
+      fullPath: '/dynamique'
+      preLoaderRoute: typeof AppDynamiqueRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/docs/': {
       id: '/docs/'
       path: '/'
@@ -137,11 +154,13 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAvanceRoute: typeof AppAvanceRoute
+  AppDynamiqueRoute: typeof AppDynamiqueRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppAvanceRoute: AppAvanceRoute,
+  AppDynamiqueRoute: AppDynamiqueRoute,
   AppIndexRoute: AppIndexRoute,
 }
 

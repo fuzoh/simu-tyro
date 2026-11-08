@@ -9,7 +9,13 @@ import { committedValue, evaluateGates, saisieEnCours } from "@/lib/rail/gates.t
 import { NO_REGIME_BANNER } from "@/lib/rail/results.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 
-import { banner, CHOOSE_REGIME_LABEL, JUMP_LABEL, noResultCause } from "./banner.ts";
+import {
+  banner,
+  CHOOSE_REGIME_LABEL,
+  JUMP_LABEL,
+  noResultCause,
+  solveGateReport,
+} from "./banner.ts";
 
 /**
  * The banner — « v1 build spec » § 7 (*Le bandeau : un occupant, quatre rangs*, *Le résumé
@@ -331,5 +337,53 @@ describe("the terrain register — a simplified Page's banner (#91)", () => {
     expect(noResultCause({ report, refusal: null, register: "terrain" })).toBe(
       "Aucun résultat — réglage de la Page Avancé invalide.",
     );
+  });
+});
+
+describe("a Page with no Verdict reads the report through the Solve Gate alone", () => {
+  const slot = (report: GateReport) =>
+    banner({ report: solveGateReport(report), refusal: null, saisie: null, verdict: null });
+
+  test("a Verdict Gate breach leaves the slot empty: there is no verdict to be missing", () => {
+    expect(banner({ report: BAD_DAF, refusal: null, saisie: null, verdict: null })).toMatchObject({
+      rank: 1,
+    });
+    expect(slot(BAD_DAF)).toBeNull();
+  });
+
+  test("the neutral no-régime strip goes too: that Page has no régime to choose", () => {
+    expect(FIRST_RUN.noRegime).toBe(true);
+    expect(slot(FIRST_RUN)).toBeNull();
+  });
+
+  test("a Solve Gate breach still stops the Page, worded for what it removes", () => {
+    expect(slot(BAD_SPAN)).toMatchObject({
+      rank: 1,
+      text: "⛔ 1 erreur bloquante — aucun résultat",
+      target: "L",
+    });
+  });
+
+  test("only the Solve Gate's breaches are counted, whatever else is wrong", () => {
+    const both = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.regime = "en15567";
+        draft.rider.DAF = -1;
+        draft.geometry = { source: "manual", L: -5, h: -18 };
+      }),
+    });
+    expect(both.errors.length).toBeGreaterThan(1);
+    expect(solveGateReport(both).errors.map((error) => error.gate)).toEqual(["solve"]);
+    expect(slot(both)?.text).toBe("⛔ 1 erreur bloquante — aucun résultat");
+  });
+
+  test("a refusal reaches the slot once no Verdict Gate breach pre-empts it", () => {
+    const refused = banner({
+      report: solveGateReport(BAD_DAF),
+      refusal: REFUSAL,
+      saisie: null,
+      verdict: null,
+    });
+    expect(refused).toMatchObject({ rank: 2, kind: "refusal" });
   });
 });

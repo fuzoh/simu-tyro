@@ -99,6 +99,12 @@ type UnitKind =
   | "kg/s"
   /** Kilograms per cubic metre — the air's density. */
   | "kg/m³"
+  /** Metres per second — the passager's speed, as the dynamic outputs print it. */
+  | "m/s"
+  /** Metres per second squared — the passager's acceleration. */
+  | "m/s²"
+  /** Seconds — the duration of a ride. */
+  | "s"
   /** Linear mass, kg/m — a mass, so the force selector does not touch it. */
   | "kg/m"
   /** A force: **newtons canonical** — § 3's SI storage — displayed in the selected unit. */
@@ -218,6 +224,14 @@ export const QUANTITIES = {
   trolleyMu: { unit: "", decimals: 3 },
   /** `ρ`, kg/m³ — §12.2 prints 1,225, and the ISA density moves the third decimal every ~10 m. */
   rho: { unit: "kg/m³", decimals: 3 },
+  /** The passager's speed, m/s — an estimation (§12.2): a tenth of a metre per second is its grain. */
+  speed: { unit: "m/s", decimals: 1 },
+  /** The same speed in km/h, whole: the unit a rider has a feel for, and no model reads finer. */
+  speedKmh: { unit: "km/h", decimals: 0 },
+  /** The passager's acceleration, m/s² — an estimation, and one decimal is what an axis tick can hold. */
+  acceleration: { unit: "m/s²", decimals: 1 },
+  /** A ride's duration, s — an estimation, read to a tenth of a second. */
+  duration: { unit: "s", decimals: 1 },
   /**
    * `Charge de rupture` `MBF`, daN — **consumed by the Override badge**: the formula gives
    * 9073,98 where a freshly prefilled override holds 9074, and float equality would badge it.

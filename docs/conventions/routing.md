@@ -123,6 +123,8 @@ against a production build served the way GitHub Pages serves it:
 | --- | --- |
 | `/?<fixture>`, each of the 26 golden links | lands on `/avance?<fixture>`; same page text and field values as opening `/avance?<fixture>` directly — **superseded by #91**: `/` is Statique |
 | `/?…` → « Avancé » → « Statique » (#91, dev, 2026-11-08) | Statique on the link's Scenario; each Page switch keeps the search byte for byte, and Statique's link is the only one active on `/` |
+| `/dynamique?ws=50&wd=0` → « Avancé » → « Dynamique » (#92, build, 2026-11-08) | Dynamique on the link's Scenario at 1440 and 390 px (no horizontal overflow at 390); each switch keeps `ws=50`, and Dynamique's link is the only one active on `/dynamique`. A head wind of 50 km/h: « sans vent » arrive au bout, « avec le vent saisi » stops at 112,3 m, one marker on the coupe and one on the curve in the same column; hovering either frame draws the rule on both with x, altitude / vitesse, accélération. `?L=0`: « Aucun résultat », the Verdict never appears |
+| `/dynamique/index.html` (build) | prerendered with its Skeleton: both rides' headings and tile labels, `aria-busy`, no value |
 | `/avance?fl=6&lo=151.64` (static host) | 301 → `/avance/?…` → **200**, refusal surface, URL intact |
 | `/avance?fl=6&lo=151.64`, `/?fl=6&lo=151.64`, `/avance?v=3` (dev) | **200**, no 307 |
 | `/avance?L=250&junk=zz` | strip names « junk », then the rewrite stays on `/avance` |
@@ -177,6 +179,8 @@ must not be enabled speculatively; a GitHub Pages deploy is the ask that spends 
 | `src/routes/_app.tsx` | the app Pages' pathless layout, server-rendered: `validateSearch` and `search.middlewares`, **declared once**; the navigation bar; the SPA shell's `pendingComponent` |
 | `src/routes/_app.avance.tsx` | the Page Avancé: `ssr: false`, `pendingComponent`, and an `errorComponent` for **genuine load failures only** |
 | `src/routes/_app.index.tsx` | `/`, the Page Statique: `ssr: false`, its Skeleton as `pendingComponent`, the shared `errorComponent` |
+| `src/routes/_app.dynamique.tsx` | `/dynamique`, the Page Dynamique (#92): `ssr: false`, its Skeleton as `pendingComponent`, the shared `errorComponent` |
+| `src/components/dynamique/` | Dynamique's frame and Skeleton, fields and output tiles (its two SVG frames are `src/components/chart/dynamique.tsx`) — over the same store, form and writer as Avancé (`usePage`), in Statique's two-column layout |
 | `src/components/statique/` | Statique's frame and Skeleton (`frame.tsx`), its fields, outputs and vue de dessus — over the same store, form and writer as Avancé (`usePage`) |
 | `src/components/app/load-failure.tsx` | every app Page's `errorComponent`, for **genuine load failures only** |
 | `src/lib/app/pages.ts` | `APP_PAGES`, the table the navigation bar and the prerender list both read |

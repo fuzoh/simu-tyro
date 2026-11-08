@@ -50,7 +50,7 @@ function pathOf(points: Polyline, x: SharedX, z: ZScale): string | null {
 }
 
 /** Five ticks at most, and three below B1 — the labels have 24 px and no room to collide. */
-function xTicks(L: number, wide: boolean): number[] {
+export function xTicks(L: number, wide: boolean): number[] {
   return wide ? [0, 0.25, 0.5, 0.75, 1].map((t) => t * L) : [0, 0.5, 1].map((t) => t * L);
 }
 

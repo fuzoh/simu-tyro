@@ -25,6 +25,11 @@ export function kmhToMs(kmh: number): number {
   return kmh * MS_PER_KMH;
 }
 
+/** m/s → km/h. */
+export function msToKmh(ms: number): number {
+  return ms / MS_PER_KMH;
+}
+
 /**
  * The cardinal directions are exact on purpose: `Math.cos(Math.PI / 2)` is 6e-17, and a wind from
  * the side must have no component along the line, not a rounding residue.

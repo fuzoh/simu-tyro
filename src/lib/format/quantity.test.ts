@@ -91,6 +91,11 @@ const ROWS: ReadonlyArray<{ id: QuantityId; value: number; expected: string }> =
   { id: "kv", value: 1.5, expected: "1,50 kg/s" },
   { id: "trolleyMu", value: 0.015, expected: "0,015" },
   { id: "rho", value: 1.225, expected: "1,225 kg/m³" },
+  // The passager's ride (#92), prints of the Page Dynamique: speeds, acceleration, duration.
+  { id: "speed", value: 20.46, expected: "20,5 m/s" },
+  { id: "speedKmh", value: 73.66, expected: "74 km/h" },
+  { id: "acceleration", value: -1.234, expected: "-1,2 m/s²" },
+  { id: "duration", value: 23.449, expected: "23,4 s" },
   // The badge's own row: the formula value, not the override, so the padding is what rounds it.
   { id: "MBF", value: 90_739.8, expected: "9074 daN" },
   // 6,897 MN in canonical newtons — the declared carve-out renders MN under every setting.

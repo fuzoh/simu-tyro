@@ -11,18 +11,18 @@
 
 import type { FieldId } from "@/lib/rail/fields.ts";
 
-import { Banner, jumpToField } from "@/components/app/banner.tsx";
+import { jumpOrAvance } from "@/components/app/avance-notice.tsx";
+import { Banner } from "@/components/app/banner.tsx";
 import { LinkStripNotice } from "@/components/app/link-strip.tsx";
 import { AppStoreProvider } from "@/components/app/store.tsx";
 import { usePage } from "@/components/app/use-page.ts";
 import { useViewport } from "@/components/app/use-viewport.ts";
 import { ChartBlock } from "@/components/chart/chart-block.tsx";
 import { useChartWidth } from "@/components/chart/use-chart-width.ts";
-import { CENTRE_IN_RAIL } from "@/lib/layout/collapse.ts";
 import { shownOnStatique } from "@/lib/statique/fields.ts";
 import { statiqueOutputs } from "@/lib/statique/outputs.ts";
 
-import { AVANCE_LINK_ID, StatiqueFields } from "./fields.tsx";
+import { StatiqueFields } from "./fields.tsx";
 import { StatiqueFrame } from "./frame.tsx";
 import { StatiqueOutputTiles } from "./outputs.tsx";
 import { TopViewFigure } from "./top-view.tsx";
@@ -50,20 +50,7 @@ function Live({ page }: { page: string }) {
   const { cause, clearance, frame, occupant, results, saisie, solved } = surfaces;
   const model = statiqueOutputs({ scenario: state.scenario, deduced, results, cause });
 
-  /**
-   * § 7's jump, for a Page that shows a subset of the fields: a field shown for this Scenario takes
-   * the caret as on Avancé, and any other lands on the way to Avancé — the link the fields' notice
-   * carries whenever such a field blocks, decided by the same predicate.
-   */
-  function jump(field: FieldId) {
-    if (shownOnStatique(field, state.scenario)) {
-      jumpToField(field);
-      return;
-    }
-    const link = document.getElementById(AVANCE_LINK_ID);
-    link?.scrollIntoView(CENTRE_IN_RAIL);
-    link?.focus();
-  }
+  const jump = (field: FieldId) => jumpOrAvance(field, shownOnStatique(field, state.scenario));
 
   return (
     <StatiqueFrame

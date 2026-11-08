@@ -502,6 +502,11 @@ describe("the imported profile — one terrain joint, one domain", () => {
     expect([...scene(imported, trace).ground.xs]).toEqual([...trace.d]);
   });
 
+  it("the frame carries the ground altitude under each anchor, and a manual line none", () => {
+    expect(frameOf(imported, trace)?.bases).toEqual({ zBaseA: 500, zBaseB: 470 });
+    expect(frameOf(firstRunDefaults())?.bases).toBeNull();
+  });
+
   it("a profil with no span has no picture, and no throw", () => {
     const lone: Trace = { ...trace, d: Float64Array.of(0), z: Float64Array.of(500) };
     expect(buildScene({ scenario: imported, trace: lone })).toBeNull();

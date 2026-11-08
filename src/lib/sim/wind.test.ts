@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { kmhToMs, windComponents } from "./wind.ts";
+import { kmhToMs, msToKmh, windComponents } from "./wind.ts";
 
 describe("kmhToMs", () => {
   it("is exactly 1/3,6", () => {
@@ -8,6 +8,13 @@ describe("kmhToMs", () => {
     expect(kmhToMs(3.6)).toBe(1);
     expect(kmhToMs(0)).toBe(0);
     expect(kmhToMs(50)).toBeCloseTo(13.888888888888889, 12);
+  });
+});
+
+describe("msToKmh", () => {
+  it("is the inverse of kmhToMs", () => {
+    expect(msToKmh(10)).toBeCloseTo(36, 12);
+    expect(msToKmh(kmhToMs(50))).toBeCloseTo(50, 12);
   });
 });
 

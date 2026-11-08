@@ -49,9 +49,10 @@ empty `ui/`.
 - **`text-sm` and `text-xl` do not exist in this app** — including on the two full-page error
   screens, whose headings are `text-lg`. Three sizes with zero exceptions is a rule that survives
   contact with future diffs; « except on … » is how the eight came back.
-- **`<text>` inside the two SVG charts is drawing, not chrome.** `strip.tsx` and `profile.tsx` size
-  their labels inside a hand-written affine scale; those sizes are out of this scale entirely and
-  are not to be folded into it.
+- **`<text>` inside the hand-rolled SVG charts is drawing, not chrome.** `strip.tsx`, `profile.tsx`
+  and `dynamique.tsx` — everything under `src/components/chart/` — size their labels inside a
+  hand-written affine scale; those sizes are out of this scale entirely and are not to be folded
+  into it. A chart that draws `<text>` lives in that directory, which is what the grep excludes.
 
 ### Numbers are mono, everything else is sans
 

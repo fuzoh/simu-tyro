@@ -73,6 +73,12 @@ describe("`readDynamics` — what every dynamic output carries", () => {
     expect(shipped.warnings).toContain("steel-trolley-unconfirmed");
   });
 
+  test("a wind with a component along the line is not windless, and a crosswind or none is", () => {
+    expect(shipped.windless).toBe(true);
+    expect(windy(0).windless).toBe(false);
+    expect(windy(90).windless).toBe(true);
+  });
+
   test("a corde rides on the SSF trolley, which carries no such warning", () => {
     expect(reading(CORDE).warnings).not.toContain("steel-trolley-unconfirmed");
   });

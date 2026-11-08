@@ -212,6 +212,11 @@ export type SceneFrame = {
   readonly domain: readonly [number, number];
   /** The terrain's own horizontal extent in the span frame, or `null` in manual mode. */
   readonly extent: { readonly min: number; readonly max: number } | null;
+  /**
+   * The ground altitude under each anchor in the profil's own frame — what turns a height of the
+   * frame into an altitude. `null` in manual mode, whose ground has none.
+   */
+  readonly bases: PlacedSpan["bases"];
   /** The engine's ground, over `[0, L]` — the one terrain joint. */
   readonly terrain: Terrain;
   /** The **drawn** ground, over the whole shared domain, ends held exactly as `zGroundAt` holds them. */
@@ -288,13 +293,14 @@ export type ChartScene = SceneBase & {
  */
 export function buildSceneFrame(placed: PlacedSpan | null): SceneFrame | null {
   if (placed === null) return null;
-  const { L, h, anchors, terrain } = placed;
+  const { L, h, anchors, terrain, bases } = placed;
   const { ground, extent } = drawnGround(placed);
   return {
     L,
     h,
     domain: xDomain(L, extent),
     extent,
+    bases,
     terrain,
     ground,
     anchors,

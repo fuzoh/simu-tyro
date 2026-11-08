@@ -10,7 +10,7 @@
  * passager. Nothing here feeds the statics or the Verdict.
  */
 
-import type { QuasiStatic, Ride, TrolleyFriction } from "@/lib/sim";
+import type { DerivedMaterial, QuasiStatic, Ride, TrolleyFriction } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { G } from "@/lib/format/quantity.ts";
@@ -27,7 +27,6 @@ import { meanAltitude } from "@/lib/terrain/trace.ts";
 
 import type { RiderSweep } from "./traverse.ts";
 import type { ScenarioDraft } from "./types.ts";
-import type { UnloadedLine } from "./unloaded.ts";
 
 /** Where the `ρ` of the rides comes from — the « lu » half of « lu et éditable ». */
 export type AirDensitySource =
@@ -53,6 +52,8 @@ export type DynamicsReading = {
   readonly calm: Ride;
   /** With the Vent entered, through its component along the line; `calm` itself without one. */
   readonly windy: Ride;
+  /** The Vent entered has no component along the line — none, or a crosswind: `windy` is `calm`. */
+  readonly windless: boolean;
   /** The air density both rides used, kg/m³. */
   readonly rho: { readonly value: number; readonly source: AirDensitySource };
   /** §12.1 over both rides, and whether it passes the warning threshold. */
@@ -61,8 +62,19 @@ export type DynamicsReading = {
 };
 
 /**
+ * What a ride reads of the line it is swept over: its span, and the member's weight per metre. An
+ * `UnloadedLine` and a chart `SceneBase` both qualify, which is why the solved scene can stand for
+ * both.
+ */
+export type RiddenLine = {
+  readonly span: { readonly L: number; readonly h: number };
+  readonly material: Pick<DerivedMaterial, "w">;
+};
+
+/**
  * The two rides of a solved traverse.
  *
+ * @param unloaded the line the traverse was swept over.
  * @param profile the **active** imported profil, `null` on a manual line — a Trace cached while
  *   manual geometry drives is no altitude of this line.
  * @returns `null` when the traverse is incomplete: a ride across a hole would run on a slope
@@ -75,8 +87,8 @@ export function readDynamics(
     wind,
     dynamics,
   }: Pick<ScenarioDraft, "material" | "rider" | "wind" | "dynamics">,
-  unloaded: UnloadedLine,
-  { traverse }: RiderSweep,
+  unloaded: RiddenLine,
+  { traverse }: Pick<RiderSweep, "traverse">,
   profile: Trace | null,
 ): DynamicsReading | null {
   if (traverse.coverage < 1) return null;
@@ -103,6 +115,7 @@ export function readDynamics(
     estimate: true,
     calm,
     windy,
+    windless: along === 0,
     rho,
     quasiStatic: { ...worst, exceeded },
     warnings,

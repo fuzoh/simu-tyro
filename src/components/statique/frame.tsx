@@ -54,6 +54,41 @@ export function StatiqueFrame({
   topView: ReactNode;
 }) {
   return (
+    <ColumnsFrame busy={busy} fields={fields} strip={strip}>
+      <Region title={SECTION.outputs}>
+        <div className="px-3">{outputs}</div>
+      </Region>
+      <Region title={SECTION.section}>
+        {/* No horizontal padding: the gutter lives inside the two SVGs, as on Avancé. */}
+        <div className="@container min-w-0" ref={sectionRef}>
+          {section}
+        </div>
+      </Region>
+      <Region title={SECTION.topView}>
+        <div className="px-3">{topView}</div>
+      </Region>
+    </ColumnsFrame>
+  );
+}
+
+/**
+ * The layout the simplified Pages share: the fields in a column on the left, the Page's regions in
+ * a column on the right, one scroller below `md`. The right column is the query container the layout
+ * contract's bands are functions of, so every Page standing a chart in it draws the same bands.
+ */
+export function ColumnsFrame({
+  busy = false,
+  strip,
+  fields,
+  children,
+}: {
+  busy?: boolean;
+  strip?: ReactNode;
+  fields: ReactNode;
+  /** The right column's {@link Region}s. */
+  children: ReactNode;
+}) {
+  return (
     <div
       aria-busy={busy || undefined}
       className="bg-background text-foreground flex h-full flex-col overflow-hidden"
@@ -70,26 +105,15 @@ export function StatiqueFrame({
           {fields}
         </aside>
         <div className="@container flex min-w-0 shrink-0 flex-col md:min-h-0 md:flex-1 md:shrink md:overflow-y-auto">
-          <Region title={SECTION.outputs}>
-            <div className="px-3">{outputs}</div>
-          </Region>
-          <Region title={SECTION.section}>
-            {/* No horizontal padding: the gutter lives inside the two SVGs, as on Avancé. */}
-            <div className="@container min-w-0" ref={sectionRef}>
-              {section}
-            </div>
-          </Region>
-          <Region title={SECTION.topView}>
-            <div className="px-3">{topView}</div>
-          </Region>
+          {children}
         </div>
       </div>
     </div>
   );
 }
 
-/** One of the right column's three regions: a heading, then its occupant. */
-function Region({ title, children }: { title: string; children: ReactNode }) {
+/** One of the right column's regions: a heading, then its occupant. */
+export function Region({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="border-border flex flex-col gap-2 border-b py-3 last:border-b-0">
       <h2 className="font-heading text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">

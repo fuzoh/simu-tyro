@@ -243,3 +243,21 @@ function fieldCause(error: BlockingError, register: Register): string {
   const label = lowerFirst(fieldErrorLabel(error.field, register));
   return error.kind === "empty" ? `${label} : valeur requise` : `${label} invalide`;
 }
+
+/**
+ * The report as a Page with **no Verdict and no garde** reads it: only the Solve Gate's breaches
+ * stand, because only they remove what the Page shows. A bad `DAF` or an empty régime breaches a
+ * gate whose output this Page does not print, and a banner saying « aucun verdict » beside a
+ * computed ride is the Page contradicting itself. With no régime breach left, the reducer's rank 4b
+ * cannot fire either.
+ */
+export function solveGateReport(report: GateReport): GateReport {
+  const errors = report.errors.filter((error) => error.gate === "solve");
+  if (errors.length === report.errors.length && !report.noRegime) return report;
+  return {
+    errors,
+    passed: { solve: report.passed.solve, clearance: true, verdict: true },
+    worst: errors[0]?.gate ?? null,
+    noRegime: false,
+  };
+}
