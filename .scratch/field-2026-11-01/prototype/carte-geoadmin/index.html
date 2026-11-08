@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<title>PROTOTYPE jetable — carte geo.admin, ancrages, profil, rose des vents</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; font: 13px/1.4 system-ui, sans-serif; }
+  #map { position: absolute; inset: 0; }
+  #panel { position: absolute; top: 8px; left: 8px; width: 340px; max-height: calc(100% - 16px); overflow: auto;
+           background: #fffdf5; border: 1px solid #c9b; padding: 10px; box-shadow: 0 2px 8px #0003; }
+  #panel h1 { font-size: 14px; margin: 0 0 6px; }
+  .proto { background: #c00; color: #fff; padding: 1px 6px; border-radius: 3px; font-weight: 700; }
+  label { display: block; margin: 4px 0; }
+  select, input[type=number] { width: 100%; }
+  table { border-collapse: collapse; width: 100%; }
+  td { padding: 1px 4px; border-bottom: 1px solid #eee; font-variant-numeric: tabular-nums; }
+  td:first-child { color: #666; }
+  #state { white-space: pre-wrap; font: 11px/1.3 ui-monospace, monospace; background: #f3f0e8; padding: 6px; }
+  #rose { position: absolute; width: 180px; height: 180px; pointer-events: none; transform: translate(-50%, -50%); }
+  #rose circle.ring { fill: #fff8; stroke: #333; stroke-width: 1; }
+  #rose .arrow { stroke: #06c; stroke-width: 3; fill: none; pointer-events: none; }
+  #rose .handle { fill: #06c; cursor: grab; pointer-events: all; }
+  #rose text { font-size: 10px; fill: #333; text-anchor: middle; pointer-events: none; }
+  .mk { width: 26px; height: 26px; border-radius: 50%; background: #e33; color: #fff; display: grid; place-items: center;
+        font-weight: 700; border: 2px solid #fff; box-shadow: 0 1px 4px #0006; cursor: grab; }
+  .mk.b { background: #2a7; }
+  svg#profile { width: 100%; height: 120px; background: #fff; border: 1px solid #ddd; }
+  a { color: #06c; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<svg id="rose" viewBox="-90 -90 180 180" aria-label="Rose des vents : direction d'où vient le vent">
+  <circle class="ring" r="80" />
+  <g id="ticks"></g>
+  <text y="-68">N</text><text x="70" y="4">E</text><text y="76">S</text><text x="-70" y="4">O</text>
+  <g id="arrowg">
+    <line class="arrow" x1="0" y1="-80" x2="0" y2="0" />
+    <polygon class="arrow" points="-7,-12 0,0 7,-12" />
+    <circle class="handle" cy="-80" r="9" />
+  </g>
+</svg>
+
+<div id="panel">
+  <h1><span class="proto">PROTOTYPE</span> carte geo.admin · <a href="3d.html" id="to3d">vue 3D →</a></h1>
+  <label>Fond de carte
+    <select id="basemap">
+      <option value="vt-light">Vecteur : ch.swisstopo.lightbasemap.vt</option>
+      <option value="vt-base">Vecteur : ch.swisstopo.basemap.vt</option>
+      <option value="vt-imagery">Vecteur+ortho : ch.swisstopo.imagerybasemap.vt</option>
+      <option value="wmts-pk">WMTS raster : ch.swisstopo.pixelkarte-farbe</option>
+      <option value="wmts-img">WMTS raster : ch.swisstopo.swissimage</option>
+    </select>
+  </label>
+  <label><input type="checkbox" id="hillshade" /> Superposer l'ombrage swissALTI3D (WMTS)</label>
+  <label>Vent : vitesse (km/h) <input type="number" id="wspeed" value="50" min="0" step="5" /></label>
+  <label>Vent : direction d'où il vient (° depuis le nord) <input type="number" id="wdir" value="60" min="0" max="359" step="5" /></label>
+  <p style="margin:6px 0">Glisser <b>A</b> (départ) et <b>B</b> (arrivée) sur la carte. La poignée bleue de la rose se tourne à la souris.</p>
+  <table id="vals"></table>
+  <svg id="profile" viewBox="0 0 340 120" preserveAspectRatio="none"></svg>
+  <details><summary>État complet</summary><div id="state"></div></details>
+  <p style="font-size:11px;color:#555;margin:6px 0 0">© swisstopo — fonds, profil et REFRAME via geo.admin.ch (fair use FSDI). Sans réseau rien ne s'affiche : c'est le point à décider.</p>
+</div>
+
+<script>
+// ---------- état partagé (URL hash : #a=lon,lat&b=lon,lat&wdir=deg&wspeed=kmh) ----------
+const DEFAULT = { a: [6.525529496858815, 46.844504482603654], b: [6.5205811331508245, 46.84607607354039], wdir: 60, wspeed: 50 };
+function readHash() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  const s = { ...DEFAULT };
+  if (p.get('a')) s.a = p.get('a').split(',').map(Number);
+  if (p.get('b')) s.b = p.get('b').split(',').map(Number);
+  if (p.get('wdir')) s.wdir = Number(p.get('wdir'));
+  if (p.get('wspeed')) s.wspeed = Number(p.get('wspeed'));
+  return s;
+}
+const S = readHash();
+S.lv95 = null; S.profile = null; S.err = null; S.reframeSource = null;
+function writeHash() {
+  const h = `a=${S.a.join(',')}&b=${S.b.join(',')}&wdir=${S.wdir}&wspeed=${S.wspeed}`;
+  history.replaceState(null, '', '#' + h);
+  document.getElementById('to3d').href = '3d.html#' + h;
+}
+
+// ---------- styles ----------
+const WMTS = (layer, ext) => ({
+  version: 8,
+  sources: { base: { type: 'raster', tiles: [`https://wmts.geo.admin.ch/1.0.0/${layer}/default/current/3857/{z}/{x}/{y}.${ext}`], tileSize: 256, attribution: '© swisstopo' } },
+  layers: [{ id: 'base', type: 'raster', source: 'base' }],
+});
+const STYLES = {
+  'vt-light': 'https://vectortiles.geo.admin.ch/styles/ch.swisstopo.lightbasemap.vt/style.json',
+  'vt-base': 'https://vectortiles.geo.admin.ch/styles/ch.swisstopo.basemap.vt/style.json',
+  'vt-imagery': 'https://vectortiles.geo.admin.ch/styles/ch.swisstopo.imagerybasemap.vt/style.json',
+  'wmts-pk': WMTS('ch.swisstopo.pixelkarte-farbe', 'jpeg'),
+  'wmts-img': WMTS('ch.swisstopo.swissimage', 'jpeg'),
+};
+
+const map = new maplibregl.Map({ container: 'map', style: STYLES['vt-light'], center: mid(S.a, S.b), zoom: 15.5, attributionControl: { compact: false } });
+map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }));
+
+function mid(a, b) { return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; }
+
+// couches "métier" : ligne + ombrage, ré-ajoutées à chaque changement de style
+function addOverlays() {
+  if (!map.getSource('line')) map.addSource('line', { type: 'geojson', data: lineGeoJSON() });
+  if (!map.getSource('hs')) map.addSource('hs', { type: 'raster', tiles: ['https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissalti3d-reliefschattierung/default/current/3857/{z}/{x}/{y}.png'], tileSize: 256 });
+  if (!map.getLayer('hs')) map.addLayer({ id: 'hs', type: 'raster', source: 'hs', paint: { 'raster-opacity': 0.6 }, layout: { visibility: document.getElementById('hillshade').checked ? 'visible' : 'none' } });
+  if (!map.getLayer('line')) map.addLayer({ id: 'line', type: 'line', source: 'line', paint: { 'line-color': '#f70', 'line-width': 4 } });
+}
+function lineGeoJSON() { return { type: 'Feature', geometry: { type: 'LineString', coordinates: [S.a, S.b] } }; }
+map.on('style.load', addOverlays);
+
+document.getElementById('basemap').onchange = (e) => map.setStyle(STYLES[e.target.value]);
+document.getElementById('hillshade').onchange = (e) => map.setLayoutProperty('hs', 'visibility', e.target.checked ? 'visible' : 'none');
+
+// ---------- marqueurs ----------
+function mkEl(txt, cls) { const d = document.createElement('div'); d.className = 'mk ' + cls; d.textContent = txt; return d; }
+const mA = new maplibregl.Marker({ element: mkEl('A', 'a'), draggable: true }).setLngLat(S.a).addTo(map);
+const mB = new maplibregl.Marker({ element: mkEl('B', 'b'), draggable: true }).setLngLat(S.b).addTo(map);
+for (const [m, k] of [[mA, 'a'], [mB, 'b']]) {
+  m.on('drag', () => { const p = m.getLngLat(); S[k] = [p.lng, p.lat]; map.getSource('line')?.setData(lineGeoJSON()); placeRose(); render(); });
+  m.on('dragend', refreshProfile);
+}
+
+// ---------- géométrie ----------
+const R = 6371000, d2r = Math.PI / 180;
+function haversine(a, b) {
+  const dφ = (b[1] - a[1]) * d2r, dλ = (b[0] - a[0]) * d2r, φ1 = a[1] * d2r, φ2 = b[1] * d2r;
+  const h = Math.sin(dφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(dλ / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function azimuth(a, b) {
+  const φ1 = a[1] * d2r, φ2 = b[1] * d2r, dλ = (b[0] - a[0]) * d2r;
+  const y = Math.sin(dλ) * Math.cos(φ2), x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(dλ);
+  return (Math.atan2(y, x) / d2r + 360) % 360;
+}
+
+// WGS84 -> LV95. Source primaire : swisstopo, « Formules et constantes pour le calcul de la projection
+// cylindrique conforme suisse et pour la transformation entre systèmes de coordonnées » (formules approchées, ~1 m).
+function wgs84ToLv95Approx([lon, lat]) {
+  const φ = (lat * 3600 - 169028.66) / 10000, λ = (lon * 3600 - 26782.5) / 10000;
+  const E = 2600072.37 + 211455.93 * λ - 10938.51 * λ * φ - 0.36 * λ * φ * φ - 44.54 * λ ** 3;
+  const N = 1200147.07 + 308807.95 * φ + 3745.25 * λ * λ + 76.63 * φ * φ - 194.56 * λ * λ * φ + 119.79 * φ ** 3;
+  return [E, N];
+}
+// REFRAME REST (observé 2026-11-08, CORS *, non documenté sur docs.geo.admin.ch)
+async function wgs84ToLv95Reframe([lon, lat]) {
+  const r = await fetch(`https://geodesy.geo.admin.ch/reframe/wgs84tolv95?easting=${lon}&northing=${lat}&format=json`);
+  if (!r.ok) throw new Error('reframe ' + r.status);
+  const j = await r.json();
+  return [Number(j.easting), Number(j.northing)];
+}
+
+let reqId = 0;
+async function refreshProfile() {
+  const id = ++reqId;
+  S.err = null;
+  try {
+    let a, b;
+    try { [a, b] = await Promise.all([wgs84ToLv95Reframe(S.a), wgs84ToLv95Reframe(S.b)]); S.reframeSource = 'REFRAME REST'; }
+    catch (e) { a = wgs84ToLv95Approx(S.a); b = wgs84ToLv95Approx(S.b); S.reframeSource = 'formule approchée (REFRAME KO : ' + e.message + ')'; }
+    S.lv95 = { a, b, approx: { a: wgs84ToLv95Approx(S.a), b: wgs84ToLv95Approx(S.b) } };
+    const geom = JSON.stringify({ type: 'LineString', coordinates: [a, b] });
+    const url = `https://api3.geo.admin.ch/rest/services/profile.json?geom=${encodeURIComponent(geom)}&sr=2056&nb_points=200`;
+    const t0 = performance.now();
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('profile ' + r.status + ' ' + (await r.text()).slice(0, 120));
+    const pts = await r.json();
+    if (id !== reqId) return;
+    S.profile = { pts, ms: Math.round(performance.now() - t0), url };
+  } catch (e) { S.err = String(e); }
+  writeHash(); render();
+}
+
+// ---------- rose des vents ----------
+const rose = document.getElementById('rose'), arrowg = document.getElementById('arrowg');
+const ticks = document.getElementById('ticks');
+for (let d = 0; d < 360; d += 30) ticks.insertAdjacentHTML('beforeend', `<line x1="0" y1="-80" x2="0" y2="${d % 90 ? -74 : -66}" stroke="#333" transform="rotate(${d})" />`);
+function placeRose() { const p = map.project(mid(S.a, S.b)); rose.style.left = p.x + 'px'; rose.style.top = p.y + 'px'; }
+map.on('move', placeRose); map.on('load', placeRose);
+function drawRose() { arrowg.setAttribute('transform', `rotate(${S.wdir})`); }
+let dragging = false;
+rose.querySelector('.handle').addEventListener('pointerdown', (e) => { dragging = true; e.target.setPointerCapture(e.pointerId); e.stopPropagation(); });
+window.addEventListener('pointermove', (e) => {
+  if (!dragging) return;
+  const r = rose.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  S.wdir = Math.round(((Math.atan2(e.clientX - cx, -(e.clientY - cy)) / d2r) + 360) % 360);
+  document.getElementById('wdir').value = S.wdir; writeHash(); render();
+});
+window.addEventListener('pointerup', () => { dragging = false; });
+document.getElementById('wdir').oninput = (e) => { S.wdir = Number(e.target.value) || 0; writeHash(); render(); };
+document.getElementById('wspeed').oninput = (e) => { S.wspeed = Number(e.target.value) || 0; writeHash(); render(); };
+document.getElementById('wdir').value = S.wdir; document.getElementById('wspeed').value = S.wspeed;
+
+// ---------- rendu ----------
+function render() {
+  drawRose();
+  const span = haversine(S.a, S.b), az = azimuth(S.a, S.b);
+  // vent "d'où il vient" wdir ; vecteur vent souffle vers wdir+180. Composante le long de la ligne A->B :
+  const blowTo = (S.wdir + 180) % 360;
+  const rel = ((blowTo - az + 540) % 360) - 180; // -180..180 ; 0 = vent arrière pur
+  const along = S.wspeed * Math.cos(rel * d2r), cross = S.wspeed * Math.sin(rel * d2r);
+  const rows = [
+    ['Portée horizontale (haversine)', span.toFixed(1) + ' m'],
+    ['Azimut A→B', az.toFixed(1) + ' °'],
+    ['Vent vient de', S.wdir + ' ° · ' + S.wspeed + ' km/h'],
+    ['Angle vent / ligne', rel.toFixed(0) + ' ° (0 = arrière, ±180 = face)'],
+    ['Composante le long de la ligne', (along >= 0 ? '+' : '') + along.toFixed(0) + ' km/h (' + (along >= 0 ? 'pousse' : 'freine') + ')'],
+    ['Composante travers', Math.abs(cross).toFixed(0) + ' km/h vers ' + (cross > 0 ? 'la droite' : 'la gauche') + ' de A→B'],
+  ];
+  if (S.profile) {
+    const p = S.profile.pts, alts = p.map((q) => q.alts.COMB);
+    const iMin = alts.indexOf(Math.min(...alts));
+    rows.push(['Profil API', p.length + ' pts, ' + S.profile.ms + ' ms, dist max ' + p.at(-1).dist + ' m']);
+    rows.push(['Altitude A / B', alts[0] + ' / ' + alts.at(-1) + ' m']);
+    rows.push(['Point bas', alts[iMin] + ' m à ' + p[iMin].dist + ' m']);
+    rows.push(['LV95 via', S.reframeSource]);
+    if (S.lv95) {
+      const d = Math.hypot(S.lv95.a[0] - S.lv95.approx.a[0], S.lv95.a[1] - S.lv95.approx.a[1]);
+      rows.push(['Écart REFRAME / formule (A)', d.toFixed(2) + ' m']);
+    }
+  }
+  if (S.err) rows.push(['Erreur', S.err]);
+  document.getElementById('vals').innerHTML = rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+  drawProfile();
+  document.getElementById('state').textContent = JSON.stringify({ ...S, profile: S.profile && { n: S.profile.pts.length, ms: S.profile.ms, first: S.profile.pts[0], last: S.profile.pts.at(-1) } }, null, 1);
+}
+function drawProfile() {
+  const svg = document.getElementById('profile');
+  if (!S.profile) { svg.innerHTML = '<text x="10" y="60" font-size="12">profil : en attente…</text>'; return; }
+  const p = S.profile.pts, W = 340, H = 120, alts = p.map((q) => q.alts.COMB);
+  const zmin = Math.min(...alts), zmax = Math.max(...alts), dmax = p.at(-1).dist || 1;
+  const x = (d) => (d / dmax) * (W - 10) + 5, y = (z) => H - 10 - ((z - zmin) / (zmax - zmin || 1)) * (H - 20);
+  const poly = p.map((q) => `${x(q.dist).toFixed(1)},${y(q.alts.COMB).toFixed(1)}`).join(' ');
+  svg.innerHTML = `<polygon points="${x(0)},${H} ${poly} ${x(dmax)},${H}" fill="#cde" /><polyline points="${poly}" fill="none" stroke="#333" stroke-width="1.5" />
+    <line x1="${x(0)}" y1="${y(alts[0])}" x2="${x(dmax)}" y2="${y(alts.at(-1))}" stroke="#f70" stroke-width="2" />
+    <text x="6" y="12" font-size="10">${zmax} m</text><text x="6" y="${H - 2}" font-size="10">${zmin} m</text>`;
+}
+
+map.on('load', () => { writeHash(); render(); refreshProfile(); });
+</script>
+</body>
+</html>
