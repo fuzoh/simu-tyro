@@ -37,14 +37,14 @@
  *   app-level guarantee rather than a router one.
  */
 
-import type { ScenarioDraft } from "@/lib/scenario/types.ts";
+import type { Positions, ScenarioDraft } from "@/lib/scenario/types.ts";
 import type {
   LayerToggles,
   RetainedManualGeometry,
   RetainedMaterial,
   Session,
 } from "@/lib/session/session.ts";
-import type { Trace } from "@/lib/terrain/trace.ts";
+import type { Trace, TraceEnds } from "@/lib/terrain/trace.ts";
 import type { DroppedKey, LinkRefusal, SearchKey, ValidatedSearch } from "@/lib/url/schema.ts";
 
 import {
@@ -210,7 +210,12 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         // user's parallel input is worth a blocking error, let alone a silent loss.
         retainedManual:
           geometry.source === "manual" ? { L: geometry.L, h: geometry.h } : state.retainedManual,
-        scenario: withViewpoint(state.scenario, { source: "trace", trace: action.tr }, trace),
+        scenario: {
+          ...withViewpoint(state.scenario, { source: "trace", trace: action.tr }, trace),
+          // Unlike `L`/`h`, typed Positions are not retained: a profil fixes them end to end
+          // (#90), so the file's Positions replace them, and a file with no coordinates leaves them empty.
+          positions: positionsOf(trace),
+        },
       };
     }
 
@@ -224,7 +229,12 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       // and the file-identity line's fourth state is what can put it back.
       return {
         ...state,
-        scenario: withViewpoint(state.scenario, { source: "manual", ...manual }, null),
+        scenario: {
+          ...withViewpoint(state.scenario, { source: "manual", ...manual }, null),
+          // The Positions the file gave go with the profil, which keeps them for « Réutiliser ce
+          // tracé ». A file with none gave nothing, so what was typed since is the user's own.
+          positions: state.trace?.ends === undefined ? state.scenario.positions : NO_POSITIONS,
+        },
       };
     }
   }
@@ -238,6 +248,18 @@ function shippedRetained(family: "steel" | "textile"): RetainedMaterial {
   if (family === "textile") return FIRST_RUN_RETAINED_TEXTILE;
   const shipped = firstRunDefaults();
   return { spec: shipped.material, terminations: shipped.terminations };
+}
+
+const NO_POSITIONS: Positions = { A: null, B: null };
+
+/**
+ * The Positions a Trace puts under the anchors: its two ends' coordinates, or none when the file
+ * had none. A profil fixes the Positions end to end (#90), so a typed one does not outlive it.
+ */
+function positionsOf(trace: Trace): Positions {
+  return trace.ends === undefined
+    ? NO_POSITIONS
+    : { A: { ...trace.ends.A }, B: { ...trace.ends.B } };
 }
 
 /**
@@ -313,7 +335,9 @@ export function initialAppState(input: MountInput): AppState {
     // The one Session extra a link *can* speak for: `tr` **is** a profile, so an arriving one is
     // decoded here rather than left to the Session to happen to have.
     trace:
-      completedSearch.tr === undefined ? base.trace : linkTrace(completedSearch.tr, input.session),
+      completedSearch.tr === undefined
+        ? base.trace
+        : linkTrace(completedSearch.tr, input.session, scenario.positions),
     link: {
       refused: null,
       dropped,
@@ -341,11 +365,28 @@ export function initialAppState(input: MountInput): AppState {
  * @returns the Session's Trace when the payload is its own, otherwise the decoded profile with
  *   **no `fileName`** — which *is* § 4's third identity state, « tracé reçu par lien ».
  */
-function linkTrace(tr: string, session: Session | null): Trace {
+function linkTrace(tr: string, session: Session | null, positions: Positions): Trace {
   const cached = session?.trace ?? null;
   const stored = session?.scenario.geometry;
-  if (cached !== null && stored?.source === "trace" && stored.trace === tr) return cached;
-  return { ...decodeP1(tr), fileName: null };
+  const { A, B } = positions;
+  // The link's Positions are where the profil's ends stand, the cached file's own included: a link
+  // that retyped them over the same profil must not bring the file's back on « Réutiliser ».
+  const base =
+    cached !== null && stored?.source === "trace" && stored.trace === tr
+      ? cached
+      : { ...decodeP1(tr), fileName: null };
+  const ends = A === null || B === null ? undefined : { A, B };
+  // The cached Trace itself when it already stands there, so its identity keeps memos warm.
+  if (sameEnds(base.ends, ends)) return base;
+  const { ends: _fileEnds, ...profil } = base;
+  return ends === undefined ? profil : { ...profil, ends };
+}
+
+function sameEnds(a: TraceEnds | undefined, b: TraceEnds | undefined): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  return [a.A, a.B].every(
+    (end, i) => end.lat === [b.A, b.B][i]?.lat && end.lon === [b.A, b.B][i]?.lon,
+  );
 }
 
 /** The Session, or § 9's shipped opening state. `firstRunDefaults()` is the one source of both. */

@@ -102,6 +102,10 @@ describe("the key table and canonical order", () => {
       "mur",
       "rho",
       "x",
+      "lata",
+      "lona",
+      "latb",
+      "lonb",
       "tr",
     ]);
     expect(new Set(CANONICAL_KEYS).size).toBe(CANONICAL_KEYS.length);
@@ -402,6 +406,27 @@ describe("an unknown or unrepresentable key is ignored and named", () => {
       query: "?L=250&mt=mx",
       dropped: [{ key: "mt", reason: "valeur-non-représentable" }],
       kept: { L: 250 },
+    },
+    {
+      name: "a latitude without its longitude (#90): half a Position is none",
+      query: "?L=250&lata=46.843556",
+      dropped: [{ key: "lata", reason: "coordonnée-isolée" }],
+      kept: { L: 250 },
+    },
+    {
+      name: "a longitude whose latitude is unreadable: the unreadable one and its orphan both leave",
+      query: "?L=250&latb=oui&lonb=6.52",
+      dropped: [
+        { key: "latb", reason: "valeur-non-représentable" },
+        { key: "lonb", reason: "coordonnée-isolée" },
+      ],
+      kept: { L: 250 },
+    },
+    {
+      name: "one anchor whole and the other's lone coordinate: only the lone one leaves",
+      query: "?L=250&lata=46.8&lona=6.5&lonb=6.52",
+      dropped: [{ key: "lonb", reason: "coordonnée-isolée" }],
+      kept: { L: 250, lata: 46.8, lona: 6.5 },
     },
     {
       name: "a duplicate key, which arrives as an array",

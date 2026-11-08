@@ -20,7 +20,9 @@ import { DEFAULT_LAYERS } from "@/lib/session/session.ts";
 import { parseProfileCsv } from "@/lib/terrain/csv.ts";
 import { encodeP1 } from "@/lib/url/p1.ts";
 import { FIRST_RUN_LINK } from "@/lib/url/scenario.ts";
+import { canonicalLink } from "@/lib/url/schema.ts";
 
+import { publishedSearch } from "./persist.ts";
 import { appReducer, initialAppState } from "./state.ts";
 
 /** The query string of § 9's first-run link — a complete, canonical, nothing-to-do bag. */
@@ -493,5 +495,109 @@ describe("#88's trial — the geoadmin profil of 2026-11-08, imported with nothi
       report,
     });
     expect(results?.verdict).not.toBeNull();
+  });
+});
+
+describe("#90's Positions — they follow the profil, end to end", () => {
+  const A = { lat: 46.843556, lon: 6.525035 };
+  const B = { lat: 46.846166, lon: 6.520783 };
+  const csv = readFileSync(
+    new URL("../../../docs/mesures dynamometre/trace-geoadmin-2026-11-08.csv", import.meta.url),
+    "utf8",
+  );
+  function importFile(text: string) {
+    const parsed = parseProfileCsv(text, "trace.csv");
+    if (!parsed.ok) throw new Error("the file must import");
+    return parsed.trace;
+  }
+  function linkSearch(scenario: typeof bare.scenario) {
+    const search = publishedSearch(scenario);
+    if (search === null) throw new Error("the Scenario must be publishable");
+    return search;
+  }
+  const withCoordinates = importFile(csv);
+  const bare = initialAppState({ query: "", session: null });
+  const imported = appReducer(bare, {
+    type: "tracé/importé",
+    trace: withCoordinates,
+    tr: encodeP1(withCoordinates),
+  });
+
+  it("importing the verified CSV fills A and B, and the link carries them", () => {
+    expect(imported.scenario.positions).toEqual({ A, B });
+    const link = canonicalLink(linkSearch(imported.scenario), "/");
+    expect(link).toContain("lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783");
+  });
+
+  it("a CSV with no coordinate columns leaves the Positions empty, even over typed ones", () => {
+    const typed = appReducer(bare, {
+      type: "scénario/modifié",
+      patch: { positions: { A, B: null } },
+    });
+    const plain = importFile("Distance;Altitude\n0;100\n50;95\n100;90\n");
+    const after = appReducer(typed, { type: "tracé/importé", trace: plain, tr: encodeP1(plain) });
+    expect(after.scenario.positions).toEqual({ A: null, B: null });
+  });
+
+  it("removing a profil whose file had no coordinates keeps the Positions typed since", () => {
+    const plain = importFile("Distance;Altitude\n0;100\n50;95\n100;90\n");
+    const loaded = appReducer(bare, { type: "tracé/importé", trace: plain, tr: encodeP1(plain) });
+    const typed = appReducer(loaded, {
+      type: "scénario/modifié",
+      patch: { positions: { A, B: null } },
+    });
+    const removed = appReducer(typed, { type: "tracé/retiré" });
+    expect(removed.scenario.positions).toEqual({ A, B: null });
+  });
+
+  it("removing the profil unsets the Positions, and re-using it brings them back", () => {
+    const removed = appReducer(imported, { type: "tracé/retiré" });
+    expect(removed.scenario.positions).toEqual({ A: null, B: null });
+    expect(removed.trace?.ends).toEqual({ A, B });
+    const reused = appReducer(removed, { type: "tracé/réutilisé", tr: encodeP1(withCoordinates) });
+    expect(reused.scenario.positions).toEqual({ A, B });
+  });
+
+  it("a link arrives with its Positions, and the profil it carries keeps them as its ends", () => {
+    const query = canonicalLink(linkSearch(imported.scenario), "/").slice(2);
+    const arrived = initialAppState({ query, session: null });
+    expect(arrived.scenario.positions).toEqual({ A, B });
+    expect(arrived.trace?.ends).toEqual({ A, B });
+    expect(arrived.trace?.fileName).toBeNull();
+  });
+
+  it("a link's Positions win over the cached file's, so « Réutiliser » restores the link's", () => {
+    const retyped = { A: { lat: 46.8, lon: 6.5 }, B: { lat: 46.9, lon: 6.6 } };
+    const query = canonicalLink(
+      linkSearch({ ...imported.scenario, positions: retyped }),
+      "/",
+    ).slice(2);
+    const session: Session = {
+      scenario: imported.scenario as Session["scenario"],
+      retainedMaterial: imported.retainedMaterial,
+      retainedManual: imported.retainedManual,
+      trace: imported.trace,
+      layers: imported.layers,
+    };
+    const arrived = initialAppState({ query, session });
+    expect(arrived.scenario.positions).toEqual(retyped);
+    expect(arrived.trace?.ends).toEqual(retyped);
+    expect(arrived.trace?.fileName).toBe("trace.csv");
+  });
+
+  it("changes neither the Results nor the Verdict", () => {
+    const ready = appReducer(imported, {
+      type: "scénario/modifié",
+      patch: { anchors: { zA: 1.5, zB: 1 }, regime: "en15567" },
+    });
+    const read = (scenario: typeof ready.scenario) =>
+      deriveResults({
+        scenario,
+        base: buildScene({ scenario, trace: ready.trace }),
+        report: evaluateGates({ scenario }),
+      });
+    const unplaced = { ...ready.scenario, positions: { A: null, B: null } };
+    expect(read(ready.scenario)).toEqual(read(unplaced));
+    expect(read(ready.scenario)?.verdict).not.toBeNull();
   });
 });

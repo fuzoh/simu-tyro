@@ -55,6 +55,7 @@ import {
   TENSIONING_SIDE_TOKEN_BY_ID,
   terminationIdFromToken,
 } from "@/lib/url/scenario.ts";
+import { POSITION_KEY_PAIRS } from "@/lib/url/schema.ts";
 import { heading } from "@/lib/vocabulary/labels.ts";
 
 /** The three sentences, each `null` when this arrival has nothing to say with it. */
@@ -141,6 +142,10 @@ const KEYS: Record<StripKey, KeyRow> = {
   mur: { label: heading("trolleyFrictionRatio", "exact"), genre: "m", quantity: "trolleyMu" },
   rho: { label: heading("airDensity", "exact"), genre: "f", quantity: "rho" },
   x: fromField("xD", "f"),
+  lata: fromField("latA", "f"),
+  lona: fromField("lonA", "f"),
+  latb: fromField("latB", "f"),
+  lonb: fromField("lonB", "f"),
   tr: { label: "Profil", genre: "m", quantity: null },
   // `v` is deliberately absent: it is the schema version, not a champ of the scenario, and naming
   // « version de schéma 1 » among the completed fields buries the numbers the sentence exists for.
@@ -211,6 +216,10 @@ const TOKENS: Record<StripKey, Readonly<Record<string, string>> | null> = {
   mur: null,
   rho: null,
   x: null,
+  lata: null,
+  lona: null,
+  latb: null,
+  lonb: null,
   tr: null,
 };
 
@@ -258,11 +267,20 @@ function clause({ key, reason }: DroppedKey): string {
   if (!isStripKey(key)) return `« ${key} » n'était pas une valeur exploitable`;
   const row = KEYS[key];
   const label = lowerFirst(row.label);
+  if (reason === "coordonnée-isolée") {
+    return `« ${key} » sans « ${twinOf(key)} » (${label} ignorée)`;
+  }
   // « n'était pas un nombre » is § 8's own wording and is true of every numeric key; a token-valued
   // key is not a number at all, and saying so of `?fam=zz` would be a lie in the one sentence whose
   // job is to tell the sender's typo apart from a value we could not read.
   const fault = row.quantity === null ? "n'était pas une valeur reconnue" : "n'était pas un nombre";
   return `« ${key} » ${fault} (${label} ignoré${row.genre === "f" ? "e" : ""})`;
+}
+
+/** The other coordinate of a Position: a lone one is dropped, and the clause names what it lacked. */
+function twinOf(key: StripKey): string {
+  const pair = POSITION_KEY_PAIRS.find((keys) => (keys as readonly string[]).includes(key));
+  return pair === undefined ? key : pair[pair[0] === key ? 1 : 0];
 }
 
 /**

@@ -108,6 +108,11 @@ export type TermId =
   | "arrivalSpeed"
   | "stopPoint"
   | "banana"
+  | "position"
+  | "latitude"
+  | "longitude"
+  | "lv95"
+  | "approximate"
   | "wind"
   | "windSpeed"
   | "windDirection"
@@ -237,6 +242,11 @@ export const LABELS = {
   arrivalSpeed: same("vitesse d'arrivée"),
   stopPoint: same("point d'arrêt"),
   banana: same("banane"),
+  position: same("position"),
+  latitude: same("latitude"),
+  longitude: same("longitude"),
+  lv95: same("LV95"),
+  approximate: same("approchée"),
   wind: same("vent"),
   windSpeed: same("vitesse du vent"),
   windDirection: same("direction du vent"),

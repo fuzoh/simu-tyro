@@ -212,6 +212,34 @@ describe("an unknown rope class is ignored and the default class is named, never
   });
 });
 
+describe("a coordinate without its pair (#90)", () => {
+  test("is named with the twin it lacked, and the Position stays unknown", () => {
+    const query = "?L=150&lata=46.843556";
+    expect(strip(query)?.ignored).toBe(
+      "Une partie du lien a été ignorée : « lata » sans « lona » (latitude A ignorée).",
+    );
+    expect(initialAppState({ query, session: null }).scenario.positions).toEqual({
+      A: null,
+      B: null,
+    });
+  });
+
+  test("names a longitude by its own anchor, and the anchor that arrived whole is kept", () => {
+    const query = "?L=150&lata=46.8&lona=6.5&lonb=6.6";
+    expect(strip(query)?.ignored).toBe(
+      "Une partie du lien a été ignorée : « lonb » sans « latb » (longitude B ignorée).",
+    );
+    expect(initialAppState({ query, session: null }).scenario.positions).toEqual({
+      A: { lat: 46.8, lon: 6.5 },
+      B: null,
+    });
+  });
+
+  test("a link with no Position completes none, so it is not announced", () => {
+    expect(strip("?L=150")?.completed).not.toMatch(/latitude|longitude/);
+  });
+});
+
 describe("a completed force is converted from the URL's daN into the screen's unit", () => {
   test("`te=900` daN prints as 9,000 kN under the kN selector", () => {
     const base = initialAppState({ query: "", session: null }).link;

@@ -734,3 +734,45 @@ describe("ADR-0001 — a restored Session is kept as given, and the gates judge 
     ]);
   });
 });
+
+describe("the Positions in the Session (#90)", () => {
+  const A = { lat: 46.843556, lon: 6.525035 };
+  const B = { lat: 46.846166, lon: 6.520783 };
+
+  test("Positions survive a write and a read", () => {
+    const storage = memoryStorage();
+    const positions = { A, B: null };
+    writeSession(storage, { ...bareSession(), scenario: { ...firstRunDefaults(), positions } });
+    expect(readSession(storage)?.scenario.positions).toEqual(positions);
+  });
+
+  test("a cached Trace keeps the coordinates of its ends, and one without has none", () => {
+    const storage = memoryStorage();
+    writeSession(storage, { ...bareSession(), trace: { ...TRACE, ends: { A, B } } });
+    expect(readSession(storage)?.trace?.ends).toEqual({ A, B });
+
+    writeSession(storage, { ...bareSession(), trace: TRACE });
+    expect(readSession(storage)?.trace).not.toHaveProperty("ends");
+  });
+
+  test("a Session stored before the key is kept, and reads both Positions unknown", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const older = { ...(blob.scenario as Record<string, unknown>) };
+    delete older.positions;
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: older }));
+
+    const restored = readSession(storage);
+    expect(restored?.trace).not.toBeNull();
+    expect(restored?.scenario.positions).toEqual({ A: null, B: null });
+  });
+
+  test("a coordinate that is not a number is not a Session — the blob is discarded whole", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const scenario = blob.scenario as Record<string, unknown>;
+    const positions = { A: { lat: "46,84", lon: 6.5 }, B: null };
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: { ...scenario, positions } }));
+    expect(readSession(storage)).toBeNull();
+  });
+});

@@ -115,6 +115,8 @@ export const FIRST_RUN_SCENARIO = {
     kv: DYNAMICS.textile.kv,
     mu: DYNAMICS.steel.mu,
   },
+  /** Unknown, which is the four coordinate keys **absent**: the first-run line has no map. */
+  positions: { A: null, B: null },
 } as const satisfies Scenario;
 
 /**

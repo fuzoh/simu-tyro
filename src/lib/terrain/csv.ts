@@ -30,6 +30,11 @@
  *   below are the spec's French copy, keyed off the issue kind and never rendered from it.
  * - **This boundary may coerce.** A CSV cell *is* text and must become a number; the
  *   no-`transform` rule belongs to `validateSearch`, where coercion provoked a 307.
+ * - **The two ends' coordinates are read, and held to the same bar.** `Longitude` and `Latitude`,
+ *   when both columns exist, give anchor A's and B's Position from the first and last row (#90):
+ *   an unreadable or non-finite cell there rejects the file with the existing message, because a
+ *   Position the file claims and cannot state is not one to guess. A file without the columns
+ *   simply has no Positions.
  * - **No resampling, no smoothing, no 3-D correction.** `Distance` is horizontal (183,4 m reported
  *   against a 183,42 m chord and a 263,9 m surface length); the file's own samples are kept and
  *   the measured spacing is disclosed instead (`provenance.ts`).
@@ -37,7 +42,9 @@
 
 import * as v from "valibot";
 
-import type { Trace } from "./trace.ts";
+import type { Position } from "@/lib/scenario/types.ts";
+
+import type { Trace, TraceEnds } from "./trace.ts";
 
 /** § 4's seven blocking kinds. There is no eighth, and no non-blocking parse outcome. */
 export type ParseFailureKind =
@@ -49,8 +56,11 @@ export type ParseFailureKind =
   | "distance-dupliquée"
   | "lecture-impossible";
 
-/** The two columns a message can name — the two this parser requires. */
-export type RequiredColumn = "Distance" | "Altitude";
+/**
+ * The columns a message can name: the two this parser requires, and the two coordinates it reads
+ * off the first and last row when the file carries them (#90).
+ */
+export type NamedColumn = "Distance" | "Altitude" | "Longitude" | "Latitude";
 
 /**
  * A blocking import failure. Every kind carries the file name because the operator may have
@@ -68,7 +78,7 @@ export type ParseFailure =
       readonly kind: "valeur-non-numérique";
       readonly fileName: string;
       readonly line: number;
-      readonly column: RequiredColumn;
+      readonly column: NamedColumn;
     }
   | { readonly kind: "distance-non-croissante"; readonly fileName: string; readonly line: number }
   | { readonly kind: "distance-dupliquée"; readonly fileName: string; readonly line: number }
@@ -246,7 +256,7 @@ export function parseProfileCsv(text: string, fileName: string): ParseResult {
     const [issue] = parsed.issues;
     const path = issue.path ?? [];
     const rowIndex = typeof path[0]?.key === "number" ? path[0].key : 0;
-    const column: RequiredColumn = path[1]?.key === "altitude" ? "Altitude" : "Distance";
+    const column: NamedColumn = path[1]?.key === "altitude" ? "Altitude" : "Distance";
     return fail({
       kind: "valeur-non-numérique",
       fileName,
@@ -270,7 +280,43 @@ export function parseProfileCsv(text: string, fileName: string): ParseResult {
     }
   }
 
-  return { ok: true, trace: { d, z, dev: straightness(cells, columns, mark), fileName } };
+  const ends = readEnds(cells, lineNumbers, columns, mark);
+  if (ends !== undefined && "column" in ends)
+    return fail({ kind: "valeur-non-numérique", fileName, ...ends });
+
+  const dev = straightness(cells, columns, mark);
+  return {
+    ok: true,
+    trace: ends === undefined ? { d, z, dev, fileName } : { d, z, dev, fileName, ends },
+  };
+}
+
+/** A coordinate cell that is not a finite number: where it is, for the existing message. */
+type Unreadable = { readonly line: number; readonly column: NamedColumn };
+
+/**
+ * The first and last row's coordinates, the cell that cannot be read, or `undefined` when the file
+ * has no `Longitude` / `Latitude` pair to read.
+ */
+function readEnds(
+  cells: readonly string[][],
+  lineNumbers: readonly number[],
+  columns: ColumnIndex,
+  mark: DecimalMark,
+): TraceEnds | Unreadable | undefined {
+  if (columns.longitude === -1 || columns.latitude === -1) return undefined;
+  const read = (row: number): Position | Unreadable => {
+    const line = lineNumbers[row];
+    const lon = numericCell(cells[row][columns.longitude], mark);
+    if (lon === null) return { line, column: "Longitude" };
+    const lat = numericCell(cells[row][columns.latitude], mark);
+    if (lat === null) return { line, column: "Latitude" };
+    return { lat, lon };
+  };
+  const A = read(0);
+  if ("column" in A) return A;
+  const B = read(cells.length - 1);
+  return "column" in B ? B : { A, B };
 }
 
 /** The four columns this parser reads. `-1` is « absent ». */

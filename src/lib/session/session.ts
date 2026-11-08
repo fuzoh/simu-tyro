@@ -54,7 +54,7 @@ import * as v from "valibot";
 
 import type { EndTermination, ForceUnit, Scenario, TextileDraft } from "@/lib/scenario/types.ts";
 import type { MaterialSpec, RegimeId, SteelSpec, TerminationId } from "@/lib/sim";
-import type { Trace } from "@/lib/terrain/trace.ts";
+import type { Trace, TraceEnds } from "@/lib/terrain/trace.ts";
 
 import { FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 import { REGIMES, TERMINATIONS } from "@/lib/sim";
@@ -176,6 +176,7 @@ type StoredTrace = {
   readonly z: readonly number[];
   readonly dev: number | null;
   readonly fileName: string | null;
+  readonly ends?: TraceEnds;
 };
 
 /** The Session as JSON holds it — a {@link Session} with the Trace's two arrays widened. */
@@ -282,6 +283,9 @@ const RETAINED_MATERIAL: v.GenericSchema<unknown, RetainedMaterial> = v.object({
   terminations: v.object({ A: END_TERMINATION, B: END_TERMINATION }),
 });
 
+/** A Position as stored: both coordinates, finite. */
+const POSITION = v.object({ lat: FINITE, lon: FINITE });
+
 /** § 7's key table as state spells it. `regime: null` **is** « — choisir — », a legitimate state. */
 const SCENARIO: v.GenericSchema<unknown, Scenario> = v.object({
   unit: FORCE_UNIT,
@@ -317,6 +321,10 @@ const SCENARIO: v.GenericSchema<unknown, Scenario> = v.object({
     v.object({ CdA: FINITE, rho: v.nullable(FINITE), F0: FINITE, kv: FINITE, mu: FINITE }),
     () => ({ ...FIRST_RUN_SCENARIO.dynamics }),
   ),
+  // Added with #90, optional with both Positions unknown: a Session written before it had none.
+  positions: v.optional(v.object({ A: v.nullable(POSITION), B: v.nullable(POSITION) }), () => ({
+    ...FIRST_RUN_SCENARIO.positions,
+  })),
 });
 
 /**
@@ -331,6 +339,8 @@ const TRACE: v.GenericSchema<unknown, StoredTrace> = v.pipe(
     z: v.array(FINITE),
     dev: v.nullable(FINITE),
     fileName: v.nullable(v.string()),
+    // Added with #90: a cached Trace keeps the coordinates of its two ends when the file had them.
+    ends: v.optional(v.object({ A: POSITION, B: POSITION })),
   }),
   v.check(
     (trace) => trace.d.length > 0 && trace.d.length === trace.z.length,
@@ -477,6 +487,7 @@ function dehydrate(session: Session): StoredSession {
             z: Array.from(trace.z),
             dev: trace.dev,
             fileName: trace.fileName,
+            ...(trace.ends === undefined ? {} : { ends: trace.ends }),
           },
     layers: session.layers,
   };
@@ -497,6 +508,7 @@ function hydrate(stored: StoredSession): Session {
             z: Float64Array.from(trace.z),
             dev: trace.dev,
             fileName: trace.fileName,
+            ...(trace.ends === undefined ? {} : { ends: trace.ends }),
           },
     layers: stored.layers,
   };

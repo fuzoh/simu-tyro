@@ -531,6 +531,24 @@ describe("searchToScenario — the read side of § 7's key table", () => {
     expect(decode("?L=250&ws=30").wind).toEqual({ speedKmh: 30, directionDeg: 0 });
   });
 
+  it("reads the four coordinates absent as Positions unknown — and neither completes nor names them (#90)", () => {
+    const { search, completed } = complete("?L=250&h=-40");
+    expect(searchToScenario(search).positions).toEqual({ A: null, B: null });
+    for (const key of ["lata", "lona", "latb", "lonb"] as const) {
+      expect(search[key]).toBeUndefined();
+      expect(completed).not.toContain(key);
+    }
+  });
+
+  it("reads each anchor's pair on its own, and writes none for an unknown one", () => {
+    const decoded = decode("?L=250&latb=46.846166&lonb=6.520783");
+    expect(decoded.positions).toEqual({ A: null, B: { lat: 46.846166, lon: 6.520783 } });
+    const out = scenarioToSearch({ ...FIRST_RUN_SCENARIO, positions: decoded.positions });
+    expect(out.lata).toBeUndefined();
+    expect(out.latb).toBe(46.846166);
+    expect(out.lonb).toBe(6.520783);
+  });
+
   it("keeps a negative wind speed as it arrived, for the form to refuse (ADR-0001)", () => {
     expect(decode("?L=250&ws=-5").wind.speedKmh).toBe(-5);
   });

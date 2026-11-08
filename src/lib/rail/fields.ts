@@ -99,7 +99,11 @@ export type FieldId =
   | "DAF"
   | "xD"
   | "windSpeed"
-  | "windDirection";
+  | "windDirection"
+  | "latA"
+  | "lonA"
+  | "latB"
+  | "lonB";
 
 /**
  * A field's tier-one hard rule — the whole of it. Two shapes, because § 7's message column has
@@ -153,6 +157,27 @@ const POSITIVE_VALUE = "une valeur strictement positive est requise";
 /** A per-anchor field's label: the registry's heading, then which anchor. */
 function withEnd(id: LabelId, end: "A" | "B"): string {
   return `${heading(id, "exact")} ${end}`;
+}
+
+/**
+ * One coordinate of an anchor's Position: optional, unranged, in no gate. Typed field by field
+ * because `NumericFieldId` and `GatedFieldId` are derived from the literal `quantity` and `gate`.
+ */
+function coordinateField<Id extends FieldId>(
+  id: Id,
+  term: "latitude" | "longitude",
+  end: "A" | "B",
+) {
+  return {
+    id,
+    label: withEnd(term, end),
+    errorLabel: withEnd(term, end),
+    quantity: "coordinate",
+    rule: { kind: "finite" },
+    optional: true,
+    warning: null,
+    gate: null,
+  } as const;
 }
 
 /**
@@ -535,14 +560,23 @@ export const FIELDS = {
     warning: null,
     gate: null,
   },
+  // The two Positions (#90). Both sit in no gate — nothing reads a Position yet — and a blank pair
+  // is « inconnue », not « vide et requis », so none is required.
+  latA: coordinateField("latA", "latitude", "A"),
+  lonA: coordinateField("lonA", "longitude", "A"),
+  latB: coordinateField("latB", "latitude", "B"),
+  lonB: coordinateField("lonB", "longitude", "B"),
 } as const satisfies Record<FieldId, FieldSpec>;
 
-/** Rail order — what « the first culpable field in table order » means. */
+/** The fields whose blank is « absent »: the textile diameter and the four coordinates. */
+export type OptionalFieldId = "dTextile" | "latA" | "lonA" | "latB" | "lonB";
+
 /** Whether a blank is « absent » for this field (read off {@link FieldSpec.optional}). */
-export function isOptionalField(id: FieldId): id is "dTextile" {
+export function isOptionalField(id: FieldId): id is OptionalFieldId {
   return (FIELDS[id] as FieldSpec).optional === true;
 }
 
+/** Rail order — what « the first culpable field in table order » means. */
 export const FIELD_ORDER = Object.keys(FIELDS) as readonly FieldId[];
 
 /**

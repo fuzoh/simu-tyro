@@ -25,6 +25,7 @@
 import type { TightnessFieldId } from "@/lib/rail/fields.ts";
 import type {
   DynamicsConstants,
+  Position,
   Scenario,
   ScenarioDraft,
   TensioningDevice,
@@ -241,7 +242,12 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
   SearchValues,
   "v" | "u" | "use" | "za" | "zb" | "ta" | "tb" | "na" | "nb" | "mp" | "hr" | "gm" | "daf" | "x"
 > &
-  Partial<Pick<SearchValues, "reg" | "bp" | "cp" | "mt" | "ws" | "wd" | "cda" | "rho">> &
+  Partial<
+    Pick<
+      SearchValues,
+      "reg" | "bp" | "cp" | "mt" | "ws" | "wd" | "cda" | "rho" | "lata" | "lona" | "latb" | "lonb"
+    >
+  > &
   CompletedTerrain &
   CompletedDriver &
   (CompletedSteel | CompletedTextile);
@@ -251,8 +257,9 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
  * `mbf`/`ea`/`mu` absent is « non surchargée », which differs from « equal to the formula value »,
  * `mbl` absent — with `mu`, under `fam=tx` — is § 9's rope nobody typed, `bp` absent is one
  * Brin porteur, `cp` absent is the Mise en tension at A, `mt` absent is the mouflage, `ws` / `wd`
- * absent is no wind and `cda` / `f0` / `kv` / `mur` / `rho` absent is §12.2's default for the ride:
- * completing any would rewrite, and name in the strip, every link older than the key.
+ * absent is no wind, `cda` / `f0` / `kv` / `mur` / `rho` absent is §12.2's default for the ride and
+ * the four coordinates absent are Positions unknown: completing any would rewrite, and name in the
+ * strip, every link older than the key.
  */
 const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>([
   "reg",
@@ -266,6 +273,10 @@ const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>([
   "kv",
   "mur",
   "rho",
+  "lata",
+  "lona",
+  "latb",
+  "lonb",
   "mbf",
   "ea",
   "mu",
@@ -306,8 +317,8 @@ export type Completion = {
  *
  * Three groups are exempt, all of them § 7's meanings of absence:
  *
- * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, `cp`, `mt`, `ws`, `wd`, the ride's constants, the Overrides
- *    and the textile blanks. Under `fam=tx`
+ * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, `cp`, `mt`, `ws`, `wd`, the ride's constants, the
+ *    Positions, the Overrides and the textile blanks. Under `fam=tx`
  *    **no rope is invented**: § 9 ships `MBL` and `μ` « vides et requis », because one made-up
  *    `MBL` decides the verdict, and those two blocking errors are the correct arrival state.
  *    Polyester's `k` stays blank too, because §13.2 publishes none.
@@ -518,7 +529,16 @@ export function searchToScenario(search: CompletedSearch): ScenarioDraft {
     // Absent **is** no wind, each key on its own: a link may state a direction before any speed.
     wind: { speedKmh: search.ws ?? 0, directionDeg: search.wd ?? 0 },
     dynamics: dynamics(search),
+    positions: {
+      A: positionOf(search.lata, search.lona),
+      B: positionOf(search.latb, search.lonb),
+    },
   };
+}
+
+/** A Position from its two keys. The schema has dropped a lone one, so both or neither arrive. */
+function positionOf(lat: number | undefined, lon: number | undefined): Position | null {
+  return lat === undefined || lon === undefined ? null : { lat, lon };
 }
 
 /**
@@ -623,6 +643,16 @@ export function scenarioToSearch(scenario: Scenario): CompletedSearch {
   }
   if (rho !== null) out.rho = rho;
   out.x = rider.xD;
+  // Unknown is the four keys **absent**, so a link with no Position stays string-identical.
+  const { A, B } = scenario.positions;
+  if (A !== null) {
+    out.lata = A.lat;
+    out.lona = A.lon;
+  }
+  if (B !== null) {
+    out.latb = B.lat;
+    out.lonb = B.lon;
+  }
 
   if (geometry.source === "trace") out.tr = geometry.trace;
 

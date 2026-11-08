@@ -37,6 +37,7 @@ import { evaluateGates, isFieldActive } from "@/lib/rail/gates.ts";
 import {
   fieldContext,
   GATED_FIELDS,
+  isPositionTwin,
   NUMERIC_FIELDS,
   railValues,
   sameGatedText,
@@ -85,11 +86,13 @@ export function useRailForm(deduced: Deduced, traverse: TraverseScenario): RailF
   // « −5 » stay on screen with its ⛔: the Scenario cannot hold it, so `values.L` never changes, so
   // nothing here overwrites it. Comparing against the text would erase the evidence on blur, which
   // is the one thing § 7's committed-invalid state may not do. The field under the caret is skipped
-  // regardless — a prefill has no business landing mid-word.
+  // regardless — a prefill has no business landing mid-word — and so is its Position twin: emptying
+  // one coordinate unsets the Position, which reads both as blank, and the other's digits stay.
   const synced = useRef(values);
   useEffect(() => {
     for (const id of NUMERIC_FIELDS) {
-      if (values[id] === synced.current[id] || id === focused) continue;
+      if (values[id] === synced.current[id] || id === focused || isPositionTwin(id, focused))
+        continue;
       form.setFieldValue(id, values[id]);
     }
     synced.current = values;

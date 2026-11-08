@@ -55,13 +55,14 @@
  * - **Forces are daN in the URL, always**, whatever `u` says. `u` is display-only, so hand-editing
  *   `u=daN` → `u=kN` must not make the line 100× tighter. The engine holds newtons; `./scenario.ts`
  *   is the one place the ÷10 happens, in both directions.
- * - **Absence carries exactly eight meanings and never a ninth.** `reg` absent is « — choisir — »,
+ * - **Absence carries exactly nine meanings and never a tenth.** `reg` absent is « — choisir — »,
  *   `mbf`/`ea`/`mu` absent is « non surchargée », `bp` absent is one Brin porteur, `cp` absent is
  *   the Mise en tension at A, `mt` absent is the mouflage, `ws`/`wd` absent is no wind (speed 0,
  *   direction 0), `cda`/`f0`/`kv`/`mur`/`rho` absent is §12.2's default for the passager's ride (#89)
- *   — `ρ`'s being derived from the profil — and a family- or terrain-scoped key absent means that
+ *   — `ρ`'s being derived from the profil —, `lata`/`lona`/`latb`/`lonb` absent is an unknown Position
+ *   (#90), and a family- or terrain-scoped key absent means that
  *   configuration is not the active one. So `stripSearchParams` is rejected, every other key with a
- *   value is stated even at its default, and `./scenario.ts`'s completion exempts the first seven.
+ *   value is stated even at its default, and `./scenario.ts`'s completion exempts the first eight.
  * - **The dropped-keys reporter takes the raw query string as a parameter**
  *   ({@link reportDroppedKeys}), never reading `window.location` — amendment A removed the jsdom
  *   environment that would otherwise be needed, and as a pure function this is a plain unit test.
@@ -130,6 +131,10 @@ export const CANONICAL_KEYS = [
   "mur",
   "rho",
   "x",
+  "lata",
+  "lona",
+  "latb",
+  "lonb",
   "tr",
 ] as const;
 
@@ -315,6 +320,12 @@ const KEY_SCHEMAS = {
   mur: FINITE, // Frottement de la poulie `μ`, sans unité — câble.
   rho: FINITE, // Masse volumique de l'air `ρ`, kg/m³. Absent = déduite du profil, 1,225 sans profil.
   x: FINITE, // Position du passager, m — clamped to the span by `searchToScenario`, **never here**.
+  // The anchors' Positions (#90), WGS84 degrees. Absent **is** unknown, and a lone coordinate is
+  // dropped by {@link salvageSearch}: a Position needs both of its own.
+  lata: FINITE, // Latitude de l'ancrage A.
+  lona: FINITE, // Longitude de l'ancrage A.
+  latb: FINITE, // Latitude de l'ancrage B.
+  lonb: FINITE, // Longitude de l'ancrage B.
   // `tr` is validated **structurally** by the codec, not by valibot: sentinel, base64url alphabet,
   // varint walk, declared `n` against bytes consumed, character budget. A structural failure is a
   // refusal, not a salvage, so it is handled in {@link refuse} rather than here.
@@ -397,8 +408,20 @@ export function isLinkRefusal(value: unknown): value is LinkRefusal {
   );
 }
 
-/** § 8's two salvageable kinds, and there is no third — the strip says **which** it was. */
-export type DropReason = "clé-inconnue" | "valeur-non-représentable";
+/**
+ * The coordinate keys of each anchor's Position (#90), latitude first. A Position is both or
+ * neither, so one without the other is not a value the link can state.
+ */
+export const POSITION_KEY_PAIRS = [
+  ["lata", "lona"],
+  ["latb", "lonb"],
+] as const satisfies readonly (readonly [SearchKey, SearchKey])[];
+
+/**
+ * § 8's salvageable kinds — the strip says **which** it was. The third is a coordinate that
+ * arrived without its pair (#90): a number in itself, but half a {@link POSITION_KEY_PAIRS} Position.
+ */
+export type DropReason = "clé-inconnue" | "valeur-non-représentable" | "coordonnée-isolée";
 
 /** One dropped key, named with its reason: « ignoré » alone cannot distinguish typo from fault. */
 export type DroppedKey = { readonly key: string; readonly reason: DropReason };
@@ -507,6 +530,13 @@ export function salvageSearch(raw: Record<string, unknown>): Salvage {
     // any client code runs, and the strip could then never name it.
     if (result.success) search[key] = result.output;
     else dropped.push({ key, reason: "valeur-non-représentable" });
+  }
+
+  for (const [lat, lon] of POSITION_KEY_PAIRS) {
+    if (lat in search === lon in search) continue;
+    const lone = lat in search ? lat : lon;
+    delete search[lone];
+    dropped.push({ key: lone, reason: "coordonnée-isolée" });
   }
 
   for (const key of Object.keys(raw)) {

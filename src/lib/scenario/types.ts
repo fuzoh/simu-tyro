@@ -160,6 +160,24 @@ export type Wind = {
 };
 
 /**
+ * Where an anchor stands on the earth (#90): WGS84 latitude and longitude, degrees. Typed to six
+ * decimals, about 0,1 m. Both or neither: a Position with one coordinate is no Position.
+ */
+export type Position = {
+  /** Degrees north. */
+  lat: number;
+  /** Degrees east. */
+  lon: number;
+};
+
+/**
+ * The two anchors' {@link Position}s, `null` where unknown (manual geometry, or a CSV with no
+ * coordinates). In a link the four numbers are `lata` / `lona` / `latb` / `lonb`, **all absent for
+ * unknown**. Nothing reads them yet: statics, the ride and the Verdict are unchanged.
+ */
+export type Positions = { A: Position | null; B: Position | null };
+
+/**
  * The constants of the passager's ride (#89) — §12.2's, every one editable and each **absent from a
  * link at its default**: `cda`, `rho`, `f0`, `kv` and `mur`. Only the ride reads them: statics and
  * the Verdict are unchanged.
@@ -209,6 +227,7 @@ export type Scenario = {
   rider: Rider;
   wind: Wind;
   dynamics: DynamicsConstants;
+  positions: Positions;
 };
 
 /**

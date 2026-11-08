@@ -82,7 +82,29 @@ export const FIELD_HELP: Record<FieldId, string> = {
     "Vitesse du vent, en km/h (0 ou plus). 0 est l'absence de vent, et c'est ce que lit un lien qui n'en porte pas. Information descriptive pour l'instant : elle ne change ni la statique, ni la garde au sol, ni le verdict. Elle servira à la dynamique du passager, qui en projette la composante le long de la ligne.",
   windDirection:
     "Direction du vent : d'où il vient, relativement au sens de parcours A → B, en degrés dans le sens horaire vu de dessus. 0° est un vent de face, 90° un vent de la droite, 180° un vent dans le dos, 270° un vent de la gauche. Elle est relative à la ligne, pas au nord : le scénario reste le même sans carte. Sans effet tant que la vitesse est nulle.",
+  latA: positionHelp("la latitude", "A"),
+  lonA: positionHelp("la longitude", "A"),
+  latB: positionHelp("la latitude", "B"),
+  lonB: positionHelp("la longitude", "B"),
 };
+
+/**
+ * Both coordinates of a Position say the same thing, so one sentence builds all four. The LV95
+ * reading beside them is swisstopo's approximate formula, which is why it is said to be one.
+ */
+function positionHelp(coordinate: string, anchor: "A" | "B"): string {
+  return (
+    `Position de l'ancrage ${anchor} : ${coordinate} en WGS84, en degrés décimaux (six décimales, soit environ 0,1 m). ` +
+    "Latitude et longitude vont ensemble : une Position n'existe qu'avec les deux, et laissées vides elles sont inconnues. " +
+    "La lecture LV95 à côté est une conversion approchée de swisstopo, précise à environ 1 m en Suisse. " +
+    "Informatif pour l'instant : une Position ne change ni la statique, ni la garde au sol, ni le verdict. " +
+    "Un fichier CSV geo.admin avec ses colonnes Longitude et Latitude la remplit."
+  );
+}
+
+/** Help for the LV95 reading beside an anchor's Position. */
+export const LV95_HELP =
+  "Lecture de la Position dans le système suisse LV95 (est, nord), en mètres. C'est la conversion approchée de swisstopo depuis WGS84, précise à environ 1 m en Suisse ; la conversion exacte (REFRAME) viendra avec le profil geo.admin. Elle ne sert qu'à la lecture et ne change aucun calcul.";
 
 /** Help for the pilot control of `Tension de la ligne` — a segmented control, not a field. */
 export const TIGHTNESS_HELP =

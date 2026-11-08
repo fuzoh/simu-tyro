@@ -61,6 +61,11 @@ export const BRANCHES = [
   "dynamics-textile",
   "dynamics-explicit-defaults",
   "dynamics-foreign-family",
+  "positions-absent",
+  "positions-both",
+  "positions-one-anchor",
+  "positions-with-trace",
+  "positions-lone-coordinate",
 ] as const;
 
 export type Branch = (typeof BRANCHES)[number];
@@ -76,7 +81,8 @@ export type CanonicalLinkFixture = {
     | typeof MEASURED_86
     | typeof MEASURED_87
     | typeof MEASURED_88
-    | typeof MEASURED_89;
+    | typeof MEASURED_89
+    | typeof MEASURED_90;
   covers: readonly Branch[];
   scenario: Scenario;
   link: string;
@@ -98,7 +104,8 @@ export type DecodeOnlyFixture = {
     | typeof MEASURED_86
     | typeof MEASURED_87
     | typeof MEASURED_88
-    | typeof MEASURED_89;
+    | typeof MEASURED_89
+    | typeof MEASURED_90;
   covers: readonly Branch[];
   link: string;
 } & ({ scenario: Scenario; canonical: string } | { scenario: ScenarioDraft; canonical: null });
@@ -111,6 +118,7 @@ const MEASURED_86 = "[MEASURED] issue #86, codec as of 2026-11-08";
 const MEASURED_87 = "[MEASURED] issue #87, codec as of 2026-11-08";
 const MEASURED_88 = "[MEASURED] issue #88, codec as of 2026-11-08";
 const MEASURED_89 = "[MEASURED] issue #89, codec as of 2026-11-08";
+const MEASURED_90 = "[MEASURED] issue #90, codec as of 2026-11-08";
 
 /** Three samples `(0,0) (50,-4) (100,-9)`, as `encodeP1` writes them — a 100 m profil. */
 export const TRACE_P1 = "p1.AwCQTpBOAJ8G5wcA";
@@ -133,7 +141,12 @@ const STEEL: Scenario = {
   rider: { mp: 120, hRider: 2.1, hClearMin: 1, DAF: 1.2, xD: 75 },
   wind: { speedKmh: 0, directionDeg: 0 },
   dynamics: { CdA: 0.45, rho: null, F0: 15, kv: 1.5, mu: 0.015 },
+  positions: { A: null, B: null },
 };
+
+/** The verified 2026-11-08 trace's two ends, as the geo.admin export spells them. */
+const POSITION_A = { lat: 46.843556, lon: 6.525035 };
+const POSITION_B = { lat: 46.846166, lon: 6.520783 };
 
 const TEXTILE: Scenario = {
   ...STEEL,
@@ -176,6 +189,7 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
       "tensioning-device-absent",
       "wind-absent",
       "dynamics-absent",
+      "positions-absent",
     ],
     scenario: STEEL,
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
@@ -303,6 +317,37 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
       dynamics: { ...TEXTILE.dynamics, kv: 2.25 },
     },
     link: `/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&${TEXTILE_BODY}&kv=2.25&x=75`,
+  },
+  {
+    name: "both Positions: four coordinates after `x`, before the profil",
+    source: MEASURED_90,
+    covers: ["positions-both"],
+    scenario: { ...STEEL, positions: { A: POSITION_A, B: POSITION_B } },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}` +
+      "&lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783",
+  },
+  {
+    name: "only anchor B is known: its two coordinates, and none for A",
+    source: MEASURED_90,
+    covers: ["positions-one-anchor"],
+    scenario: { ...STEEL, positions: { A: null, B: POSITION_B } },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}` +
+      "&latb=46.846166&lonb=6.520783",
+  },
+  {
+    name: "Positions on an imported profil: the coordinates travel beside `tr`",
+    source: MEASURED_90,
+    covers: ["positions-with-trace", "trace"],
+    scenario: {
+      ...STEEL,
+      geometry: { source: "trace", trace: TRACE_P1 },
+      positions: { A: POSITION_A, B: POSITION_B },
+    },
+    link:
+      `/?v=1&u=daN&use=perm&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}` +
+      `&lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783&tr=${TRACE_P1}`,
   },
   {
     name: "ratio driver, kgf display",
@@ -567,6 +612,14 @@ export const DECODE_ONLY_LINKS: readonly DecodeOnlyFixture[] = [
     link:
       `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
       "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&f0=2&kv=3&x=75",
+    scenario: STEEL,
+    canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "a latitude without its longitude is dropped, and the Position stays unknown",
+    source: MEASURED_90,
+    covers: ["positions-lone-coordinate"],
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}&lata=46.843556`,
     scenario: STEEL,
     canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
   },

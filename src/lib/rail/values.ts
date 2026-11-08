@@ -45,12 +45,20 @@ import {
 } from "@/lib/scenario/first-run.ts";
 import { clampX, spanOfGeometry } from "@/lib/scenario/geometry.ts";
 import { TEXTILE } from "@/lib/sim";
+import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 import type { Deduced, DeducedMaterial, DeducedSolve } from "./deduced.ts";
 import type { FieldContext, FieldId, TightnessFieldId } from "./fields.ts";
 
 import { deduceValues } from "./deduced.ts";
-import { displayField, FIELD_ORDER, FIELDS, TIGHTNESS_FIELD } from "./fields.ts";
+import {
+  checkField,
+  commitField,
+  displayField,
+  FIELD_ORDER,
+  FIELDS,
+  TIGHTNESS_FIELD,
+} from "./fields.ts";
 import { pretensionOf } from "./tensioning.ts";
 
 /**
@@ -121,6 +129,30 @@ export function isOverrideField(id: FieldId): id is OverrideFieldId {
   return (OVERRIDE_FIELDS as readonly FieldId[]).includes(id);
 }
 
+/**
+ * The two coordinate fields of each anchor's Position, latitude first. They are typed as a pair
+ * ({@link applyPosition}) because a Position is both coordinates or neither.
+ */
+export const POSITION_FIELDS = {
+  A: ["latA", "lonA"],
+  B: ["latB", "lonB"],
+} as const satisfies Record<"A" | "B", readonly [FieldId, FieldId]>;
+
+/** Which anchor a coordinate field belongs to, or `null` for any other field. */
+function positionEnd(id: PositionFieldId): "A" | "B";
+function positionEnd(id: FieldId): "A" | "B" | null;
+function positionEnd(id: FieldId): "A" | "B" | null {
+  if ((POSITION_FIELDS.A as readonly FieldId[]).includes(id)) return "A";
+  return (POSITION_FIELDS.B as readonly FieldId[]).includes(id) ? "B" : null;
+}
+
+/** The four coordinate fields, whose blank is « inconnue ». */
+export type PositionFieldId = (typeof POSITION_FIELDS)[keyof typeof POSITION_FIELDS][number];
+
+export function isPositionField(id: FieldId): id is PositionFieldId {
+  return positionEnd(id) !== null;
+}
+
 /** The fields whose blank is state: § 9's textile blanks and the three Overrides. */
 type NullableFieldId = OverrideFieldId | "MBL" | "muTextile" | "dTextile" | "k";
 
@@ -138,7 +170,11 @@ type LensScope<K extends NumericFieldId> = K extends TightnessFieldId
 type FieldAccess = {
   readonly [K in NumericFieldId]: K extends OverrideFieldId
     ? OverrideLens<LensScope<K>>
-    : FieldLens<LensScope<K>, K extends NullableFieldId ? number | null : number>;
+    : K extends PositionFieldId
+      ? // Read-only: a Position is written as a pair, by {@link applyPosition} alone, so a
+        // coordinate has no second way in.
+        Pick<FieldLens<ScenarioDraft, number | null>, "read">
+      : FieldLens<LensScope<K>, K extends NullableFieldId ? number | null : number>;
 };
 
 /**
@@ -266,7 +302,18 @@ export const FIELD_ACCESS: FieldAccess = {
     read: ({ wind }) => wind.directionDeg,
     write: (s, directionDeg) => ({ ...s, wind: { ...s.wind, directionDeg } }),
   },
+  latA: coordinateRead("A", "lat"),
+  lonA: coordinateRead("A", "lon"),
+  latB: coordinateRead("B", "lat"),
+  lonB: coordinateRead("B", "lon"),
 };
+
+/** One coordinate's read: blank where the Position is unknown. */
+function coordinateRead(end: "A" | "B", key: "lat" | "lon") {
+  return {
+    read: ({ positions }: ScenarioDraft) => positions[end]?.[key] ?? null,
+  };
+}
 
 /**
  * A steel Override. The three derived rows are editable at all times on a steel line — typing
@@ -336,13 +383,87 @@ export function heldValue(
  */
 export function applyField(
   scenario: ScenarioDraft,
-  id: NumericFieldId,
+  id: Exclude<NumericFieldId, PositionFieldId>,
   value: number,
   trace: Trace | null,
 ): ScenarioDraft {
   const written = FIELD_ACCESS[id].write(scenario, value);
   const xD = clampX(written.rider.xD, spanOfGeometry(written.geometry, trace));
   return xD === written.rider.xD ? written : { ...written, rider: { ...written.rider, xD } };
+}
+
+/**
+ * An anchor's two coordinate texts, committed as one Position. Both readable is the Position; a
+ * blank in either is « inconnue » — the Position is unset rather than kept beside a field that
+ * shows nothing, so the screen, the link and the Session never disagree. Text tier one refuses
+ * leaves the Scenario as it was, as every refused text does: it keeps its evidence on screen and
+ * the last good value in state.
+ *
+ * @returns the argument itself when nothing changed.
+ */
+export function applyPosition(
+  scenario: ScenarioDraft,
+  end: "A" | "B",
+  text: Pick<RailValues, PositionFieldId>,
+  context: FieldContext,
+): ScenarioDraft {
+  const [latField, lonField] = POSITION_FIELDS[end];
+  const [latText, lonText] = [text[latField], text[lonField]];
+  if (latText.trim() === "" || lonText.trim() === "") {
+    if (scenario.positions[end] === null) return scenario;
+    return { ...scenario, positions: { ...scenario.positions, [end]: null } };
+  }
+  if (checkField(latField, latText, context) !== null) return scenario;
+  if (checkField(lonField, lonText, context) !== null) return scenario;
+  const lat = commitField(latField, latText, context);
+  const lon = commitField(lonField, lonText, context);
+  if (lat === null || lon === null) return scenario;
+  return { ...scenario, positions: { ...scenario.positions, [end]: { lat, lon } } };
+}
+
+/**
+ * One coordinate field's commit: {@link applyPosition} on the pair with `raw` in place, and the
+ * coordinate that **entered state** — `null` when this write did not land (a blank, or a pair the
+ * Scenario would not take), so the field is never snapped to a value state does not hold.
+ */
+export function commitPosition(
+  scenario: ScenarioDraft,
+  id: PositionFieldId,
+  text: Pick<RailValues, PositionFieldId>,
+  context: FieldContext,
+): { readonly scenario: ScenarioDraft; readonly value: number | null } {
+  const end = positionEnd(id);
+  const applied = applyPosition(scenario, end, text, context);
+  const position = applied.positions[end];
+  if (applied === scenario || position === null) return { scenario: applied, value: null };
+  const [latField] = POSITION_FIELDS[end];
+  return { scenario: applied, value: position[id === latField ? "lat" : "lon"] };
+}
+
+/**
+ * Whether `id` is the other coordinate of the anchor whose coordinate holds the caret. Its text is
+ * not the store's to rewrite mid-edit: backspacing one half unsets the Position, and the twin's
+ * digits are the user's, not a stale copy.
+ */
+export function isPositionTwin(id: FieldId, focused: FieldId | null): boolean {
+  if (focused === null) return false;
+  const end = positionEnd(focused);
+  return end !== null && id !== focused && positionEnd(id) === end;
+}
+
+/**
+ * What the Rail says under an anchor's coordinates while one is blank and the other is not — a
+ * property of the world, not an act: the Position is not the pair typed so far.
+ */
+export function positionPairNote(
+  text: Pick<RailValues, PositionFieldId>,
+  end: "A" | "B",
+): string | null {
+  const [latField, lonField] = POSITION_FIELDS[end];
+  const blanks = [text[latField], text[lonField]].filter((raw) => raw.trim() === "").length;
+  return blanks === 1
+    ? `${heading("position", "exact")} incomplète : ${label("latitude", "exact")} et ${label("longitude", "exact")} vont ensemble.`
+    : null;
 }
 
 /**

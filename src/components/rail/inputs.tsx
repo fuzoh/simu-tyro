@@ -37,7 +37,7 @@
 import type { ReactNode } from "react";
 
 import { Link, useNavigate } from "@tanstack/react-router";
-import { createContext, use, useEffect, useRef, useState } from "react";
+import { createContext, Fragment, use, useEffect, useRef, useState } from "react";
 
 import type { RailFormApi, RailFormState } from "@/components/app/use-rail-form.ts";
 import type { Deduced, DeducedSolve, ReadOutRow } from "@/lib/rail/deduced.ts";
@@ -83,7 +83,13 @@ import {
   TEXTILE_UNAVAILABLE_REASON,
   terminationOptions,
 } from "@/lib/rail/gates.ts";
-import { DEDUCED_HELP, FIELD_HELP, PRESET_HELP, TIGHTNESS_HELP } from "@/lib/rail/help.ts";
+import {
+  DEDUCED_HELP,
+  FIELD_HELP,
+  LV95_HELP,
+  PRESET_HELP,
+  TIGHTNESS_HELP,
+} from "@/lib/rail/help.ts";
 import {
   MATERIAL_PRESETS,
   PRESET_LABEL,
@@ -94,6 +100,7 @@ import { PROVENANCE_COPY, warningLadder } from "@/lib/rail/provenance.ts";
 import { MAESTRO_ROPE_ONLY, PASS_TO_PULLEY } from "@/lib/rail/tensioning.ts";
 import {
   applyField,
+  commitPosition,
   applyRopeClass,
   applyShippedTerminations,
   clearOverride,
@@ -101,6 +108,9 @@ import {
   FIELD_ACCESS,
   fieldContext,
   isGatedField,
+  POSITION_FIELDS,
+  isPositionField,
+  positionPairNote,
   spanLength,
   switchTightness,
   TERMINATION_FIELD,
@@ -108,9 +118,10 @@ import {
 import { clearSession } from "@/lib/session/session.ts";
 import { isFamilyAllowed, isRegimeAvailable, REGIMES, TERMINATIONS } from "@/lib/sim";
 import { parseFailureMessage, parseProfileCsv, readFailure } from "@/lib/terrain/csv.ts";
+import { formatLv95, inLv95Domain, lv95FromWgs84 } from "@/lib/terrain/lv95.ts";
 import { encodeP1 } from "@/lib/url/p1.ts";
 import { cn } from "@/lib/utils.ts";
-import { heading } from "@/lib/vocabulary/labels.ts";
+import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 import type { ClampEvent } from "./controls.tsx";
 
@@ -238,6 +249,12 @@ export function RailInputs({
    */
   function commit(id: NumericFieldId, raw: string, settled: boolean): number | null {
     if (checkField(id, raw, context) !== null) return null;
+    if (isPositionField(id)) {
+      // A Position is both coordinates or neither: this one's text commits with its pair's.
+      const committed = commitPosition(scenario, id, { ...text, [id]: raw }, context);
+      patch(committed.scenario);
+      return committed.value;
+    }
     // An optional field emptied is « absent »: the one blank that is written, not refused.
     if (isOptionalField(id) && raw.trim() === "") {
       patch(FIELD_ACCESS.dTextile.write(scenario, null));
@@ -762,6 +779,39 @@ export function RailInputs({
           <Group title={heading("wind", "exact")}>
             <NumericRow hint="km/h" id="windSpeed" />
             <NumericRow hint="°" id="windDirection" />
+          </Group>
+
+          {/* The Positions (#90): typed in WGS84, read in LV95. Nothing reads them yet. */}
+          <Group title={heading("position", "exact")}>
+            {(["A", "B"] as const).map((end) => {
+              const note = positionPairNote(text, end);
+              const position = scenario.positions[end];
+              return (
+                <Fragment key={end}>
+                  <NumericRow
+                    hint="°"
+                    id={POSITION_FIELDS[end][0]}
+                    warning={text[POSITION_FIELDS[end][0]].trim() === "" ? note : null}
+                  />
+                  <NumericRow
+                    hint="°"
+                    id={POSITION_FIELDS[end][1]}
+                    warning={text[POSITION_FIELDS[end][1]].trim() === "" ? note : null}
+                  />
+                  {position !== null && (
+                    <ReadOut
+                      help={LV95_HELP}
+                      label={`${label("lv95", "exact")} ${end} (${label("approximate", "exact")})`}
+                      value={
+                        inLv95Domain(position)
+                          ? formatLv95(lv95FromWgs84(position))
+                          : "hors du domaine suisse"
+                      }
+                    />
+                  )}
+                </Fragment>
+              );
+            })}
           </Group>
         </div>
       </RailSection>

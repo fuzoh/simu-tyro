@@ -4,17 +4,23 @@ import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
+import { traverseInputs } from "@/lib/scenario/traverse.ts";
 
 import { deduceValues } from "./deduced.ts";
 import { commitField } from "./fields.ts";
 import {
   applyField,
+  applyPosition,
+  commitPosition,
   applyRopeClass,
   applyShippedTerminations,
   clearOverride,
   drivingField,
   FIELD_ACCESS,
   NUMERIC_FIELDS,
+  isPositionField,
+  isPositionTwin,
+  positionPairNote,
   railValues,
   sameGatedText,
   switchTightness,
@@ -246,7 +252,8 @@ describe("applyField — one committed field, written back", () => {
         overrides: { MBF: 90740, EA: 6.9e6, mu: 0.5465 },
       };
     });
-    for (const id of NUMERIC_FIELDS) {
+    // The four coordinates are written as pairs, by `applyPosition`, which is tested below.
+    for (const id of NUMERIC_FIELDS.filter((field) => !isPositionField(field))) {
       const base = id === "L" || id === "h" ? steel : complete;
       const host = id.endsWith("Override") || id === "d" ? steel : base;
       const after = applyField(host, id, 7, null);
@@ -285,6 +292,10 @@ describe("FIELD_ACCESS — one lens per numeric field", () => {
       "xD",
       "windSpeed",
       "windDirection",
+      "latA",
+      "lonA",
+      "latB",
+      "lonB",
     ]);
   });
 
@@ -562,5 +573,104 @@ describe("applyShippedTerminations — the termination Fix Action's effect", () 
       A: { id: "oeil-cousu-epissure", eta: 0.9 },
       B: { id: "oeil-cousu-epissure", eta: 0.9 },
     });
+  });
+});
+
+describe("Positions (#90) — an anchor's two coordinates, committed as one", () => {
+  const A = { lat: 46.843556, lon: 6.525035 };
+  const blank = { latA: "", lonA: "", latB: "", lonB: "" };
+
+  test("both texts readable make the Position, at six decimals", () => {
+    const after = applyPosition(
+      scenario(),
+      "A",
+      { ...blank, latA: "46,8435564", lonA: "6.525035" },
+      {},
+    );
+    expect(after.positions).toEqual({ A, B: null });
+  });
+
+  test("a text refused by tier one leaves the Scenario as it was", () => {
+    const before = scenario();
+    expect(applyPosition(before, "A", { ...blank, latA: "46,84", lonA: "6,x" }, {})).toBe(before);
+    const placed = { ...before, positions: { A, B: null } };
+    expect(applyPosition(placed, "A", { ...blank, latA: "46,84", lonA: "6,x" }, {})).toBe(placed);
+  });
+
+  test("a blank half is « inconnue »: it unsets the Position it would have left half-shown", () => {
+    const before = scenario();
+    expect(applyPosition(before, "A", { ...blank, latA: "46,84" }, {})).toBe(before);
+    const placed = { ...before, positions: { A, B: null } };
+    expect(applyPosition(placed, "A", { ...blank, latA: "46,84" }, {}).positions.A).toBeNull();
+    expect(applyPosition(placed, "A", { ...blank, lonA: "6,52" }, {}).positions.A).toBeNull();
+  });
+
+  test("a coordinate field commits what entered state, and nothing when the write did not land", () => {
+    const placed = { ...scenario(), positions: { A, B: null } };
+    const landed = commitPosition(placed, "latA", { ...blank, latA: "47,1", lonA: "6,52" }, {});
+    expect(landed.value).toBe(47.1);
+    expect(landed.scenario.positions.A).toEqual({ lat: 47.1, lon: 6.52 });
+    // The pair's other half is blank: the Position is gone, and the field is not snapped to a value.
+    const halfBlank = commitPosition(placed, "latA", { ...blank, latA: "47,1" }, {});
+    expect(halfBlank.value).toBeNull();
+    expect(halfBlank.scenario.positions.A).toBeNull();
+    // The pair's other half is unreadable: state keeps the old Position, and says nothing is new.
+    const refused = commitPosition(placed, "latA", { ...blank, latA: "47,1", lonA: "6,x" }, {});
+    expect(refused.value).toBeNull();
+    expect(refused.scenario).toBe(placed);
+  });
+
+  test("both blank unsets the Position, and the other anchor is untouched", () => {
+    const placed = { ...scenario(), positions: { A, B: { lat: 46.846166, lon: 6.520783 } } };
+    const after = applyPosition(placed, "A", blank, {});
+    expect(after.positions).toEqual({ A: null, B: { lat: 46.846166, lon: 6.520783 } });
+  });
+
+  test("the fields read the Position back, blank where it is unknown", () => {
+    const placed = { ...scenario(), positions: { A, B: null } };
+    expect(railValues(placed)).toMatchObject({
+      latA: "46,843556",
+      lonA: "6,525035",
+      latB: "",
+      lonB: "",
+    });
+  });
+
+  test("a Position changes nothing the Sweep reads, so it cannot re-run it", () => {
+    const before = scenario();
+    const placed = applyPosition(before, "A", { ...blank, latA: "46,84", lonA: "6,52" }, {});
+    expect(placed.positions.A).not.toBeNull();
+    const [kept, moved] = [traverseInputs(before), traverseInputs(placed)];
+    expect(moved).toEqual(kept);
+    // The memo keys are compared by identity, not by value.
+    for (const key of Object.keys(kept) as (keyof typeof kept)[]) {
+      expect(Object.is(moved[key], kept[key])).toBe(true);
+    }
+  });
+
+  test("a coordinate emptied keeps its twin's text out of the sync's reach", () => {
+    const placed = { ...scenario(), positions: { A, B: null } };
+    const text = { ...blank, latA: "", lonA: "6,525035" };
+    const committed = commitPosition(placed, "latA", text, {});
+    expect(committed.scenario.positions.A).toBeNull();
+    // The Position now reads blank in both fields; the focused one's twin must not take that.
+    expect(railValues(committed.scenario)).toMatchObject({ latA: "", lonA: "" });
+    expect(isPositionTwin("lonA", "latA")).toBe(true);
+    expect(isPositionTwin("latA", "lonA")).toBe(true);
+    expect(isPositionTwin("latA", "latA")).toBe(false);
+    expect(isPositionTwin("lonB", "latA")).toBe(false);
+    expect(isPositionTwin("lonA", null)).toBe(false);
+    expect(isPositionTwin("lonA", "L")).toBe(false);
+    expect(positionPairNote(text, "A")).not.toBeNull();
+  });
+
+  test("a lone coordinate is named, as a property of the pair", () => {
+    expect(positionPairNote({ ...blank, latA: "46,84" }, "A")).toBe(
+      "Position incomplète : latitude et longitude vont ensemble.",
+    );
+    expect(positionPairNote({ ...blank, latA: "46,84", lonA: "6,5" }, "A")).toBeNull();
+    expect(positionPairNote(blank, "A")).toBeNull();
+    // Another anchor's blanks say nothing about this one.
+    expect(positionPairNote({ ...blank, latB: "46,84" }, "A")).toBeNull();
   });
 });

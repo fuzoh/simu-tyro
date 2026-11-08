@@ -8,6 +8,7 @@ import {
   DEDUCED_HELP,
   FIELD_HELP,
   GRID_HELP,
+  LV95_HELP,
   RESULT_HELP,
   TIGHTNESS_HELP,
 } from "./help.ts";
@@ -20,6 +21,7 @@ function copyByKey(): Record<string, string> {
     Object.entries(rows).map(([key, text]): [string, string] => [`${table}.${key}`, String(text)]),
   );
   entries.push(["TIGHTNESS_HELP", TIGHTNESS_HELP]);
+  entries.push(["LV95_HELP", LV95_HELP]);
   NOT_COMPUTED_LINES.forEach((line, index) => entries.push([`NOT_COMPUTED_LINES[${index}]`, line]));
   for (const field of Object.values(FIELDS)) {
     entries.push([`FIELDS.${field.id}.label`, field.label]);

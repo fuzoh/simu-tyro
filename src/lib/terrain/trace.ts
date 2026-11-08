@@ -23,7 +23,14 @@
  *   dependency-free; it imports the engine's `Terrain` **type** and nothing else.
  */
 
+import type { Position } from "@/lib/scenario/types.ts";
 import type { Terrain } from "@/lib/sim";
+
+/**
+ * The coordinates of a Trace's two end samples (#90): where anchor A and anchor B stand when the
+ * file said so. Held with the Trace so a retained one keeps its Positions.
+ */
+export type TraceEnds = { readonly A: Position; readonly B: Position };
 
 /**
  * § 4's Session-state Trace, verbatim. Held in **file coordinates** and never mutated.
@@ -42,6 +49,8 @@ export type Trace = {
   readonly dev: number | null;
   /** `null` ⇒ « tracé reçu par lien » — ticket 09's payload drops the filename. */
   readonly fileName: string | null;
+  /** The first and last sample's coordinates. **Absent** when the file carried none (#90). */
+  readonly ends?: TraceEnds;
 };
 
 /** § 4's derived read-outs: `L` and `h`, measured anchor top to anchor top. */
