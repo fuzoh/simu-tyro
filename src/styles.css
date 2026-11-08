@@ -348,7 +348,9 @@
   .doc code,
   .doc .doc-path {
     font-family: var(--font-mono);
-    font-size: 0.875em;
+    /* 1em, not the usual 0,875: Iosevka Charon Mono shares Iosevka Charon's metrics, so inline
+       code sits at the height of the prose around it without a size step. */
+    font-size: 1em;
     background: var(--muted);
     padding: 0 calc(var(--spacing) * 1);
   }
