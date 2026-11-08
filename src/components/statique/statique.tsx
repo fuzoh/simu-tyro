@@ -73,7 +73,7 @@ function Live({ page }: { page: string }) {
       }
       sectionRef={ref}
       strip={<LinkStripNotice strip={strip} />}
-      topView={<TopMap />}
+      topView={<TopMap frame={frame} solved={solved} />}
     />
   );
 }

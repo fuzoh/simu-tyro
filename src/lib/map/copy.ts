@@ -1,7 +1,7 @@
 /**
  * The vue de dessus's words (#93), in the terrain register: the Fonds de carte, the Couche pentes,
- * the two placing controls and the lines under the map. One table, read by the map and by the
- * label tables of the Pages that show it.
+ * the two placing controls, the switch to the Vue 3D (#95) and the lines under the map. One table,
+ * read by the map and by the label tables of the Pages that show it.
  */
 
 import type { Positions, Wind } from "@/lib/scenario/types.ts";
@@ -12,10 +12,12 @@ import { label } from "@/lib/vocabulary/labels.ts";
 
 import type { Fond } from "./display.ts";
 import type { Anchor } from "./gesture.ts";
+import type { Vue3dBlock } from "./vue-3d.ts";
 import type { RoseReference } from "./wind-rose.ts";
 
 import { FONDS } from "./display.ts";
 import { fondAttribution } from "./style.ts";
+import { drapedAttribution } from "./vue-3d.ts";
 import { windAzimuth } from "./wind-rose.ts";
 
 export const FOND_LABEL = {
@@ -39,7 +41,21 @@ export const MAP_COPY = {
   roseCalm: "Pas de vent. Glissez la poignée de la rose pour en régler la direction et la force.",
   /** Where the line is drawn level the reading says why it gives no azimuth. */
   roseNorthUnknown: "nord inconnu",
+  /** The switch that puts the Vue 3D in the vue de dessus's place (#95). */
+  view3d: "3D",
+  /** The Vue 3D's accessible name. */
+  vue3dTitle: `Vue 3D de la ${label("anchorLine", "terrain")}`,
+  vue3dLoading: "Chargement de la Vue 3D…",
+  /** No network, no WebGL: the vue de dessus is back, and this says why. */
+  vue3dUnavailable: "Vue 3D indisponible",
 } as const;
+
+/** Why the switch to the Vue 3D is off, said under the map. */
+export const VUE_3D_BLOCKED = {
+  positions: "Vue 3D : placez A et B sur la carte.",
+  profil:
+    "Vue 3D : il faut le profil entre A et B — replacez A ou B sur la carte, ou importez un profil.",
+} as const satisfies Record<Vue3dBlock, string>;
 
 /** The eight points of the compass, with the preposition they take. */
 const COMPASS = [
@@ -108,8 +124,9 @@ export function mapLabelTable(): readonly string[] {
   return [
     ...Object.values(FOND_LABEL),
     ...Object.values(MAP_COPY),
+    ...Object.values(VUE_3D_BLOCKED),
     ...[0, 90, 180, 270, 45, 108].map(describeRelative),
-    ...new Set(FONDS.map(fondAttribution)),
+    ...new Set([...FONDS.map(fondAttribution), ...FONDS.map(drapedAttribution)]),
     ...(["A", "B"] as const).flatMap((anchor) => [
       clickHint(anchor, { A: null, B: null }) ?? "",
       clickHint(anchor, { A: { lat: 0, lon: 0 }, B: { lat: 0, lon: 0 } }) ?? "",

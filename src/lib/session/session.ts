@@ -57,7 +57,7 @@ import type { EndTermination, ForceUnit, Scenario, TextileDraft } from "@/lib/sc
 import type { MaterialSpec, RegimeId, SteelSpec, TerminationId } from "@/lib/sim";
 import type { Trace, TraceEnds, TraceOrigin } from "@/lib/terrain/trace.ts";
 
-import { DEFAULT_MAP_DISPLAY, FONDS } from "@/lib/map/display.ts";
+import { DEFAULT_MAP_DISPLAY, FONDS, MAP_VIEWS } from "@/lib/map/display.ts";
 import { FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 import { REGIMES, TERMINATIONS } from "@/lib/sim";
 import { P1Error, validateP1Structure } from "@/lib/url/p1.ts";
@@ -156,7 +156,7 @@ export type Session = {
   /** § 5's two toggles. The other display preferences — `u`, the active tightness mode — are the
    * Scenario's own fields, so they persist with it rather than beside it. */
   readonly layers: LayerToggles;
-  /** The vue de dessus's Fond de carte and Couche pentes (#93) — never in a link. */
+  /** The vue de dessus's Fond de carte and Couche pentes (#93), 2D or 3D (#95) — never in a link. */
   readonly map: MapDisplay;
 };
 
@@ -396,10 +396,16 @@ const STORED_SESSION: v.GenericSchema<unknown, StoredSession> = v.object({
     riderTip: v.optional(v.boolean(), DEFAULT_LAYERS.riderTip),
     trajectory: v.optional(v.boolean(), DEFAULT_LAYERS.trajectory),
   }),
-  // Added with #93, optional with the carte claire for the same reason as the later layers.
-  map: v.optional(v.object({ fond: v.picklist(FONDS), pentes: v.boolean() }), () => ({
-    ...DEFAULT_MAP_DISPLAY,
-  })),
+  // Added with #93, optional with the carte claire for the same reason as the later layers; its
+  // `view` came with #95, optional with the vue de dessus for the same reason again.
+  map: v.optional(
+    v.object({
+      fond: v.picklist(FONDS),
+      pentes: v.boolean(),
+      view: v.optional(v.picklist(MAP_VIEWS), DEFAULT_MAP_DISPLAY.view),
+    }),
+    () => ({ ...DEFAULT_MAP_DISPLAY }),
+  ),
 });
 
 /**

@@ -17,6 +17,10 @@
  *   exactly where they are; the line is inside every style for the same reason.
  * - **Every network call goes through one `fetch`**, the platform's own, passed to the two pure
  *   loaders — the profil geo.admin and the carte claire's style.
+ * - **The Vue 3D is behind one door** (#95): the « 3D » switch stands it in the map's place, and its
+ *   renderer is fetched through `./load-vue-3d.ts` the first time it is chosen — never imported
+ *   here. Whatever stops it (no network, no WebGL) brings the vue de dessus back with « Vue 3D
+ *   indisponible »; without the two Positions or a profil the switch is off and says why.
  */
 
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -25,11 +29,13 @@ import type { RefObject } from "react";
 
 import { Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl } from "maplibre-gl";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import type { SceneBase, SceneFrame } from "@/lib/chart/scene.ts";
 import type { Fond, MapDisplay } from "@/lib/map/display.ts";
 import type { Anchor, MapEvent, MapGesture } from "@/lib/map/gesture.ts";
 import type { FondHealth, MapStyle } from "@/lib/map/style.ts";
+import type { Vue3dBlock, Vue3dScene } from "@/lib/map/vue-3d.ts";
 import type { Position, Positions } from "@/lib/scenario/types.ts";
 import type { Fetch } from "@/lib/terrain/geoadmin.ts";
 
@@ -39,7 +45,15 @@ import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.tsx";
 import { Toggle } from "@/components/ui/toggle.tsx";
-import { anchorReading, clickHint, FOND_LABEL, MAP_COPY, windReading } from "@/lib/map/copy.ts";
+import { placeRider } from "@/lib/chart/scene.ts";
+import {
+  anchorReading,
+  clickHint,
+  FOND_LABEL,
+  MAP_COPY,
+  VUE_3D_BLOCKED,
+  windReading,
+} from "@/lib/map/copy.ts";
 import { FONDS } from "@/lib/map/display.ts";
 import { clickTarget, drawnPositions, IDLE, stepGesture } from "@/lib/map/gesture.ts";
 import {
@@ -53,9 +67,13 @@ import {
   mapStyle,
   SWISSTOPO_COVERAGE,
 } from "@/lib/map/style.ts";
+import { drapedAttribution, vue3dPlacement, vue3dScene } from "@/lib/map/vue-3d.ts";
 import { LEVEL_REFERENCE, roseReference } from "@/lib/map/wind-rose.ts";
 import { geoadminNotice, loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
 
+import type { Vue3d } from "./vue-3d-renderer.ts";
+
+import { loadVue3d } from "./load-vue-3d.ts";
 import { WindRose } from "./wind-rose.tsx";
 
 // MapLibre cannot find its worker inside a bundle; Vite hands over the file's URL.
@@ -67,7 +85,11 @@ const browserFetch: Fetch = (url) => fetch(url);
 /** Wide enough to see both anchors and what lies around them, never closer than a street. */
 const FIT = { padding: 48, maxZoom: 16 } as const;
 
-export function TopMap() {
+/**
+ * @param frame the coupe's input half and `solved` its solved half, as the Page's gates leave them:
+ *   the Vue 3D draws the same line the coupe does, or none.
+ */
+export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: SceneBase | null }) {
   const { scenario, map: display } = useAppState();
   const dispatch = useAppDispatch();
   const { positions } = scenario;
@@ -76,6 +98,14 @@ export function TopMap() {
   const target = clickTarget(gesture, positions);
   const [failed, setFailed] = useState(false);
   const [health, setHealth] = useState<FondHealth>(() => freshHealth(display.fond));
+
+  const placement = vue3dPlacement(positions, frame);
+  // The Vue 3D fell over this visit: the vue de dessus is back until the switch is pressed again.
+  const [lost3d, setLost3d] = useState(false);
+  const shows3d = display.view === "3d" && placement.ok && !lost3d;
+  const lose3d = useCallback(() => setLost3d(true), [setLost3d]);
+  const renderer = useVue3dRenderer(shows3d, lose3d);
+  const scene3d = useVue3dScene(shows3d, frame, solved);
 
   const plain = failed ? plainDrawing(drawn) : null;
   // The plain drawing orients itself by the LV95 domain, so the rose reads the line as it is drawn.
@@ -93,92 +123,244 @@ export function TopMap() {
               {anchorReading(anchor, drawn)}
             </span>
           ))}
-          <span>{windReading(scenario.wind, reference)}</span>
-          <span>
-            {gesture.kind === "loading"
-              ? MAP_COPY.loading
-              : gesture.kind === "idle" && gesture.notice !== null
-                ? geoadminNotice(gesture.notice)
-                : clickHint(target, positions)}
-          </span>
-          {unavailable && (
-            <span>{[MAP_COPY.unavailable, plain?.unoriented].filter(Boolean).join(" · ")}</span>
+          {!shows3d && (
+            <>
+              <span>{windReading(scenario.wind, reference)}</span>
+              <span>
+                {gesture.kind === "loading"
+                  ? MAP_COPY.loading
+                  : gesture.kind === "idle" && gesture.notice !== null
+                    ? geoadminNotice(gesture.notice)
+                    : clickHint(target, positions)}
+              </span>
+              {unavailable && (
+                <span>{[MAP_COPY.unavailable, plain?.unoriented].filter(Boolean).join(" · ")}</span>
+              )}
+            </>
+          )}
+          {placement.ok ? (
+            lost3d && <span>{MAP_COPY.vue3dUnavailable}</span>
+          ) : (
+            <span>{VUE_3D_BLOCKED[placement.block]}</span>
           )}
         </>
       }
       controls={
         <MapControls
+          blocked={placement.ok ? null : placement.block}
           display={display}
           onDisplay={(next) => dispatch({ type: "carte/affichée", map: next })}
+          // Pressing the switch again tries the Vue 3D again, whatever stopped it last time.
+          onView={(view) => {
+            setLost3d(false);
+            dispatch({ type: "carte/affichée", map: { ...display, view } });
+          }}
+          shows3d={shows3d}
         />
       }
       figure={
-        <>
-          {plain === null ? (
-            <>
-              <MapCanvas
+        shows3d ? (
+          <>
+            {renderer === null || scene3d === null ? (
+              <Vue3dLoading />
+            ) : (
+              <Vue3dHost
                 display={display}
-                drawn={drawn}
-                gesture={gesture}
-                onFailed={() => setFailed(true)}
-                onHealth={setHealth}
-                rose={rose}
-                send={send}
-                target={target}
+                onUnavailable={lose3d}
+                renderer={renderer}
+                scene={scene3d}
               />
-              <div className="pointer-events-none absolute top-2 left-2 flex gap-1">
-                {(["A", "B"] as const).map((anchor) => (
-                  <Toggle
-                    className="bg-background pointer-events-auto"
-                    disabled={gesture.kind !== "idle"}
-                    key={anchor}
-                    onPressedChange={() => send({ type: "arm", anchor })}
-                    pressed={gesture.kind === "idle" && gesture.armed === anchor}
-                    size="sm"
-                    variant="outline"
-                  >
-                    {anchor === "A" ? MAP_COPY.placeA : MAP_COPY.placeB}
-                  </Toggle>
-                ))}
-              </div>
-            </>
-          ) : (
-            plain.figure
-          )}
-          <WindRose
-            hostRef={rose}
-            onWind={(next) => dispatch({ type: "scénario/modifié", patch: { wind: next } })}
-            reference={reference}
-            wind={scenario.wind}
-          />
-          <Attribution fond={display.fond} />
-        </>
+            )}
+            <Attribution text={drapedAttribution(display.fond)} />
+          </>
+        ) : (
+          <>
+            {plain === null ? (
+              <>
+                <MapCanvas
+                  display={display}
+                  drawn={drawn}
+                  gesture={gesture}
+                  onFailed={() => setFailed(true)}
+                  onHealth={setHealth}
+                  rose={rose}
+                  send={send}
+                  target={target}
+                />
+                <div className="pointer-events-none absolute top-2 left-2 flex gap-1">
+                  {(["A", "B"] as const).map((anchor) => (
+                    <Toggle
+                      className="bg-background pointer-events-auto"
+                      disabled={gesture.kind !== "idle"}
+                      key={anchor}
+                      onPressedChange={() => send({ type: "arm", anchor })}
+                      pressed={gesture.kind === "idle" && gesture.armed === anchor}
+                      size="sm"
+                      variant="outline"
+                    >
+                      {anchor === "A" ? MAP_COPY.placeA : MAP_COPY.placeB}
+                    </Toggle>
+                  ))}
+                </div>
+              </>
+            ) : (
+              plain.figure
+            )}
+            <WindRose
+              hostRef={rose}
+              onWind={(next) => dispatch({ type: "scénario/modifié", patch: { wind: next } })}
+              reference={reference}
+              wind={scenario.wind}
+            />
+            <Attribution text={fondAttribution(display.fond)} />
+          </>
+        )
       }
     />
   );
 }
 
 /** swisstopo's attribution, always on the map — a condition of its terms, network or not. */
-function Attribution({ fond }: { fond: Fond }) {
+function Attribution({ text }: { text: string }) {
   return (
     <span className="bg-background/80 text-foreground pointer-events-none absolute right-0 bottom-0 px-1 text-xs">
-      {fondAttribution(fond)}
+      {text}
     </span>
   );
 }
 
+type Vue3dRenderer = Awaited<ReturnType<typeof loadVue3d>>;
+
+/**
+ * The Vue 3D's renderer, fetched the first time it is wanted and kept. A fetch that fails — the
+ * chunk cannot arrive offline — is one more way the Vue 3D falls over.
+ */
+function useVue3dRenderer(wanted: boolean, onFailed: () => void): Vue3dRenderer | null {
+  const [loaded, setLoaded] = useState<Vue3dRenderer | null>(null);
+  useEffect(() => {
+    if (!wanted || loaded !== null) return;
+    let current = true;
+    loadVue3d().then(
+      (renderer) => {
+        if (current) setLoaded(renderer);
+      },
+      () => {
+        if (current) onFailed();
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [wanted, loaded, onFailed]);
+  return loaded;
+}
+
+function Vue3dLoading() {
+  return (
+    <span className="text-muted-foreground absolute inset-0 grid place-items-center text-xs">
+      {MAP_COPY.vue3dLoading}
+    </span>
+  );
+}
+
+/**
+ * The Vue 3D in the frame: opened once the renderer is here, handed every new scene and display,
+ * closed when the vue de dessus comes back.
+ */
+function Vue3dHost({
+  renderer,
+  scene,
+  display,
+  onUnavailable,
+}: {
+  renderer: Vue3dRenderer;
+  scene: Vue3dScene;
+  display: MapDisplay;
+  onUnavailable: () => void;
+}) {
+  const container = useRef<HTMLDivElement>(null);
+  const [view, setView] = useState<Vue3d | null>(null);
+  const fallen = useRef(onUnavailable);
+  useLayoutEffect(() => {
+    fallen.current = onUnavailable;
+  }, [onUnavailable]);
+
+  useEffect(() => {
+    const node = container.current;
+    if (node === null) return;
+    let live = true;
+    let opened: Vue3d | null = null;
+    const fail = () => {
+      if (!live) return;
+      live = false;
+      fallen.current();
+    };
+    renderer.openVue3d(node, fail).then((open) => {
+      if (live) {
+        opened = open;
+        setView(open);
+      } else open.destroy();
+    }, fail);
+    return () => {
+      live = false;
+      opened?.destroy();
+      setView(null);
+    };
+  }, [renderer]);
+
+  useEffect(() => {
+    view?.show(scene, display);
+  }, [view, scene, display]);
+
+  return (
+    <div className="absolute inset-0">
+      <div
+        aria-label={MAP_COPY.vue3dTitle}
+        className="h-full w-full"
+        ref={container}
+        role="region"
+      />
+      {view === null && <Vue3dLoading />}
+    </div>
+  );
+}
+
+/**
+ * What the Vue 3D draws, while it is shown: the coupe's line placed on the two Positions, the
+ * passager where the Scenario puts it.
+ */
+function useVue3dScene(shown: boolean, frame: SceneFrame | null, solved: SceneBase | null) {
+  const { positions, rider } = useAppState().scenario;
+  const { xD } = rider;
+  return useMemo(() => {
+    if (!shown) return null;
+    const at = vue3dPlacement(positions, frame);
+    if (!at.ok) return null;
+    const placed = solved === null ? null : placeRider(solved, xD);
+    return vue3dScene({ placement: at.placement, solved, rider: placed });
+  }, [shown, positions, frame, solved, xD]);
+}
+
 function MapControls({
   display,
+  blocked,
+  shows3d,
   onDisplay,
+  onView,
 }: {
   display: MapDisplay;
+  /** Why the Vue 3D cannot stand, `null` when it can. */
+  blocked: Vue3dBlock | null;
+  shows3d: boolean;
   onDisplay: (display: MapDisplay) => void;
+  onView: (view: MapDisplay["view"]) => void;
 }) {
   return (
     <>
       <NativeSelect
         aria-label={MAP_COPY.fond}
-        className="max-w-48"
+        // The one control that gives way at 390 px: a Fond name cut short still reads.
+        className="max-w-48 min-w-0"
         onChange={(event) => onDisplay({ ...display, fond: event.target.value as Fond })}
         size="sm"
         title={MAP_COPY.fond}
@@ -190,13 +372,26 @@ function MapControls({
           </NativeSelectOption>
         ))}
       </NativeSelect>
-      <Label className="gap-1">
+      <Label className="shrink-0 gap-1 whitespace-nowrap">
         <Checkbox
           checked={display.pentes}
           onCheckedChange={(pentes) => onDisplay({ ...display, pentes })}
         />
         {MAP_COPY.pentes}
       </Label>
+      {/* A disabled button takes no hover, so the reason's title is on its wrapper. */}
+      <span className="shrink-0" title={blocked === null ? undefined : VUE_3D_BLOCKED[blocked]}>
+        <Toggle
+          aria-label={MAP_COPY.vue3dTitle}
+          disabled={blocked !== null}
+          onPressedChange={(pressed) => onView(pressed ? "3d" : "2d")}
+          pressed={shows3d}
+          size="sm"
+          variant="outline"
+        >
+          {MAP_COPY.view3d}
+        </Toggle>
+      </span>
     </>
   );
 }

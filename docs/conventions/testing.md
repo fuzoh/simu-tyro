@@ -13,6 +13,10 @@ The `test` block lives in `vite.config.ts`.
 - The two seams that once wanted a DOM are **parameters** instead: the dropped-keys reporter takes the
   **raw query string** as an argument, and `readSession` / `writeSession` take the **storage object**.
   Pure functions test fine in `node`, and they are the better seam.
+- **One test builds the app**: `src/components/map/load-vue-3d.test.ts` runs Vite's production
+  client build in memory (`build.write: false`) and reads its chunks — the Vue 3D's CesiumJS behind
+  a dynamic import, the size of what `/` downloads (#95). A chunk graph is the only place that
+  contract is observable, and it is still `node`, no DOM.
 
 ## What deserves a test
 

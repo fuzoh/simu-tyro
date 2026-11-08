@@ -114,7 +114,7 @@ function fullSession(): Session {
     trace: TRACE,
     retainedCsv: null,
     layers: { unloadedLine: true, chordAB: false, riderTip: false, trajectory: true },
-    map: { fond: "carte-nationale", pentes: true },
+    map: { fond: "carte-nationale", pentes: true, view: "3d" },
   };
 }
 
@@ -833,10 +833,10 @@ describe("the Positions in the Session (#90)", () => {
   });
 });
 
-describe("the vue de dessus's Fond de carte and Couche pentes in the Session (#93)", () => {
-  test("the orthophoto under the Couche pentes survives a write and a read", () => {
+describe("the vue de dessus's Fond de carte and Couche pentes (#93), 2D or 3D (#95), in the Session", () => {
+  test("the orthophoto under the Couche pentes, in 3D, survives a write and a read", () => {
     const storage = memoryStorage();
-    const map = { fond: "orthophoto", pentes: true } as const;
+    const map = { fond: "orthophoto", pentes: true, view: "3d" } as const;
     writeSession(storage, { ...bareSession(), map });
     expect(readSession(storage)?.map).toEqual(map);
   });
@@ -848,7 +848,23 @@ describe("the vue de dessus's Fond de carte and Couche pentes in the Session (#9
 
     const restored = readSession(storage);
     expect(restored?.trace).not.toBeNull();
-    expect(restored?.map).toEqual({ fond: "carte-claire", pentes: false });
+    expect(restored?.map).toEqual({ fond: "carte-claire", pentes: false, view: "2d" });
+  });
+
+  test("a Session stored before the Vue 3D keeps its Fond and reads the vue de dessus", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const before95 = { fond: "carte-nationale", pentes: true };
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, map: before95 }));
+    expect(readSession(storage)?.map).toEqual({ ...before95, view: "2d" });
+  });
+
+  test("a view the app does not know is not a Session — the blob is discarded whole", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const map = { fond: "carte-claire", pentes: false, view: "vr" };
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, map }));
+    expect(readSession(storage)).toBeNull();
   });
 
   test("a Fond the app does not know is not a Session — the blob is discarded whole", () => {

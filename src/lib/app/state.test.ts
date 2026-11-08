@@ -57,7 +57,7 @@ function storedSession(): Session {
     trace: null,
     retainedCsv: null,
     layers: { unloadedLine: true, chordAB: false, riderTip: false, trajectory: true },
-    map: { fond: "orthophoto", pentes: true },
+    map: { fond: "orthophoto", pentes: true, view: "3d" },
   };
 }
 
@@ -735,9 +735,9 @@ describe("#103's profil geo.admin — loaded between the two Positions, a third 
   });
 });
 
-describe("#93's Fond de carte and Couche pentes — the Session's, never the link's", () => {
+describe("#93's Fond de carte and Couche pentes, #95's Vue 3D — the Session's, never the link's", () => {
   const ORIGIN = "https://scoutech.example";
-  const CHOSEN = { fond: "orthophoto", pentes: true } as const;
+  const CHOSEN = { fond: "orthophoto", pentes: true, view: "3d" } as const;
 
   /** A page load with `query` on whatever the last one stored. */
   function reload(storage: Map<string, string>, state: AppState, query = ""): AppState {
@@ -755,8 +755,8 @@ describe("#93's Fond de carte and Couche pentes — the Session's, never the lin
   const opened = initialAppState({ query: "", session: null });
   const switched = appReducer(opened, { type: "carte/affichée", map: CHOSEN });
 
-  it("opens on the carte claire with no Couche pentes, and a switch moves no part of the Scenario", () => {
-    expect(opened.map).toEqual({ fond: "carte-claire", pentes: false });
+  it("opens on the carte claire with no Couche pentes, in 2D, and a switch moves no part of the Scenario", () => {
+    expect(opened.map).toEqual({ fond: "carte-claire", pentes: false, view: "2d" });
     expect(switched.map).toEqual(CHOSEN);
     expect(switched.scenario).toBe(opened.scenario);
   });
@@ -771,7 +771,7 @@ describe("#93's Fond de carte and Couche pentes — the Session's, never the lin
     const shared = link(switched);
     if (!shared.ok) throw new Error(shared.message);
     expect(shared).toEqual(link(opened));
-    expect(shared.href).not.toMatch(/orthophoto|pentes|carte/);
+    expect(shared.href).not.toMatch(/orthophoto|pentes|carte|3d/);
 
     const arrived = reload(new Map(), switched, shared.href.slice(shared.href.indexOf("?")));
     expect(arrived.map).toEqual(CHOSEN);

@@ -35,10 +35,13 @@ under `bun run dev` it happens per request. Same output either way — which is 
 - No service worker and no PWA manifest. Since the
   [network policy](https://github.com/fuzoh/simu-tyro/issues/13) every computation and every Page
   work with no network after load; the connected functions — the profil geo.admin
-  (`src/lib/terrain/geoadmin.ts`), the Fond de carte (`src/lib/map/style.ts`, #93) and, later, the
-  Vue 3D — call swisstopo with the native `fetch`, passed in as a parameter, and degrade to an
-  ambient message rather than an error. A link carries the profil's points, so it opens offline;
-  the Fond de carte and the Couche pentes are the Session's, never the link's.
+  (`src/lib/terrain/geoadmin.ts`) and the Fond de carte (`src/lib/map/style.ts`, #93) — call
+  swisstopo with the native `fetch`, passed in as a parameter, and degrade to an ambient message
+  rather than an error. The Vue 3D (#95) is the one connected function whose requests are not the
+  app's: CesiumJS fetches the relief and the draped tiles itself, so its failure — no network, no
+  WebGL, a render error — is caught at the renderer, which hands back the vue de dessus with
+  « Vue 3D indisponible ». A link carries the profil's points, so it opens offline; the Fond de
+  carte, the Couche pentes and the 2D/3D choice are the Session's, never the link's.
 - **The router's `basepath` is read, never written.** `src/router.tsx` sets
   `basepath: import.meta.env.BASE_URL`, which Vite fills from `base` in `vite.config.ts` — `/` in
   dev, `/simu-tyro/` on the GitHub Pages project site. Route code stays written against `/`; the
@@ -132,6 +135,7 @@ against a production build served the way GitHub Pages serves it:
 | `/dynamique/index.html` (build) | prerendered with its Skeleton: both rides' headings and tile labels, `aria-busy`, no value |
 | `/` on a blank Scenario → the vue de dessus (#93, dev, `maplibre-gl` 6.16.0, 2026-11-08) | the carte claire over Switzerland, « © swisstopo » bottom-right, « Cliquez sur la carte pour placer A. ». Two clicks near Les Petites Roches: A, then B and « profil geo.admin · 200 points », a Verdict (« Hors limites ») once a Marge exigée is chosen. Dragging B over ten pointer moves: B's reading follows, the line follows, « Placer A / B » greyed, **no geo.admin call**; at the release, three calls (two REFRAME, one `profile.json`) and the engine's new figures. Orthophoto, carte nationale and the Couche pentes each switch under the line and both anchors; a reload keeps carte nationale + pentes (Session `map`), and the URL holds no Fond key. Offline (`set offline on`): a Fond switch leaves the line on the plain background with « fond de carte indisponible »; a drag of B snaps back with « profil geo.admin indisponible », same figures, same Verdict. An imported CSV far from the view: the map moves to its two Positions; a drag then makes « profil geo.admin » active with « CSV en mémoire : … (non utilisé) ». A Latitude B typed on Avancé moves B on Statique. 390 px: the control row and the attribution fit, no horizontal overflow; the scroll stays put across a placement |
 | `/?lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783` → the rose des vents (#94, dev, 2026-11-08) | the rose centred on the line's midpoint, rings at 20 / 40 / 60 km/h, the handle at the centre, « Pas de vent. ». A pointer drag of the handle to 51 px right and 30 px up (8 moves): the map does not move (A and B keep their pixels), the fields read 40 km/h and 108° **before the release**, the reading under the map says « Vent de nord-est (60°), 40 km/h : par la droite à l'arrière, 108° par rapport à la ligne A → B. », and `ws=40&wd=108` is in the address bar after it. Typing 270 in « direction du vent » turns the handle to 222° on the screen (the trial line runs at 312°); typing 20 in the speed moves it to a third of the radius. 390 px: the rose fits the map, no horizontal overflow. `?L=150&h=-18&ws=30&wd=108` (no Positions): the line is drawn by the rose, level, A on the left, and the reading ends « (nord inconnu) ». `/dynamique`: no rose |
+| a line with Positions and a profil geo.admin → « 3D » (#95, dev and `BASE_PATH=/simu-tyro/` build in `vite preview`, `cesium` 1.147.0, 2026-11-08) | `/` loads **no** `vue-3d-renderer-*.js` and nothing under `cesium/`; the first press of « 3D » fetches `assets/vue-3d-renderer-*.{js,css}`, then `/simu-tyro/cesium/Workers/*` and `cesium/Assets/*` (all 200), `3d.geo.admin.ch/ch.swisstopo.terrain.3d/v1/layer.json` and its `.terrain` tiles, and the Fond draped over them: the carte claire as `ch.swisstopo.pixelkarte-grau`, the orthophoto with the Couche pentes at its 2D opacity and « © CNES, Spot Image, swisstopo, NPOC » under the view. The coupe stays. Each anchor stands on its Fil à plomb — a ground mark and a dashed vertical leaving the top of the view — from the closest zoom to the 20 km limit; two Brins porteurs are two lines. A reload keeps the Vue 3D (Session `map.view`), and the URL holds no view key. Manual geometry with Positions: the switch is greyed, « Vue 3D : il faut le profil entre A et B … » under the map; no Positions: « Vue 3D : placez A et B sur la carte. ». Offline (`set offline on`) and with `3d.geo.admin.ch` alone aborted: « Vue 3D indisponible », the 2D map back, the switch released, the coupe and figures unchanged. 390 px: the control row fits, no horizontal overflow |
 | `/avance?fl=6&lo=151.64` (static host) | 301 → `/avance/?…` → **200**, refusal surface, URL intact |
 | `/avance?fl=6&lo=151.64`, `/?fl=6&lo=151.64`, `/avance?v=3` (dev) | **200**, no 307 |
 | `/avance?L=250&junk=zz` | strip names « junk », then the rewrite stays on `/avance` |
@@ -173,6 +177,9 @@ must not be enabled speculatively; a GitHub Pages deploy is the ask that spends 
   from `siteOrigin()` in `src/lib/app/site.ts`, which is origin + `BASE_URL`, and its `page` is the
   Page's router path (`Route.fullPath`). A new absolute-URL writer must use both, or it ships links
   that 404 or open the wrong Page.
+- `dist/client/cesium/` (7,5 MB) is CesiumJS's workers and assets, which it loads by URL at run
+  time from `BASE_URL` + `cesium/` — copied there by `vite-plugin-static-copy`, not bundled. Only
+  the Vue 3D reads them, on the first press of « 3D ».
 - Only `dist/client/` is published. `dist/server/` is still emitted by Start — SPA mode does not
   suppress it — and is deliberately not deployed.
 - The site is published **per release**, not per push: merging the release-please PR tags `main`,
@@ -189,9 +196,11 @@ must not be enabled speculatively; a GitHub Pages deploy is the ask that spends 
 | `src/routes/_app.dynamique.tsx` | `/dynamique`, the Page Dynamique (#92): `ssr: false`, its Skeleton as `pendingComponent`, the shared `errorComponent` |
 | `src/components/dynamique/` | Dynamique's frame and Skeleton, fields and output tiles (its two SVG frames are `src/components/chart/dynamique.tsx`) — over the same store, form and writer as Avancé (`usePage`), in Statique's two-column layout |
 | `src/components/statique/` | Statique's frame and Skeleton (`frame.tsx`), its fields, outputs and vue de dessus's frame — over the same store, form and writer as Avancé (`usePage`) |
-| `src/components/map/top-map.tsx` | the vue de dessus as a MapLibre map (#93): the Fond de carte and Couche pentes controls, the anchors as markers, « Placer A / B », the attribution; the plain drawing where WebGL is missing |
+| `src/components/map/top-map.tsx` | the vue de dessus as a MapLibre map (#93): the Fond de carte and Couche pentes controls, the anchors as markers, « Placer A / B », the attribution; the plain drawing where WebGL is missing. The « 3D » switch (#95), off with its reason without Positions or a profil, puts the Vue 3D in the map's place and falls back to 2D when it fails |
+| `src/components/map/load-vue-3d.ts` | the Vue 3D's one door, a dynamic `import()`: CesiumJS lands in its own `vue-3d-renderer-*` chunk, fetched on the first press of « 3D ». `load-vue-3d.test.ts` builds the client and holds the line: no CesiumJS in what `/` downloads, and that set within 10 % of its size before #95 |
+| `src/components/map/vue-3d-renderer.ts` | the CesiumJS view (#95), imperative behind `openVue3d` → `{ show, destroy }`: the relief, the draped Fond and Couche pentes, the Fils à plomb, the engine's lines; `CESIUM_BASE_URL` is `BASE_URL` + `cesium/`, where `vite-plugin-static-copy` puts its workers and assets. Imported for its types only, anywhere else |
 | `src/components/map/wind-rose.tsx` | the rose des vents (#94): a sibling of the map, not inside it, so a gesture on its handle never reaches MapLibre's pan; it writes the Scenario's Vent as the handle moves |
-| `src/lib/map/` | the map's pure halves: the style builder and « fond de carte indisponible » (`style.ts`), the click-and-drag state machine that asks for a profil only at a release (`gesture.ts`), the rose's azimuth ↔ relative conversions (`wind-rose.ts`), the Session's display choice (`display.ts`), its copy (`copy.ts`) |
+| `src/lib/map/` | the map's pure halves: the style builder and « fond de carte indisponible » (`style.ts`), the click-and-drag state machine that asks for a profil only at a release (`gesture.ts`), the rose's azimuth ↔ relative conversions (`wind-rose.ts`), the Vue 3D's earth coordinates, draped layers and why its switch is off (`vue-3d.ts`), the Session's display choice (`display.ts`), its copy (`copy.ts`) |
 | `src/components/app/load-failure.tsx` | every app Page's `errorComponent`, for **genuine load failures only** |
 | `src/lib/app/pages.ts` | `APP_PAGES`, the table the navigation bar and the prerender list both read |
 | `src/components/app/navigation-bar.tsx` | `PageFrame` — the bar above, the Page's shell below, one viewport tall |
@@ -239,6 +248,8 @@ re-probe below attached**.
 | `@tanstack/react-form` | 1.33.5 | no — form state, no router surface |
 | `valibot` | 1.4.2 | no — boundary validation only |
 | `maplibre-gl` | 6.16.0 | no — the vue de dessus (#93); the style it is handed is built and tested in `src/lib/map/style.ts` |
+| `cesium` | 1.147.0 | no — the Vue 3D (#95); what it draws is built and tested in `src/lib/map/vue-3d.ts`. Resolved on 2026-11-08: `@cesium/engine` 26.5.0, `@cesium/widgets` 16.3.1, `@cesium/core` 0.1.1 |
+| `vite-plugin-static-copy` | 4.1.1 | no — build only: copies CesiumJS's `Workers`, `ThirdParty`, `Assets` and `Widgets` to `<base>cesium/` |
 
 Transitives, **recorded rather than pinned** — what `bun install` resolved on 2026-08-13:
 `@tanstack/router-core` **1.171.22**, `@tanstack/start-server-core` **1.169.26**

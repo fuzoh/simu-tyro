@@ -168,6 +168,18 @@ app's code, and the only place that may hold them. Everything around the canvas 
 markers, « Placer A / B », the attribution — is HTML over it and takes the tokens as everywhere
 else.
 
+The Vue 3D (#95) is the same case: CesiumJS takes a `Color`, so `vue-3d-renderer.ts` reads those
+very literals from `style.ts` — the globe's background is `PLAIN`, the lines and the Fils à plomb
+`LINE_INK` cased in `LINE_CASING` — and holds none of its own. The attribution and the messages
+under it are HTML, on the tokens.
+
+**The carte claire has no raster twin, so the Vue 3D drapes its nearest one.** The carte claire is
+swisstopo's vector `ch.swisstopo.lightbasemap.vt`, which CesiumJS cannot drape; the WMTS
+capabilities read on 2026-11-08 offer no raster light base map (only its relief shading), so the
+Vue 3D drapes `ch.swisstopo.pixelkarte-grau`, the grey national map — light, neutral, the ligne
+A–B legible on it. `DRAPED` in `src/lib/map/vue-3d.ts` is the table; the orthophoto and the carte
+nationale drape the very tiles the vue de dessus shows.
+
 ## Charts
 
 **Hand-rolled SVG in React with `d3-shape` for the paths, and one hand-written affine scale per

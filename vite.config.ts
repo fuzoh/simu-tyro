@@ -5,6 +5,7 @@ import { devtools } from "@tanstack/devtools-vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { viteStaticCopy } from "vite-plugin-static-copy";
 
 import { APP_PAGES } from "./src/lib/app/pages.ts";
 
@@ -70,6 +71,21 @@ const config = defineConfig({
       ],
     }),
     viteReact(),
+    /**
+     * **CesiumJS's workers and assets, beside the app** — the Vue 3D's renderer (#95) loads them by
+     * URL at run time (terrain decoding runs in a Worker), so they are files, not modules. Served
+     * from `node_modules` under `bun run dev`, copied into `dist/client/cesium/` by the build; the
+     * renderer points `CESIUM_BASE_URL` at `<base>cesium/`. Nothing fetches them until the 3D is
+     * chosen. The four folders are the ones Cesium's own Vite example copies.
+     */
+    viteStaticCopy({
+      targets: ["Workers", "ThirdParty", "Assets", "Widgets"].map((folder) => ({
+        src: `node_modules/cesium/Build/Cesium/${folder}`,
+        dest: "cesium",
+        // `node_modules/cesium/Build/Cesium/` off the front: `cesium/Workers/…`, not the whole path.
+        rename: { stripBase: 4 },
+      })),
+    }),
   ],
   test: {
     // `node`, always. Vitest is unit-only here: no jsdom, no component tests,

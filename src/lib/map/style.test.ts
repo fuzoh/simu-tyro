@@ -54,7 +54,7 @@ const VECTOR: MapStyle = {
 };
 
 const DISPLAYS: readonly MapDisplay[] = FONDS.flatMap((fond) =>
-  [false, true].map((pentes) => ({ fond, pentes })),
+  [false, true].map((pentes) => ({ fond, pentes, view: "2d" as const })),
 );
 
 function rasterTiles(style: MapStyle, source: string): readonly string[] {
@@ -118,7 +118,7 @@ describe("the three Fonds de carte", () => {
     ["carte-nationale", "ch.swisstopo.pixelkarte-farbe", "jpeg", 19],
   ] as const)("%s is swisstopo's WMTS layer %s in EPSG:3857", (fond, layer, format, maxzoom) => {
     const style = mapStyle({
-      display: { fond, pentes: false },
+      display: { fond, pentes: false, view: "2d" },
       vector: VECTOR,
       positions: TRIAL_ENDS,
     });
@@ -138,7 +138,7 @@ describe("the three Fonds de carte", () => {
 
   test("the Couche pentes is « pentes supérieures à 30° », at geo.admin's 40 %", () => {
     const style = mapStyle({
-      display: { fond: "orthophoto", pentes: true },
+      display: { fond: "orthophoto", pentes: true, view: "2d" },
       vector: null,
       positions: TRIAL_ENDS,
     });

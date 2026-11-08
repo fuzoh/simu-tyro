@@ -121,7 +121,10 @@ export type AppState = {
   readonly retainedCsv: Trace | null;
   /** § 5's two toggles: Session-only, never in the URL. */
   readonly layers: LayerToggles;
-  /** The vue de dessus's Fond de carte and Couche pentes (#93): Session-only, never in the URL. */
+  /**
+   * The vue de dessus's Fond de carte and Couche pentes (#93), 2D or 3D (#95): Session-only, never
+   * in the URL.
+   */
   readonly map: MapDisplay;
   /** What this page load's link did. Fixed at first render. */
   readonly link: LinkArrival;
@@ -140,7 +143,7 @@ export type AppAction =
   | { readonly type: "scénario/modifié"; readonly patch: Partial<ScenarioDraft> }
   /** § 5's two toggles — Session-only display preferences. */
   | { readonly type: "calques/basculés"; readonly layers: LayerToggles }
-  /** The Fond de carte or the Couche pentes (#93) — a display preference, like the toggles. */
+  /** The Fond de carte, the Couche pentes (#93) or the Vue 3D (#95) — a display preference. */
   | { readonly type: "carte/affichée"; readonly map: MapDisplay }
   /**
    * § 9's « Réinitialiser le scénario ». It returns the **active configuration** to the shipped

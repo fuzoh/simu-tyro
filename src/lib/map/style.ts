@@ -50,7 +50,7 @@ export const LINE_SOURCE = "ligne-ab";
 export const PENTES_SOURCE = "pentes";
 
 /** One swisstopo WMTS layer as XYZ tiles: the URL template docs.geo.admin.ch documents. */
-type WmtsLayer = {
+export type WmtsLayer = {
   readonly id: string;
   readonly format: "jpeg" | "png";
   /** The last zoom of the layer's tile matrix set (`3857_19` → 19); MapLibre overzooms past it. */
@@ -59,7 +59,7 @@ type WmtsLayer = {
   readonly attribution: string;
 };
 
-const RASTER_FONDS = {
+export const RASTER_FONDS = {
   orthophoto: {
     id: "ch.swisstopo.swissimage",
     format: "jpeg",
@@ -74,7 +74,7 @@ const RASTER_FONDS = {
   },
 } as const satisfies Record<Exclude<Fond, "carte-claire">, WmtsLayer>;
 
-const PENTES_LAYER = {
+export const PENTES_LAYER = {
   id: "ch.swisstopo.hangneigung-ueber_30",
   format: "png",
   maxzoom: 17,
@@ -82,15 +82,15 @@ const PENTES_LAYER = {
 } as const satisfies WmtsLayer;
 
 /** geo.admin draws the Couche pentes at this opacity (`layersConfig`, `opacity: 0.4`). */
-const PENTES_OPACITY = 0.4;
+export const PENTES_OPACITY = 0.4;
 
 /** The carte claire's attribution — its TileJSON's own. */
 const VECTOR_ATTRIBUTION = "© swisstopo";
 
 /** The « fond uni » under everything, and the line's two strokes: drawing colours, not chrome. */
-const PLAIN = "#f1f3f4";
-const LINE_CASING = "#ffffff";
-const LINE_INK = "#16191b";
+export const PLAIN = "#f1f3f4";
+export const LINE_CASING = "#ffffff";
+export const LINE_INK = "#16191b";
 
 /** The attribution the map must show for the Fond on screen — a condition of swisstopo's terms. */
 export function fondAttribution(fond: Fond): string {
@@ -207,10 +207,16 @@ function fondStyle(fond: Fond, vector: MapStyle | null): FondStyle {
   };
 }
 
-function rasterSource({ id, format, maxzoom, attribution }: WmtsLayer): StyleSource {
+/** A WMTS layer's tile URL, `{z}/{x}/{y}` in EPSG:3857 — the same for MapLibre and the Vue 3D. */
+export function wmtsTiles({ id, format }: WmtsLayer): string {
+  return `https://wmts.geo.admin.ch/1.0.0/${id}/default/current/3857/{z}/{x}/{y}.${format}`;
+}
+
+function rasterSource(layer: WmtsLayer): StyleSource {
+  const { maxzoom, attribution } = layer;
   return {
     type: "raster",
-    tiles: [`https://wmts.geo.admin.ch/1.0.0/${id}/default/current/3857/{z}/{x}/{y}.${format}`],
+    tiles: [wmtsTiles(layer)],
     tileSize: 256,
     maxzoom,
     bounds: [...SWISSTOPO_COVERAGE],
