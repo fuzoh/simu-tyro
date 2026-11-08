@@ -16,12 +16,20 @@
  * - **Two Brins porteurs keep the coupe's pixel gap.** Both members are one solve; each is shifted
  *   by as many metres as the coupe's pixels span at the line, re-read before every frame, so the
  *   two stay apart without touching at every zoom.
+ * - **An anchor drags as on the carte** (#97), through the same gesture machine: a press takes an
+ *   anchor only when the pointer is on one, and the camera is frozen from that press to the release;
+ *   anywhere else the press is the camera's. While the anchor moves, its Fil à plomb and the Ligne
+ *   A–B follow by `CallbackProperty`, never by re-adding entities. At the release the relief is
+ *   sampled at its finest under the anchor, then the gesture ends and the profil is asked for.
  */
 
 import "cesium/Source/Widgets/CesiumWidget/CesiumWidget.css";
+import type { Scene, TerrainProvider } from "cesium";
+
 import {
   ArcType,
   BoundingSphere,
+  CallbackPositionProperty,
   CallbackProperty,
   Cartesian2,
   Cartesian3,
@@ -31,6 +39,7 @@ import {
   Color,
   Ellipsoid,
   EllipsoidGeodesic,
+  Entity,
   HeadingPitchRange,
   HorizontalOrigin,
   ImageryLayer,
@@ -40,14 +49,19 @@ import {
   PolylineDashMaterialProperty,
   PolylineOutlineMaterialProperty,
   Rectangle,
+  sampleTerrainMostDetailed,
+  SceneTransforms,
+  ScreenSpaceEventHandler,
+  ScreenSpaceEventType,
   UrlTemplateImageryProvider,
   VerticalOrigin,
   WebMercatorTilingScheme,
 } from "cesium";
 
 import type { MapDisplay } from "@/lib/map/display.ts";
+import type { Anchor, MapEvent } from "@/lib/map/gesture.ts";
 import type { WmtsLayer } from "@/lib/map/style.ts";
-import type { EarthPoint, Ends, Vue3dScene } from "@/lib/map/vue-3d.ts";
+import type { EarthPoint, Ends, Vue3dFollowing, Vue3dScene } from "@/lib/map/vue-3d.ts";
 
 import {
   LINE_CASING,
@@ -58,7 +72,7 @@ import {
   SWISSTOPO_COVERAGE,
   wmtsTiles,
 } from "@/lib/map/style.ts";
-import { CAMERA_REACH, DRAPED, TERRAIN_URL } from "@/lib/map/vue-3d.ts";
+import { CAMERA_REACH, DRAPED, TERRAIN_URL, vue3dFollowing } from "@/lib/map/vue-3d.ts";
 
 // Cesium's workers and assets are copied beside the app (`vite.config.ts`); this says where.
 (globalThis as { CESIUM_BASE_URL?: string }).CESIUM_BASE_URL = `${import.meta.env.BASE_URL}cesium/`;
@@ -72,18 +86,28 @@ const PITCH = CesiumMath.toRadians(-25);
 
 /** An open Vue 3D. */
 export type Vue3d = {
-  /** Draws this scene over this display; called again whenever either changes. */
-  show(scene: Vue3dScene, display: MapDisplay): void;
+  /**
+   * Draws this scene over this display; called again whenever any of the three changes.
+   *
+   * @param idle the gesture machine waits for a gesture: only then may an anchor be taken, and only
+   *   then does a dragged anchor give way to the scene's — the line its release loaded, or the one
+   *   it could not replace.
+   */
+  show(scene: Vue3dScene, display: MapDisplay, idle: boolean): void;
   destroy(): void;
 };
 
 /**
  * Opens the Vue 3D in `container` once swisstopo's relief has answered.
  *
+ * @param onGesture hears a drag as the vue de dessus's markers tell it: start, moves, release.
  * @param onUnavailable called once if the Vue 3D falls over after it opened — a render error.
  * @returns the open view; rejects when it cannot open — no relief, no WebGL.
  */
-export async function openVue3d(container: HTMLElement, onUnavailable: () => void): Promise<Vue3d> {
+export async function openVue3d(
+  container: HTMLElement,
+  { onGesture, onUnavailable }: { onGesture: (event: MapEvent) => void; onUnavailable: () => void },
+): Promise<Vue3d> {
   const terrainProvider = await CesiumTerrainProvider.fromUrl(TERRAIN_URL);
   const widget = new CesiumWidget(container, {
     terrainProvider,
@@ -113,11 +137,84 @@ export async function openVue3d(container: HTMLElement, onUnavailable: () => voi
       clientWidth > 0 ? (buffer * cesium.drawingBufferWidth) / clientWidth : 0;
   });
 
-  let shown: { scene: Vue3dScene; display: MapDisplay } | null = null;
+  let shown: { scene: Vue3dScene; display: MapDisplay; idle: boolean } | null = null;
+  let drawn: Drawn | null = null;
+  // The anchor under a press; `moved` once it has left its Position, which is when the gesture
+  // starts — a press and release on an anchor is no new line.
+  let grip: { anchor: Anchor; moved: boolean } | null = null;
+  // Where the dragged anchor stands, from its first move until the machine is idle again.
+  let pose: { anchor: Anchor; foot: EarthPoint } | null = null;
+  let following: Vue3dFollowing | null = null;
+
+  /** Draws the dragged anchor where `pose` has it, or the scene's own anchors and lines. */
+  function follow() {
+    following =
+      shown === null || pose === null ? null : vue3dFollowing(shown.scene, pose.anchor, pose.foot);
+    if (drawn === null) return;
+    for (const entity of drawn.lines) entity.show = following === null;
+    drawn.ligneAB.show = following !== null;
+  }
+
+  function anchorAt(at: Cartesian2): Anchor | null {
+    // The Fil à plomb, the mark at its foot and the lines' ends all cross the anchor's dot, and any
+    // of them may be on top: drill through them to the anchor.
+    for (const picked of cesium.drillPick(at)) {
+      const entity: unknown = (picked as { id?: unknown }).id;
+      const anchor = entity instanceof Entity ? drawn?.anchors.get(entity) : undefined;
+      if (anchor !== undefined) return anchor;
+    }
+    return null;
+  }
+
+  const pointer = new ScreenSpaceEventHandler(cesium.canvas);
+  pointer.setInputAction(({ position }: ScreenSpaceEventHandler.PositionedEvent) => {
+    if (shown?.idle !== true) return;
+    const anchor = anchorAt(position);
+    if (anchor === null) return;
+    grip = { anchor, moved: false };
+    cesium.screenSpaceCameraController.enableInputs = false;
+    cesium.canvas.style.cursor = "grabbing";
+  }, ScreenSpaceEventType.LEFT_DOWN);
+
+  pointer.setInputAction(({ endPosition }: ScreenSpaceEventHandler.MotionEvent) => {
+    if (grip === null) {
+      cesium.canvas.style.cursor =
+        shown?.idle === true && anchorAt(endPosition) !== null ? "grab" : "";
+      return;
+    }
+    const foot = groundUnder(cesium, endPosition);
+    if (foot === null) return;
+    pose = { anchor: grip.anchor, foot };
+    follow();
+    const at = { lat: foot.lat, lon: foot.lon };
+    if (grip.moved) onGesture({ type: "drag-move", at });
+    else {
+      grip.moved = true;
+      onGesture({ type: "drag-start", anchor: grip.anchor, at });
+    }
+  }, ScreenSpaceEventType.MOUSE_MOVE);
+
+  pointer.setInputAction(() => {
+    if (grip === null) return;
+    const { moved } = grip;
+    grip = null;
+    cesium.screenSpaceCameraController.enableInputs = true;
+    cesium.canvas.style.cursor = "";
+    const released = pose;
+    if (!moved || released === null) return;
+    void finestFoot(terrainProvider, released.foot).then((foot) => {
+      if (pose === released && !widget.isDestroyed()) {
+        pose = { anchor: released.anchor, foot };
+        follow();
+      }
+      onGesture({ type: "drag-end", at: { lat: foot.lat, lon: foot.lon } });
+    });
+  }, ScreenSpaceEventType.LEFT_UP);
+
   return {
-    show(scene, display) {
+    show(scene, display, idle) {
       const before = shown;
-      shown = { scene, display };
+      shown = { scene, display, idle };
       if (
         before === null ||
         before.display.fond !== display.fond ||
@@ -131,26 +228,57 @@ export async function openVue3d(container: HTMLElement, onUnavailable: () => voi
         line = BoundingSphere.fromPoints(
           [scene.fils.A.anchor, scene.fils.B.anchor, ...(scene.loaded ?? [])].map(cartesian),
         );
-        draw(widget, scene, metresPerPixel);
+        drawn = draw(widget, scene, metresPerPixel, () => following);
       }
-      // The camera stands back from the line when it opens and when the Positions move, not
-      // otherwise: a new Scenario on the same two points leaves the view where the reader put it.
-      if (before === null || !sameEnds(before.scene.ends, scene.ends)) frameLine(widget, scene);
+      if (idle && grip === null) pose = null;
+      follow();
+      // The camera stands back from the line when it opens, and when the Positions move to where
+      // the reader cannot see them — a typed Position, an imported CSV. A line dragged in the view
+      // is already in it, so the camera stays where the reader put it.
+      if (before === null || (!sameEnds(before.scene.ends, scene.ends) && !inView(cesium, scene))) {
+        frameLine(widget, scene);
+      }
     },
     destroy() {
+      pointer.destroy();
+      // Closed under a moving anchor, the view hears no release: the gesture ends where the anchor
+      // was drawn, or the machine would wait for it — and keep the vue de dessus's markers — forever.
+      if (grip?.moved === true && pose !== null) {
+        onGesture({ type: "drag-end", at: { lat: pose.foot.lat, lon: pose.foot.lon } });
+      }
+      grip = null;
       if (!widget.isDestroyed()) widget.destroy();
     },
   };
 }
 
-function draw(widget: CesiumWidget, scene: Vue3dScene, metresPerPixel: { current: number }) {
+/** The entities of one scene: what a press may take, and the lines a drag hides or shows. */
+type Drawn = {
+  readonly anchors: ReadonlyMap<Entity, Anchor>;
+  /** The engine's lines, the last release's: hidden while an anchor follows the pointer. */
+  readonly lines: readonly Entity[];
+  /** The Ligne A–B, shown while an anchor follows the pointer. */
+  readonly ligneAB: Entity;
+};
+
+/** @param following what a drag moves, read on every frame — `null` when nothing follows the pointer. */
+function draw(
+  widget: CesiumWidget,
+  scene: Vue3dScene,
+  metresPerPixel: { current: number },
+  following: () => Vue3dFollowing | null,
+): Drawn {
   const { entities } = widget;
   entities.removeAll();
+  const fils = () => following()?.fils ?? scene.fils;
+  const anchors = new Map<Entity, Anchor>();
   for (const name of ["A", "B"] as const) {
-    const { foot, anchor, top } = scene.fils[name];
+    // Read on every frame, so a dragged anchor moves without a new entity.
+    const at = (point: "foot" | "anchor" | "top") =>
+      new CallbackPositionProperty(() => cartesian(fils()[name][point]), false);
     // The ground mark and the anchor are drawn over the relief, never behind it.
     entities.add({
-      position: cartesian(foot),
+      position: at("foot"),
       point: {
         pixelSize: 9,
         color: CASING,
@@ -161,14 +289,17 @@ function draw(widget: CesiumWidget, scene: Vue3dScene, metresPerPixel: { current
     });
     entities.add({
       polyline: {
-        positions: [cartesian(foot), cartesian(top)],
+        positions: new CallbackProperty(
+          () => [cartesian(fils()[name].foot), cartesian(fils()[name].top)],
+          false,
+        ),
         arcType: ArcType.NONE,
         width: 2,
         material: new PolylineDashMaterialProperty({ color: INK, dashLength: 12 }),
       },
     });
-    entities.add({
-      position: cartesian(anchor),
+    const anchor = entities.add({
+      position: at("anchor"),
       point: {
         pixelSize: 12,
         color: CASING,
@@ -190,40 +321,104 @@ function draw(widget: CesiumWidget, scene: Vue3dScene, metresPerPixel: { current
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
     });
+    anchors.set(anchor, name);
   }
+  const lines: Entity[] = [];
   for (const offsetPx of scene.membersPx) {
     if (scene.unloaded !== null) {
-      entities.add({
-        polyline: {
-          positions: member(scene.unloaded, offsetPx, metresPerPixel),
-          arcType: ArcType.NONE,
-          width: 2,
-          material: new PolylineDashMaterialProperty({ color: INK, dashLength: 10 }),
-        },
-      });
+      lines.push(
+        entities.add({
+          polyline: {
+            positions: member(scene.unloaded, offsetPx, metresPerPixel),
+            arcType: ArcType.NONE,
+            width: 2,
+            material: new PolylineDashMaterialProperty({ color: INK, dashLength: 10 }),
+          },
+        }),
+      );
     }
     if (scene.loaded !== null) {
-      entities.add({
-        polyline: {
-          positions: member(scene.loaded, offsetPx, metresPerPixel),
-          arcType: ArcType.NONE,
-          // 2 px of ink in a thin casing: two members 6 px apart keep air between them, as on the coupe.
-          width: 3,
-          material: new PolylineOutlineMaterialProperty({
-            color: INK,
-            outlineColor: CASING,
-            outlineWidth: 0.5,
-          }),
-          // A ridge between the camera and the line hides it from the relief, not from the reader.
-          depthFailMaterial: Color.fromAlpha(INK, 0.5),
-        },
-      });
+      lines.push(
+        entities.add({
+          polyline: {
+            positions: member(scene.loaded, offsetPx, metresPerPixel),
+            arcType: ArcType.NONE,
+            // 2 px of ink in a thin casing: two members 6 px apart keep air between them, as on the coupe.
+            width: 3,
+            material: new PolylineOutlineMaterialProperty({
+              color: INK,
+              outlineColor: CASING,
+              outlineWidth: 0.5,
+            }),
+            // A ridge between the camera and the line hides it from the relief, not from the reader.
+            depthFailMaterial: Color.fromAlpha(INK, 0.5),
+          },
+        }),
+      );
     }
   }
+  const ligneAB = entities.add({
+    show: false,
+    polyline: {
+      positions: new CallbackProperty(
+        () => (following()?.ligneAB ?? [scene.fils.A.anchor, scene.fils.B.anchor]).map(cartesian),
+        false,
+      ),
+      arcType: ArcType.NONE,
+      width: 3,
+      material: new PolylineOutlineMaterialProperty({
+        color: INK,
+        outlineColor: CASING,
+        outlineWidth: 0.5,
+      }),
+      depthFailMaterial: Color.fromAlpha(INK, 0.5),
+    },
+  });
+  return { anchors, lines, ligneAB };
 }
 
 function cartesian({ lon, lat, altitude }: EarthPoint): Cartesian3 {
   return Cartesian3.fromDegrees(lon, lat, altitude);
+}
+
+/** The relief under a window position, as the view draws it now — `null` off the globe. */
+function groundUnder(cesium: Scene, at: Cartesian2): EarthPoint | null {
+  const ray = cesium.camera.getPickRay(at);
+  const hit = ray === undefined ? undefined : cesium.globe.pick(ray, cesium);
+  if (hit === undefined) return null;
+  const { longitude, latitude, height } = Cartographic.fromCartesian(hit);
+  return {
+    lon: CesiumMath.toDegrees(longitude),
+    lat: CesiumMath.toDegrees(latitude),
+    altitude: height,
+  };
+}
+
+/**
+ * The relief under `foot` at its finest tiles. Where they do not come, the altitude the view drew
+ * stays: it only places the Fil à plomb until the profil arrives.
+ */
+async function finestFoot(terrain: TerrainProvider, foot: EarthPoint): Promise<EarthPoint> {
+  try {
+    const [sampled] = await sampleTerrainMostDetailed(terrain, [
+      Cartographic.fromDegrees(foot.lon, foot.lat),
+    ]);
+    const altitude: number | undefined = sampled?.height;
+    return altitude === undefined || !Number.isFinite(altitude) ? foot : { ...foot, altitude };
+  } catch {
+    return foot;
+  }
+}
+
+/** Both anchors of `scene` inside the view's box, in front of the camera. */
+function inView(cesium: Scene, { fils }: Vue3dScene): boolean {
+  const { clientWidth, clientHeight } = cesium.canvas;
+  return [fils.A.anchor, fils.B.anchor].every((point) => {
+    const at = SceneTransforms.worldToWindowCoordinates(cesium, cartesian(point));
+    return (
+      at !== undefined && at.x >= 0 && at.x <= clientWidth && at.y >= 0 && at.y <= clientHeight
+    );
+  });
 }
 
 /** A swisstopo WMTS layer on the relief, asked for only inside its coverage. */

@@ -24,6 +24,8 @@
  *   renderer is fetched through `./load-vue-3d.ts` the first time it is chosen — never imported
  *   here. Whatever stops it (no network, no WebGL) brings the vue de dessus back with « Vue 3D
  *   indisponible »; without the two Positions or a profil the switch is off and says why.
+ * - **One gesture machine for both views** (#97): an anchor dragged in the Vue 3D is sent to the
+ *   same `send` as a marker, so its release is the same new line, recomputed by the same rule.
  */
 
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -122,9 +124,21 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
   const rose = useRef<HTMLDivElement>(null);
   const unavailable = failed || fondUnavailable(health, drawn);
   // The Banane is on screen when there is a cross wind and a line for it to bow: the map's, or the
-  // Ligne à vide the Vue 3D drew.
+  // Ligne à vide the Vue 3D drew — which it does not while an anchor follows the pointer.
   const bananeShown =
-    across !== 0 && (shows3d ? scene3d?.unloaded != null : drawn.A !== null && drawn.B !== null);
+    across !== 0 &&
+    (shows3d
+      ? scene3d?.unloaded != null && gesture.kind === "idle"
+      : drawn.A !== null && drawn.B !== null);
+  // A release loads its profil the same way in both views, and says so under either.
+  const gestureLine =
+    gesture.kind === "loading"
+      ? MAP_COPY.loading
+      : gesture.kind === "idle" && gesture.notice !== null
+        ? geoadminNotice(gesture.notice)
+        : shows3d
+          ? null
+          : clickHint(target, positions);
 
   return (
     <TopViewFrame
@@ -135,20 +149,10 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
               {anchorReading(anchor, drawn)}
             </span>
           ))}
-          {!shows3d && (
-            <>
-              <span>{windReading(scenario.wind, reference)}</span>
-              <span>
-                {gesture.kind === "loading"
-                  ? MAP_COPY.loading
-                  : gesture.kind === "idle" && gesture.notice !== null
-                    ? geoadminNotice(gesture.notice)
-                    : clickHint(target, positions)}
-              </span>
-              {unavailable && (
-                <span>{[MAP_COPY.unavailable, plain?.unoriented].filter(Boolean).join(" · ")}</span>
-              )}
-            </>
+          {!shows3d && <span>{windReading(scenario.wind, reference)}</span>}
+          <span>{gestureLine}</span>
+          {!shows3d && unavailable && (
+            <span>{[MAP_COPY.unavailable, plain?.unoriented].filter(Boolean).join(" · ")}</span>
           )}
           {bananeShown && <span title={BANANE_HELP}>{MAP_COPY.bananeNote}</span>}
           {placement.ok ? (
@@ -179,6 +183,8 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
             ) : (
               <Vue3dHost
                 display={display}
+                idle={gesture.kind === "idle"}
+                onGesture={send}
                 onUnavailable={lose3d}
                 renderer={renderer}
                 scene={scene3d}
@@ -280,24 +286,32 @@ function Vue3dLoading() {
 /**
  * The Vue 3D in the frame: opened once the renderer is here, handed every new scene and display,
  * closed when the vue de dessus comes back.
+ *
+ * @param idle the gesture machine waits for a gesture, so an anchor may be taken.
  */
 function Vue3dHost({
   renderer,
   scene,
   display,
+  idle,
+  onGesture,
   onUnavailable,
 }: {
   renderer: Vue3dRenderer;
   scene: Vue3dScene;
   display: MapDisplay;
+  idle: boolean;
+  onGesture: (event: MapEvent) => void;
   onUnavailable: () => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<Vue3d | null>(null);
   const fallen = useRef(onUnavailable);
+  const gestured = useRef(onGesture);
   useLayoutEffect(() => {
     fallen.current = onUnavailable;
-  }, [onUnavailable]);
+    gestured.current = onGesture;
+  }, [onUnavailable, onGesture]);
 
   useEffect(() => {
     const node = container.current;
@@ -309,7 +323,11 @@ function Vue3dHost({
       live = false;
       fallen.current();
     };
-    renderer.openVue3d(node, fail).then((open) => {
+    const options = {
+      onGesture: (event: MapEvent) => gestured.current(event),
+      onUnavailable: fail,
+    };
+    renderer.openVue3d(node, options).then((open) => {
       if (live) {
         opened = open;
         setView(open);
@@ -323,8 +341,8 @@ function Vue3dHost({
   }, [renderer]);
 
   useEffect(() => {
-    view?.show(scene, display);
-  }, [view, scene, display]);
+    view?.show(scene, display, idle);
+  }, [view, scene, display, idle]);
 
   return (
     <div className="absolute inset-0">

@@ -21,12 +21,16 @@
  * - **No profil, no Vue 3D.** Manual geometry has a span and a dénivelé but no altitude to stand
  *   them on; placing them on the relief would be a rule nobody decided, so the switch says why it
  *   is off instead, as it does without the two Positions.
+ * - **A dragged anchor takes its Fil à plomb and the Ligne A–B with it, and nothing else** (#97).
+ *   The engine's lines belong to the last release; until the next one has its profil they are not
+ *   drawn, rather than drawn between ends they were not solved for.
  */
 
 import type { Polyline, SceneBase, SceneFrame, SceneRider } from "@/lib/chart/scene.ts";
 import type { Position, Positions } from "@/lib/scenario/types.ts";
 
 import type { Fond } from "./display.ts";
+import type { Anchor } from "./gesture.ts";
 import type { WmtsLayer } from "./style.ts";
 
 import { bananePoint } from "./banane.ts";
@@ -162,10 +166,8 @@ export function vue3dScene({
   const topA = bases.zBaseA + anchors.zA;
   const onEarth = earthFrame({ ends, L, topA });
   const onBanane = earthFrame({ ends, L, topA, across });
-  const fil = (x: number, top: number, height: number): FilAPlomb => {
-    const foot = onEarth(x, top - height);
-    return { foot, anchor: onEarth(x, top), top: { ...foot, altitude: foot.altitude + FIL_RISE } };
-  };
+  const fil = (x: number, top: number, height: number) =>
+    filAPlomb(onEarth(x, top - height), height);
   return {
     ends,
     fils: { A: fil(0, 0, anchors.zA), B: fil(L, h, anchors.zB) },
@@ -175,6 +177,39 @@ export function vue3dScene({
         ? null
         : alongLine(onEarth, throughNode(rider.cable, rider.step.xD, rider.step.zD)),
     membersPx: solved?.members.map((member) => member.offsetPx) ?? [0],
+  };
+}
+
+/** What the Vue 3D draws while an anchor follows the pointer (#97). */
+export type Vue3dFollowing = {
+  readonly fils: { readonly A: FilAPlomb; readonly B: FilAPlomb };
+  /** The Ligne A–B, straight from anchor to anchor. */
+  readonly ligneAB: readonly [EarthPoint, EarthPoint];
+};
+
+/**
+ * The scene with `anchor` moved: its Fil à plomb stands on `foot`, its Anchor Height kept; the
+ * other anchor stays where the scene has it.
+ *
+ * @param foot the relief under the pointer, at the detail the view shows during the gesture and
+ *   sampled at the finest after the release.
+ */
+export function vue3dFollowing(
+  scene: Vue3dScene,
+  anchor: Anchor,
+  foot: EarthPoint,
+): Vue3dFollowing {
+  const held = scene.fils[anchor];
+  const moved = filAPlomb(foot, held.anchor.altitude - held.foot.altitude);
+  const fils = anchor === "A" ? { A: moved, B: scene.fils.B } : { A: scene.fils.A, B: moved };
+  return { fils, ligneAB: [fils.A.anchor, fils.B.anchor] };
+}
+
+function filAPlomb(foot: EarthPoint, height: number): FilAPlomb {
+  return {
+    foot,
+    anchor: { ...foot, altitude: foot.altitude + height },
+    top: { ...foot, altitude: foot.altitude + FIL_RISE },
   };
 }
 

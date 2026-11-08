@@ -3,7 +3,8 @@
  * machine, its actions go to the app's reducer, and the profil it asks for is fetched with an
  * **injected, counted `fetch`** — the trial line's recorded answers (#103), or a network that is not
  * there. No map, no DOM: the gesture is the pure part, and it is where « nothing is asked for
- * during a drag » lives.
+ * during a drag » lives — for the markers of the vue de dessus and the anchors of the Vue 3D (#97)
+ * alike.
  */
 
 import { readFileSync } from "node:fs";
@@ -28,6 +29,7 @@ import type { MapEvent, MapGesture } from "./gesture.ts";
 
 import { clickTarget, drawnPositions, IDLE, stepGesture } from "./gesture.ts";
 import { lineData } from "./style.ts";
+import { vue3dFollowing, vue3dPlacement, vue3dScene } from "./vue-3d.ts";
 
 /** The map as `TopMap` wires it: the gesture, the app's state, and every URL the network was asked. */
 type Rig = { gesture: MapGesture; state: AppState; asked: string[] };
@@ -73,6 +75,27 @@ function verdictOf({ scenario, trace }: AppState) {
     report: evaluateGates({ scenario }),
   })?.verdict;
 }
+
+/**
+ * A service that answers any line with a level profil of 200 points at 1 450 m over its LV95 chord,
+ * REFRAME down so the Positions go through the approximate formulas.
+ */
+const anywhere: Fetch = async (url) => {
+  const asked = new URL(url);
+  if (asked.hostname === "geodesy.geo.admin.ch") return new Response("down", { status: 503 });
+  const geom = JSON.parse(asked.searchParams.get("geom") ?? "") as {
+    coordinates: [[number, number], [number, number]];
+  };
+  const [[e0, n0], [e1, n1]] = geom.coordinates;
+  const length = Math.hypot(e1 - e0, n1 - n0);
+  const samples = Array.from({ length: 200 }, (_, i) => ({
+    dist: Math.round(((i * length) / 199) * 10) / 10,
+    alts: { COMB: 1450 },
+    easting: e0 + ((e1 - e0) * i) / 199,
+    northing: n0 + ((n1 - n0) * i) / 199,
+  }));
+  return new Response(JSON.stringify(samples), { status: 200 });
+};
 
 /** A point 0,001° from B in both directions — about 110 m north and 76 m east. */
 const ASIDE: Position = { lat: 46.847166, lon: 6.521783 };
@@ -175,23 +198,6 @@ describe("dragging B — recomputed at the release, and only there", () => {
 
   test("dropped elsewhere, the new line ends where B was let go", async () => {
     const loaded = await twoClicks();
-    // A service that answers any line with a level profil of 200 points over its LV95 chord.
-    const anywhere: Fetch = async (url) => {
-      const asked = new URL(url);
-      if (asked.hostname === "geodesy.geo.admin.ch") return new Response("down", { status: 503 });
-      const geom = JSON.parse(asked.searchParams.get("geom") ?? "") as {
-        coordinates: [[number, number], [number, number]];
-      };
-      const [[e0, n0], [e1, n1]] = geom.coordinates;
-      const length = Math.hypot(e1 - e0, n1 - n0);
-      const samples = Array.from({ length: 200 }, (_, i) => ({
-        dist: Math.round(((i * length) / 199) * 10) / 10,
-        alts: { COMB: 1450 },
-        easting: e0 + ((e1 - e0) * i) / 199,
-        northing: n0 + ((n1 - n0) * i) / 199,
-      }));
-      return new Response(JSON.stringify(samples), { status: 200 });
-    };
     const fetch = counted(loaded.asked, anywhere);
 
     const grabbed = await send(
@@ -254,6 +260,73 @@ describe("dragging B — recomputed at the release, and only there", () => {
       expect(step.gesture).toBe(released.gesture);
       expect(step.load).toBeNull();
     }
+  });
+});
+
+describe("dragging B in the Vue 3D (#97) — the same machine, the same release", () => {
+  /** The Vue 3D the Page draws for a state: the coupe's line on its two Positions. */
+  function vue3dOf({ scenario, trace }: AppState) {
+    const scene = buildScene({ scenario, trace });
+    const at = vue3dPlacement(scenario.positions, scene);
+    if (scene === null || !at.ok) throw new Error("the line stands in the Vue 3D");
+    return vue3dScene({ placement: at.placement, solved: scene, rider: scene.rider, across: 0 });
+  }
+
+  test("only B, its Fil à plomb and the Ligne A–B follow the relief; nothing is asked until the release", async () => {
+    const loaded = await twoClicks();
+    const shown = vue3dOf(loaded.state);
+    const fetch = counted(loaded.asked, anywhere);
+
+    // The Vue 3D starts the gesture at the anchor's first move, its foot on the relief it draws.
+    let rig = loaded;
+    for (let i = 0; i < 20; i++) {
+      const foot = {
+        lat: TRIAL_ENDS.B.lat + i * 5e-5,
+        lon: TRIAL_ENDS.B.lon + i * 5e-5,
+        altitude: 1438.7 + i,
+      };
+      const at = { lat: foot.lat, lon: foot.lon };
+      const event: MapEvent =
+        i === 0 ? { type: "drag-start", anchor: "B", at } : { type: "drag-move", at };
+      rig = await send(rig, event, fetch);
+
+      expect(drawnPositions(rig.gesture, rig.state.scenario.positions).B).toEqual(at);
+      // The scene is the last release's, untouched: the Vue 3D redraws B over it, and only B.
+      expect(vue3dOf(rig.state)).toEqual(shown);
+      const following = vue3dFollowing(shown, "B", foot);
+      expect(following.fils.B.anchor.altitude).toBeCloseTo(foot.altitude + 1, 9);
+      expect(following.ligneAB).toEqual([shown.fils.A.anchor, following.fils.B.anchor]);
+      expect(rig.asked).toHaveLength(3);
+      expect(rig.state).toBe(loaded.state);
+    }
+  });
+
+  test("released, B's Position moves, a new profil and a new Verdict come, the heights are kept", async () => {
+    const loaded = await twoClicks();
+    const verdict = verdictOf(loaded.state);
+    const fetch = counted(loaded.asked, anywhere);
+    const grabbed = await send(loaded, { type: "drag-start", anchor: "B", at: ASIDE }, fetch);
+    // The release comes once the relief under B was sampled at its finest — no call of the app's.
+    const released = await send(grabbed, { type: "drag-end", at: ASIDE }, fetch);
+
+    // Two REFRAME calls and one profile, at the release alone.
+    expect(released.asked).toHaveLength(6);
+    expect(released.gesture).toEqual(IDLE);
+    expect(released.state.scenario.positions).toEqual({ A: TRIAL_ENDS.A, B: ASIDE });
+    expect(released.state.trace?.origin).toEqual({ kind: "geoadmin" });
+    expect(released.state.scenario.anchors).toEqual({ zA: 1.5, zB: 1 });
+    expect(verdictOf(released.state)).toEqual(
+      expect.objectContaining({ state: expect.any(String) }),
+    );
+    expect(verdictOf(released.state)).not.toEqual(verdict);
+    expect(sessionOf(released.state)?.scenario.positions).toEqual({ A: TRIAL_ENDS.A, B: ASIDE });
+
+    // The Vue 3D stands on the new profil: both feet on its 1 450 m, each anchor its height above.
+    const { ends, fils } = vue3dOf(released.state);
+    expect(ends).toEqual({ A: TRIAL_ENDS.A, B: ASIDE });
+    expect(fils.A.anchor.altitude).toBeCloseTo(1451.5, 6);
+    expect(fils.B.foot.altitude).toBeCloseTo(1450, 6);
+    expect(fils.B.anchor.altitude).toBeCloseTo(1451, 6);
   });
 });
 

@@ -1,6 +1,7 @@
 /**
  * The Vue 3D's pure half (#95): when the switch is off and why, what each Fond drapes, and where the
- * engine's lines and the Fils à plomb stand on the earth.
+ * engine's lines and the Fils à plomb stand on the earth — and what follows an anchor dragged there
+ * (#97).
  *
  * The line is the trial's (#68): Positions as the geo.admin export spells them, a three-sample profil
  * with the export's altitudes under A (1 453,7 m) and B (1 438,7 m), Anchor Heights 1,5 and 1 m.
@@ -19,7 +20,7 @@ import { placeSpan } from "@/lib/scenario/geometry.ts";
 import { TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
 
 import { mapStyle, wmtsTiles } from "./style.ts";
-import { CAMERA_REACH, DRAPED, vue3dPlacement, vue3dScene } from "./vue-3d.ts";
+import { CAMERA_REACH, DRAPED, vue3dFollowing, vue3dPlacement, vue3dScene } from "./vue-3d.ts";
 
 const PROFIL: Trace = {
   d: Float64Array.from([0, 243, 435.2]),
@@ -254,5 +255,39 @@ describe("the Fils à plomb", () => {
     for (const anchor of ["A", "B"] as const) {
       expect(fils[anchor].top.altitude - fils[anchor].foot.altitude).toBeGreaterThan(CAMERA_REACH);
     }
+  });
+});
+
+describe("an anchor dragged in the Vue 3D (#97)", () => {
+  const scene = solved(trial());
+  const shown = vue3dScene({
+    placement: placed(scene),
+    solved: scene,
+    rider: scene.rider,
+    across: 10,
+  });
+  /** Where the pointer meets the relief: 0,001° north and east of B, on ground at 1 500 m. */
+  const FOOT = { lat: 46.847166, lon: 6.521783, altitude: 1500 };
+
+  test("B's Fil à plomb stands on the relief under the pointer, B its 1 m above; A stays", () => {
+    const { fils } = vue3dFollowing(shown, "B", FOOT);
+    expect(fils.A).toEqual(shown.fils.A);
+    expect(fils.B.foot).toEqual(FOOT);
+    expect(fils.B.anchor.lat).toBe(FOOT.lat);
+    expect(fils.B.anchor.lon).toBe(FOOT.lon);
+    // 1 500 + 1 m.
+    expect(fils.B.anchor.altitude).toBeCloseTo(1501, 9);
+    expect(fils.B.top.altitude - fils.B.foot.altitude).toBeGreaterThan(CAMERA_REACH);
+  });
+
+  test("A keeps its 1,5 m the same way", () => {
+    expect(vue3dFollowing(shown, "A", FOOT).fils.A.anchor.altitude).toBeCloseTo(1501.5, 9);
+  });
+
+  test("the line that follows is the Ligne A–B, straight from anchor to anchor, without the Banane", () => {
+    const { ligneAB, fils } = vue3dFollowing(shown, "B", FOOT);
+    // A where the scene stands it, 1 453,7 + 1,5 m; B on the pointer's ground.
+    expect(ligneAB).toEqual([shown.fils.A.anchor, fils.B.anchor]);
+    expect(ligneAB[0].altitude).toBeCloseTo(1455.2, 9);
   });
 });
