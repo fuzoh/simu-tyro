@@ -38,12 +38,19 @@ import type { ForceUnit } from "@/lib/scenario/types.ts";
 import type { DroppedKey, SearchKey, TerminationToken, ValidatedSearch } from "@/lib/url/schema.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
-import { CONSTRUCTION_LABEL, FIELDS, lowerFirst, ROPE_CLASS_LABEL } from "@/lib/rail/fields.ts";
+import {
+  CONSTRUCTION_LABEL,
+  FIELDS,
+  lowerFirst,
+  ROPE_CLASS_LABEL,
+  TENSIONING_SIDE_LABEL,
+} from "@/lib/rail/fields.ts";
 import { TERMINATIONS } from "@/lib/sim";
 import {
   CONSTRUCTION_TOKEN_BY_ID,
   newtonsFromDaN,
   ROPE_CLASS_TOKEN_BY_ID,
+  TENSIONING_SIDE_TOKEN_BY_ID,
   terminationIdFromToken,
 } from "@/lib/url/scenario.ts";
 
@@ -102,6 +109,8 @@ const KEYS: Record<StripKey, KeyRow> = {
   te: fromField("H_target", "f", true),
   lo: fromField("L0", "f"),
   vr: fromField("vRatio", "m"),
+  tp: fromField("T_target", "f", true),
+  cp: fromField("tensioningSide", "m"),
   bp: fromField("carryingLines", "m"),
   fam: fromField("family", "f"),
   d: fromField("d", "m"),
@@ -164,6 +173,8 @@ const TOKENS: Record<StripKey, Readonly<Record<string, string>> | null> = {
   te: null,
   lo: null,
   vr: null,
+  tp: null,
+  cp: labelsByToken(TENSIONING_SIDE_TOKEN_BY_ID, TENSIONING_SIDE_LABEL),
   bp: null,
   fam: { ac: "acier", tx: "textile" },
   d: null,

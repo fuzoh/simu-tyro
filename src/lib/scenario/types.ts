@@ -29,6 +29,7 @@
  */
 
 import type {
+  AnchorSide,
   MaterialSpec,
   RegimeId,
   SteelSpec,
@@ -109,14 +110,21 @@ export type Rider = {
 };
 
 /**
- * The Tightness Driver **as the app holds it**: the engine's three modes plus « Rapport V », the
- * ratio `P / H` of the passenger's design load to the horizontal pretension (decision of
- * 2026-09-23). A higher ratio is a deeper V under the rider. It is a parameterisation of the
- * tension mode, not a fourth inversion: `engineTightness` in `./tightness.ts` maps it to
+ * The Tightness Driver **as the app holds it** — five drivers: the engine's four modes plus
+ * « Rapport V », the ratio `P / H` of the passenger's design load to the tension horizontale
+ * (decision of 2026-09-23). A higher ratio is a deeper V under the rider. It is a parameterisation
+ * of the tension mode, not another inversion: `engineTightness` in `./tightness.ts` maps it to
  * `{ mode: "tension", H_target: m_p·g / ratio }` before anything reaches `resolveL0`, which is why
  * `src/lib/sim/**` does not know it exists.
+ *
+ * The prétension (`anchor`, #85) holds its target only: the anchor it is read at is the Scenario's
+ * {@link Scenario.tensioningSide}, which a read-out needs whatever drives, so it is not repeated
+ * here.
  */
-export type TightnessDraft = TightnessSpec | { mode: "ratio"; ratio: number };
+export type TightnessDraft =
+  | Exclude<TightnessSpec, { mode: "anchor" }>
+  | { mode: "anchor"; T_target: number }
+  | { mode: "ratio"; ratio: number };
 
 /**
  * **Brins porteurs** — how many load-bearing members the Span carries (decision of #4). Two are
@@ -124,6 +132,12 @@ export type TightnessDraft = TightnessSpec | { mode: "ratio"; ratio: number };
  * own weight. The gap between them is constant and enters no computation.
  */
 export type CarryingLines = 1 | 2;
+
+/**
+ * The anchor that carries the **Mise en tension** (#85) — where the prétension is read, per
+ * member: what a dynamometer between that anchor and the Maestro shows.
+ */
+export type TensioningSide = AnchorSide;
 
 /** § 7's Scenario: everything a link transports, and nothing the Session keeps on the side. */
 export type Scenario = {
@@ -135,9 +149,11 @@ export type Scenario = {
   anchors: AnchorHeights;
   /** `bp` in a link, and **absent there for one member** — so links older than the key read 1. */
   carryingLines: CarryingLines;
+  /** `cp` in a link, and **absent there for A** — so links older than the key read A. */
+  tensioningSide: TensioningSide;
   /**
-   * §7's presence-encoded Tightness Driver — exactly one of flèche / prétension / `L₀` / rapport V.
-   * The fourth is the app's, not the engine's: {@link TightnessDraft}.
+   * §7's presence-encoded Tightness Driver — exactly one of flèche / prétension / tension
+   * horizontale / `L₀` / rapport V. The last is the app's, not the engine's: {@link TightnessDraft}.
    */
   tightness: TightnessDraft;
   /** The **active** family's spec. The retained one is the Session's — see {@link TextileDraft}. */

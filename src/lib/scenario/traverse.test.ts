@@ -22,6 +22,7 @@ const KEYS: readonly (keyof TraverseInputs)[] = [
   "geometry",
   "anchors",
   "carryingLines",
+  "tensioningSide",
   "tightness",
   "material",
   "terminations",
@@ -35,7 +36,7 @@ describe("`traverseInputs` — the fields a memo keys on", () => {
   const before = firstRunDefaults() as ScenarioDraft;
   const inputs = traverseInputs(before);
 
-  test("the Scenario's thirteen Traverse-scope fields, and no `x_D`", () => {
+  test("the Scenario's fourteen Traverse-scope fields, and no `x_D`", () => {
     expect(Object.keys(inputs).sort()).toEqual([...KEYS].sort());
   });
 

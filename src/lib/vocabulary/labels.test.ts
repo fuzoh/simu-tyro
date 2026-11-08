@@ -119,6 +119,21 @@ describe("#61's table, row by row", () => {
   });
 });
 
+describe("#85 — the prétension and the horizontal `H` are two quantities", () => {
+  test("the prétension keeps #61's two words, and `H` is « tension horizontale » on Avancé alone", () => {
+    expect(label("pretension", "exact")).toBe("prétension");
+    expect(label("horizontalTension", "exact")).toBe("tension horizontale");
+    expect("hiddenOnTerrain" in LABELS.horizontalTension).toBe(true);
+    // GLOSSARY « Tension de pose »: a simplified Page never names `H` with the terrain word.
+    expect(label("horizontalTension", "exact")).not.toBe(label("pretension", "terrain"));
+  });
+
+  test("the tensioning side is named after the Mise en tension, in both registers", () => {
+    expect(label("tensioningSide", "terrain")).toBe(label("tensioningSide", "exact"));
+    expect(label("tensioningSide", "exact")).toContain(label("tensioningDevice", "exact"));
+  });
+});
+
 describe("heading", () => {
   test("capitalises the first letter and leaves symbols and digits alone", () => {
     expect(heading("pretension", "exact")).toBe("Prétension");

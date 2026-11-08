@@ -218,6 +218,7 @@ const GEOMETRY: v.GenericSchema<unknown, Scenario["geometry"]> = v.variant("sour
 const TIGHTNESS: v.GenericSchema<unknown, Scenario["tightness"]> = v.variant("mode", [
   v.object({ mode: v.literal("sag"), D_target: FINITE }),
   v.object({ mode: v.literal("tension"), H_target: FINITE }),
+  v.object({ mode: v.literal("anchor"), T_target: FINITE }),
   v.object({ mode: v.literal("length"), L0: FINITE }),
   v.object({ mode: v.literal("ratio"), ratio: FINITE }),
 ]);
@@ -289,6 +290,8 @@ const SCENARIO: v.GenericSchema<unknown, Scenario> = v.object({
   anchors: v.object({ zA: FINITE, zB: FINITE }),
   // Added with #84, optional with the shipped one member for the same reason as `hClearMin`.
   carryingLines: v.optional(v.picklist([1, 2]), FIRST_RUN_SCENARIO.carryingLines),
+  // Added with #85, optional with the shipped side for the same reason.
+  tensioningSide: v.optional(v.picklist(["A", "B"]), FIRST_RUN_SCENARIO.tensioningSide),
   tightness: TIGHTNESS,
   material: MATERIAL_SPEC,
   terminations: v.object({ A: END_TERMINATION, B: END_TERMINATION }),

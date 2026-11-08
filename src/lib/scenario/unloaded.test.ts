@@ -26,6 +26,7 @@ const KEYS: readonly (keyof UnloadedInputs)[] = [
   "anchors",
   "material",
   "tightness",
+  "tensioningSide",
   "mp",
   "trace",
 ];
@@ -34,7 +35,7 @@ describe("`unloadedInputs` — the fields a memo keys on", () => {
   const before = scenario();
   const inputs = unloadedInputs(before, null);
 
-  test("exactly the six inputs: no `x_D`, no `unit`", () => {
+  test("exactly the seven inputs: no `x_D`, no `unit`", () => {
     expect(Object.keys(inputs).sort()).toEqual([...KEYS].sort());
   });
 

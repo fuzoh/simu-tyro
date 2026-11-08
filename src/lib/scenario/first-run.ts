@@ -64,6 +64,8 @@ export const FIRST_RUN_SCENARIO = {
   anchors: { zA: 12, zB: 12 },
   /** One member, which is `bp` **absent**: the shipped link did not change when the key arrived. */
   carryingLines: 1,
+  /** The Mise en tension at A, which is `cp` **absent**: the shipped link did not change either. */
+  tensioningSide: "A",
   /** `fl=6.0` — §7 mode 3, the only mode whose shipped value is exact at display precision. */
   tightness: { mode: "sag", D_target: 6 },
   /**

@@ -74,6 +74,8 @@ describe("the key table and canonical order", () => {
       "te",
       "lo",
       "vr",
+      "tp",
+      "cp",
       "bp",
       "fam",
       "d",
@@ -142,6 +144,15 @@ describe("the three refusal classes come back as a marker, never as a throw", ()
       query: "?te=253.5&lo=151.64",
       kind: "deux-directeurs",
     },
+    // The fifth driver joins the same rule (#85): the prétension beside any other is two models.
+    { name: "two tightness drivers — tp + te", query: "?tp=260&te=253.5", kind: "deux-directeurs" },
+    { name: "two tightness drivers — tp + fl", query: "?tp=260&fl=6", kind: "deux-directeurs" },
+    {
+      name: "two tightness drivers — tp + lo",
+      query: "?lo=151.64&tp=260",
+      kind: "deux-directeurs",
+    },
+    { name: "two tightness drivers — tp + vr", query: "?vr=0.8&tp=260", kind: "deux-directeurs" },
     {
       name: "three tightness drivers at once",
       query: "?fl=6&te=253.5&lo=151.64",
@@ -364,6 +375,12 @@ describe("an unknown or unrepresentable key is ignored and named", () => {
       name: "a third Brin porteur, which the schema does not publish",
       query: "?L=250&bp=3",
       dropped: [{ key: "bp", reason: "valeur-non-représentable" }],
+      kept: { L: 250 },
+    },
+    {
+      name: "a third anchor for the Mise en tension, which the schema does not publish",
+      query: "?L=250&cp=c",
+      dropped: [{ key: "cp", reason: "valeur-non-représentable" }],
       kept: { L: 250 },
     },
     {

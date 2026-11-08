@@ -365,6 +365,16 @@ modes, all converted to `L₀`:
    (§14). Same framing as the mooring "pretension problem" and overhead-line
    "sag-tension/stringing" problem [R2 B5].
 
+   **Anchor target** `T_target` (decision of 2026-11-08, #85 — what a dynamometer reads
+   between the tensioning anchor and the Maestro): the monotonicity above is proven for `H`
+   only. `T_A(L₀)` (or `T_B`) falls from the chord as `H` does, but `T = √(H² + V²)` (§2)
+   keeps the weight of every metre added, so on a very slack line it bottoms out and rises
+   again. The bisection runs on the **taut branch** — from the §5.4 floor to that minimum,
+   located by golden-section search once a doubled slack reads higher than the step before
+   it — and a target under the minimum is unreachable. Checked numerically, not
+   cross-validated: `src/lib/sim/parameterise.test.ts` resolves the `T_A`/`T_B` of Z1–Z3
+   back to their `L₀`.
+
 3. **Target unloaded sag** `D_target`: seed `H ≈ wL²/(8D_target)` [ALGO §3], refine `H`
    against the exact catenary sag, then mode 2. (Loaded-sag targets: same loop around the
    §6.1 solve.)

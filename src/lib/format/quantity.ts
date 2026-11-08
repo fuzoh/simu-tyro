@@ -145,8 +145,14 @@ export const QUANTITIES = {
    */
   D_target: { unit: "m", decimals: 2 },
   /**
-   * `Prétension cible` `H_target`, daN — prefilled; 0,05 daN has no effect. The deduced
-   * `Prétension` `H à vide` read-out is the same grandeur at the same grain, and § 3 tables it
+   * `Prétension` `T_target`, daN — the tension at the tensioning anchor, per member (#85).
+   * Prefilled from its read-out like `H`, and read on the same dynamometer grain; the deduced
+   * `Prétension` row renders through this row too.
+   */
+  T_target: { unit: "force", decimals: 1 },
+  /**
+   * `Tension horizontale` `H_target`, daN — prefilled; 0,05 daN has no effect. The deduced
+   * `Tension horizontale` read-out is the same grandeur at the same grain, and § 3 tables it
    * once: both render through this row.
    */
   H_target: { unit: "force", decimals: 1 },

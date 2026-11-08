@@ -60,13 +60,17 @@ export const FIELD_HELP: Record<FieldId, string> = {
   tb: "Type de terminaison à l'ancrage B. Même règle qu'en A : le rendement η par défaut est celui de §10.2/§10.3 à son extrémité conservatrice, repris dans le champ « Rendement η » et modifiable. Les deux extrémités sont jugées séparément dans la grille critères × extrémités.",
   etaA: "Rendement de la terminaison A, η_A ∈ ]0, 1] : fraction de la charge de rupture que la ligne conserve à cette extrémité. Il multiplie directement la tension admissible T adm,A = η_A · MBF / k et le facteur de sécurité FS_A = η_A · MBF / T max,A majoré. Prérempli depuis le type choisi ; une valeur modifiée passe en « valeur utilisateur » dans la provenance.",
   etaB: "Rendement de la terminaison B, η_B ∈ ]0, 1] : fraction de la charge de rupture conservée à cette extrémité. T adm,B = η_B · MBF / k et FS_B = η_B · MBF / T max,B majoré. Le critère « charge suspendue » utilise min(η_A, η_B), car une ligne cède à sa terminaison la plus faible.",
+  tensioningSide:
+    "Ancrage où se trouve la Mise en tension : A ou B. C'est là que se lit la prétension, par ligne — ce que montre un dynamomètre posé entre cet ancrage et le Maestro. La tension à vide est la plus grande à l'ancrage le plus haut (§2) : sur une portée inclinée, changer de côté change la prétension lue et, quand la prétension est le pilote, la longueur non tendue L₀ qui la donne.",
   D_target:
-    "Flèche à vide voulue, en mètres : creux maximal de la ligne sans passager sous la ligne A–B. Le solveur cherche la longueur non tendue L₀ (et donc la prétension H) qui donne exactement cette flèche à la chaînette élastique (§4, §5). C'est le pilote de tension par défaut, car sa valeur est exacte à la précision affichée.",
+    "Flèche à vide voulue, en mètres : creux maximal de la ligne sans passager sous la ligne A–B. Le solveur cherche la longueur non tendue L₀ (et donc la tension horizontale H) qui donne exactement cette flèche à la chaînette élastique (§4, §5). C'est le pilote de tension par défaut, car sa valeur est exacte à la précision affichée.",
+  T_target:
+    "Prétension voulue, par ligne : la tension de la ligne à vide à l'ancrage de la Mise en tension, celle que lit un dynamomètre entre cet ancrage et le Maestro. Le solveur cherche la longueur non tendue L₀ qui donne cette tension à cet ancrage (§7). La tension à l'ancrage passe par un minimum sur une ligne très lâche : seule la branche tendue est retenue, et une prétension sous ce minimum est « Cible inatteignable ». Une prétension que la ligne ne peut porter sans rompre est refusée (« Tension impossible », §5.4). Avec deux Brins porteurs, chaque ligne reçoit cette prétension.",
   H_target:
-    "Prétension voulue, composante horizontale H de la tension, constante sur toute la ligne. Le solveur cherche la longueur non tendue L₀ qui, sous le poids propre w = μ · g, donne cette H. Une H trop faible pour la ligne A–B est refusée par le moteur (« Tension impossible », §5.4).",
-  L0: "Longueur non tendue L₀ de la ligne, en mètres : longueur du câble hors charge, avant allongement élastique. C'est la vraie grandeur d'état du modèle — les deux autres pilotes s'y ramènent. La ligne installée s'allonge de T · L₀ / EA ; L₀ doit dépasser la ligne A–B moins cet allongement.",
+    "Tension horizontale voulue H : composante horizontale de la tension, constante sur toute la ligne à vide. Ce n'est pas la prétension : à l'ancrage, T = √(H² + V²) est plus grande. Le solveur cherche la longueur non tendue L₀ qui, sous le poids propre w = μ · g, donne cette H (§7). Une H que la ligne ne peut porter sans rompre est refusée par le moteur (« Tension impossible », §5.4).",
+  L0: "Longueur non tendue L₀ de la ligne, en mètres : longueur du câble hors charge, avant allongement élastique. C'est la vraie grandeur d'état du modèle — les autres pilotes s'y ramènent. La ligne installée s'allonge de T · L₀ / EA ; L₀ doit dépasser la ligne A–B moins cet allongement.",
   vRatio:
-    "Rapport V = P / H : poids du passager P = m_p · g sur la prétension horizontale H. C'est un paramétrage du mode « Tension » : H voulue = m_p · g / rapport. Plus le rapport est grand, plus H est faible et plus la ligne forme un V profond sous le passager.",
+    "Rapport V = P / H : poids du passager P = m_p · g sur la tension horizontale H. C'est un paramétrage du pilote « H » : H voulue = m_p · g / rapport. Plus le rapport est grand, plus H est faible et plus la ligne forme un V profond sous le passager.",
   mp: "Masse du passager m_p, en kg. La charge ponctuelle appliquée à la ligne vaut P = m_p · g ; elle crée le point anguleux de la chaînette chargée, augmente les tensions aux ancrages et la flèche chargée. Les 120 kg par défaut sont attribués à EN 15567-1 mais non vérifiés dans le texte primaire.",
   hRider:
     "Gabarit du passager h_rider, en mètres : hauteur occupée sous le câble par le passager, son harnais et sa poulie. Elle est soustraite directement de la hauteur du câble pour obtenir la garde au sol : h_clear(x) = z_câble(x) − z_sol(x) − h_rider (§11). 2,1 m est une [CONVENTION] : aucune valeur normative n'est publiée.",
@@ -78,7 +82,7 @@ export const FIELD_HELP: Record<FieldId, string> = {
 
 /** Help for the pilot control of `Tension de la ligne` — a segmented control, not a field. */
 export const TIGHTNESS_HELP =
-  "Pilote de tension : exactement une des quatre grandeurs est saisie, les autres sont déduites. « Flèche » fixe la flèche à vide, « Tension » la prétension horizontale H, « Longueur » la longueur non tendue L₀, « Rapport V » le rapport P / H. Changer de pilote préremplit le nouveau champ avec la valeur déduite courante, à sa précision d'affichage, de sorte que la ligne ne bouge pas.";
+  "Pilote de tension : exactement une des cinq grandeurs est saisie, les quatre autres sont déduites. « Flèche » fixe la flèche à vide, « Prétension » la tension à l'ancrage de la Mise en tension, « H » la tension horizontale, « Longueur » la longueur non tendue L₀, « Rapport V » le rapport P / H. Changer de pilote préremplit le nouveau champ avec la valeur déduite courante, à sa précision d'affichage, de sorte que la ligne ne bouge pas.";
 
 /** Help for the read-only rows of `Valeurs déduites`. The three steel derived rows use {@link FIELD_HELP}. */
 export const DEDUCED_HELP: Record<DeducedRowId, string> = {
@@ -94,9 +98,13 @@ export const DEDUCED_HELP: Record<DeducedRowId, string> = {
   w: "Poids linéique de la ligne w = μ · g, en force par mètre. C'est la charge répartie qui donne la forme de chaînette à vide : constante C = H / w, y(x) = C · cosh((x − x₀) / C) + y₀ (§3, §4).",
   chord:
     "Longueur de la ligne A–B, droite entre les deux ancrages : √(L² + h²), en mètres. Toute longueur non tendue L₀ doit dépasser cette longueur diminuée de l'allongement élastique ; la borne §5.4 refuse une tension qui ne la respecte pas.",
-  L0: "Longueur non tendue L₀ résolue par le solveur pour le pilote choisi (flèche, prétension ou rapport V), en mètres. C'est la longueur de câble à mesurer hors charge avant de monter la ligne. Elle est préremplie dans le champ si vous passez au pilote « Longueur ».",
-  H: "Prétension horizontale H de la ligne à vide, résolue par le solveur pour le pilote choisi. Constante sur toute la ligne ; la tension totale en un point vaut T = H / cos θ, et T aux ancrages est la plus grande là où la pente est la plus forte. Préremplie dans le champ si vous passez au pilote « Tension ».",
+  L0: "Longueur non tendue L₀ résolue par le solveur pour le pilote choisi (flèche, prétension, tension horizontale ou rapport V), en mètres. C'est la longueur de câble à mesurer hors charge avant de monter la ligne. Elle est préremplie dans le champ si vous passez au pilote « Longueur ».",
+  pretension:
+    "Prétension de la ligne à vide, par ligne : sa tension à l'ancrage de la Mise en tension, T = √(H² + V²) à cet ancrage (§2) — ce que lit un dynamomètre entre cet ancrage et le Maestro. Préremplie dans le champ si vous passez au pilote « Prétension ».",
+  H: "Tension horizontale H de la ligne à vide, résolue par le solveur pour le pilote choisi. Constante sur toute la ligne ; la tension totale en un point vaut T = H / cos θ, si bien que la prétension, lue à un ancrage, est plus grande. Préremplie dans le champ si vous passez au pilote « H ».",
   sag: "Flèche à vide : creux maximal de la ligne sans passager sous la ligne A–B, en mètres, et la position x où il se produit. Résolue depuis la chaînette élastique pour la L₀ courante (§4). Préremplie dans le champ si vous passez au pilote « Flèche ».",
+  vRatio:
+    "Rapport V = P / H de la ligne à vide : poids du passager m_p · g sur la tension horizontale H. Prérempli dans le champ si vous passez au pilote « Rapport V ».",
   sagRatio:
     "Rapport flèche à vide / portée, en %. C'est un indicateur de validité du modèle : sous 3 % (§8.2) la ligne se raidit, la réponse dynamique est mal décrite et la majoration au départ 1,2 sort de son régime de mesure — un avertissement s'affiche alors ici et sur la majoration au départ.",
   standingTension:

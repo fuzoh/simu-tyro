@@ -10,7 +10,8 @@
  * - **Both directions read the same tables.** {@link scenarioToSearch} and {@link searchToScenario}
  *   sit side by side so a token, a unit or a key cannot be taught to one direction only.
  * - **The URL's daN become the state's newtons here, and nowhere else.** § 3's « SI internally,
- *   always » governs the state object; `te`, `mbf`, `ea` and `mbl` are the forces a link carries.
+ *   always » governs the state object; `te`, `tp`, `mbf`, `ea` and `mbl` are the forces a link
+ *   carries.
  * - **A blank is `null`, never a number nobody typed.** `?fam=tx` with no `mbl`/`mu` is § 9's
  *   « vides et requis » — the correct arrival state, and two blocking errors rather than an
  *   invented rope. Hence a {@link ScenarioDraft} rather than a `Scenario` on the way in.
@@ -25,6 +26,7 @@ import type { TightnessFieldId } from "@/lib/rail/fields.ts";
 import type {
   Scenario,
   ScenarioDraft,
+  TensioningSide,
   TextileDraft,
   TightnessDraft,
 } from "@/lib/scenario/types.ts";
@@ -44,6 +46,7 @@ import type {
   RopeClassToken,
   SearchKey,
   SearchValues,
+  TensioningSideToken,
   TerminationToken,
   TightnessKey,
 } from "./schema.ts";
@@ -64,13 +67,23 @@ export const ROPE_CLASS_TOKEN_BY_ID = {
   polyester: "pes",
 } as const satisfies Record<TextileSpec["ropeClass"], RopeClassToken>;
 
+/** The write-side direction of `cp`. Total over the two anchors. */
+export const TENSIONING_SIDE_TOKEN_BY_ID = {
+  A: "a",
+  B: "b",
+} as const satisfies Record<TensioningSide, TensioningSideToken>;
+
 /** The key each Tightness Driver's field travels under. Total over the drivers and the keys. */
 const DRIVER_KEY = {
   D_target: "fl",
   H_target: "te",
+  T_target: "tp",
   L0: "lo",
   vRatio: "vr",
 } as const satisfies Record<TightnessFieldId, TightnessKey>;
+
+/** The two drivers that are forces, and therefore daN on the wire. */
+const FORCE_DRIVER_KEYS: ReadonlySet<TightnessKey> = new Set<TightnessKey>(["te", "tp"]);
 
 type Values<T> = T[keyof T];
 
@@ -84,8 +97,9 @@ type Covers<Token extends string, Table> = [Token] extends [Values<Table>]
 const TOKEN_TABLES_COVER_TUPLES: [
   Covers<ConstructionToken, typeof CONSTRUCTION_TOKEN_BY_ID>,
   Covers<RopeClassToken, typeof ROPE_CLASS_TOKEN_BY_ID>,
+  Covers<TensioningSideToken, typeof TENSIONING_SIDE_TOKEN_BY_ID>,
   Covers<TightnessKey, typeof DRIVER_KEY>,
-] = [true, true, true];
+] = [true, true, true, true];
 void TOKEN_TABLES_COVER_TUPLES;
 
 /**
@@ -106,6 +120,10 @@ export const CONSTRUCTION_ID_BY_TOKEN = invert<SteelSpec["construction"], Constr
 
 export const ROPE_CLASS_ID_BY_TOKEN = invert<TextileSpec["ropeClass"], RopeClassToken>(
   ROPE_CLASS_TOKEN_BY_ID,
+);
+
+const TENSIONING_SIDE_BY_TOKEN = invert<TensioningSide, TensioningSideToken>(
+  TENSIONING_SIDE_TOKEN_BY_ID,
 );
 
 /** N → daN. § 7: forces serialise in daN, **fixed**, and ×10 exactly, so the step is lossless. */
@@ -205,7 +223,7 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
   SearchValues,
   "v" | "u" | "use" | "za" | "zb" | "ta" | "tb" | "na" | "nb" | "mp" | "hr" | "gm" | "daf" | "x"
 > &
-  Partial<Pick<SearchValues, "reg" | "bp">> &
+  Partial<Pick<SearchValues, "reg" | "bp" | "cp">> &
   CompletedTerrain &
   CompletedDriver &
   (CompletedSteel | CompletedTextile);
@@ -213,12 +231,14 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
 /**
  * The keys whose **absence is meaning**, never completed. `reg` absent is « — choisir — »,
  * `mbf`/`ea`/`mu` absent is « non surchargée », which differs from « equal to the formula value »,
- * `mbl` absent — with `mu`, under `fam=tx` — is § 9's rope nobody typed, and `bp` absent is one
- * Brin porteur: completing it would rewrite, and name in the strip, every link older than the key.
+ * `mbl` absent — with `mu`, under `fam=tx` — is § 9's rope nobody typed, `bp` absent is one
+ * Brin porteur and `cp` absent is the Mise en tension at A: completing either would rewrite, and
+ * name in the strip, every link older than the key.
  */
 const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>([
   "reg",
   "bp",
+  "cp",
   "mbf",
   "ea",
   "mu",
@@ -267,7 +287,7 @@ export type Completion = {
  *
  * Three groups are exempt, all of them § 7's meanings of absence:
  *
- * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, the Overrides and the textile blanks. Under `fam=tx`
+ * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, `cp`, the Overrides and the textile blanks. Under `fam=tx`
  *    **no rope is invented**: § 9 ships `MBL` and `μ` « vides et requis », because one made-up
  *    `MBL` decides the verdict, and those two blocking errors are the correct arrival state.
  *    Polyester's `k` stays blank too, because §13.2 publishes none.
@@ -422,6 +442,7 @@ function tightness(search: CompletedDriver): TightnessDraft {
   if (search.fl !== undefined) return { mode: "sag", D_target: search.fl };
   if (search.te !== undefined) return { mode: "tension", H_target: newtonsFromDaN(search.te) };
   if (search.lo !== undefined) return { mode: "length", L0: search.lo };
+  if (search.tp !== undefined) return { mode: "anchor", T_target: newtonsFromDaN(search.tp) };
   return { mode: "ratio", ratio: search.vr };
 }
 
@@ -478,6 +499,8 @@ export function searchToScenario(search: CompletedSearch): ScenarioDraft {
     anchors: { zA: search.za, zB: search.zb },
     // Absent **is** one member — the meaning of absence, never a completed default.
     carryingLines: search.bp ?? 1,
+    // Absent **is** A, likewise.
+    tensioningSide: search.cp === undefined ? "A" : TENSIONING_SIDE_BY_TOKEN[search.cp],
     tightness: tightness(search),
     material: search.fam === "tx" ? textile(search) : steel(search),
     terminations: {
@@ -525,9 +548,11 @@ export function scenarioToSearch(scenario: Scenario): CompletedSearch {
 
   const driver = tightnessDriver(scenario);
   const driverKey = DRIVER_KEY[driver.field];
-  out[driverKey] = driverKey === "te" ? daNFromNewtons(driver.value) : driver.value;
+  out[driverKey] = FORCE_DRIVER_KEYS.has(driverKey) ? daNFromNewtons(driver.value) : driver.value;
 
-  // One member is `bp` **absent**, so the links written before the key stay string-identical.
+  // A is `cp` **absent** and one member is `bp` **absent**, so the links written before either key
+  // stay string-identical.
+  if (scenario.tensioningSide === "B") out.cp = TENSIONING_SIDE_TOKEN_BY_ID.B;
   if (scenario.carryingLines === 2) out.bp = 2;
 
   if (material.family === "steel") {

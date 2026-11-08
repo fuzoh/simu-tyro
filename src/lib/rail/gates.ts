@@ -192,7 +192,8 @@ export type CulpritMode =
   | "importé"
   | "mode Longueur"
   | "mode Flèche"
-  | "mode Tension"
+  | "mode Prétension"
+  | "mode Tension horizontale"
   | "mode Rapport V"
   | "acier"
   | "acier surchargé"
@@ -205,7 +206,8 @@ const CULPRITS: Partial<Record<`${Grandeur}/${CulpritMode}`, readonly FieldId[]>
   "h/importé": ["sa", "sb", "zA", "zB"],
   "L0/mode Longueur": ["L0"],
   "L0/mode Flèche": ["D_target"],
-  "L0/mode Tension": ["H_target"],
+  "L0/mode Prétension": ["T_target"],
+  "L0/mode Tension horizontale": ["H_target"],
   "L0/mode Rapport V": ["vRatio"],
   "MBF/acier": ["d", "R0", "cst"],
   "MBF/acier surchargé": ["mbfOverride"],

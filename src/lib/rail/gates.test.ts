@@ -604,7 +604,8 @@ describe("the culprit table — static, indexed by (grandeur × mode), never inf
     expect(culprits("h", "importé")).toEqual(["sa", "sb", "zA", "zB"]);
     expect(culprits("L0", "mode Longueur")).toEqual(["L0"]);
     expect(culprits("L0", "mode Flèche")).toEqual(["D_target"]);
-    expect(culprits("L0", "mode Tension")).toEqual(["H_target"]);
+    expect(culprits("L0", "mode Prétension")).toEqual(["T_target"]);
+    expect(culprits("L0", "mode Tension horizontale")).toEqual(["H_target"]);
   });
 
   test("the steel rows follow §13.1's formulas, not the field group", () => {

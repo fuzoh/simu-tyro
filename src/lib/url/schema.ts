@@ -49,17 +49,17 @@
  * - **`tr` is validated structurally and kept verbatim.** {@link validateP1} allocates no arrays;
  *   the real decode is a memoised derivation inside the client-only subtree and never enters the
  *   validated search object, because arrays in it would be stringified back into the address bar.
- * - **The tightness driver is encoded by which key is *present*** — `fl` / `te` / `lo` / `vr`. Two
+ * - **The tightness driver is encoded by which key is *present*** — `fl` / `te` / `lo` / `vr` / `tp`. Two
  *   present keys « are not a bad value but two contradictory models of the same line », so presence
  *   is counted on the **raw** bag, before per-key validation, and the link refuses whole.
  * - **Forces are daN in the URL, always**, whatever `u` says. `u` is display-only, so hand-editing
  *   `u=daN` → `u=kN` must not make the line 100× tighter. The engine holds newtons; `./scenario.ts`
  *   is the one place the ÷10 happens, in both directions.
- * - **Absence carries exactly four meanings and never a fifth.** `reg` absent is « — choisir — »,
- *   `mbf`/`ea`/`mu` absent is « non surchargée », `bp` absent is one Brin porteur, and a family- or
- *   terrain-scoped key absent means that configuration is not the active one. So
- *   `stripSearchParams` is rejected, every other key with a value is stated even at its default,
- *   and `./scenario.ts`'s completion exempts the first three.
+ * - **Absence carries exactly five meanings and never a sixth.** `reg` absent is « — choisir — »,
+ *   `mbf`/`ea`/`mu` absent is « non surchargée », `bp` absent is one Brin porteur, `cp` absent is
+ *   the Mise en tension at A, and a family- or terrain-scoped key absent means that configuration
+ *   is not the active one. So `stripSearchParams` is rejected, every other key with a value is
+ *   stated even at its default, and `./scenario.ts`'s completion exempts the first four.
  * - **The dropped-keys reporter takes the raw query string as a parameter**
  *   ({@link reportDroppedKeys}), never reading `window.location` — amendment A removed the jsdom
  *   environment that would otherwise be needed, and as a pure function this is a plain unit test.
@@ -100,6 +100,8 @@ export const CANONICAL_KEYS = [
   "te",
   "lo",
   "vr",
+  "tp",
+  "cp",
   "bp",
   "fam",
   "d",
@@ -147,6 +149,12 @@ export const REGIME_TOKENS = [
 /** `bp` — one or two Brins porteurs (#4). A third is unrepresentable, not out of range. */
 export const CARRYING_LINES = [1, 2] as const satisfies readonly CarryingLines[];
 
+/** `cp` tokens — the anchor carrying the Mise en tension (#85), spelled like `za` / `zb`. */
+export const TENSIONING_SIDE_TOKENS = ["a", "b"] as const;
+
+/** A `cp` token. */
+export type TensioningSideToken = (typeof TENSIONING_SIDE_TOKENS)[number];
+
 /** § 7's `fam` tokens — `ac` acier, `tx` textile. */
 export const FAMILY_TOKENS = ["ac", "tx"] as const;
 
@@ -190,10 +198,11 @@ export type TerminationToken = (typeof TERMINATION_TOKENS)[number];
 export const GRADES = [1770, 1960] as const;
 
 /**
- * § 7's tightness drivers — three, plus `vr` (« Rapport V », `P / H`, added 2026-09-23). **Exactly
- * one** may be present; two is a refusal.
+ * § 7's tightness drivers — three, plus `vr` (« Rapport V », `P / H`, added 2026-09-23) and `tp`
+ * (the prétension read at the tensioning anchor, #85). **Exactly one** may be present; two is a
+ * refusal.
  */
-export const TIGHTNESS_KEYS = ["fl", "te", "lo", "vr"] as const;
+export const TIGHTNESS_KEYS = ["fl", "te", "lo", "vr", "tp"] as const;
 
 /** One of § 7's tightness-driver keys. */
 export type TightnessKey = (typeof TIGHTNESS_KEYS)[number];
@@ -250,10 +259,14 @@ const KEY_SCHEMAS = {
   za: FINITE, // Hauteur d'ancrage A, m.
   zb: FINITE, // Hauteur d'ancrage B, m.
   fl: FINITE, // Flèche à vide cible, m.
-  te: FINITE, // Prétension cible, **daN**.
+  te: FINITE, // Tension horizontale `H`, **daN**.
   lo: FINITE, // Longueur non tendue, m.
   // « Rapport V » `P / H`, dimensionless. Presence selects the driver, like the three above.
   vr: FINITE,
+  // Prétension at the tensioning anchor, per member, **daN** — the fifth driver (#85).
+  tp: FINITE,
+  // The anchor carrying the Mise en tension. Absent **is** A, so a link older than the key reads A.
+  cp: v.picklist(TENSIONING_SIDE_TOKENS),
   // Brins porteurs. Absent **is** one member, so a link older than the key reads as it always did.
   bp: v.picklist(CARRYING_LINES),
   fam: v.picklist(FAMILY_TOKENS),
@@ -298,8 +311,8 @@ const SCENARIO_KEY_SET: ReadonlySet<string> = new Set<string>(
  * - `version-inconnue` — « version de schéma inconnue (v = 3) »
  * - `tracé-illisible` — « tracé illisible »
  * - `tracé-hors-budget` — « tracé trop volumineux pour cette adresse »
- * - `deux-directeurs` — « flèche à vide cible, prétension cible, longueur non tendue et rapport V
- *   cible : deux valeurs de tension dans le même lien »
+ * - `deux-directeurs` — « flèche à vide, prétension, tension horizontale, longueur non tendue et
+ *   rapport V : deux valeurs de tension dans le même lien »
  */
 export const REFUSAL_KINDS = [
   "version-inconnue",

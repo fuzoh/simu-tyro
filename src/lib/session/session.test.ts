@@ -568,6 +568,42 @@ describe("Brins porteurs in the Session (#84)", () => {
   });
 });
 
+describe("the tensioning side and the prétension driver in the Session (#85)", () => {
+  test("side B and a prétension driver survive a write and a read", () => {
+    const storage = memoryStorage();
+    const scenario: Scenario = {
+      ...firstRunDefaults(),
+      tensioningSide: "B",
+      tightness: { mode: "anchor", T_target: 2500 },
+    };
+    writeSession(storage, { ...bareSession(), scenario });
+    expect(readSession(storage)?.scenario).toMatchObject({
+      tensioningSide: "B",
+      tightness: { mode: "anchor", T_target: 2500 },
+    });
+  });
+
+  test("a Session stored before the key is kept, and reads side A", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const older = { ...(blob.scenario as Record<string, unknown>) };
+    delete older.tensioningSide;
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: older }));
+
+    const restored = readSession(storage);
+    expect(restored?.trace).not.toBeNull();
+    expect(restored?.scenario.tensioningSide).toBe("A");
+  });
+
+  test("a third side is not a Session — the blob is discarded whole", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const scenario = { ...(blob.scenario as Record<string, unknown>), tensioningSide: "C" };
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario }));
+    expect(readSession(storage)).toBeNull();
+  });
+});
+
 describe("ADR-0001 — a restored Session is kept as given, and the gates judge it", () => {
   test("a knot on HMPE comes back unchanged and blocks the verdict on Terminaison A", () => {
     const knotted: Scenario = {

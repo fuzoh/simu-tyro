@@ -80,7 +80,11 @@ function openingState(scenario: Scenario) {
   // `g` is § 2's fixed, unexposed constant; A2 owns the app-side copy the Rail will read.
   const P = rider.mp * STEEL.g;
 
-  const L0 = resolveL0(engineTightness(scenario.tightness, rider.mp), { L, h, ...derived });
+  const L0 = resolveL0(engineTightness(scenario.tightness, rider.mp, scenario.tensioningSide), {
+    L,
+    h,
+    ...derived,
+  });
   if (!L0.ok) throw new Error(`expected an L₀, got ${JSON.stringify(L0.error)}`);
 
   const span: SpanInput = {
@@ -166,6 +170,8 @@ describe("FIRST_RUN_SCENARIO — § 9's shipped inputs", () => {
     expect(FIRST_RUN_SCENARIO.anchors).toEqual({ zA: 12, zB: 12 });
     // One Brin porteur — `bp` absent, so § 9's link did not move when the key arrived (#84).
     expect(FIRST_RUN_SCENARIO.carryingLines).toBe(1);
+    // The Mise en tension at A — `cp` absent, likewise (#85).
+    expect(FIRST_RUN_SCENARIO.tensioningSide).toBe("A");
   });
 
   test("Flèche is the active Tightness segment, at 6,0 m", () => {

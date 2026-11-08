@@ -95,9 +95,14 @@ describe("§ 7's message table — committed invalid, ⛔ and blocking", () => {
       "⛔ Flèche à vide — une flèche strictement positive est requise. Valeur : 0,00 m.",
     ],
     [
-      "H_target",
+      "T_target",
       "0",
       "⛔ Prétension — une tension strictement positive est requise. Valeur : 0,0 daN.",
+    ],
+    [
+      "H_target",
+      "0",
+      "⛔ Tension horizontale — une tension strictement positive est requise. Valeur : 0,0 daN.",
     ],
     [
       "L0",
@@ -363,7 +368,10 @@ describe("the Rail labels its fields in the exact register", () => {
     ["sa", "Distance A"],
     ["sb", "Distance B"],
     ["D_target", "Flèche à vide"],
-    ["H_target", "Prétension"],
+    ["tensioningSide", "Côté de la Mise en tension"],
+    // #85: the prétension is read at the tensioning anchor; `H` keeps its own exact name.
+    ["T_target", "Prétension"],
+    ["H_target", "Tension horizontale"],
     ["L0", "Longueur non tendue"],
     ["vRatio", "Rapport V"],
     ["hRider", "Gabarit du passager"],

@@ -64,6 +64,19 @@ describe("§ 8's first sentence — the `vr` and `gm` keys are named like every 
     );
   });
 
+  test("a third anchor for the Mise en tension is not a value the link can carry", () => {
+    expect(strip("?L=250&cp=c")?.ignored).toBe(
+      "Une partie du lien a été ignorée : « cp » n'était pas une valeur reconnue " +
+        "(côté de la Mise en tension ignoré).",
+    );
+  });
+
+  test("an unreadable `tp` names the prétension", () => {
+    expect(strip("?L=250&tp=abc")?.ignored).toBe(
+      "Une partie du lien a été ignorée : « tp » n'était pas un nombre (prétension ignorée).",
+    );
+  });
+
   test("a third Brin porteur is not a value the link can carry, and the clause says so", () => {
     expect(strip("?L=250&bp=3")?.ignored).toBe(
       "Une partie du lien a été ignorée : « bp » n'était pas une valeur reconnue " +
@@ -94,7 +107,8 @@ describe("§ 8's second sentence — the completion names the values", () => {
 
   test("a force is undone from the URL's daN into the unit the screen reads", () => {
     // § 7 serialises every force in daN; the strip prints what the recipient's own field shows.
-    expect(strip("?te=900&L=150")?.completed).not.toContain("prétension");
+    expect(strip("?te=900&L=150")?.completed).not.toContain("tension horizontale");
+    expect(strip("?tp=900&L=150")?.completed).not.toContain("prétension");
     expect(strip("?L=150&h=-18")?.completed).toContain("flèche à vide 6,00 m");
   });
 
@@ -106,6 +120,8 @@ describe("§ 8's second sentence — the completion names the values", () => {
     expect(sentence).not.toContain("charge de rupture");
     // `bp` absent is one Brin porteur (#84): a link older than the key is not corrected for it.
     expect(sentence).not.toContain("Brins porteurs");
+    // `cp` absent is the Mise en tension at A (#85), likewise.
+    expect(sentence).not.toContain("Mise en tension");
   });
 });
 
@@ -164,6 +180,12 @@ describe("a completed force is converted from the URL's daN into the screen's un
   test("`te=900` daN prints as 9,000 kN under the kN selector", () => {
     const base = initialAppState({ query: "", session: null }).link;
     const link = { ...base, completed: ["te" as const], rewrite: { te: 900 } };
+    expect(linkStrip(link, "kN")?.completed).toContain("tension horizontale 9,000 kN");
+  });
+
+  test("`tp=900` daN prints as the prétension, 9,000 kN under the kN selector", () => {
+    const base = initialAppState({ query: "", session: null }).link;
+    const link = { ...base, completed: ["tp" as const], rewrite: { tp: 900 } };
     expect(linkStrip(link, "kN")?.completed).toContain("prétension 9,000 kN");
   });
 });

@@ -10,7 +10,7 @@
  *
  * | Engine | Surface |
  * | --- | --- |
- * | `invalid-input{field: "L0" \| "D_target" \| "H_target"}` | **Tension impossible**, with the attainable bound and **no Fix Action** |
+ * | `invalid-input{field: "L0" \| "D_target" \| "H_target" \| "T_target"}` | **Tension impossible**, with the attainable bound and **no Fix Action** |
  * | `resolveL0`'s bracket failure — `no-convergence` at stage `L0` | **Cible inatteignable**, naming the *target* |
  * | `solveSpan`'s `no-convergence` **or** `slack-limit` | **Calcul impossible**, with `[ Copier le diagnostic ]` |
  *
@@ -20,7 +20,7 @@
  *   bound *is* the breaking load, so no unambiguous repair exists. You cannot tension a rope past
  *   its breaking load, and a rupture verdict would report a line that cannot exist.
  * - **The bound is quoted in the driving field's own quantity and unit, and never twice.** In
- *   tension mode the copy states the prétension and *not* « soit L₀ ≥ 197,40 m »: a second
+ *   a tension mode the copy states that tension and *not* « soit L₀ ≥ 197,40 m »: a second
  *   equivalent invites the user to type a length into a tension field. That is why the two
  *   mode-specific messages depend on `resolveL0` re-emitting the floor in the driving quantity —
  *   without it the state degrades to quoting an `L₀` floor at a user editing a tension.
@@ -46,7 +46,7 @@ import { FIELDS, lowerFirst } from "@/lib/rail/fields.ts";
 import { tightnessDriver } from "@/lib/rail/values.ts";
 import { SOLVER } from "@/lib/sim";
 import { CONSTRUCTION_TOKEN_BY_ID } from "@/lib/url/scenario.ts";
-import { label } from "@/lib/vocabulary/labels.ts";
+import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 /** The three surfaces § 7 names. Three, not two: `no-convergence` has two origins. */
 export type RefusalId = "tension-impossible" | "cible-inatteignable" | "calcul-impossible";
@@ -119,12 +119,22 @@ export function engineRefusal(
           )} · valeur : ${formatQuantity("L0", error.value)}.`,
           diagnostic: false,
         };
+      case "T_target":
+        return {
+          id: "tension-impossible",
+          message: `${TENSION_LEAD} ${heading("pretension", "exact")} maximale atteignable : ${formatQuantity(
+            "T_target",
+            error.bound,
+            unit,
+          )}.`,
+          diagnostic: false,
+        };
       case "H_target":
         return {
           id: "tension-impossible",
           // In « Rapport V » the engine still speaks of `H_target` — the ratio resolved to one —
           // so the bound is named in the quantity the user can act on.
-          message: `${TENSION_LEAD} Prétension maximale atteignable : ${formatQuantity(
+          message: `${TENSION_LEAD} ${heading("horizontalTension", "exact")} maximale atteignable : ${formatQuantity(
             "H_target",
             error.bound,
             unit,
@@ -165,7 +175,8 @@ export function engineRefusal(
 /** How « Cible inatteignable » names each driver's target — the refusal's own wording. */
 const TARGET_NOUN: Record<TightnessFieldId, string> = {
   D_target: "cette flèche à vide",
-  H_target: "cette prétension",
+  T_target: "cette prétension",
+  H_target: "cette tension horizontale",
   L0: "cette longueur non tendue",
   vRatio: "ce rapport V",
 };

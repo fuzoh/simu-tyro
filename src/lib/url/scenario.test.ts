@@ -544,8 +544,19 @@ describe("searchToScenario — the read side of § 7's key table", () => {
     expect(decode("?L=250&bp=1").carryingLines).toBe(1);
   });
 
-  it("turns the URL's daN back into the state's newtons — `te` and `mbl`", () => {
+  it("reads `cp` absent as the Mise en tension at A — and neither completes nor names it (#85)", () => {
+    const { search, completed } = complete("?L=250&h=-40");
+    expect(searchToScenario(search).tensioningSide).toBe("A");
+    expect(search.cp).toBeUndefined();
+    expect(completed).not.toContain("cp");
+    expect(decode("?L=250&cp=b").tensioningSide).toBe("B");
+    expect(decode("?L=250&cp=a").tensioningSide).toBe("A");
+  });
+
+  it("turns the URL's daN back into the state's newtons — `te`, `tp` and `mbl`", () => {
+    // A link written before #85 keeps meaning what it meant: `te` is still `H`.
     expect(decode("?te=253.5").tightness).toEqual({ mode: "tension", H_target: 2535 });
+    expect(decode("?tp=263.4").tightness).toEqual({ mode: "anchor", T_target: 2634 });
     expect(decode("?fam=tx&cls=hmpe&mbl=10000&mu=0.1&k=22").material).toEqual({
       family: "textile",
       ropeClass: "hmpe",

@@ -41,7 +41,12 @@
 import * as v from "valibot";
 
 import type { QuantityId } from "@/lib/format/quantity.ts";
-import type { CarryingLines, ForceUnit, TightnessDraft } from "@/lib/scenario/types.ts";
+import type {
+  CarryingLines,
+  ForceUnit,
+  TensioningSide,
+  TightnessDraft,
+} from "@/lib/scenario/types.ts";
 import type { SteelSpec, TextileSpec } from "@/lib/sim";
 import type { LabelId } from "@/lib/vocabulary/labels.ts";
 
@@ -82,7 +87,9 @@ export type FieldId =
   | "tb"
   | "etaA"
   | "etaB"
+  | "tensioningSide"
   | "D_target"
+  | "T_target"
   | "H_target"
   | "L0"
   | "vRatio"
@@ -411,6 +418,16 @@ export const FIELDS = {
     warning: null,
     gate: "verdict",
   },
+  tensioningSide: {
+    id: "tensioningSide",
+    label: heading("tensioningSide", "exact"),
+    errorLabel: heading("tensioningSide", "exact"),
+    quantity: null,
+    rule: null,
+    warning: null,
+    // It is where a prétension is read, so it moves `L₀` whenever the prétension drives.
+    gate: "solve",
+  },
   D_target: {
     id: "D_target",
     label: heading("sag", "exact"),
@@ -420,10 +437,19 @@ export const FIELDS = {
     warning: null,
     gate: "solve",
   },
-  H_target: {
-    id: "H_target",
+  T_target: {
+    id: "T_target",
     label: heading("pretension", "exact"),
     errorLabel: heading("pretension", "exact"),
+    quantity: "T_target",
+    rule: { kind: "positive", sentence: "une tension strictement positive est requise" },
+    warning: null,
+    gate: "solve",
+  },
+  H_target: {
+    id: "H_target",
+    label: heading("horizontalTension", "exact"),
+    errorLabel: heading("horizontalTension", "exact"),
     quantity: "H_target",
     rule: { kind: "positive", sentence: "une tension strictement positive est requise" },
     warning: null,
@@ -515,6 +541,7 @@ export const FIELD_ORDER = Object.keys(FIELDS) as readonly FieldId[];
  */
 export const TIGHTNESS_FIELD = {
   sag: "D_target",
+  anchor: "T_target",
   tension: "H_target",
   length: "L0",
   ratio: "vRatio",
@@ -649,6 +676,12 @@ export const CONSTRUCTION_LABEL = {
   iwrc: label("constructionIwrc", "exact"),
 } as const satisfies Record<SteelSpec["construction"], string>;
 
+/** `Côté de la Mise en tension`'s two entries: the two anchors, as the Rail names them. */
+export const TENSIONING_SIDE_LABEL = {
+  A: `${heading("anchor", "exact")} A`,
+  B: `${heading("anchor", "exact")} B`,
+} as const satisfies Record<TensioningSide, string>;
+
 /** One picker entry. */
 export type PickerOption<Id extends string> = { readonly value: Id; readonly label: string };
 
@@ -663,6 +696,8 @@ export const CARRYING_LINES_OPTIONS = [
     label: `2 ${label("line", "exact")}s (${label("upperLine", "exact")}, ${label("lowerLine", "exact")})`,
   },
 ] as const satisfies readonly PickerOption<`${CarryingLines}`>[];
+
+export const TENSIONING_SIDE_OPTIONS = pickerOptions(TENSIONING_SIDE_LABEL);
 
 export const ROPE_CLASS_OPTIONS = pickerOptions(ROPE_CLASS_LABEL);
 

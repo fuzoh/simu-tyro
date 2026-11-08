@@ -52,7 +52,7 @@ describe("§ 8 — the refusal page's copy", () => {
       "Profil trop volumineux pour cette adresse.",
     );
     expect(refusalReasonLine(marker("deux-directeurs", ["fl", "lo"]))).toBe(
-      "Flèche à vide, prétension, longueur non tendue et rapport V : deux valeurs de tension dans le même lien.",
+      "Flèche à vide, prétension, tension horizontale, longueur non tendue et rapport V : deux valeurs de tension dans le même lien.",
     );
   });
 

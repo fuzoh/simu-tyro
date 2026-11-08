@@ -351,8 +351,10 @@ export function Segmented<T extends string>({
       value={[value]}
       variant="outline"
     >
+      {/* Content-sized, not equal: five driver labels fit the rail only if « H » gives its share
+          to « Prétension » (#85). */}
       {options.map((option) => (
-        <ToggleGroupItem className="flex-1" key={option.value} value={option.value}>
+        <ToggleGroupItem className="flex-auto" key={option.value} value={option.value}>
           {option.label}
         </ToggleGroupItem>
       ))}

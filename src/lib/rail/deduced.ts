@@ -39,7 +39,7 @@ import type { EngineFailure, Unloaded } from "@/lib/scenario/unloaded.ts";
 import type { SteelValues } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
-import { equalAtDisplayPrecision, formatAtX, formatQuantity } from "@/lib/format/quantity.ts";
+import { equalAtDisplayPrecision, formatAtX, formatQuantity, G } from "@/lib/format/quantity.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { resolveSteelValues, STEEL, steelFormula, TEXTILE } from "@/lib/sim";
 import { heading } from "@/lib/vocabulary/labels.ts";
@@ -89,7 +89,7 @@ export type DeducedSpan = {
 export type DeducedSolve = {
   /** `L₀`, m. Present as a read-out **hors mode Longueur**, where it is the driving field. */
   readonly L0: number;
-  /** `H à vide`, N. Present **hors mode Tension**. */
+  /** `Tension horizontale` `H` à vide, N. A row **hors mode Tension horizontale**. */
   readonly H: number;
   /** `Flèche à vide`, m, and where it sits. Present **hors mode Flèche**. */
   readonly sag: number;
@@ -98,9 +98,24 @@ export type DeducedSolve = {
   readonly sagRatio: number;
   /** `Tension permanente`, **percent of `MBF`** — §9.2's cap is 30 %, the useful regime under 7 %. */
   readonly standingTension: number;
-  /** The unloaded anchor tensions, N — what `lineWarnings` reads §9.2's cap against. */
+  /**
+   * The unloaded anchor tensions, N — what `lineWarnings` reads §9.2's cap against, and where the
+   * `Prétension` row is read, at the tensioning side (`pretensionOf`).
+   */
   readonly Tvide: { readonly TA: number; readonly TB: number };
 };
+
+/**
+ * The prétension a solved line reads — its unloaded tension at the anchor carrying the Mise en
+ * tension, per member. The one place the side picks an anchor, so the field's prefill and the
+ * `Valeurs déduites` row cannot read different ends.
+ */
+export function pretensionOf(
+  solve: Pick<DeducedSolve, "Tvide">,
+  { tensioningSide }: Pick<ScenarioDraft, "tensioningSide">,
+): number {
+  return tensioningSide === "A" ? solve.Tvide.TA : solve.Tvide.TB;
+}
 
 /** Everything § 3's `Valeurs déduites` block reports, plus why a row is missing when one is. */
 export type Deduced = {
@@ -179,8 +194,10 @@ export type DeducedRowId =
   | "w"
   | "chord"
   | "L0"
+  | "pretension"
   | "H"
   | "sag"
+  | "vRatio"
   | "sagRatio"
   | "standingTension";
 
@@ -204,8 +221,11 @@ export type ReadOutRow = {
  * @param cause « Aucun résultat — … », or `null`. **The cause governs, not `deduced.solve`**: the
  *   rider-free chain is derived from the Scenario, which cannot hold a committed-invalid « −5 » or
  *   an emptied `m_p`, so under a Solve Gate breach it still resolves — and printing `L₀ 151,64 m`
- *   beside « aucun résultat » is the stale number invariant 3 forbids. The five solve rows go and
+ *   beside « aucun résultat » is the stale number invariant 3 forbids. The solve rows go and
  *   `ligne A–B` and `w`, which need no solve, stay.
+ *
+ * Of the five Tightness Driver quantities, the four that are not driving are rows (#85): `L₀`, the
+ * prétension and the tension horizontale side by side, the flèche, and the rapport V.
  */
 export function deducedRows(
   scenario: ScenarioDraft,
@@ -254,11 +274,20 @@ export function deducedRows(
   const driver = TIGHTNESS_FIELD[scenario.tightness.mode];
   if (driver !== "L0")
     push("L0", heading("unstretchedLength", "exact"), formatQuantity("L0", solve.L0));
+  if (driver !== "T_target") {
+    const pretension = formatQuantity("T_target", pretensionOf(solve, scenario), unit);
+    push("pretension", heading("pretension", "exact"), pretension);
+  }
   if (driver !== "H_target")
-    push("H", heading("pretension", "exact"), formatQuantity("H_target", solve.H, unit));
+    push("H", heading("horizontalTension", "exact"), formatQuantity("H_target", solve.H, unit));
   if (driver !== "D_target") {
     const sag = `${formatQuantity("sag", solve.sag)} (${formatAtX(solve.sagAtX)})`;
     push("sag", heading("sag", "exact"), sag);
+  }
+  if (driver !== "vRatio") {
+    // `P / H` off the read-out `H`, as the field's prefill reads it — voir `scenario/tightness.ts`.
+    const ratio = (scenario.rider.mp * G) / solve.H;
+    push("vRatio", heading("vRatio", "exact"), formatQuantity("vRatio", ratio));
   }
   push("sagRatio", heading("sagRatio", "exact"), formatQuantity("sagRatio", solve.sagRatio));
   const standing = formatQuantity("standingTension", solve.standingTension);

@@ -75,6 +75,7 @@ import {
   fieldSchema,
   parseDecimal,
   ROPE_CLASS_OPTIONS,
+  TENSIONING_SIDE_OPTIONS,
   warningFor,
 } from "@/lib/rail/fields.ts";
 import {
@@ -666,7 +667,20 @@ export function RailInputs({
           </Group>
 
           <Group title="Tension de la ligne">
-            {/* Exactly one field is editable; the other two appear under `Valeurs déduites`.
+            {/* Where the prétension is read — whatever drives, since its read-out reads there too. */}
+            <Row
+              control={
+                <Segmented
+                  onChange={(side) => patch({ ...scenario, tensioningSide: side })}
+                  options={TENSIONING_SIDE_OPTIONS}
+                  value={scenario.tensioningSide}
+                />
+              }
+              help={FIELD_HELP.tensioningSide}
+              label={FIELDS.tensioningSide.label}
+              stacked
+            />
+            {/* Exactly one field is editable; the other four appear under `Valeurs déduites`.
                 Switching mode **pre-fills the new field from its read-out**. */}
             <div className="flex items-center gap-1 py-1">
               <span className="text-muted-foreground text-xs">Pilote</span>
@@ -678,24 +692,26 @@ export function RailInputs({
               }
               options={[
                 { value: "sag", label: "Flèche" },
-                { value: "tension", label: "Tension" },
+                { value: "anchor", label: "Prétension" },
+                { value: "tension", label: "H" },
                 { value: "length", label: "Longueur" },
                 { value: "ratio", label: "Rapport V" },
               ]}
               value={scenario.tightness.mode}
             />
             {driver === "D_target" && <NumericRow hint="m" id="D_target" />}
+            {driver === "T_target" && <NumericRow hint={unit} id="T_target" />}
             {driver === "H_target" && <NumericRow hint={unit} id="H_target" />}
             {driver === "L0" && <NumericRow hint="m" id="L0" />}
-            {/* `P / H` — the passenger's design load over the horizontal pretension. It resolves to
-                a `H_target` from `m_p`, so the resulting `Prétension` shows under `Valeurs
-                déduites` like any other mode's. */}
+            {/* `P / H` — the passenger's design load over the tension horizontale. It resolves to
+                a `H_target` from `m_p`, so the resulting `Tension horizontale` shows under
+                `Valeurs déduites` like any other mode's. */}
             {driver === "vRatio" && (
               <NumericRow
                 hint="P/H"
                 id="vRatio"
                 note={
-                  <AmbientNote text="P / H : poids du passager sur la prétension horizontale — plus il est grand, plus la ligne forme un V sous le passager." />
+                  <AmbientNote text="P / H : poids du passager sur la tension horizontale — plus il est grand, plus la ligne forme un V sous le passager." />
                 }
               />
             )}

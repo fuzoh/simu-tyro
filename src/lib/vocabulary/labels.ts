@@ -55,6 +55,7 @@ export type TermId =
   | "lineFamily"
   | "anchorLine"
   | "pretension"
+  | "horizontalTension"
   | "standingTension"
   | "unstretchedLength"
   | "sag"
@@ -100,6 +101,7 @@ export type TermId =
   | "passengerMass"
   | "riderPosition"
   | "tensioningDevice"
+  | "tensioningSide"
   | "maestro"
   | "pulleySystem"
   | "tensionLimit"
@@ -168,10 +170,9 @@ export const LABELS = {
   cable: same("câble"),
   lineFamily: same("famille de ligne"),
   anchorLine: same("ligne A–B"),
-  // TODO(#85): the Rail binds this id to the horizontal component H, which Avancé should show as
-  // « tension horizontale »; « tension de pose » is read at the tensioning anchor, not H. Until
-  // then a terrain Page must not label H with it (GLOSSARY « Tension de pose »).
+  // Read at the anchor carrying the Mise en tension, per member — never the horizontal `H`.
   pretension: { terrain: "tension de pose", exact: "prétension" },
+  horizontalTension: exactOnly("tension horizontale"),
   standingTension: exactOnly("tension à vide"),
   unstretchedLength: { terrain: "longueur à vide", exact: "longueur non tendue" },
   sag: { terrain: "flèche", exact: "flèche à vide" },
@@ -221,6 +222,7 @@ export const LABELS = {
   passengerMass: same("masse du passager"),
   riderPosition: same("position du passager"),
   tensioningDevice: same("Mise en tension"),
+  tensioningSide: same("côté de la Mise en tension"),
   maestro: same("Maestro"),
   pulleySystem: same("mouflage"),
   tensionLimit: same("limite de tension"),

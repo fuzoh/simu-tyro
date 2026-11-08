@@ -50,7 +50,7 @@ describe("« Tension impossible » — the bound is the breaking load", () => {
     });
   });
 
-  test("mode Tension quotes a **prétension**, and never « soit L₀ ≥ 197,40 m »", () => {
+  test("mode Tension horizontale quotes a **tension horizontale**, and never « soit L₀ ≥ 197,40 m »", () => {
     // The bound is quoted in the driving field's own quantity and unit, and **never twice**: a
     // second equivalent invites the user to type a length into a tension field, which is the
     // eyeball-confusion class the global force-unit decision refused a `kN` carve-out to avoid.
@@ -68,9 +68,31 @@ describe("« Tension impossible » — the bound is the breaking load", () => {
       { tightness: { mode: "tension", H_target: 2e6 } },
     );
     expect(refusal?.message).toBe(
-      "⛔ Tension impossible — la ligne casserait avant d'atteindre cette tension. Prétension maximale atteignable : 9074,0 daN.",
+      "⛔ Tension impossible — la ligne casserait avant d'atteindre cette tension. Tension horizontale maximale atteignable : 9074,0 daN.",
     );
     expect(refusal?.message).not.toContain("L₀");
+  });
+
+  test("mode Prétension quotes the **prétension** at the tensioning anchor (#85)", () => {
+    const refusal = engineRefusal(
+      {
+        stage: "L0",
+        error: {
+          kind: "invalid-input",
+          field: "T_target",
+          value: 2e6,
+          bound: 90_740,
+          boundKind: "max",
+        },
+      },
+      { tightness: { mode: "anchor", T_target: 2e6 } },
+    );
+    expect(refusal).toEqual({
+      id: "tension-impossible",
+      message:
+        "⛔ Tension impossible — la ligne casserait avant d'atteindre cette tension. Prétension maximale atteignable : 9074,0 daN.",
+      diagnostic: false,
+    });
   });
 
   test("the same bound reads in the selected force unit", () => {
@@ -151,14 +173,29 @@ describe("« Cible inatteignable » — the bracket failure, naming the target",
     });
   });
 
-  test("mode Tension names the prétension instead", () => {
+  test("mode Tension horizontale names the tension horizontale instead", () => {
     const refusal = engineRefusal(
       { stage: "L0", error: { kind: "no-convergence", attempts: 5, residual: 1e-3 } },
       { tightness: { mode: "tension", H_target: 25_350 } },
     );
     expect(refusal?.message).toBe(
-      "⛔ Cible inatteignable — aucune longueur non tendue ne donne cette prétension (2535,0 daN).",
+      "⛔ Cible inatteignable — aucune longueur non tendue ne donne cette tension horizontale (2535,0 daN).",
     );
+  });
+
+  test("mode Prétension names the prétension, with no Fix Action (#85)", () => {
+    // A prétension under the least anchor tension the line can have — a target, not a line, is
+    // wrong, so the copy names it and offers nothing to press.
+    const refusal = engineRefusal(
+      { stage: "L0", error: { kind: "no-convergence", attempts: 80, residual: 12 } },
+      { tightness: { mode: "anchor", T_target: 1000 } },
+    );
+    expect(refusal).toEqual({
+      id: "cible-inatteignable",
+      message:
+        "⛔ Cible inatteignable — aucune longueur non tendue ne donne cette prétension (100,0 daN).",
+      diagnostic: false,
+    });
   });
 
   test("mode Rapport V names the ratio", () => {

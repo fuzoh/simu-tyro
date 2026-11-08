@@ -10,18 +10,18 @@
  *
  * Rules this module exists to keep:
  *
- * - **`L₀` is first-class state, and the three modes are an adapter *above* `solveSpan`** — never
+ * - **`L₀` is first-class state, and the four modes are an adapter *above* `solveSpan`** — never
  *   a mode flag inside it. That is what makes mode switching a prefill of the length just
  *   achieved, keeps the §15 fixture surface at one row, and lets §9's `ΔL₀` story compose later.
  *   *Later*: §9 is out of v1 scope and nothing here anticipates it beyond `L₀` being a value.
  * - **The §5.4 bound comes back in the quantity the user is editing.** `solveSpan` refuses with
  *   `field: "L0"` and the floor in metres; this module catches that and re-emits
- *   `field: "H_target" | "D_target"` with the bound **mapped forward through the same inversion
+ *   `field: "H_target" | "T_target" | "D_target"` with the bound **mapped forward through the same inversion
  *   that failed** — « Prétension maximale atteignable : 9 074 daN », « Flèche minimale
  *   atteignable : 0,29 m ». Quoting an `L₀` in metres beside a tension field is the
  *   eyeball-confusion the re-emission exists to prevent, so the bound is stated **once**, in the
  *   driving field's own quantity.
- * - **The bound is violable in all three modes**, direct-`L₀` included — ticket 04 §7's line 261
+ * - **The bound is violable in every mode**, direct-`L₀` included — ticket 04 §7's line 261
  *   was struck on that ground. Mode `length` runs the same §5.4 floor before returning.
  * - **The floor _is_ the breaking load.** There is no reachable state where an over-target solves
  *   cleanly and the verdict says rupture, which is why this module refuses with a bound and no
@@ -49,19 +49,29 @@ import { chordBoundFloor, solveSpan } from "./solve.ts";
  */
 export type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
 
+/** §2's two anchors: A at `x = 0`, B at `x = L`. */
+export type AnchorSide = "A" | "B";
+
 /**
- * §7's three input modes — « Tension de la ligne »'s segmented control, the **Tightness Driver**.
- * Exactly one of the three quantities is editable; the other two are read-outs, which is why the
- * field names carry their `_target` suffix and mode `length` carries none: it is not a target,
- * it is the state variable itself.
+ * §7's input modes — the engine's half of the **Tightness Driver**. Exactly one quantity is
+ * editable and the others are read-outs, which is why the field names carry their `_target`
+ * suffix and mode `length` carries none: it is not a target, it is the state variable itself.
  */
 export type TightnessSpec =
-  /** §7 mode 3 — flèche à vide cible, m. The shipped active segment. */
+  /** §7 mode 3 — flèche à vide, m. The shipped active segment. */
   | { mode: "sag"; D_target: number }
-  /** §7 mode 2 — prétension cible, N (the horizontal component `H`, not an anchor tension). */
+  /** §7 mode 2 — the horizontal component `H`, N: Avancé's « tension horizontale ». */
   | { mode: "tension"; H_target: number }
+  /**
+   * §7 mode 2's « or anchor `T_target` » — the unloaded line's tension at one anchor, N: the
+   * prétension a dynamometer between that anchor and the Mise en tension reads (#85).
+   */
+  | { mode: "anchor"; side: AnchorSide; T_target: number }
   /** §7 mode 1 — `L₀` direct, m. No inversion to run; the §5.4 floor still applies. */
   | { mode: "length"; L0: number };
+
+/** The modes with a target to invert. */
+type InverseSpec = Exclude<TightnessSpec, { mode: "length" }>;
 
 /**
  * What an inversion needs beside the target: the span it happens on, plus the breaking load
@@ -226,24 +236,83 @@ function refuseGeometry(span: SpanGeometry): SolveError | null {
 }
 
 /**
- * The monotone quantity one inverse mode drives, as the bracket sees it. Two modes, one loop:
- * §7 states mode 3 as « seed `H`, refine, **then mode 2** », and this is where that reuse lands
- * — with the one deviation the elastic catenary forces, recorded on {@link resolveL0}.
+ * The quantity one inverse mode drives, as the bracket sees it. Three modes, one loop: §7 states
+ * mode 3 as « seed `H`, refine, **then mode 2** », and this is where that reuse lands — with the
+ * one deviation the elastic catenary forces, recorded on {@link resolveL0}.
  */
 type Driver = {
   /** The field a §5.4 refusal is re-emitted in. */
-  field: "H_target" | "D_target";
+  field: "H_target" | "T_target" | "D_target";
   /** The value asked for, in that field's own quantity. */
   target: number;
   /** Reads the driving quantity off a solved unloaded span. */
   read: (state: SpanState) => number;
-  /** `true` when the quantity **falls** as `L₀` grows: tension does, flèche does not. */
+  /** `true` when the quantity **falls** as `L₀` grows from the floor: tension does, flèche does not. */
   falling: boolean;
+  /**
+   * `true` when the quantity turns back up past a minimum on a very slack line, so only the taut
+   * branch — floor to minimum — is monotone. §7 proves monotonicity for `H` alone; an anchor
+   * tension `√(H² + V²)` keeps the weight of every metre added, and rises again once `H` has
+   * little left to lose.
+   */
+  turns: boolean;
   /** Which side of the attainable range the §5.4 floor sits on. */
   boundKind: "min" | "max";
   /** §7's closed-form seed for the far end of the bracket, m. */
   seed: number;
 };
+
+/** The field each inverse mode's target is refused and re-emitted in. */
+const TARGET_FIELD = {
+  tension: "H_target",
+  anchor: "T_target",
+  sag: "D_target",
+} as const satisfies Record<InverseSpec["mode"], Driver["field"]>;
+
+/** The value an inverse spec asks for, in its own field's quantity. */
+function targetOf(spec: InverseSpec): number {
+  if (spec.mode === "tension") return spec.H_target;
+  if (spec.mode === "anchor") return spec.T_target;
+  return spec.D_target;
+}
+
+/** The {@link Driver} of a spec whose target tier one has already accepted. */
+function driverOf(spec: InverseSpec, span: SpanGeometry): Driver {
+  const target = targetOf(spec);
+  if (spec.mode === "tension") {
+    return {
+      field: "H_target",
+      target,
+      read: (state) => state.H,
+      falling: true,
+      turns: false,
+      boundKind: "max",
+      seed: closedFormSeedL0(span, target),
+    };
+  }
+  if (spec.mode === "anchor") {
+    return {
+      field: "T_target",
+      target,
+      read: spec.side === "A" ? (state) => state.TA : (state) => state.TB,
+      falling: true,
+      turns: true,
+      boundKind: "max",
+      // `T ≥ H` at either anchor, so the length that would give `H` the target is tighter than
+      // the answer: the seed starts the growth on the taut side of it.
+      seed: closedFormSeedL0(span, target),
+    };
+  }
+  return {
+    field: "D_target",
+    target,
+    read: (state) => unloadedSag(state, span).D,
+    falling: false,
+    turns: false,
+    boundKind: "min",
+    seed: closedFormSeedL0(span, tensionForSag(span, target)),
+  };
+}
 
 /** A bracket failure — « Cible inatteignable ». Never a `slack-limit`; see {@link solveAt}. */
 function unreachable(attempts: number, residual: number): SolveError {
@@ -274,7 +343,8 @@ function solveAt(
 
 /**
  * §7's bracket: **lower bound the §5.4 floor, upper bound grown by doubling the slack** until the
- * driving quantity passes the target.
+ * driving quantity passes the target — or, for a driver that {@link Driver.turns}, until it reads
+ * higher than at the length before, which puts its minimum behind the growth ({@link tautBranch}).
  *
  * §7 writes the lower bound as `L₀ = chord`. The floor is where it actually sits: `chord` is
  * itself below §5.4's `chord/(1 + T_break/EA)`, so a bisection anchored there would ask
@@ -296,6 +366,10 @@ function bracketL0(
   let upper =
     Number.isFinite(driver.seed) && driver.seed > floor ? driver.seed : floor + minimumSlack;
   let warm: SpanState = atFloor;
+  // The two lengths the growth passed last: once a turning driver reads higher than at `previous`,
+  // its minimum lies between `before` and the length just solved.
+  let before = floor;
+  let previous = { L0: floor, value: driver.read(atFloor) };
 
   for (let doubling = 0; doubling <= PARAMETERISE.maxDoublings; doubling++) {
     const solved = solveAt(span, upper, warm);
@@ -304,9 +378,75 @@ function bracketL0(
     const value = driver.read(solved.value);
     const past = driver.falling ? value <= driver.target : value >= driver.target;
     if (past) return { ok: true, value: { lower: floor, upper } };
+    if (driver.turns && value > previous.value) {
+      return tautBranch(span, driver, floor, { lower: before, upper }, warm);
+    }
+    before = previous.L0;
+    previous = { L0: upper, value };
     upper = chord + 2 * Math.max(upper - chord, minimumSlack);
   }
   return { ok: false, error: unreachable(PARAMETERISE.maxDoublings, upper - floor) };
+}
+
+/** `(√5 − 1)/2` — the interval a golden-section search keeps per step. Arithmetic, not physics. */
+const GOLDEN_SECTION = (Math.sqrt(5) - 1) / 2;
+
+/**
+ * The taut branch of a driver that turns: a golden-section search for its minimum inside
+ * `around`, which holds it, stopping at the first length that already reads at or under the
+ * target. Between the floor and that length the quantity crosses the target exactly once — on the
+ * taut branch, whichever side of the minimum the length itself fell — so the two close the
+ * bracket the bisection then runs on.
+ *
+ * A target under the minimum is attainable at no length: no-convergence, « Cible inatteignable »,
+ * and no bound, since nothing about the line is wrong — only the target is. Its `residual` is how
+ * far above the target the least value found stays, in the driving quantity.
+ */
+function tautBranch(
+  span: SpanGeometry,
+  driver: Driver,
+  floor: number,
+  around: Bracket,
+  warmStart: SpanState,
+): Result<Bracket, SolveError> {
+  let warm = warmStart;
+  const read = (L0: number): Result<number, SolveError> => {
+    const solved = solveAt(span, L0, warm);
+    if (!solved.ok) return solved;
+    warm = solved.value;
+    return { ok: true, value: driver.read(solved.value) };
+  };
+
+  let { lower, upper } = around;
+  let near = upper - GOLDEN_SECTION * (upper - lower);
+  let far = lower + GOLDEN_SECTION * (upper - lower);
+  let atNear = read(near);
+  if (!atNear.ok) return atNear;
+  let atFar = read(far);
+  if (!atFar.ok) return atFar;
+
+  for (let step = 0; step < PARAMETERISE.maxBisections; step++) {
+    if (atNear.value <= driver.target) return { ok: true, value: { lower: floor, upper: near } };
+    if (atFar.value <= driver.target) return { ok: true, value: { lower: floor, upper: far } };
+    if (upper - lower <= PARAMETERISE.bracketTolerance * upper) break;
+    if (atNear.value < atFar.value) {
+      upper = far;
+      far = near;
+      atFar = atNear;
+      near = upper - GOLDEN_SECTION * (upper - lower);
+      atNear = read(near);
+      if (!atNear.ok) return atNear;
+    } else {
+      lower = near;
+      near = far;
+      atNear = atFar;
+      far = lower + GOLDEN_SECTION * (upper - lower);
+      atFar = read(far);
+      if (!atFar.ok) return atFar;
+    }
+  }
+  const least = Math.min(atNear.value, atFar.value);
+  return { ok: false, error: unreachable(PARAMETERISE.maxBisections, least - driver.target) };
 }
 
 /** Bisection on the monotone driver, warm-started from the previous midpoint. */
@@ -341,15 +481,12 @@ type Inversion = { floor: number; atFloor: SpanState; driver: Driver };
  * inversion that runs before a bracket exists, shared so that {@link tightnessBracket} and
  * {@link resolveL0} cannot disagree about where the interval starts.
  */
-function prepare(
-  spec: Exclude<TightnessSpec, { mode: "length" }>,
-  span: SpanGeometry,
-): Result<Inversion, SolveError> {
+function prepare(spec: InverseSpec, span: SpanGeometry): Result<Inversion, SolveError> {
   const geometry = refuseGeometry(span);
   if (geometry) return { ok: false, error: geometry };
 
-  const target = spec.mode === "tension" ? spec.H_target : spec.D_target;
-  const field = spec.mode === "tension" ? "H_target" : "D_target";
+  const target = targetOf(spec);
+  const field = TARGET_FIELD[spec.mode];
   if (!Number.isFinite(target) || target <= 0) {
     return {
       ok: false,
@@ -362,24 +499,7 @@ function prepare(
   if (!solvedFloor.ok) return { ok: false, error: solvedFloor.error };
   const atFloor = solvedFloor.value;
 
-  const driver: Driver =
-    spec.mode === "tension"
-      ? {
-          field: "H_target",
-          target,
-          read: (state) => state.H,
-          falling: true,
-          boundKind: "max",
-          seed: closedFormSeedL0(span, target),
-        }
-      : {
-          field: "D_target",
-          target,
-          read: (state) => unloadedSag(state, span).D,
-          falling: false,
-          boundKind: "min",
-          seed: closedFormSeedL0(span, tensionForSag(span, target)),
-        };
+  const driver = driverOf(spec, span);
 
   // The floor's own value **is** the attainable bound — the most tension, the least flèche, any
   // admissible line on this span can carry. Past it the line breaks, so the refusal is §5.4's,
@@ -412,7 +532,7 @@ function prepare(
  * parameter excludes it rather than returning a refusal for it.
  */
 export function tightnessBracket(
-  spec: Exclude<TightnessSpec, { mode: "length" }>,
+  spec: InverseSpec,
   span: SpanGeometry,
 ): Result<Bracket, SolveError> {
   const inversion = prepare(spec, span);
@@ -422,13 +542,17 @@ export function tightnessBracket(
 }
 
 /**
- * §7's three input modes, all resolved to `L₀` **above** the solver — the engine's one inverse
- * entry point, and the reason there is no `solveForTension` beside `solveSpan`.
+ * §7's input modes, all resolved to `L₀` **above** the solver — the engine's one inverse entry
+ * point, and the reason there is no `solveForTension` beside `solveSpan`.
  *
- * - **Mode `length`** runs no inversion. It still runs §5.4's floor: the bound is violable in all
- *   three modes, and this is the one that re-emits it as `field: "L0"` unchanged.
+ * - **Mode `length`** runs no inversion. It still runs §5.4's floor: the bound is violable in
+ *   every mode, and this is the one that re-emits it as `field: "L0"` unchanged.
  * - **Mode `tension`** is §7 mode 2 — `H(L₀) = H_target` by bisection, safe because `H` is
  *   **strictly monotone decreasing in `L₀`** (`[VERIFIED-NUM]` on `Z6`'s bracket).
+ * - **Mode `anchor`** is §7 mode 2's anchor `T_target` — `T_A(L₀)` or `T_B(L₀)` equal to the
+ *   target. Not monotone: it falls from the floor, bottoms out on a very slack line and rises
+ *   again, so the bisection runs on the **taut branch** only ({@link tautBranch}), and a target
+ *   under its minimum is « Cible inatteignable ».
  * - **Mode `sag`** is §7 mode 3 — seed `H ≈ w·L²/(8·D_target)`, refine it against the exact
  *   catenary sag, then mode 2. **One deviation, and it is deliberate**: mode 2 is reused for its
  *   *bracket and bisection*, run on the flèche itself rather than on the `H` the seed produced.

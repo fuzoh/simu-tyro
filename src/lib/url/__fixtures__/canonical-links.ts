@@ -23,6 +23,7 @@ export const BRANCHES = [
   "trace",
   "driver-sag",
   "driver-tension",
+  "driver-pretension",
   "driver-ratio",
   "driver-length",
   "override-mbf",
@@ -43,6 +44,9 @@ export const BRANCHES = [
   "carrying-lines-absent",
   "carrying-lines-two",
   "carrying-lines-one-explicit",
+  "tensioning-side-absent",
+  "tensioning-side-b",
+  "tensioning-side-a-explicit",
 ] as const;
 
 export type Branch = (typeof BRANCHES)[number];
@@ -50,7 +54,7 @@ export type Branch = (typeof BRANCHES)[number];
 /** A Scenario and the one link that encodes it — asserted in both directions. */
 export type CanonicalLinkFixture = {
   name: string;
-  source: typeof MEASURED | typeof MEASURED_83 | typeof MEASURED_84;
+  source: typeof MEASURED | typeof MEASURED_83 | typeof MEASURED_84 | typeof MEASURED_85;
   covers: readonly Branch[];
   scenario: Scenario;
   link: string;
@@ -64,7 +68,7 @@ export type CanonicalLinkFixture = {
  */
 export type DecodeOnlyFixture = {
   name: string;
-  source: typeof MEASURED | typeof MEASURED_83 | typeof MEASURED_84;
+  source: typeof MEASURED | typeof MEASURED_83 | typeof MEASURED_84 | typeof MEASURED_85;
   covers: readonly Branch[];
   link: string;
 } & ({ scenario: Scenario; canonical: string } | { scenario: ScenarioDraft; canonical: null });
@@ -72,6 +76,7 @@ export type DecodeOnlyFixture = {
 const MEASURED = "[MEASURED] issue #34, codec as of 2026-11-07";
 const MEASURED_83 = "[MEASURED] issue #83, codec as of 2026-11-08";
 const MEASURED_84 = "[MEASURED] issue #84, codec as of 2026-11-08";
+const MEASURED_85 = "[MEASURED] issue #85, codec as of 2026-11-08";
 
 /** Three stations `(0,0) (50,-4) (100,-9)`, as `encodeP1` writes them. */
 export const TRACE_P1 = "p1.AwCQTpBOAJ8G5wcA";
@@ -83,6 +88,7 @@ const STEEL: Scenario = {
   geometry: { source: "manual", L: 150, h: -18 },
   anchors: { zA: 12, zB: 12 },
   carryingLines: 1,
+  tensioningSide: "A",
   tightness: { mode: "sag", D_target: 6 },
   material: { family: "steel", d: 12, R0: 1770, construction: "iwrc" },
   terminations: {
@@ -117,8 +123,15 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
   {
     name: "first-run: steel, manual, sag driver, perm, no regime",
     source: MEASURED,
-    // No `bp`, as before the key existed: one Brin porteur.
-    covers: ["steel", "manual", "driver-sag", "use-perm", "carrying-lines-absent"],
+    // No `bp` and no `cp`, as before either key existed: one Brin porteur, Mise en tension at A.
+    covers: [
+      "steel",
+      "manual",
+      "driver-sag",
+      "use-perm",
+      "carrying-lines-absent",
+      "tensioning-side-absent",
+    ],
     scenario: STEEL,
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
   },
@@ -135,6 +148,32 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
     covers: ["driver-tension"],
     scenario: { ...STEEL, unit: "kN", tightness: { mode: "tension", H_target: 2535 } },
     link: `/?v=1&u=kN&use=perm&L=150&h=-18&za=12&zb=12&te=253.5&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "prétension driver: `tp` in daN, read at A",
+    source: MEASURED_85,
+    covers: ["driver-pretension"],
+    scenario: { ...STEEL, tightness: { mode: "anchor", T_target: 2600 } },
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&tp=260&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "prétension read at B on two Brins porteurs: `tp`, `cp`, `bp` in that order",
+    source: MEASURED_85,
+    covers: ["driver-pretension", "tensioning-side-b", "carrying-lines-two"],
+    scenario: {
+      ...STEEL,
+      carryingLines: 2,
+      tensioningSide: "B",
+      tightness: { mode: "anchor", T_target: 2600 },
+    },
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&tp=260&cp=b&bp=2&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "the side rides on its own, beside a flèche driver",
+    source: MEASURED_85,
+    covers: ["tensioning-side-b"],
+    scenario: { ...STEEL, tensioningSide: "B" },
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&cp=b&${STEEL_HEAD}&${TAIL}`,
   },
   {
     name: "ratio driver, kgf display",
@@ -363,6 +402,14 @@ export const DECODE_ONLY_LINKS: readonly DecodeOnlyFixture[] = [
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&bp=1&${STEEL_HEAD}&${TAIL}`,
     scenario: STEEL,
     canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "`cp=a` is the Mise en tension at A, and the canonical link says so by omitting it",
+    source: MEASURED_85,
+    covers: ["tensioning-side-a-explicit"],
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&tp=260&cp=a&${STEEL_HEAD}&${TAIL}`,
+    scenario: { ...STEEL, tightness: { mode: "anchor", T_target: 2600 } },
+    canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&tp=260&${STEEL_HEAD}&${TAIL}`,
   },
   {
     name: "textile with MBL and mu left blank",

@@ -66,6 +66,7 @@ const ROWS: ReadonlyArray<{ id: QuantityId; value: number; expected: string }> =
   // § 4's own printed « Alt. base A 540,4 m » — an altitude in the file's frame, not a difference.
   { id: "zBase", value: 540.44, expected: "540,4 m" },
   { id: "D_target", value: 6, expected: "6,00 m" },
+  { id: "T_target", value: 2605.2, expected: "260,5 daN" },
   { id: "H_target", value: 2535.2, expected: "253,5 daN" },
   { id: "L0", value: 151.644, expected: "151,64 m" },
   { id: "vRatio", value: 0.8175, expected: "0,82" },
@@ -254,8 +255,9 @@ describe("« le changement d'unité n'écrit jamais dans l'état ; daN→X→daN
     return kind === "force" || kind === "force/m";
   });
 
-  test("the nine force rows are the ones the selector moves", () => {
+  test("the ten force rows are the ones the selector moves", () => {
     expect(FORCE_IDS).toEqual([
+      "T_target",
       "H_target",
       "MBL",
       "MBF",

@@ -85,7 +85,7 @@ export { CLEARANCE, evaluateClearance } from "./clearance.ts";
 // —— parameterise.ts — §7's inverse modes, resolved above the solver ————————————————————————
 // `unloadedSag` is the app's, not only `resolveL0`'s: § 6 displays « flèche à vide » and §8.2's
 // sag-ratio warnings are scored on it through `lineWarnings`, and nothing else can compute it.
-export type { Result, SpanGeometry, TightnessSpec } from "./parameterise.ts";
+export type { AnchorSide, Result, SpanGeometry, TightnessSpec } from "./parameterise.ts";
 export { resolveL0, unloadedSag } from "./parameterise.ts";
 
 // —— verdict.ts — §10's regimes, `T_allow = η_t·MBF/k` and the §10.4 use-class gate ——————————

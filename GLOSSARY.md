@@ -35,9 +35,9 @@ _Avoid_: montage, terminaison, ancrage
 **Tension de pose**:
 The tension wanted on the unloaded line, read **at the anchor that carries the Mise en
 tension**, per member: what a dynamometer rigged between that ancrage and the Maestro
-shows. Not the horizontal component `H` the engine drives today; Avancé shows that one
-beside it as tension horizontale. Simplified Pages say tension de pose; Avancé says
-prétension.
+shows. That anchor is A or B, held by the Scenario (`cp`; absent is A). It is a Tightness
+Driver of its own (`tp`), not the horizontal component `H`; Avancé shows that one beside it
+as tension horizontale. Simplified Pages say tension de pose; Avancé says prétension.
 _Avoid_: tension cible, tension permanente, pretension setting, tension horizontale (as the
 simplified label)
 
@@ -52,22 +52,23 @@ The multiplier on the passager's extra tension because a controlled step-off set
 _Avoid_: coefficient dynamique, DAF, limite, marge
 
 **Rapport V**:
-A way to ask for the unloaded tension: passenger weight divided by horizontal tension de pose. Not the measured depth of the V. A larger rapport V asks for a slacker line, and the deep V under the passager is the consequence. Named only on Avancé.
+A way to ask for the unloaded tension: passenger weight divided by the tension horizontale `H`. Not the measured depth of the V. A larger rapport V asks for a slacker line, and the deep V under the passager is the consequence. Named only on Avancé.
 _Avoid_: poids / tension, creux, flèche
 
 **Tightness Spec**:
 The user's chosen way of saying how tight the line is: unstretched length directly, a
-target installed tension, a target unloaded sag, or a target V ratio. Whichever is chosen,
-it resolves to an unstretched length before anything is computed.
+target tension de pose, a target horizontal tension, a target unloaded sag, or a target V
+ratio. Whichever is chosen, it resolves to an unstretched length before anything is computed.
 _Avoid_: tension mode, pretension setting, parameterisation mode
 
 **Tightness Driver**:
-Which one of the four tightness quantities — target sag, tension, unstressed length and
-V ratio — is the editable one. Exactly one is the driver and the other three are
-read-outs derived from it, so the driver is state: it is encoded by *which key is
-present* (`fl` / `te` / `lo` / `vr`), never by a mode key beside a
-value. Two drivers arriving at once is a contradiction, not a preference, and the link
-is refused whole.
+Which one of the five tightness quantities — target sag, tension de pose, horizontal
+tension `H`, unstressed length and V ratio — is the editable one. Exactly one is the driver
+and the other four are read-outs derived from it, so the driver is state: it is encoded by
+*which key is present* (`fl` / `tp` / `te` / `lo` / `vr`), never by a mode key beside a
+value. `tp` is the tension de pose, the one the simplified Pages drive; `te` is `H`, still
+valid for the links that carry it. Two drivers arriving at once — any two of the five — is a
+contradiction, not a preference, and the link is refused whole.
 _Avoid_: tightness mode, active field, `tm`, parameterisation mode
 
 **Material Spec**:

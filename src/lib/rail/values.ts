@@ -49,7 +49,7 @@ import { TEXTILE } from "@/lib/sim";
 import type { Deduced, DeducedMaterial, DeducedSolve } from "./deduced.ts";
 import type { FieldContext, FieldId, TightnessFieldId } from "./fields.ts";
 
-import { deduceValues } from "./deduced.ts";
+import { deduceValues, pretensionOf } from "./deduced.ts";
 import { displayField, FIELD_ORDER, FIELDS, TIGHTNESS_FIELD } from "./fields.ts";
 
 /**
@@ -225,6 +225,11 @@ export const FIELD_ACCESS: FieldAccess = {
   D_target: {
     read: ({ tightness }) => (tightness.mode === "sag" ? tightness.D_target : undefined),
     write: (s, D_target) => ({ ...s, tightness: { mode: "sag", D_target } }),
+  },
+  // The target alone: the anchor it is read at is `tensioningSide`, which the lens leaves as it is.
+  T_target: {
+    read: ({ tightness }) => (tightness.mode === "anchor" ? tightness.T_target : undefined),
+    write: (s, T_target) => ({ ...s, tightness: { mode: "anchor", T_target } }),
   },
   H_target: {
     read: ({ tightness }) => (tightness.mode === "tension" ? tightness.H_target : undefined),
@@ -473,6 +478,8 @@ export function switchTightness(
 const PREFILL: Record<TightnessFieldId, (solve: DeducedSolve, scenario: ScenarioDraft) => number> =
   {
     D_target: (solve) => solve.sag,
+    // The unloaded tension at the anchor the Mise en tension stands at — {@link pretensionOf}.
+    T_target: (solve, scenario) => pretensionOf(solve, scenario),
     H_target: (solve) => solve.H,
     L0: (solve) => solve.L0,
     // `P / H` from the read-out `H` — voir `scenario/tightness.ts`.

@@ -266,6 +266,7 @@ describe("FIELD_ACCESS — one lens per numeric field", () => {
       "etaA",
       "etaB",
       "D_target",
+      "T_target",
       "H_target",
       "L0",
       "vRatio",
@@ -363,10 +364,22 @@ describe("the Tightness Spec — one editable field, prefilled from its own read
     expect(drivingField(length)).toBe("L0");
   });
 
-  test("« Flèche » → « Tension » lands on the prétension just achieved", () => {
+  test("« Flèche » → « H » lands on the tension horizontale just achieved", () => {
     const tension = switchTightness(first, "tension", deduced);
     expect(tension.tightness).toEqual({ mode: "tension", H_target: 2535 });
     expect(railValues(tension).H_target).toBe("253,5");
+  });
+
+  test("« Flèche » → « Prétension » lands on the tension just achieved at A, where it is read", () => {
+    const pretension = switchTightness(first, "anchor", deduced);
+    expect(pretension.tightness).toEqual({ mode: "anchor", T_target: 2634 });
+    expect(pretension.tensioningSide).toBe("A");
+    expect(drivingField(pretension)).toBe("T_target");
+    expect(railValues(pretension).T_target).toBe("263,4");
+    // And it is the same line: the prefill is at 0,1 daN, so `L₀` moves by far less than its grain.
+    const solve = deduceValues(pretension, null).solve;
+    if (solve === null) throw new Error("expected a solve");
+    expect(Math.abs(solve.L0 - 151.64)).toBeLessThan(0.005);
   });
 
   test("« Flèche » → « Rapport V » lands on `m_p·g / H` at 2 decimals, and solves to the same line", () => {
@@ -423,6 +436,48 @@ describe("the Tightness Spec — one editable field, prefilled from its own read
 
   test("switching to the mode already active is a no-op", () => {
     expect(switchTightness(first, "sag", deduced)).toBe(first);
+  });
+});
+
+describe("#85 — the prétension's lens and the tensioning side", () => {
+  test("the lens reads the prétension's target, and only under its own driver", () => {
+    const driven = scenario((draft) => {
+      draft.tightness = { mode: "anchor", T_target: 2600 };
+    });
+    expect(FIELD_ACCESS.T_target.read(driven)).toBe(2600);
+    expect(FIELD_ACCESS.H_target.read(driven)).toBeUndefined();
+    expect(FIELD_ACCESS.T_target.read(scenario())).toBeUndefined();
+  });
+
+  test("writing the prétension makes it the driver and leaves the side where it stands", () => {
+    const atB = scenario((draft) => {
+      draft.tensioningSide = "B";
+    });
+    const written = applyField(atB, "T_target", 2500);
+    expect(written.tightness).toEqual({ mode: "anchor", T_target: 2500 });
+    expect(written.tensioningSide).toBe("B");
+  });
+
+  test("A ↔ B changes the prétension the switch prefills on the inclined first-run span", () => {
+    // `h = −18`: one line, two readings — the higher anchor A reads more, as §2 says it must.
+    const atA = scenario();
+    const atB = scenario((draft) => {
+      draft.tensioningSide = "B";
+    });
+    const fromA = switchTightness(atA, "anchor", deduceValues(atA, null));
+    const fromB = switchTightness(atB, "anchor", deduceValues(atB, null));
+    expect(fromA.tightness).toEqual({ mode: "anchor", T_target: 2634 });
+    expect(fromB.tightness).toEqual({ mode: "anchor", T_target: 2537 });
+  });
+
+  test("the prefill under « Aucun résultat » reads the last good line at the current side", () => {
+    const atB = scenario((draft) => {
+      draft.tensioningSide = "B";
+      draft.tightness = { mode: "sag", D_target: 0.01 };
+    });
+    const lastGood = deduceValues(scenario(), null).solve;
+    const switched = switchTightness(atB, "anchor", deduceValues(atB, null), lastGood);
+    expect(switched.tightness).toEqual({ mode: "anchor", T_target: 2537 });
   });
 });
 

@@ -380,16 +380,19 @@ describe("`deducedRows` — the rows the Rail prints, decided outside the compon
   const shown = (rows: ReturnType<typeof deducedRows>) =>
     rows.map(({ label, value, warning }) => [label, value, warning]);
 
-  test("the opening screen's six read-only rows, as the Rail printed them before the move", () => {
+  test("the opening screen's eight read-only rows", () => {
     // Read off the running app at `/` with an empty Session. `Flèche` drives, so its read-out is
-    // the field and not a row; the three steel Override rows are fields of their own.
+    // the field and not a row; the three steel Override rows are fields of their own. Since #85
+    // the prétension is read at A, where the Mise en tension ships, and `H` sits beside it.
     const opening = scenario();
     const rows = deducedRows(opening, deduceValues(opening, null), null);
     expect(shown(rows)).toEqual([
       ["Poids linéique", "0,536 daN/m", null],
       ["Ligne A–B", "151,08 m", null],
       ["Longueur non tendue", "151,64 m", null],
-      ["Prétension", "253,5 daN", null],
+      ["Prétension", "263,4 daN", null],
+      ["Tension horizontale", "253,5 daN", null],
+      ["Rapport V", "0,46", null],
       ["Flèche / portée", "4,00 %", null],
       ["Tension à vide", "2,90 % MBF", null],
     ]);
@@ -408,7 +411,9 @@ describe("`deducedRows` — the rows the Rail prints, decided outside the compon
       ["Poids linéique", "0,069 daN/m", null],
       ["Ligne A–B", "151,08 m", null],
       ["Longueur non tendue", "140,23 m", null],
+      ["Prétension", "255,9 daN", null],
       ["Flèche à vide", "0,71 m (à x 75,0 m)", null],
+      ["Rapport V", "0,46", null],
       [
         "Flèche / portée",
         "0,47 %",
@@ -418,13 +423,15 @@ describe("`deducedRows` — the rows the Rail prints, decided outside the compon
     ]);
   });
 
-  test("a length-driven line hides « Longueur non tendue » and shows the other two drivers", () => {
-    // Read off the running app at `?lo=151` before the move.
+  test("a length-driven line hides « Longueur non tendue » and shows the other four drivers", () => {
+    // `H` read off the running app at `?lo=151` before the move; the prétension is #85's.
     const { scenario: byLength } = initialAppState({ query: "?lo=151", session: null });
     const rows = shown(deducedRows(byLength, deduceValues(byLength, null), null));
     expect(rows.map(([label]) => label)).not.toContain("Longueur non tendue");
-    expect(rows).toContainEqual(["Prétension", "707,6 daN", null]);
+    expect(rows).toContainEqual(["Prétension", "718,7 daN", null]);
+    expect(rows).toContainEqual(["Tension horizontale", "707,6 daN", null]);
     expect(rows).toContainEqual(["Flèche à vide", "2,14 m (à x 74,9 m)", null]);
+    expect(rows).toContainEqual(["Rapport V", "0,17", null]);
   });
 
   test("under a cause the five solve rows go, and `w` and `ligne A–B` stay", () => {
@@ -453,5 +460,82 @@ describe("`deducedRows` — the rows the Rail prints, decided outside the compon
     ]);
     expect(rows.slice(0, 4).every((row) => row.group === "placement")).toBe(true);
     expect(rows.find((row) => row.label === "Ligne A–B")?.value).toBe("170,93 m");
+  });
+});
+
+describe("#85 — the prétension is read at the tensioning anchor, `H` beside it", () => {
+  const rowsOf = (draft: ScenarioDraft) => deducedRows(draft, deduceValues(draft, null), null);
+  const valueOf = (draft: ScenarioDraft, label: string) =>
+    rowsOf(draft).find((row) => row.label === label)?.value;
+
+  test("driven by the prétension: its field replaces its row, and the four others are read", () => {
+    const driven = scenario((draft) => {
+      draft.tightness = { mode: "anchor", T_target: 2634 };
+    });
+    const labels = rowsOf(driven).map((row) => row.label);
+    expect(labels).not.toContain("Prétension");
+    expect(labels).toEqual(
+      expect.arrayContaining(["Tension horizontale", "Longueur non tendue", "Flèche à vide"]),
+    );
+    expect(labels).toContain("Rapport V");
+  });
+
+  test.each([
+    ["flèche", { mode: "sag", D_target: 6 }],
+    ["longueur", { mode: "length", L0: 151 }],
+    ["rapport V", { mode: "ratio", ratio: 0.46 }],
+  ] as const)("driven by the %s, `H` is read right beside the prétension", (_label, tightness) => {
+    const labels = rowsOf(scenario((draft) => (draft.tightness = tightness))).map((r) => r.label);
+    expect(labels).toContain("Prétension");
+    expect(labels.indexOf("Tension horizontale")).toBe(labels.indexOf("Prétension") + 1);
+  });
+
+  test("a `te=` link still drives `H`, and the prétension is the read-out beside it", () => {
+    const { scenario: byH } = initialAppState({ query: "?te=253.5", session: null });
+    expect(byH.tightness).toEqual({ mode: "tension", H_target: 2535 });
+    const labels = rowsOf(byH).map((row) => row.label);
+    expect(labels).not.toContain("Tension horizontale");
+    expect(valueOf(byH, "Prétension")).toBe("263,3 daN");
+  });
+
+  test("A ↔ B moves the prétension read on the inclined first-run span, and nothing else", () => {
+    // `h = −18`: A is the higher anchor, where §2 puts the unloaded line's greater tension.
+    const atA = scenario();
+    const atB = scenario((draft) => {
+      draft.tensioningSide = "B";
+    });
+    expect(valueOf(atA, "Prétension")).toBe("263,4 daN");
+    expect(valueOf(atB, "Prétension")).toBe("253,7 daN");
+    const others = (draft: ScenarioDraft) =>
+      rowsOf(draft).filter((row) => row.label !== "Prétension");
+    expect(others(atB)).toEqual(others(atA));
+  });
+
+  test("on a level span the two sides read the same prétension", () => {
+    const level = (side: "A" | "B") =>
+      scenario((draft) => {
+        draft.geometry = { source: "manual", L: 150, h: 0 };
+        draft.tensioningSide = side;
+      });
+    expect(valueOf(level("B"), "Prétension")).toBe(valueOf(level("A"), "Prétension"));
+  });
+
+  test("driven by the prétension, A ↔ B moves the line: the same reading at B is a tighter line", () => {
+    const at = (side: "A" | "B") =>
+      deduceValues(
+        scenario((draft) => {
+          draft.tensioningSide = side;
+          draft.tightness = { mode: "anchor", T_target: 2634 };
+        }),
+        null,
+      ).solve;
+    const solvedA = at("A");
+    const solvedB = at("B");
+    // The resolved line reads the target back at its own anchor, at the solved-scalar tier.
+    expect(Math.abs((solvedA?.Tvide.TA ?? NaN) - 2634) / 2634).toBeLessThan(4e-6);
+    expect(Math.abs((solvedB?.Tvide.TB ?? NaN) - 2634) / 2634).toBeLessThan(4e-6);
+    // B is the lower anchor, so it reads less on any one line: asking it for the same number
+    // takes less length.
+    expect(solvedB?.L0 ?? NaN).toBeLessThan(solvedA?.L0 ?? NaN);
   });
 });
