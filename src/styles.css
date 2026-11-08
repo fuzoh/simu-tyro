@@ -7,8 +7,16 @@
 @import "tailwindcss" source("../src");
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/inter";
-@import "@fontsource-variable/manrope";
+/* Iosevka Charon (quasi-proportional) for prose, Iosevka Charon Mono for every computed quantity.
+   Static faces only — no variable build is published — so the three weights the app uses are
+   imported by hand; `font-semibold` (600) has no face and resolves upward to 700. Each file carries
+   every subset behind a `unicode-range`, so only `latin` is actually downloaded. */
+@import "@fontsource/iosevka-charon/400.css";
+@import "@fontsource/iosevka-charon/500.css";
+@import "@fontsource/iosevka-charon/700.css";
+@import "@fontsource/iosevka-charon-mono/400.css";
+@import "@fontsource/iosevka-charon-mono/500.css";
+@import "@fontsource/iosevka-charon-mono/700.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -158,13 +166,12 @@
 }
 
 @theme inline {
-  --font-sans: "Inter Variable", sans-serif;
-  --font-heading: "Manrope Variable", sans-serif;
-  /* **No mono face is bundled** — amendment L. Digits therefore differ by platform, which is a
-     choice, and `CELL_WRAP_PX` budgets a 0,62 em advance for it rather than pretending otherwise.
-     Declared even though it is close to Tailwind's own default, because an absent declaration reads
-     identical to the bug ticket 40 opened on: « a typeface referenced and never loaded ». */
-  --font-mono: ui-monospace, monospace;
+  --font-sans: "Iosevka Charon", sans-serif;
+  --font-heading: "Iosevka Charon", sans-serif;
+  /* Iosevka Charon Mono is bundled (2026-11-08, replacing amendment L's unbound `ui-monospace`).
+     Its advance is 0,50 em, inside the 0,62 em `CELL_WRAP_PX` budgets, so the layout constants
+     stand; the fallbacks keep the budget honest while the face is still in flight. */
+  --font-mono: "Iosevka Charon Mono", ui-monospace, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
