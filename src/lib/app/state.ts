@@ -54,6 +54,7 @@ import {
 } from "@/lib/scenario/first-run.ts";
 import { clampX, spanOfGeometry } from "@/lib/scenario/geometry.ts";
 import { DEFAULT_LAYERS } from "@/lib/session/session.ts";
+import { traceEnds } from "@/lib/terrain/trace.ts";
 import { decodeP1 } from "@/lib/url/p1.ts";
 import { completeFromDefaults, searchToScenario } from "@/lib/url/scenario.ts";
 import { hasScenarioKey, parseLinkSearch, salvageSearch } from "@/lib/url/schema.ts";
@@ -203,6 +204,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       const trace = action.type === "tracé/importé" ? action.trace : state.trace;
       if (trace === null) return state;
       const { geometry } = state.scenario;
+      // The same ends a link missing its stations completes to — `traceEnds` is their one source.
+      const { start, end } = traceEnds(trace);
       return {
         ...state,
         trace,
@@ -213,8 +216,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         scenario: withViewpoint(state.scenario, {
           source: "trace",
           trace: action.tr,
-          sa: trace.d[0],
-          sb: trace.d[trace.d.length - 1],
+          sa: start,
+          sb: end,
         }),
       };
     }

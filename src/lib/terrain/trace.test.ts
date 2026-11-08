@@ -10,6 +10,7 @@ import {
   deriveTerrain,
   maxSpacing,
   snapStation,
+  traceEnds,
   traceExtent,
 } from "./trace.ts";
 
@@ -41,6 +42,15 @@ describe("altitudeAt", () => {
   test("holds the ends rather than extrapolating — a station off the trace is a blocked placement", () => {
     expect(altitudeAt(RAMP, -40)).toBe(600);
     expect(altitudeAt(RAMP, 999)).toBe(540);
+  });
+});
+
+describe("traceEnds", () => {
+  test("reads the first and last `Distance` in the file's own frame, not from 0", () => {
+    expect(traceEnds(trace([12.5, 40, 183.4], [500, 498, 470]))).toEqual({
+      start: 12.5,
+      end: 183.4,
+    });
   });
 });
 

@@ -126,9 +126,32 @@ export function snapStation(trace: Trace, station: number): number {
   return station - d[lo] > d[hi] - station ? d[hi] : d[lo];
 }
 
+/** A Trace's first and last `Distance`, m, in file coordinates. */
+export type TraceEnds = {
+  /** The first sample's `Distance` — where an import places Station A. */
+  readonly start: number;
+  /** The last sample's `Distance` — where an import places Station B. */
+  readonly end: number;
+};
+
+/**
+ * **The one definition of « the Trace's ends »**, m, in file coordinates. § 4's import reads it to
+ * place A on the first station and B on the last — the trace *is* the intended span — and a link
+ * missing a station completes it from the same pair, so the in-app import and a shared link cannot
+ * drift apart on where a Trace begins and ends.
+ *
+ * Typed on `d` alone so a decoded `p1.` payload, which has no `fileName`, reads it as a `Trace` does.
+ *
+ * @param trace the profile; at least one sample, `d` strictly increasing.
+ */
+export function traceEnds(trace: Pick<Trace, "d">): TraceEnds {
+  return { start: trace.d[0], end: trace.d[trace.d.length - 1] };
+}
+
 /** The trace's own horizontal extent, m — `d[last] − d[0]`, the « sur *X* m » of § 6's copy. */
 export function traceExtent(trace: Trace): number {
-  return trace.d[trace.d.length - 1] - trace.d[0];
+  const { start, end } = traceEnds(trace);
+  return end - start;
 }
 
 /**
