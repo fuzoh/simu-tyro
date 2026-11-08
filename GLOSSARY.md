@@ -33,9 +33,13 @@ Montage is the act of installing the line (« on va monter »), not this device 
 _Avoid_: montage, terminaison, ancrage
 
 **Tension de pose**:
-The tension wanted on the unloaded line. The same quantity as prétension. Simplified Pages
-say tension de pose; Avancé says prétension.
-_Avoid_: tension cible, tension permanente, pretension setting
+The tension wanted on the unloaded line, read **at the anchor that carries the Mise en
+tension**, per member: what a dynamometer rigged between that ancrage and the Maestro
+shows. Not the horizontal component `H` the engine drives today; Avancé shows that one
+beside it as tension horizontale. Simplified Pages say tension de pose; Avancé says
+prétension.
+_Avoid_: tension cible, tension permanente, pretension setting, tension horizontale (as the
+simplified label)
 
 **Majoration au départ**:
 The multiplier on the passager's extra tension because a controlled step-off sets the passager in motion. Not the static supplement the weight already produces, and not a limit. Default 1,2. Simplified Pages assume it and do not ask. Avancé names the field majoration au départ.
