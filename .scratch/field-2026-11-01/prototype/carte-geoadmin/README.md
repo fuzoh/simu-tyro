@@ -30,6 +30,21 @@ Tout l'état (A, B, direction et vitesse du vent) est dans le hash d'URL, partag
 
 Voir le commentaire de résolution sur le ticket #63.
 
+## Suite : glisser un ancrage dans la Vue 3D (#74)
+
+`3d-drag.html` répond au ticket [Prototype : glisser un ancrage dans la Vue 3D (#74)](https://github.com/fuzoh/simu-tyro/issues/74) :
+saisir A ou B dans la scène Cesium, le déplacer sur le relief, fil à plomb en pointillé, profil geo.admin relancé au lâcher.
+
+| Mécanisme | Cesium |
+| --- | --- |
+| Saisie | `ScreenSpaceEventHandler` `LEFT_DOWN` + `scene.pick` : on ne capture que si l'entité touchée est un ancrage |
+| Gel de la caméra pendant le glissement | `scene.screenSpaceCameraController.enableInputs = false`, rendu au `LEFT_UP` |
+| Position sous le curseur | mode libre : `globe.pick(camera.getPickRay(pos))` (surface rendue) ; mode plan : `IntersectionTests.rayPlane` sur le plan tangent à la position de saisie, altitude par `globe.getHeight` |
+| Mise à jour sans ré-ajout d'entités | `CallbackProperty` sur ancrage, fil à plomb (`PolylineDashMaterialProperty`) et ligne |
+| Lâcher | `sampleTerrainMostDetailed` pour l'altitude exacte, puis REFRAME + `profile.json` (200 pts), identique à `index.html` |
+
+Captures : `captures/3d-drag-*.png`. Résultat et verdict : commentaire de résolution sur #74.
+
 ## Sources
 
 - Capacités API : recherche [Swisstopo et geo.admin : profil, fond de carte et 3D (#11)](https://github.com/fuzoh/simu-tyro/issues/11).
