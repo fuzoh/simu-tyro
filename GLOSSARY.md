@@ -75,38 +75,42 @@ _Avoid_: ground profile, elevation data, topography
 **Trace**:
 A ground profile the app *received* rather than computed: distance and altitude samples
 along a line drawn on a map. French: **profil** — the cut of the ground under the line,
-altitudes side by side. The cut view uses the same word. It enters two ways — an imported CSV, which keeps its
-filename and its own coordinates, or « profil reçu par lien », which arrives with **no
-file and no filename** and carries straightness as one scalar `dev` instead of
-coordinates. Either way it is held exactly as received and never resampled or smoothed,
-so point count and sample spacing are disclosed properties and Terrain is derived from
-it. A Trace can sit cached in the Session while not being the active terrain source.
+altitudes side by side. The cut view uses the same word. It always runs from Anchor A to
+Anchor B: its first sample is under A, its last under B. It enters three ways — an
+imported CSV, which keeps its filename and its own coordinates; a **profil geo.admin**,
+fetched between the two Positions; or « profil reçu par lien », which arrives with **no
+file and no filename**. Either way it is held exactly as received and never resampled or
+smoothed, so point count and sample spacing are disclosed properties and Terrain is
+derived from it. A Trace can sit cached in the Session while not being the active terrain
+source.
 _Avoid_: tracé, track, GPX, path, uploaded file
 
 **Station**:
 A distance along the profil, measured from the profil's own start. French: **distance**.
-Distinct from `x`, which is horizontal distance from Anchor A — converting between them is the one translation the import
-performs.
-_Avoid_: station (as the spoken word), offset, position, distance along track
-
-**Anchor Placement**:
-Where an anchor sits on a Trace: a Station plus an Anchor Height above the profile at that
-Station. The two Placements are what the user edits once a Trace is loaded; Span and Elevation
-Difference are then derived, not entered.
-_Avoid_: anchor position, pin, marker
+Read out on hover only: the anchors are never placed at a Station, they are the profil's
+two ends. Distinct from `x`, which is horizontal distance from Anchor A.
+_Avoid_: station (as the spoken word), offset, position, distance along track, anchor placement
 
 **Anchor Height**:
 How far an anchor stands above the ground beneath it. Feeds the Terrain only, never the
 statics — the solve takes span and elevation difference, which are measured anchor to anchor.
-French: ancrage. An amarrage would be heard as the termination.
+French: ancrage. An amarrage would be heard as the termination. In the Vue 3D it is the
+dashed plumb line from the anchor down to the ground.
 _Avoid_: pole height, tower height, offset, amarrage
+
+**Position**:
+Where an anchor stands on the earth: its geographic coordinates (WGS84 or LV95). Set by a
+click or a drag on the Fond de carte, or typed. Two Positions fix a Trace end to end; moving
+one means a new line between two points, not an anchor slid along the old profil.
+_Avoid_: marqueur, marker, pin, point GPS, waypoint, anchor placement
 
 ### What is saved and shared
 
 **Scenario**:
 The line as a shareable thing: every input needed to reproduce one Verdict, and nothing
 else. A Scenario holds only the *active* configuration — the active Material Spec, the
-active terrain source — never a retained alternate. This is what a link carries.
+active terrain source, the two Positions when they are known — never a retained alternate.
+This is what a link carries; the Fond de carte is not part of it.
 _Avoid_: state, config, params, model
 
 **Session**:
@@ -331,6 +335,32 @@ spinner, no « — » and no live control — only reserved height where one wil
 layout as the app, so it is correct at every width for free, and replaced wholesale at
 hydration.
 _Avoid_: loader, loading state, placeholder, spinner, shell (the shell is the document)
+
+### The map
+
+**Fond de carte**:
+The swisstopo rendering under the vue de dessus: carte claire (default), orthophoto
+swissimage or carte nationale. A display choice, never part of the Scenario; without
+network or outside swisstopo coverage the vue de dessus keeps its drawing on a plain
+background.
+_Avoid_: basemap, map layer, tiles, carte (for the rendering itself)
+
+**Couche pentes**:
+The swisstopo « pentes supérieures à 30° » overlay, switched on over any Fond de carte, in
+2D and draped in the Vue 3D. An overlay, not a fourth Fond de carte.
+_Avoid_: slope layer, hillshade, relief
+
+**Vue 3D**:
+The relief view of the line: swisstopo terrain and imagery, both anchors with their plumb
+lines, Ligne à vide and loaded line from the engine, and the Banane. Context, not
+measurement: it states nothing the coupe does not. Loaded only when chosen.
+_Avoid_: 3D map, globe, scene, viewer
+
+**Mesure**:
+The one-line ruler on the vue de dessus: two clicked points, a third click starts over.
+Reports the horizontal distance, the straight distance between the two points and the
+distance along the ground. Never saved.
+_Avoid_: measure tool, ruler, polyline, outil de distance
 
 ### When something is wrong
 
