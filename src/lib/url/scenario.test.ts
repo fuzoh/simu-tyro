@@ -301,7 +301,7 @@ describe("completion follows the active family and names every key it fills", ()
 
 describe("an imported link is the whole profil — #88", () => {
   /** The Trace a link's `tr` names, as `initialAppState` decodes it beside the Scenario. */
-  const traceOf = (tr: string): Trace => ({ ...decodeP1(tr), fileName: null });
+  const traceOf = (tr: string): Trace => ({ ...decodeP1(tr), origin: { kind: "lien" } });
 
   test("a completed imported link passes the gates with nothing placed", () => {
     expect(evaluateGates({ scenario: decode(`?tr=${OFFSET_TRACE}`) }).errors).toEqual([]);
@@ -310,7 +310,7 @@ describe("an imported link is the whole profil — #88", () => {
   test("the completed geometry is the one an in-app import holds", () => {
     const imported = appReducer(initialAppState({ query: "", session: null }), {
       type: "tracé/importé",
-      trace: { ...traceOf(OFFSET_TRACE), fileName: "t.csv" },
+      trace: { ...traceOf(OFFSET_TRACE), origin: { kind: "csv", fileName: "t.csv" } },
       tr: OFFSET_TRACE,
     }).scenario.geometry;
     expect(decode(`?tr=${OFFSET_TRACE}`).geometry).toEqual(imported);

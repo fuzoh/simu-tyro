@@ -49,6 +49,7 @@ import type { NumericFieldId, RailValues } from "@/lib/rail/values.ts";
 import type { ForceUnit, UseClass } from "@/lib/scenario/types.ts";
 import type { RegimeId, TerminationId, TextileSpec } from "@/lib/sim";
 import type { ParseFailure } from "@/lib/terrain/csv.ts";
+import type { Trace, TraceEnds } from "@/lib/terrain/trace.ts";
 
 import { RailSection } from "@/components/app/shell.tsx";
 import { useAppDispatch, useAppState } from "@/components/app/store.tsx";
@@ -86,6 +87,7 @@ import {
 import {
   DEDUCED_HELP,
   FIELD_HELP,
+  GEOADMIN_HELP,
   LV95_HELP,
   PRESET_HELP,
   TIGHTNESS_HELP,
@@ -118,7 +120,9 @@ import {
 import { clearSession } from "@/lib/session/session.ts";
 import { isFamilyAllowed, isRegimeAvailable, REGIMES, TERMINATIONS } from "@/lib/sim";
 import { parseFailureMessage, parseProfileCsv, readFailure } from "@/lib/terrain/csv.ts";
+import { geoadminNotice, loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
 import { formatLv95, inLv95Domain, lv95FromWgs84 } from "@/lib/terrain/lv95.ts";
+import { traceName } from "@/lib/terrain/provenance.ts";
 import { encodeP1 } from "@/lib/url/p1.ts";
 import { cn } from "@/lib/utils.ts";
 import { heading, label } from "@/lib/vocabulary/labels.ts";
@@ -473,6 +477,13 @@ export function RailInputs({
                   dispatch({ type: "tracé/réutilisé", tr: encodeP1(state.trace) });
                 }
               }}
+              onReuseCsv={() => {
+                if (state.retainedCsv !== null) {
+                  const csv = state.retainedCsv;
+                  dispatch({ type: "tracé/importé", trace: csv, tr: encodeP1(csv) });
+                }
+              }}
+              retainedCsv={state.retainedCsv}
               trace={trace}
             />
             {/* A **button, not a drop zone**: the chart already carries three drag targets. The
@@ -781,7 +792,8 @@ export function RailInputs({
             <NumericRow hint="°" id="windDirection" />
           </Group>
 
-          {/* The Positions (#90): typed in WGS84, read in LV95. Nothing reads them yet. */}
+          {/* The Positions (#90): typed in WGS84, read in LV95. The statics never read them; the
+              profil geo.admin is loaded between them (#103). */}
           <Group title={heading("position", "exact")}>
             {(["A", "B"] as const).map((end) => {
               const note = positionPairNote(text, end);
@@ -812,6 +824,7 @@ export function RailInputs({
                 </Fragment>
               );
             })}
+            <GeoadminControls />
           </Group>
         </div>
       </RailSection>
@@ -1120,9 +1133,9 @@ export function RailHeaderControls({
               if (storage === null) return;
               // The **only destructive control**, so the only confirmation — and it warns harder
               // when the cached Trace arrived by link, because that one cannot be re-imported from
-              // a file: `fileName === null` **is** « profil reçu par lien ».
+              // a file.
               const extra =
-                state.trace !== null && state.trace.fileName === null
+                state.trace?.origin.kind === "lien"
                   ? "\n\nCe profil est arrivé par lien : il ne pourra pas être réimporté depuis un fichier."
                   : "";
               if (!window.confirm(`${CLEAR_SESSION_CONFIRM}${extra}`)) return;
@@ -1192,26 +1205,30 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 /**
  * § 4's three controls plus the file-identity line, which has **four** states — the fourth being
  * what « Réinitialiser le scénario » leaves behind, and the reason the cached Trace is not dead
- * weight.
+ * weight. A CSV a profil geo.admin displaced (#103) gets its own line and its own way back.
  */
 function FileControls({
   trace,
+  retainedCsv,
   geometrySource,
   failure,
   onChoose,
   onRemove,
   onReuse,
+  onReuseCsv,
 }: {
-  trace: { fileName: string | null } | null;
+  trace: Trace | null;
+  retainedCsv: Trace | null;
   geometrySource: "manual" | "trace";
   failure: ParseFailure | null;
   onChoose: () => void;
   onRemove: () => void;
   onReuse: () => void;
+  onReuseCsv: () => void;
 }) {
   const active = geometrySource === "trace" && trace !== null;
   const cached = geometrySource === "manual" && trace !== null;
-  const name = trace?.fileName;
+  const name = trace === null ? null : traceName(trace.origin);
   return (
     <div className="flex flex-col gap-1 py-1">
       <div className="flex flex-wrap items-center gap-1">
@@ -1228,17 +1245,26 @@ function FileControls({
             Réutiliser ce profil
           </Button>
         )}
+        {retainedCsv !== null && (
+          <Button onClick={onReuseCsv} size="sm" type="button" variant="outline">
+            Réutiliser le CSV
+          </Button>
+        )}
       </div>
       <p className="text-muted-foreground text-xs">
         {active
-          ? // A link carries the payload but not the filename.
-            (name ?? "profil reçu par lien")
+          ? name
           : cached
-            ? name === null || name === undefined
-              ? "profil reçu par lien (non utilisé)"
-              : `Profil en mémoire : ${name} (non utilisé)`
+            ? trace.origin.kind === "csv"
+              ? `Profil en mémoire : ${name} (non utilisé)`
+              : `${name} (non utilisé)`
             : "(aucun profil)"}
       </p>
+      {retainedCsv !== null && (
+        <p className="text-muted-foreground text-xs">
+          CSV en mémoire : {traceName(retainedCsv.origin)} (non utilisé)
+        </p>
+      )}
       {failure !== null && (
         <div className="flex flex-col gap-1">
           {/* **Inline beneath the control, never in the banner slot** — nothing about the current
@@ -1248,6 +1274,56 @@ function FileControls({
             <FixButton label="Choisir un autre fichier" onClick={onChoose} />
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * « Charger le profil geo.admin » (#103) — an explicit action, never a side effect of typing a
+ * Position. Every outcome short of a profil is an **ambient** line under the button: the terrain on
+ * screen stays as it was, because the profil is a connected extra on top of an app that computes
+ * offline.
+ */
+function GeoadminControls() {
+  const { scenario } = useAppState();
+  const dispatch = useAppDispatch();
+  const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const { A, B } = scenario.positions;
+
+  async function load(ends: TraceEnds) {
+    setLoading(true);
+    const outcome = await loadGeoadminProfile(ends, (url) => fetch(url));
+    setLoading(false);
+    if (!outcome.ok) {
+      setNotice(geoadminNotice(outcome.failure));
+      return;
+    }
+    setNotice(null);
+    dispatch({ type: "tracé/importé", trace: outcome.trace, tr: encodeP1(outcome.trace) });
+  }
+
+  return (
+    <div className="flex flex-col gap-1 py-1">
+      <div className="flex items-center gap-1">
+        <Button
+          disabled={A === null || B === null || loading}
+          onClick={() => {
+            if (A !== null && B !== null) void load({ A, B });
+          }}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          Charger le profil geo.admin
+        </Button>
+        <InfoTip label="Charger le profil geo.admin" text={GEOADMIN_HELP} />
+      </div>
+      {A === null || B === null ? (
+        <AmbientNote text="Les Positions A et B sont nécessaires." />
+      ) : (
+        <AmbientNote text={loading ? "Chargement du profil geo.admin…" : notice} />
       )}
     </div>
   );

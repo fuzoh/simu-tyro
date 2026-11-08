@@ -472,7 +472,7 @@ describe("the imported profile — one terrain joint, one domain", () => {
     d: Float64Array.from([0, 50, 100, 150, 200, 250, 300, 350, 400]),
     z: Float64Array.from([500, 502, 498, 494, 486, 480, 478, 476, 470]),
     dev: 1.2,
-    fileName: "profil.csv",
+    origin: { kind: "csv", fileName: "profil.csv" },
   };
 
   const imported: ScenarioDraft = {
@@ -542,7 +542,7 @@ describe("the frame outlives the solve — § 8's « les entrées se dessinent t
     d: Float64Array.from([0, 100, 200, 300, 400]),
     z: Float64Array.from([500, 498, 486, 478, 470]),
     dev: 1.2,
-    fileName: "profil.csv",
+    origin: { kind: "csv", fileName: "profil.csv" },
   };
 
   it("a textile draft with a blank MBL still has a frame, and no solved half", () => {

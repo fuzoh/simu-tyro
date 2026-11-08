@@ -41,7 +41,7 @@ const TRACE: Trace = {
   d: Float64Array.from([0, 200]),
   z: Float64Array.from([100, 80]),
   dev: null,
-  fileName: "t.csv",
+  origin: { kind: "csv", fileName: "t.csv" },
 };
 
 function scenario(patch: (draft: ScenarioDraft) => void = () => {}): ScenarioDraft {

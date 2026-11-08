@@ -738,6 +738,7 @@ describe("le repli n'est ni dans le Scénario, ni dans la Session, ni dans l'URL
       retainedMaterial: null,
       retainedManual: null,
       trace: null,
+      retainedCsv: null,
       layers: DEFAULT_LAYERS,
     });
     const written = map.get(SESSION_KEY) ?? "";

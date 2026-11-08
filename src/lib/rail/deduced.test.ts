@@ -26,7 +26,7 @@ const TRACE: Trace = {
   d: Float64Array.from([0, 112, 224]),
   z: Float64Array.from([540, 520, 500]),
   dev: 0,
-  fileName: "profil-2.csv",
+  origin: { kind: "csv", fileName: "profil-2.csv" },
 };
 
 function scenario(patch: (draft: ScenarioDraft) => void = () => {}): ScenarioDraft {

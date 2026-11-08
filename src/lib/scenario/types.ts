@@ -173,7 +173,8 @@ export type Position = {
 /**
  * The two anchors' {@link Position}s, `null` where unknown (manual geometry, or a CSV with no
  * coordinates). In a link the four numbers are `lata` / `lona` / `latb` / `lonb`, **all absent for
- * unknown**. Nothing reads them yet: statics, the ride and the Verdict are unchanged.
+ * unknown**. Only « Charger le profil geo.admin » reads them (#103), and only when pressed: statics,
+ * the ride and the Verdict never do.
  */
 export type Positions = { A: Position | null; B: Position | null };
 

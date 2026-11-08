@@ -54,7 +54,7 @@ import * as v from "valibot";
 
 import type { EndTermination, ForceUnit, Scenario, TextileDraft } from "@/lib/scenario/types.ts";
 import type { MaterialSpec, RegimeId, SteelSpec, TerminationId } from "@/lib/sim";
-import type { Trace, TraceEnds } from "@/lib/terrain/trace.ts";
+import type { Trace, TraceEnds, TraceOrigin } from "@/lib/terrain/trace.ts";
 
 import { FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 import { REGIMES, TERMINATIONS } from "@/lib/sim";
@@ -149,6 +149,8 @@ export type Session = {
    * scénario »'s promise to keep it real and « Tracé en mémoire … (non utilisé) » implementable.
    */
   readonly trace: Trace | null;
+  /** The CSV a profil geo.admin displaced (#103): a file the app cannot fetch back. */
+  readonly retainedCsv: Trace | null;
   /** § 5's two toggles. The other display preferences — `u`, the active tightness mode — are the
    * Scenario's own fields, so they persist with it rather than beside it. */
   readonly layers: LayerToggles;
@@ -161,7 +163,7 @@ export type Session = {
 export type WriteOutcome =
   /** The whole Session is stored. */
   | "écrit"
-  /** Stored without the cached Trace: it did not fit. The caller says so. */
+  /** Stored without the cached Trace and the kept CSV: they did not fit. The caller says so. */
   | "sans-tracé"
   /** Nothing was stored, and what was already there is untouched. */
   | "échec";
@@ -175,12 +177,15 @@ type StoredTrace = {
   readonly d: readonly number[];
   readonly z: readonly number[];
   readonly dev: number | null;
-  readonly fileName: string | null;
+  readonly origin: TraceOrigin;
   readonly ends?: TraceEnds;
 };
 
-/** The Session as JSON holds it — a {@link Session} with the Trace's two arrays widened. */
-type StoredSession = Omit<Session, "trace"> & { readonly trace: StoredTrace | null };
+/** The Session as JSON holds it — a {@link Session} with each Trace's two arrays widened. */
+type StoredSession = Omit<Session, "trace" | "retainedCsv"> & {
+  readonly trace: StoredTrace | null;
+  readonly retainedCsv: StoredTrace | null;
+};
 
 /**
  * A finite number, and nothing else. `JSON.stringify` writes `NaN` and both infinities as `null`,
@@ -327,8 +332,15 @@ const SCENARIO: v.GenericSchema<unknown, Scenario> = v.object({
   })),
 });
 
+/** Where a cached profil came from (#103). */
+const TRACE_ORIGIN: v.GenericSchema<unknown, TraceOrigin> = v.variant("kind", [
+  v.object({ kind: v.literal("csv"), fileName: v.string() }),
+  v.object({ kind: v.literal("geoadmin") }),
+  v.object({ kind: v.literal("lien") }),
+]);
+
 /**
- * The cached profile. The one cross-field check is that the two columns agree and hold at least one
+ * A cached profile. The one cross-field check is that the two columns agree and hold at least one
  * sample — every consumer indexes `z` by `d`'s index, so a blob where they disagree is not a
  * degraded trace but an unreadable one. Strict increase is `csv.ts`'s and the codec's, not a
  * property re-derived here.
@@ -338,7 +350,10 @@ const TRACE: v.GenericSchema<unknown, StoredTrace> = v.pipe(
     d: v.array(FINITE),
     z: v.array(FINITE),
     dev: v.nullable(FINITE),
-    fileName: v.nullable(v.string()),
+    origin: v.optional(TRACE_ORIGIN),
+    // Before #103 a Session spelled the origin as a filename, `null` for a profil received by link.
+    // Read so that the cached profil of a Session stored then is not discarded with it.
+    fileName: v.optional(v.nullable(v.string())),
     // Added with #90: a cached Trace keeps the coordinates of its two ends when the file had them.
     ends: v.optional(v.object({ A: POSITION, B: POSITION })),
   }),
@@ -346,6 +361,14 @@ const TRACE: v.GenericSchema<unknown, StoredTrace> = v.pipe(
     (trace) => trace.d.length > 0 && trace.d.length === trace.z.length,
     "d and z must be non-empty and of equal length",
   ),
+  v.check(
+    (trace) => trace.origin !== undefined || trace.fileName !== undefined,
+    "a cached profil says where it came from",
+  ),
+  v.transform(({ origin, fileName, ...samples }): StoredTrace => ({
+    ...samples,
+    origin: origin ?? (typeof fileName === "string" ? { kind: "csv", fileName } : { kind: "lien" }),
+  })),
 );
 
 /**
@@ -358,6 +381,8 @@ const STORED_SESSION: v.GenericSchema<unknown, StoredSession> = v.object({
   retainedMaterial: v.nullable(RETAINED_MATERIAL),
   retainedManual: v.nullable(v.object({ L: FINITE, h: FINITE })),
   trace: v.nullable(TRACE),
+  // Added with #103, optional with none: a Session stored before it had no profil geo.admin.
+  retainedCsv: v.optional(v.nullable(TRACE), null),
   // The two later layers are **optional with their defaults**: a Session stored before they existed
   // is otherwise whole, and « valid or discarded » would throw away its cached Trace over two
   // display preferences it could not have held.
@@ -440,8 +465,9 @@ export function writeSession(storage: SessionStorage, session: Session): WriteOu
   const stored = dehydrate(session);
   if (trySet(storage, JSON.stringify(stored))) return "écrit";
   // Nothing left to shed: a scenario alone that will not fit is a storage that is not writable.
-  if (stored.trace === null) return "échec";
-  if (trySet(storage, JSON.stringify({ ...stored, trace: null }))) return "sans-tracé";
+  if (stored.trace === null && stored.retainedCsv === null) return "échec";
+  const traceless = { ...stored, trace: null, retainedCsv: null };
+  if (trySet(storage, JSON.stringify(traceless))) return "sans-tracé";
   return "échec";
 }
 
@@ -472,44 +498,46 @@ function trySet(storage: SessionStorage, payload: string): boolean {
   }
 }
 
-/** In-memory Session → the JSON shape: the Trace's two typed arrays widen to plain arrays. */
+/** In-memory Session → the JSON shape: each Trace's two typed arrays widen to plain arrays. */
 function dehydrate(session: Session): StoredSession {
-  const { trace } = session;
   return {
     scenario: session.scenario,
     retainedMaterial: session.retainedMaterial,
     retainedManual: session.retainedManual,
-    trace:
-      trace === null
-        ? null
-        : {
-            d: Array.from(trace.d),
-            z: Array.from(trace.z),
-            dev: trace.dev,
-            fileName: trace.fileName,
-            ...(trace.ends === undefined ? {} : { ends: trace.ends }),
-          },
+    trace: session.trace === null ? null : storedTrace(session.trace),
+    retainedCsv: session.retainedCsv === null ? null : storedTrace(session.retainedCsv),
     layers: session.layers,
   };
 }
 
 /** The JSON shape → an in-memory Session: the samples become `Float64Array` again, losslessly. */
 function hydrate(stored: StoredSession): Session {
-  const { trace } = stored;
   return {
     scenario: stored.scenario,
     retainedMaterial: stored.retainedMaterial,
     retainedManual: stored.retainedManual,
-    trace:
-      trace === null
-        ? null
-        : {
-            d: Float64Array.from(trace.d),
-            z: Float64Array.from(trace.z),
-            dev: trace.dev,
-            fileName: trace.fileName,
-            ...(trace.ends === undefined ? {} : { ends: trace.ends }),
-          },
+    trace: stored.trace === null ? null : heldTrace(stored.trace),
+    retainedCsv: stored.retainedCsv === null ? null : heldTrace(stored.retainedCsv),
     layers: stored.layers,
+  };
+}
+
+function storedTrace(trace: Trace): StoredTrace {
+  return {
+    d: Array.from(trace.d),
+    z: Array.from(trace.z),
+    dev: trace.dev,
+    origin: trace.origin,
+    ...(trace.ends === undefined ? {} : { ends: trace.ends }),
+  };
+}
+
+function heldTrace(trace: StoredTrace): Trace {
+  return {
+    d: Float64Array.from(trace.d),
+    z: Float64Array.from(trace.z),
+    dev: trace.dev,
+    origin: trace.origin,
+    ...(trace.ends === undefined ? {} : { ends: trace.ends }),
   };
 }

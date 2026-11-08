@@ -55,7 +55,7 @@ describe("placeSpan — an imported profil is taken whole (#88)", () => {
       d: Float64Array.of(0),
       z: Float64Array.of(500),
       dev: null,
-      fileName: null,
+      origin: { kind: "lien" },
     };
     expect(placeSpan({ geometry: IMPORTED, anchors }, lone)).toBeNull();
   });

@@ -33,6 +33,16 @@ import type { Terrain } from "@/lib/sim";
 export type TraceEnds = { readonly A: Position; readonly B: Position };
 
 /**
+ * Where a Trace came from — the three ways a profil enters (#103). Only a CSV has a name to show:
+ * a profil geo.admin is fetched between the two Positions and is attributed to swisstopo, and a
+ * profil received by link arrives with no file at all.
+ */
+export type TraceOrigin =
+  | { readonly kind: "csv"; readonly fileName: string }
+  | { readonly kind: "geoadmin" }
+  | { readonly kind: "lien" };
+
+/**
  * § 4's Session-state Trace, verbatim. Held in **file coordinates** and never mutated.
  *
  * `dev` is the straightness scalar (§ 4 — *Rectitude*): the max lateral deviation from the A→B
@@ -47,8 +57,8 @@ export type Trace = {
   readonly z: Float64Array;
   /** Max lateral deviation from the A→B chord, m; `null` = unverifiable. */
   readonly dev: number | null;
-  /** `null` ⇒ « tracé reçu par lien » — ticket 09's payload drops the filename. */
-  readonly fileName: string | null;
+  /** A link's payload carries no origin, so what a link brings is always `lien`. */
+  readonly origin: TraceOrigin;
   /** The first and last sample's coordinates. **Absent** when the file carried none (#90). */
   readonly ends?: TraceEnds;
 };
@@ -69,7 +79,7 @@ export type DerivedSpan = {
  * The trace's own horizontal extent, m — `d[last] − d[0]`. It **is** the span: the anchors stand on
  * the two end samples. Also the « sur *X* m » of § 6's copy.
  *
- * Typed on `d` alone so a decoded `p1.` payload, which has no `fileName`, reads it as a `Trace` does.
+ * Typed on `d` alone so a decoded `p1.` payload, which has no `origin`, reads it as a `Trace` does.
  */
 export function traceExtent(trace: Pick<Trace, "d">): number {
   return trace.d[trace.d.length - 1] - trace.d[0];

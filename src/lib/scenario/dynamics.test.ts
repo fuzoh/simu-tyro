@@ -58,7 +58,7 @@ function levelProfile(altitude: number): Trace {
     d: Float64Array.from([0, 75, 150]),
     z: Float64Array.from([altitude, altitude, altitude]),
     dev: null,
-    fileName: null,
+    origin: { kind: "lien" },
   };
 }
 

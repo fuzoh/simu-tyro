@@ -285,9 +285,10 @@ export function parseProfileCsv(text: string, fileName: string): ParseResult {
     return fail({ kind: "valeur-non-numérique", fileName, ...ends });
 
   const dev = straightness(cells, columns, mark);
+  const origin = { kind: "csv", fileName } as const;
   return {
     ok: true,
-    trace: ends === undefined ? { d, z, dev, fileName } : { d, z, dev, fileName, ends },
+    trace: ends === undefined ? { d, z, dev, origin } : { d, z, dev, origin, ends },
   };
 }
 

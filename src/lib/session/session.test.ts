@@ -68,7 +68,7 @@ const TRACE: Trace = {
   d: Float64Array.from([0, 12.5, 40.25, 183.4]),
   z: Float64Array.from([1234.5678, 1230.1234, 1221.9999, 1196.0401]),
   dev: 0.4231,
-  fileName: "pont-du-diable.csv",
+  origin: { kind: "csv", fileName: "pont-du-diable.csv" },
 };
 
 /** The same profile as a link carries it — `tr` verbatim, and no filename. */
@@ -85,7 +85,7 @@ function denseTrace(points: number): Trace {
     d[i] = Math.round(i * 24.7) / 100;
     z[i] = Math.round(54000 + 300 * Math.sin(i / 40)) / 100;
   }
-  return { d, z, dev: null, fileName: "profil-dense.csv" };
+  return { d, z, dev: null, origin: { kind: "csv", fileName: "profil-dense.csv" } };
 }
 
 /** That profile's `tr` value — over budget by construction, asserted in the case that uses it. */
@@ -98,6 +98,7 @@ function bareSession(): Session {
     retainedMaterial: null,
     retainedManual: null,
     trace: null,
+    retainedCsv: null,
     layers: DEFAULT_LAYERS,
   };
 }
@@ -109,6 +110,7 @@ function fullSession(): Session {
     retainedMaterial: FIRST_RUN_RETAINED_TEXTILE,
     retainedManual: { L: 150, h: -18 },
     trace: TRACE,
+    retainedCsv: null,
     layers: { unloadedLine: true, chordAB: false, riderTip: false, trajectory: true },
   };
 }
@@ -175,14 +177,50 @@ describe("the round-trip", () => {
     expect(trace?.d).toEqual(TRACE.d);
     expect(trace?.z).toEqual(TRACE.z);
     expect(trace?.dev).toBe(TRACE.dev);
-    expect(trace?.fileName).toBe(TRACE.fileName);
+    expect(trace?.origin).toEqual({ kind: "csv", fileName: "pont-du-diable.csv" });
   });
 
-  test("« tracé reçu par lien » round-trips as `fileName: null`, not as an empty string", () => {
+  test("« profil reçu par lien » round-trips as its own origin, with no filename", () => {
     const storage = memoryStorage();
-    writeSession(storage, { ...fullSession(), trace: { ...TRACE, fileName: null } });
+    writeSession(storage, { ...fullSession(), trace: { ...TRACE, origin: { kind: "lien" } } });
 
-    expect(readSession(storage)?.trace?.fileName).toBeNull();
+    expect(readSession(storage)?.trace?.origin).toEqual({ kind: "lien" });
+  });
+
+  test("a profil geo.admin comes back as one, with the CSV it displaced kept beside it (#103)", () => {
+    const storage = memoryStorage();
+    const geoadmin: Trace = { ...TRACE, origin: { kind: "geoadmin" } };
+    writeSession(storage, { ...fullSession(), trace: geoadmin, retainedCsv: TRACE });
+
+    const restored = readSession(storage);
+    expect(restored?.trace?.origin).toEqual({ kind: "geoadmin" });
+    expect(restored?.retainedCsv?.origin).toEqual({
+      kind: "csv",
+      fileName: "pont-du-diable.csv",
+    });
+    expect(restored?.retainedCsv?.z).toEqual(TRACE.z);
+  });
+
+  test("a Session stored before #103 keeps its cached profil: the filename names its origin", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const { origin: _origin, ...samples } = blob.trace as Record<string, unknown>;
+    const { retainedCsv: _retainedCsv, ...before } = blob;
+    storage.map.set(
+      SESSION_KEY,
+      JSON.stringify({ ...before, trace: { ...samples, fileName: "pont-du-diable.csv" } }),
+    );
+    expect(readSession(storage)?.trace?.origin).toEqual({
+      kind: "csv",
+      fileName: "pont-du-diable.csv",
+    });
+    expect(readSession(storage)?.retainedCsv).toBeNull();
+
+    storage.map.set(
+      SESSION_KEY,
+      JSON.stringify({ ...before, trace: { ...samples, fileName: null } }),
+    );
+    expect(readSession(storage)?.trace?.origin).toEqual({ kind: "lien" });
   });
 
   test("an imported geometry keeps its `p1.` payload verbatim", () => {
@@ -364,14 +402,14 @@ describe("a blob that fails its schema is discarded, whole", () => {
       name: "a cached Trace whose two columns disagree",
       blob: JSON.stringify({
         ...storedBlob(fullSession()),
-        trace: { d: [0, 10, 20], z: [1, 2], dev: null, fileName: null },
+        trace: { d: [0, 10, 20], z: [1, 2], dev: null, origin: { kind: "lien" } },
       }),
     },
     {
       name: "an empty cached Trace",
       blob: JSON.stringify({
         ...storedBlob(fullSession()),
-        trace: { d: [], z: [], dev: null, fileName: null },
+        trace: { d: [], z: [], dev: null, origin: { kind: "lien" } },
       }),
     },
     {
@@ -461,6 +499,21 @@ describe("the quota rule — store the scenario without the Trace, and say so", 
     expect(restored?.trace).toBeNull();
     expect(restored?.scenario).toEqual(firstRunDefaults());
     expect(restored?.retainedMaterial).toEqual(FIRST_RUN_RETAINED_TEXTILE);
+  });
+
+  test("the CSV kept behind a profil geo.admin is dropped with the Trace, never alone", () => {
+    const storage = memoryStorage();
+    const session = { ...fullSession(), retainedCsv: TRACE };
+    storage.budget = JSON.stringify({
+      ...storedBlob(session),
+      trace: null,
+      retainedCsv: null,
+    }).length;
+
+    expect(writeSession(storage, session)).toBe("sans-tracé");
+    const restored = readSession(storage);
+    expect(restored?.trace).toBeNull();
+    expect(restored?.retainedCsv).toBeNull();
   });
 
   test("an imported line survives a dropped cache: the payload rides in the Scenario", () => {

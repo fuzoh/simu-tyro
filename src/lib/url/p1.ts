@@ -50,7 +50,7 @@
  *   character `JSON.parse` throws on, forever.
  * - **The filename does not travel** and neither does the import date: the filename is the only
  *   weakly identifying string in the payload and it reproduces nothing. The receiving side reads
- *   « tracé reçu par lien » — hence {@link TracePayload}, which is a Trace *minus* `fileName`.
+ *   « tracé reçu par lien » — hence {@link TracePayload}, which is a Trace *minus* `origin`.
  */
 
 /** The sentinel. One character `JSON.parse` throws on, and the format's version marker. */
@@ -107,7 +107,7 @@ export class P1Error extends Error {
 }
 
 /**
- * What a link carries of a Trace. Structurally a `Trace` minus `fileName` — a `Trace` is
+ * What a link carries of a Trace. Structurally a `Trace` minus `origin` — a `Trace` is
  * assignable to it, and what comes back out becomes « tracé reçu par lien ».
  */
 export type TracePayload = {
@@ -141,7 +141,7 @@ export function fitsLinkBudget(href: string): boolean {
  * thousands of points over any shareable span, so the budget refuses such a file at « Copier le
  * lien » long before the grid could collapse it. § 8's structural check list is the whole list.
  *
- * @param trace the imported profile, in file coordinates. `fileName` is ignored — it does not
+ * @param trace the imported profile, in file coordinates. `origin` is ignored — it does not
  *   travel.
  * @returns the `tr` value, ready to be written into the query string unescaped.
  * @throws RangeError when the columns disagree, a sample is not finite, there are fewer than two
@@ -237,7 +237,7 @@ function walkWhole(raw: string, enforceBudget: boolean): string {
  * implementation, so nothing can decode that `validateSearch` would have refused.
  *
  * @param raw the `tr` value.
- * @returns the profile in file coordinates. **No `fileName`**: the receiving side reads « tracé
+ * @returns the profile in file coordinates. **No `origin`**: the receiving side reads « tracé
  *   reçu par lien ».
  * @throws P1Error exactly as {@link validateP1} does.
  */

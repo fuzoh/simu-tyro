@@ -93,7 +93,7 @@ function syntheticTrace(span: number): Trace {
     z[i] = Math.round(relief * 100) / 100;
   }
 
-  return { d, z, dev: 0.42, fileName: null };
+  return { d, z, dev: 0.42, origin: { kind: "lien" } };
 }
 
 /** A hand-authored trace at an arbitrary pitch — the only way to exceed the budget. */
@@ -104,7 +104,7 @@ function denseTrace(points: number): Trace {
     d[i] = Math.round(i * 24.7) / 100;
     z[i] = Math.round(54000 + 300 * Math.sin(i / 40)) / 100;
   }
-  return { d, z, dev: null, fileName: "profil-dense.csv" };
+  return { d, z, dev: null, origin: { kind: "csv", fileName: "profil-dense.csv" } };
 }
 
 describe("URL cost — the measurement the embed decision rests on", () => {
@@ -193,7 +193,7 @@ describe("the ceiling rule is never nearest", () => {
       d: Float64Array.from([0, 1, 2, 3]),
       z: Float64Array.from([540.401, 540.409, 540.4, -0.001]),
       dev: 0,
-      fileName: null,
+      origin: { kind: "lien" },
     };
     const { z } = decodeP1(encodeP1(trace));
     // 540,401 and 540,409 both land on 540,41 — nearest would have given 540,40 to the first.
@@ -221,7 +221,7 @@ describe("the ceiling rule is never nearest", () => {
       d: Float64Array.from([0, 1]),
       z: Float64Array.from([-12.34, 0.07]),
       dev: null,
-      fileName: null,
+      origin: { kind: "lien" },
     };
     expect(Array.from(decodeP1(encodeP1(trace)).z)).toEqual([-12.34, 0.07]);
   });

@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import type { Session } from "@/lib/session/session.ts";
+import type { Fetch } from "@/lib/terrain/geoadmin.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { buildScene } from "@/lib/chart/scene.ts";
@@ -17,12 +18,16 @@ import { deriveResults } from "@/lib/rail/results.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { placeSpan } from "@/lib/scenario/geometry.ts";
 import { DEFAULT_LAYERS } from "@/lib/session/session.ts";
+import { replayTrial, TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
 import { parseProfileCsv } from "@/lib/terrain/csv.ts";
-import { encodeP1 } from "@/lib/url/p1.ts";
+import { loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
+import { encodeP1, URL_BUDGET_CHARS } from "@/lib/url/p1.ts";
 import { FIRST_RUN_LINK } from "@/lib/url/scenario.ts";
 import { canonicalLink } from "@/lib/url/schema.ts";
 
-import { publishedSearch } from "./persist.ts";
+import type { AppState } from "./state.ts";
+
+import { copyLink, publishedSearch, sessionOf } from "./persist.ts";
 import { appReducer, initialAppState } from "./state.ts";
 
 /** The query string of § 9's first-run link — a complete, canonical, nothing-to-do bag. */
@@ -37,6 +42,9 @@ const TRACE_DATA = {
 /** A real `p1.` payload: the validator walks it structurally, so a made-up one is a refusal. */
 const TRACE = encodeP1({ ...TRACE_DATA, dev: 0 });
 
+/** Where the tests' own cached profile came from: a CSV the user imported. */
+const PONT = { kind: "csv", fileName: "pont.csv" } as const;
+
 /** A returning user's Session: their own span, their own toggles, a rope kept on the side. */
 function storedSession(): Session {
   const scenario = firstRunDefaults();
@@ -47,6 +55,7 @@ function storedSession(): Session {
     retainedMaterial: FIRST_RUN_RETAINED_TEXTILE,
     retainedManual: { L: 150, h: -18 },
     trace: null,
+    retainedCsv: null,
     layers: { unloadedLine: true, chordAB: false, riderTip: false, trajectory: true },
   };
 }
@@ -228,9 +237,9 @@ describe("initialAppState — § 8's mount order", () => {
       expect(state.scenario.geometry).toEqual({ source: "trace", trace: TRACE });
       expect(state.trace?.d).toEqual(TRACE_DATA.d);
       expect(state.trace?.z).toEqual(TRACE_DATA.z);
-      // § 4's third identity state: the filename does not travel, so its absence *is* « tracé reçu
-      // par lien » rather than a blank the UI has to guess at.
-      expect(state.trace?.fileName).toBeNull();
+      // § 4's third identity state: the filename does not travel, so the profile is « reçu par
+      // lien » rather than a blank the UI has to guess at.
+      expect(state.trace?.origin).toEqual({ kind: "lien" });
     });
 
     it("keeps the Session's own file when the link carries that same profile", () => {
@@ -238,7 +247,7 @@ describe("initialAppState — § 8's mount order", () => {
       // link built from your own import may not rename your file « tracé reçu par lien ».
       const session = storedSession();
       session.scenario.geometry = { source: "trace", trace: TRACE };
-      const cached = { d: TRACE_DATA.d, z: TRACE_DATA.z, dev: 0, fileName: "pont.csv" };
+      const cached: Trace = { ...TRACE_DATA, dev: 0, origin: PONT };
       const state = initialAppState({
         query: IMPORTED_QUERY,
         session: { ...session, trace: cached },
@@ -250,18 +259,18 @@ describe("initialAppState — § 8's mount order", () => {
     it("decodes rather than adopting a cached Trace the link does not name", () => {
       // The payload is the identity test. A Session whose *active* geometry is manual has a Trace
       // in memory, not on the line, and nothing says it is the one that just arrived.
-      const cached = { d: TRACE_DATA.d, z: TRACE_DATA.z, dev: 0, fileName: "pont.csv" };
+      const cached: Trace = { ...TRACE_DATA, dev: 0, origin: PONT };
       const state = initialAppState({
         query: IMPORTED_QUERY,
         session: { ...storedSession(), trace: cached },
       });
 
       expect(state.trace).not.toBe(cached);
-      expect(state.trace?.fileName).toBeNull();
+      expect(state.trace?.origin).toEqual({ kind: "lien" });
     });
 
     it("leaves the cached Trace alone when the link carries no `tr` at all", () => {
-      const cached = { d: TRACE_DATA.d, z: TRACE_DATA.z, dev: 0, fileName: "pont.csv" };
+      const cached: Trace = { ...TRACE_DATA, dev: 0, origin: PONT };
       const state = initialAppState({
         query: "?L=250&h=-40",
         session: { ...storedSession(), trace: cached },
@@ -337,7 +346,7 @@ describe("appReducer — the Rail's five structural actions", () => {
 
   describe("« Réinitialiser le scénario » — § 9's reset table, column by column", () => {
     const edited = appReducer(
-      { ...first, trace: { d: TRACE_DATA.d, z: TRACE_DATA.z, dev: 0, fileName: "pont.csv" } },
+      { ...first, trace: { ...TRACE_DATA, dev: 0, origin: PONT } },
       { type: "scénario/modifié", patch: { unit: "kN", regime: "en15567" } },
     );
     const reset = appReducer(edited, { type: "scénario/réinitialisé" });
@@ -408,7 +417,7 @@ describe("appReducer — the Rail's five structural actions", () => {
   });
 
   describe("import, removal and re-use — one Trace, three lifetimes", () => {
-    const trace = { d: TRACE_DATA.d, z: TRACE_DATA.z, dev: 0, fileName: "pont.csv" };
+    const trace: Trace = { ...TRACE_DATA, dev: 0, origin: PONT };
     const imported = appReducer(first, { type: "tracé/importé", trace, tr: TRACE });
 
     it("the profil is taken whole — A over its first sample, B over its last", () => {
@@ -563,7 +572,7 @@ describe("#90's Positions — they follow the profil, end to end", () => {
     const arrived = initialAppState({ query, session: null });
     expect(arrived.scenario.positions).toEqual({ A, B });
     expect(arrived.trace?.ends).toEqual({ A, B });
-    expect(arrived.trace?.fileName).toBeNull();
+    expect(arrived.trace?.origin).toEqual({ kind: "lien" });
   });
 
   it("a link's Positions win over the cached file's, so « Réutiliser » restores the link's", () => {
@@ -577,12 +586,13 @@ describe("#90's Positions — they follow the profil, end to end", () => {
       retainedMaterial: imported.retainedMaterial,
       retainedManual: imported.retainedManual,
       trace: imported.trace,
+      retainedCsv: imported.retainedCsv,
       layers: imported.layers,
     };
     const arrived = initialAppState({ query, session });
     expect(arrived.scenario.positions).toEqual(retyped);
     expect(arrived.trace?.ends).toEqual(retyped);
-    expect(arrived.trace?.fileName).toBe("trace.csv");
+    expect(arrived.trace?.origin).toEqual({ kind: "csv", fileName: "trace.csv" });
   });
 
   it("changes neither the Results nor the Verdict", () => {
@@ -599,5 +609,126 @@ describe("#90's Positions — they follow the profil, end to end", () => {
     const unplaced = { ...ready.scenario, positions: { A: null, B: null } };
     expect(read(ready.scenario)).toEqual(read(unplaced));
     expect(read(ready.scenario)?.verdict).not.toBeNull();
+  });
+});
+
+describe("#103's profil geo.admin — loaded between the two Positions, a third origin", () => {
+  const ORIGIN = "https://scoutech.example";
+  const csv = readFileSync(
+    new URL("../../../docs/mesures dynamometre/trace-geoadmin-2026-11-08.csv", import.meta.url),
+    "utf8",
+  );
+  const parsed = parseProfileCsv(csv, "trace-geoadmin-2026-11-08.csv");
+  if (!parsed.ok) throw new Error("the trial CSV must import");
+  const fromCsv = parsed.trace;
+
+  /** The trial's anchor heights and a régime, so that there is a Verdict to compare. */
+  const ready = appReducer(initialAppState({ query: "", session: null }), {
+    type: "scénario/modifié",
+    patch: { anchors: { zA: 1.5, zB: 1 }, regime: "en15567" },
+  });
+  const onCsv = appReducer(ready, {
+    type: "tracé/importé",
+    trace: fromCsv,
+    tr: encodeP1(fromCsv),
+  });
+
+  /** « Charger le profil geo.admin », as the button runs it: the loader, then one dispatch. */
+  async function loadOver(state: AppState, fetch: Fetch): Promise<AppState> {
+    const { A, B } = state.scenario.positions;
+    if (A === null || B === null) throw new Error("both Positions are needed");
+    const outcome = await loadGeoadminProfile({ A, B }, fetch);
+    if (!outcome.ok) return state;
+    return appReducer(state, {
+      type: "tracé/importé",
+      trace: outcome.trace,
+      tr: encodeP1(outcome.trace),
+    });
+  }
+
+  function verdictOf(state: AppState) {
+    const { scenario, trace } = state;
+    return deriveResults({
+      scenario,
+      base: buildScene({ scenario, trace }),
+      report: evaluateGates({ scenario }),
+    })?.verdict;
+  }
+
+  it("loaded over a CSV, it is the active source and the CSV stays in the Session", async () => {
+    const loaded = await loadOver(onCsv, replayTrial());
+
+    expect(loaded.trace?.origin).toEqual({ kind: "geoadmin" });
+    expect(loaded.trace?.d.length).toBe(200);
+    expect(loaded.scenario.geometry).toEqual({
+      source: "trace",
+      trace: encodeP1(loaded.trace ?? fromCsv),
+    });
+    // The anchors stand on the profil's two ends, at the heights they had.
+    expect(loaded.scenario.anchors).toEqual({ zA: 1.5, zB: 1 });
+    expect(loaded.scenario.positions).toEqual(TRIAL_ENDS);
+
+    const session = sessionOf(loaded);
+    expect(session?.trace?.origin).toEqual({ kind: "geoadmin" });
+    expect(session?.retainedCsv).toBe(fromCsv);
+  });
+
+  it("a CSV cached behind manual geometry is kept just the same", async () => {
+    const removed = appReducer(onCsv, { type: "tracé/retiré" });
+    const typed = appReducer(removed, {
+      type: "scénario/modifié",
+      patch: { positions: TRIAL_ENDS },
+    });
+    const loaded = await loadOver(typed, replayTrial());
+    expect(loaded.trace?.origin).toEqual({ kind: "geoadmin" });
+    expect(loaded.retainedCsv).toBe(fromCsv);
+  });
+
+  it("re-using the kept CSV puts it back, and nothing is kept behind it", async () => {
+    const loaded = await loadOver(onCsv, replayTrial());
+    const kept = loaded.retainedCsv;
+    if (kept === null) throw new Error("the CSV must be kept");
+    const back = appReducer(loaded, { type: "tracé/importé", trace: kept, tr: encodeP1(kept) });
+    expect(back.trace).toBe(fromCsv);
+    expect(back.retainedCsv).toBeNull();
+  });
+
+  it("a failed load leaves the line exactly as it was", async () => {
+    const offline: Fetch = async () => {
+      throw new TypeError("Failed to fetch");
+    };
+    expect(await loadOver(onCsv, offline)).toBe(onCsv);
+  });
+
+  it("the link carries Positions and points, and reopens offline on the same Verdict", async () => {
+    const loaded = await loadOver(onCsv, replayTrial());
+    const copied = copyLink({
+      scenario: loaded.scenario,
+      trace: loaded.trace,
+      origin: ORIGIN,
+      page: "/avance",
+    });
+    if (!copied.ok) throw new Error(copied.message);
+    expect(copied.href.length).toBeLessThanOrEqual(URL_BUDGET_CHARS);
+    expect(copied.href).toContain("lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783");
+    expect(copied.href).toContain(`tr=${encodeP1(loaded.trace ?? fromCsv)}`);
+
+    // A recipient with no Session and no network: opening the link fetches nothing, and a press
+    // of « Charger le profil geo.admin » there fails without moving the line.
+    const offline: Fetch = async () => {
+      throw new TypeError("Failed to fetch");
+    };
+    const reopened = initialAppState({
+      query: copied.href.slice(copied.href.indexOf("?")),
+      session: null,
+    });
+    const pressed = await loadOver(reopened, offline);
+
+    expect(pressed).toBe(reopened);
+    expect(reopened.trace?.origin).toEqual({ kind: "lien" });
+    expect(reopened.scenario.positions).toEqual(TRIAL_ENDS);
+    const verdict = verdictOf(loaded);
+    expect(verdict).not.toBeNull();
+    expect(verdictOf(pressed)).toEqual(verdict);
   });
 });

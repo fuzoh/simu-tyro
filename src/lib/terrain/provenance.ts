@@ -23,12 +23,12 @@
  * - **The km hint belongs here, not to the parse failures.** That file *was* accepted and the hint
  *   qualifies terrain now in use — a blocking failure has no scenario to disclose.
  * - **The copy is the spec's, verbatim.** Only the numbers are computed, and they carry the app's
- *   one decimal mark.
+ *   one decimal mark. A profil geo.admin (#103) is named as one, with swisstopo's attribution.
  */
 
 import { DECIMAL_MARK } from "@/lib/format/quantity.ts";
 
-import type { Trace } from "./trace.ts";
+import type { Trace, TraceOrigin } from "./trace.ts";
 
 import { maxSpacing, traceExtent } from "./trace.ts";
 
@@ -49,6 +49,24 @@ export type DisclosureLine = {
 export type TerrainSource =
   | { readonly kind: "manual" }
   | { readonly kind: "trace"; readonly trace: Trace };
+
+/**
+ * How the Rail names a profil: a CSV by its file, the two others by where they came from (#103).
+ * A link carries no filename, so a profil it brought is only ever « reçu par lien ».
+ */
+export function traceName(origin: TraceOrigin): string {
+  switch (origin.kind) {
+    case "csv":
+      return origin.fileName;
+    case "geoadmin":
+      return "profil geo.admin";
+    case "lien":
+      return "profil reçu par lien";
+  }
+}
+
+/** The source mention a profil geo.admin carries wherever it is shown (#103). */
+export const SWISSTOPO_ATTRIBUTION = "Altitudes © swisstopo, service de profil de geo.admin.ch.";
 
 /** § 4's warning threshold on the measured max spacing, m. Crossed at a span of ≈995 m. */
 export const COARSE_SPACING_M = 5;
@@ -99,11 +117,12 @@ export function terrainDisclosure(source: TerrainSource): readonly DisclosureLin
   const { trace } = source;
   const spacing = maxSpacing(trace);
   const extent = traceExtent(trace);
+  const sampling = `${trace.d.length} points · pas max ${fr(spacing, 1)} m`;
   const lines: DisclosureLine[] = [
-    {
-      tier: "plain",
-      text: `Profil importé · ${trace.d.length} points · pas max ${fr(spacing, 1)} m`,
-    },
+    trace.origin.kind === "geoadmin"
+      ? // swisstopo's terms of use ask for the source beside data drawn from its services.
+        { tier: "plain", text: `Profil geo.admin · ${sampling}`, detail: SWISSTOPO_ATTRIBUTION }
+      : { tier: "plain", text: `Profil importé · ${sampling}` },
   ];
 
   if (spacing > COARSE_SPACING_M) {

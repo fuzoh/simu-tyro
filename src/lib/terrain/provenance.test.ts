@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest";
 import type { Trace } from "./trace.ts";
 
 import { parseProfileCsv } from "./csv.ts";
-import { isStraight, terrainDisclosure } from "./provenance.ts";
+import { isStraight, terrainDisclosure, traceName } from "./provenance.ts";
 
 /**
  * The terrain-provenance disclosure block — « v1 build spec » § 6 (*La qualité du terrain est
@@ -21,7 +21,7 @@ function trace(d: readonly number[], dev: number | null): Trace {
     d: Float64Array.from(d),
     z: Float64Array.from(d.map(() => 100)),
     dev,
-    fileName: "t.csv",
+    origin: { kind: "csv", fileName: "t.csv" },
   };
 }
 
@@ -49,6 +49,23 @@ describe("manual ground", () => {
     expect(lines[0].detail).toContain("le dénivelé ne gagne aucune garde");
     expect(lines[0].detail).toContain("garde min 2,43 / 2,42 / 2,34 / 2,22 m");
     expect(lines[0].detail).toContain("−62,8 m sur une ligne de 1109 m");
+  });
+});
+
+describe("a profil geo.admin (#103)", () => {
+  const geoadmin: Trace = { ...exported(435.2, 0.0005), origin: { kind: "geoadmin" } };
+
+  test("is named as one, with its point count, its spacing and swisstopo's attribution", () => {
+    const [identity] = terrainDisclosure({ kind: "trace", trace: geoadmin });
+    expect(identity.tier).toBe("plain");
+    expect(identity.text).toBe("Profil geo.admin · 200 points · pas max 2,2 m");
+    expect(identity.detail).toContain("© swisstopo");
+  });
+
+  test("the Rail names each origin, and only a CSV by its file", () => {
+    expect(traceName({ kind: "geoadmin" })).toBe("profil geo.admin");
+    expect(traceName({ kind: "lien" })).toBe("profil reçu par lien");
+    expect(traceName({ kind: "csv", fileName: "pont.csv" })).toBe("pont.csv");
   });
 });
 

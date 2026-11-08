@@ -39,6 +39,7 @@ function appState(scenario: ScenarioDraft, trace: Trace | null = null): AppState
     retainedMaterial: FIRST_RUN_RETAINED_TEXTILE,
     retainedManual: null,
     trace,
+    retainedCsv: null,
     layers: DEFAULT_LAYERS,
     link: { refused: null, dropped: [], completed: [], xClamped: false, rewrite: null },
   };
@@ -54,7 +55,7 @@ function imported(points: number): AppState {
     d[i] = i * 0.5;
     z[i] = 500 + Math.round((seed / 2 ** 31) * 4000) / 100;
   }
-  const trace: Trace = { d, z, dev: 0, fileName: "releve.csv" };
+  const trace: Trace = { d, z, dev: 0, origin: { kind: "csv", fileName: "releve.csv" } };
   const scenario: ScenarioDraft = {
     ...firstRunDefaults(),
     geometry: { source: "trace", trace: encodeP1(trace) },

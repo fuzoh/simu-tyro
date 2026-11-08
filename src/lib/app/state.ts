@@ -115,6 +115,8 @@ export type AppState = {
    * and no ground — voir {@link linkTrace}.
    */
   readonly trace: Trace | null;
+  /** The CSV a profil geo.admin displaced (#103), kept so the file is not lost to a fetch. */
+  readonly retainedCsv: Trace | null;
   /** § 5's two toggles: Session-only, never in the URL. */
   readonly layers: LayerToggles;
   /** What this page load's link did. Fixed at first render. */
@@ -147,8 +149,9 @@ export type AppAction =
    */
   | { readonly type: "matériau/famille"; readonly family: "steel" | "textile" }
   /**
-   * § 4's import. **The profil is taken whole** — anchor A over its first sample, B over its last
-   * (#88) — and the displaced manual `L`/`h` are retained for « Retirer le tracé ».
+   * A new profil: § 4's CSV import, or « Charger le profil geo.admin » (#103). **The profil is
+   * taken whole** — anchor A over its first sample, B over its last (#88) — and the displaced
+   * manual `L`/`h` are retained for « Retirer le tracé ».
    */
   | { readonly type: "tracé/importé"; readonly trace: Trace; readonly tr: string }
   /** « Retirer le tracé »: the import goes, **the Trace stays cached**, manual `L`/`h` come back. */
@@ -206,6 +209,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         trace,
+        retainedCsv: csvBehind(state, trace),
         // Manual `L`/`h` stay in state untouched and are restored exactly on removal: discarding a
         // user's parallel input is worth a blocking error, let alone a silent loss.
         retainedManual:
@@ -251,6 +255,16 @@ function shippedRetained(family: "steel" | "textile"): RetainedMaterial {
 }
 
 const NO_POSITIONS: Positions = { A: null, B: null };
+
+/**
+ * The CSV kept behind the profil `next` (#103). A profil geo.admin can be fetched again from the
+ * Positions and a file cannot, so loading one over a CSV keeps the CSV, while a CSV — new, or the
+ * kept one put back — needs nothing kept behind it.
+ */
+function csvBehind(state: AppState, next: Trace): Trace | null {
+  if (next.origin.kind === "csv") return null;
+  return state.trace?.origin.kind === "csv" ? state.trace : state.retainedCsv;
+}
 
 /**
  * The Positions a Trace puts under the anchors: its two ends' coordinates, or none when the file
@@ -362,8 +376,8 @@ export function initialAppState(input: MountInput): AppState {
  *
  * @param tr the validated `p1.` payload. `decodeP1` cannot fail on it: `salvageSearch` has already
  *   walked it structurally, and an undecodable or oversize one is a **refusal** that returns above.
- * @returns the Session's Trace when the payload is its own, otherwise the decoded profile with
- *   **no `fileName`** — which *is* § 4's third identity state, « tracé reçu par lien ».
+ * @returns the Session's Trace when the payload is its own, otherwise the decoded profile, whose
+ *   origin is `lien` — § 4's third identity state, « tracé reçu par lien ».
  */
 function linkTrace(tr: string, session: Session | null, positions: Positions): Trace {
   const cached = session?.trace ?? null;
@@ -374,7 +388,7 @@ function linkTrace(tr: string, session: Session | null, positions: Positions): T
   const base =
     cached !== null && stored?.source === "trace" && stored.trace === tr
       ? cached
-      : { ...decodeP1(tr), fileName: null };
+      : { ...decodeP1(tr), origin: { kind: "lien" } as const };
   const ends = A === null || B === null ? undefined : { A, B };
   // The cached Trace itself when it already stands there, so its identity keeps memos warm.
   if (sameEnds(base.ends, ends)) return base;
@@ -397,6 +411,7 @@ function sessionState(session: Session | null): Omit<AppState, "link"> {
       retainedMaterial: session.retainedMaterial,
       retainedManual: session.retainedManual,
       trace: session.trace,
+      retainedCsv: session.retainedCsv,
       layers: session.layers,
     };
   }
@@ -406,6 +421,7 @@ function sessionState(session: Session | null): Omit<AppState, "link"> {
     retainedMaterial: FIRST_RUN_RETAINED_TEXTILE,
     retainedManual: null,
     trace: null,
+    retainedCsv: null,
     layers: DEFAULT_LAYERS,
   };
 }

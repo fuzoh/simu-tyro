@@ -7,6 +7,7 @@ import {
   CELL_HELP,
   DEDUCED_HELP,
   FIELD_HELP,
+  GEOADMIN_HELP,
   GRID_HELP,
   LV95_HELP,
   RESULT_HELP,
@@ -22,6 +23,7 @@ function copyByKey(): Record<string, string> {
   );
   entries.push(["TIGHTNESS_HELP", TIGHTNESS_HELP]);
   entries.push(["LV95_HELP", LV95_HELP]);
+  entries.push(["GEOADMIN_HELP", GEOADMIN_HELP]);
   NOT_COMPUTED_LINES.forEach((line, index) => entries.push([`NOT_COMPUTED_LINES[${index}]`, line]));
   for (const field of Object.values(FIELDS)) {
     entries.push([`FIELDS.${field.id}.label`, field.label]);
@@ -40,6 +42,12 @@ describe("the Rail speaks the exact register", () => {
       proscribedIn(text).map((word) => `${key}: ${word}`),
     );
     expect(offences).toEqual([]);
+  });
+
+  test("the profil geo.admin is named as such, with swisstopo's attribution (#103)", () => {
+    expect(GEOADMIN_HELP).toContain("profil geo.admin");
+    expect(GEOADMIN_HELP).toContain("© swisstopo");
+    expect(LV95_HELP).toContain("profil geo.admin");
   });
 
   test("the installation field is called Installation, never a usage", () => {

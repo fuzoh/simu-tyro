@@ -17,7 +17,12 @@ import { deriveSpan, deriveTerrain, maxSpacing, meanAltitude, traceExtent } from
  */
 
 function trace(d: readonly number[], z: readonly number[]): Trace {
-  return { d: Float64Array.from(d), z: Float64Array.from(z), dev: null, fileName: "t.csv" };
+  return {
+    d: Float64Array.from(d),
+    z: Float64Array.from(z),
+    dev: null,
+    origin: { kind: "csv", fileName: "t.csv" },
+  };
 }
 
 /** A profile whose altitude is exactly `600 − d/5`, so every read-out has a closed form. */

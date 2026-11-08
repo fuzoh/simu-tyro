@@ -66,6 +66,7 @@ export const BRANCHES = [
   "positions-one-anchor",
   "positions-with-trace",
   "positions-lone-coordinate",
+  "trace-full-profil",
 ] as const;
 
 export type Branch = (typeof BRANCHES)[number];
@@ -82,7 +83,8 @@ export type CanonicalLinkFixture = {
     | typeof MEASURED_87
     | typeof MEASURED_88
     | typeof MEASURED_89
-    | typeof MEASURED_90;
+    | typeof MEASURED_90
+    | typeof MEASURED_103;
   covers: readonly Branch[];
   scenario: Scenario;
   link: string;
@@ -105,7 +107,8 @@ export type DecodeOnlyFixture = {
     | typeof MEASURED_87
     | typeof MEASURED_88
     | typeof MEASURED_89
-    | typeof MEASURED_90;
+    | typeof MEASURED_90
+    | typeof MEASURED_103;
   covers: readonly Branch[];
   link: string;
 } & ({ scenario: Scenario; canonical: string } | { scenario: ScenarioDraft; canonical: null });
@@ -119,9 +122,17 @@ const MEASURED_87 = "[MEASURED] issue #87, codec as of 2026-11-08";
 const MEASURED_88 = "[MEASURED] issue #88, codec as of 2026-11-08";
 const MEASURED_89 = "[MEASURED] issue #89, codec as of 2026-11-08";
 const MEASURED_90 = "[MEASURED] issue #90, codec as of 2026-11-08";
+const MEASURED_103 = "[MEASURED] issue #103, codec as of 2026-11-08";
 
 /** Three samples `(0,0) (50,-4) (100,-9)`, as `encodeP1` writes them — a 100 m profil. */
 export const TRACE_P1 = "p1.AwCQTpBOAJ8G5wcA";
+
+/**
+ * The trial line's profil geo.admin of 2026-11-08 (#103) — 200 points over 435,2 m, from 1453,7 m
+ * to 1438,7 m — as `encodeP1` wrote it from the recorded answer of `profile.json`.
+ */
+const GEOADMIN_P1 =
+  "p1.yAEAuAO4A7gDpAO4A7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDpAO4A7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDuAOkA7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDuAOkA7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDuAOkA7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDuAOkA7gDuAO4A7gDuAO4A7gDpAO4A7gDuAO4A7gDuAOkA7gDuAO4A7gDuAO4A7gDpAO4A7gDuAO4A7gDuAOkA7gDuAO4A7gDuAO4A7gDpAO4A7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDpAO4A7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDpAO4A7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDpAO4A7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDuAOkA7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDuAOkA7gDuAO4A7gDuAO03xGfAdMCnwHnApcCswF30wKrArMBqwKLAecCiwHTAqsCnwGfAb8CgwK_AgDTAqsCqwJ3swGXAp8BqwLTAp8Bd5cClwKXArMBT4MCqwKLAasCnwGDAneXAoMCd2ODAu8Bd3fHAYMCY4MCd8cBY8cBswF3T7MB2wGzAWN3swFPswGLAWM7iwF3iwEAiwF3dydjO08AdwBPE087ACc7JwAnJzsAExMnKBQTEwAnADw8ExQoPCgAPDw8KAA8KFA8FFBQUFBkAGR4ZFAoeIwBZKABZMgBZMgBmAJkoAHwAdwBhAIAhAKYAlCsAowB8AGMAZgCrAKEAgCYAvABmAKMAWTwAYQCtAHcAYwB3AFk3AGYAgCEAtQCwAKMAaABkAP8AqAB_ALcAfwC8AHgA9QC1AIApAMC";
 
 const STEEL: Scenario = {
   unit: "daN",
@@ -348,6 +359,19 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
     link:
       `/?v=1&u=daN&use=perm&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}` +
       `&lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783&tr=${TRACE_P1}`,
+  },
+  {
+    name: "a profil geo.admin: its 200 points and the two Positions it was loaded between",
+    source: MEASURED_103,
+    covers: ["trace-full-profil", "positions-with-trace", "trace"],
+    scenario: {
+      ...STEEL,
+      geometry: { source: "trace", trace: GEOADMIN_P1 },
+      positions: { A: POSITION_A, B: POSITION_B },
+    },
+    link:
+      `/?v=1&u=daN&use=perm&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}` +
+      `&lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783&tr=${GEOADMIN_P1}`,
   },
   {
     name: "ratio driver, kgf display",

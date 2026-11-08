@@ -97,14 +97,21 @@ function positionHelp(coordinate: string, anchor: "A" | "B"): string {
     `Position de l'ancrage ${anchor} : ${coordinate} en WGS84, en degrés décimaux (six décimales, soit environ 0,1 m). ` +
     "Latitude et longitude vont ensemble : une Position n'existe qu'avec les deux, et laissées vides elles sont inconnues. " +
     "La lecture LV95 à côté est une conversion approchée de swisstopo, précise à environ 1 m en Suisse. " +
-    "Informatif pour l'instant : une Position ne change ni la statique, ni la garde au sol, ni le verdict. " +
+    "Une Position ne change ni la statique, ni la garde au sol, ni le verdict : les deux ensemble permettent de charger le profil geo.admin. " +
     "Un fichier CSV geo.admin avec ses colonnes Longitude et Latitude la remplit."
   );
 }
 
 /** Help for the LV95 reading beside an anchor's Position. */
 export const LV95_HELP =
-  "Lecture de la Position dans le système suisse LV95 (est, nord), en mètres. C'est la conversion approchée de swisstopo depuis WGS84, précise à environ 1 m en Suisse ; la conversion exacte (REFRAME) viendra avec le profil geo.admin. Elle ne sert qu'à la lecture et ne change aucun calcul.";
+  "Lecture de la Position dans le système suisse LV95 (est, nord), en mètres. C'est la conversion approchée de swisstopo depuis WGS84, précise à environ 1 m en Suisse ; le chargement du profil geo.admin passe par la conversion exacte (REFRAME). Elle ne sert qu'à la lecture et ne change aucun calcul.";
+
+/** Help for « Charger le profil geo.admin » (#103). */
+export const GEOADMIN_HELP =
+  "Charge le profil geo.admin entre les Positions A et B : chaque Position passe en LV95 par REFRAME (swisstopo), ou par la conversion approchée si REFRAME ne répond pas, puis le service de profil de geo.admin.ch échantillonne la ligne en 200 points, comme l'export du géoportail. " +
+  "Le profil est pris entier, ancrage A sur son premier point et B sur son dernier ; les hauteurs d'ancrage sont conservées. Il devient le profil utilisé, et un CSV importé reste en mémoire. " +
+  "Demande une connexion : sans réseau ou hors couverture swisstopo, rien ne change et une note le dit. Le lien copié porte les Positions et les points du profil, et s'ouvre sans réseau. " +
+  "Altitudes © swisstopo.";
 
 /** Help for the pilot control of `Tension de la ligne` — a segmented control, not a field. */
 export const TIGHTNESS_HELP =
@@ -112,7 +119,7 @@ export const TIGHTNESS_HELP =
 
 /** Help for the read-only rows of `Valeurs déduites`. The three steel derived rows use {@link FIELD_HELP}. */
 export const DEDUCED_HELP: Record<DeducedRowId, string> = {
-  L: "Portée déduite du profil importé, pris entier d'un ancrage à l'autre : son premier point est sous l'ancrage A, son dernier sous l'ancrage B. L = distance du dernier point − distance du premier, en mètres. Avec un profil la portée n'est pas saisie.",
+  L: "Portée déduite du profil (CSV importé, profil geo.admin ou profil reçu par lien), pris entier d'un ancrage à l'autre : son premier point est sous l'ancrage A, son dernier sous l'ancrage B. L = distance du dernier point − distance du premier, en mètres. Avec un profil la portée n'est pas saisie.",
   h: "Dénivelé déduit du profil importé : h = (altitude du dernier point + hauteur B) − (altitude du premier point + hauteur A), en mètres. Négatif quand l'ancrage B est plus bas que A.",
   zBaseA:
     "Altitude du sol sous l'ancrage A : celle du premier point du profil importé (colonne Altitude). L'ancrage A se trouve à cette altitude plus la hauteur d'ancrage A.",

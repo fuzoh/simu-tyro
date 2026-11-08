@@ -46,6 +46,7 @@ function appState(scenario: ScenarioDraft, trace: Trace | null = null): AppState
     retainedMaterial: FIRST_RUN_RETAINED_TEXTILE,
     retainedManual: null,
     trace,
+    retainedCsv: null,
     layers: DEFAULT_LAYERS,
     link: { refused: null, dropped: [], completed: [], xClamped: false, rewrite: null },
   };
@@ -106,7 +107,7 @@ describe("the Session is strictly larger than the link", () => {
       d: Float64Array.from([0, 100]),
       z: Float64Array.from([500, 490]),
       dev: 0,
-      fileName: "profil.csv",
+      origin: { kind: "csv", fileName: "profil.csv" },
     };
     const state: AppState = {
       ...appState(firstRunDefaults(), trace),
@@ -140,7 +141,7 @@ describe("oversize refuses at « Copier le lien » — it never degrades", () =>
       // Alternating altitudes so the delta coding cannot compress the payload away.
       z[i] = 500 + (i % 7) * 0.13;
     }
-    return { d, z, dev: 0, fileName: "releve-a-la-main.csv" };
+    return { d, z, dev: 0, origin: { kind: "csv", fileName: "releve-a-la-main.csv" } };
   }
 
   it("names the point count and sends the user to the file", () => {
@@ -184,7 +185,7 @@ describe("one gate for both writers — an oversize import never reaches the add
       d[i] = i * 0.5;
       z[i] = 500 + Math.round((seed / 2 ** 31) * 4000) / 100;
     }
-    return { d, z, dev: 0, fileName: "releve.csv" };
+    return { d, z, dev: 0, origin: { kind: "csv", fileName: "releve.csv" } };
   }
 
   function imported(points: number) {

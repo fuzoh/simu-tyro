@@ -19,7 +19,8 @@ import type { UnloadedLine } from "./unloaded.ts";
  * The Scenario as every Traverse-scope number reads it: all of it but `x_D`, which selects a Sweep
  * Step and judges nothing, the Mise en tension device, which is descriptive (#86), the Vent and
  * the ride's constants, which only the passager's ride reads (#87, #89), and the Positions, which
- * nothing reads yet (#90) — so a change of any of them cannot re-run the Sweep.
+ * only « Charger le profil geo.admin » reads (#90, #103) — so a change of any of them cannot re-run
+ * the Sweep.
  */
 export type TraverseScenario = Omit<
   ScenarioDraft,

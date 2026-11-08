@@ -65,7 +65,7 @@ describe("the three real traces — the gate", () => {
     expect(traceExtent(trace)).toBeCloseTo(extent, 10);
     // A fixed 200 points and not a fixed pitch: spacing is `length/199`.
     expect(maxSpacing(trace)).toBeCloseTo(spacing, 10);
-    expect(trace.fileName).toBe(`example-profile-trace${n}.csv`);
+    expect(trace.origin).toEqual({ kind: "csv", fileName: `example-profile-trace${n}.csv` });
   });
 
   test.each(CASES)("trace$n has strictly increasing Distance and no missing Altitude", ({ n }) => {

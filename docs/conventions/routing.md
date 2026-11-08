@@ -32,8 +32,12 @@ under `bun run dev` it happens per request. Same output either way — which is 
   code runs, which destroys the evidence the ignored-keys banner needs.
 - `Route.useSearch()` returns raw ∪ validated at runtime while typed as validated-only. Never
   treat it as the schema; the app reads one derived Scenario object built from the validated keys.
-- No service worker and no PWA manifest. "Fully offline" means no runtime network dependency
-  after load, not an installable app.
+- No service worker and no PWA manifest. Since the
+  [network policy](https://github.com/fuzoh/simu-tyro/issues/13) every computation and every Page
+  work with no network after load; the connected functions — the profil geo.admin
+  (`src/lib/terrain/geoadmin.ts`) and, later, the Fond de carte and the Vue 3D — call swisstopo
+  with the native `fetch`, passed in as a parameter, and degrade to an ambient message rather than
+  an error. A link carries the profil's points, so it opens offline.
 - **The router's `basepath` is read, never written.** `src/router.tsx` sets
   `basepath: import.meta.env.BASE_URL`, which Vite fills from `base` in `vite.config.ts` — `/` in
   dev, `/simu-tyro/` on the GitHub Pages project site. Route code stays written against `/`; the

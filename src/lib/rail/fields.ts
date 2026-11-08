@@ -560,8 +560,8 @@ export const FIELDS = {
     warning: null,
     gate: null,
   },
-  // The two Positions (#90). Both sit in no gate — nothing reads a Position yet — and a blank pair
-  // is « inconnue », not « vide et requis », so none is required.
+  // The two Positions (#90). Both sit in no gate — no computation reads a Position — and a blank
+  // pair is « inconnue », not « vide et requis », so none is required.
   latA: coordinateField("latA", "latitude", "A"),
   lonA: coordinateField("lonA", "longitude", "A"),
   latB: coordinateField("latB", "latitude", "B"),

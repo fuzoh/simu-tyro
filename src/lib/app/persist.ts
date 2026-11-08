@@ -167,6 +167,7 @@ export function sessionOf(state: AppState): Session | null {
     retainedMaterial: state.retainedMaterial,
     retainedManual: state.retainedManual,
     trace: state.trace,
+    retainedCsv: state.retainedCsv,
     layers: state.layers,
   };
 }
