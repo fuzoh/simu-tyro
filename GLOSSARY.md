@@ -94,8 +94,8 @@ _Avoid_: station (as the spoken word), offset, position, distance along track, a
 **Anchor Height**:
 How far an anchor stands above the ground beneath it. Feeds the Terrain only, never the
 statics — the solve takes span and elevation difference, which are measured anchor to anchor.
-French: ancrage. An amarrage would be heard as the termination. In the Vue 3D it is the
-dashed plumb line from the anchor down to the ground.
+French: ancrage. An amarrage would be heard as the termination. In the Vue 3D it is read on
+the Fil à plomb: the anchor sits that high above the ground mark.
 _Avoid_: pole height, tower height, offset, amarrage
 
 **Position**:
@@ -351,10 +351,17 @@ The swisstopo « pentes supérieures à 30° » overlay, switched on over any Fo
 _Avoid_: slope layer, hillshade, relief
 
 **Vue 3D**:
-The relief view of the line: swisstopo terrain and imagery, both anchors with their plumb
-lines, Ligne à vide and loaded line from the engine, and the Banane. Context, not
-measurement: it states nothing the coupe does not. Loaded only when chosen.
+The relief view of the line: swisstopo terrain and imagery, both anchors on their Fils à
+plomb, Ligne à vide and loaded line from the engine, and the Banane. Context, not
+measurement: it states nothing the coupe does not. Anchors drag there as on the carte: the
+line follows the pointer, the recalculation waits for the release. Loaded only when chosen.
 _Avoid_: 3D map, globe, scene, viewer
+
+**Fil à plomb**:
+The vertical under each anchor in the Vue 3D: a mark on the ground at the anchor's foot
+and a dashed line rising from it until it leaves the view, so it reads at any zoom. The
+anchor is the point on that line at its Anchor Height. Always shown, never a measurement.
+_Avoid_: pole, mast, drop line
 
 **Mesure**:
 The one-line ruler on the vue de dessus: two clicked points, a third click starts over.
