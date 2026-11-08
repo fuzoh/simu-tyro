@@ -55,10 +55,11 @@
  * - **Forces are daN in the URL, always**, whatever `u` says. `u` is display-only, so hand-editing
  *   `u=daN` → `u=kN` must not make the line 100× tighter. The engine holds newtons; `./scenario.ts`
  *   is the one place the ÷10 happens, in both directions.
- * - **Absence carries exactly three meanings and never a fourth.** `reg` absent is « — choisir — »,
- *   `mbf`/`ea`/`mu` absent is « non surchargée », and a family- or terrain-scoped key absent means
- *   that configuration is not the active one. So `stripSearchParams` is rejected, every key with a
- *   value is stated even at its default, and `./scenario.ts`'s completion exempts the first two.
+ * - **Absence carries exactly four meanings and never a fifth.** `reg` absent is « — choisir — »,
+ *   `mbf`/`ea`/`mu` absent is « non surchargée », `bp` absent is one Brin porteur, and a family- or
+ *   terrain-scoped key absent means that configuration is not the active one. So
+ *   `stripSearchParams` is rejected, every other key with a value is stated even at its default,
+ *   and `./scenario.ts`'s completion exempts the first three.
  * - **The dropped-keys reporter takes the raw query string as a parameter**
  *   ({@link reportDroppedKeys}), never reading `window.location` — amendment A removed the jsdom
  *   environment that would otherwise be needed, and as a pure function this is a plain unit test.
@@ -69,6 +70,7 @@ import type { SearchMiddleware } from "@tanstack/react-router";
 import { defaultParseSearch, defaultStringifySearch } from "@tanstack/react-router";
 import * as v from "valibot";
 
+import type { CarryingLines } from "@/lib/scenario/types.ts";
 import type { RegimeId } from "@/lib/sim";
 
 import { P1Error, validateP1 } from "./p1.ts";
@@ -98,6 +100,7 @@ export const CANONICAL_KEYS = [
   "te",
   "lo",
   "vr",
+  "bp",
   "fam",
   "d",
   "r0",
@@ -140,6 +143,9 @@ export const REGIME_TOKENS = [
   "ansi5",
   "secours10",
 ] as const satisfies readonly RegimeId[];
+
+/** `bp` — one or two Brins porteurs (#4). A third is unrepresentable, not out of range. */
+export const CARRYING_LINES = [1, 2] as const satisfies readonly CarryingLines[];
 
 /** § 7's `fam` tokens — `ac` acier, `tx` textile. */
 export const FAMILY_TOKENS = ["ac", "tx"] as const;
@@ -248,6 +254,8 @@ const KEY_SCHEMAS = {
   lo: FINITE, // Longueur non tendue, m.
   // « Rapport V » `P / H`, dimensionless. Presence selects the driver, like the three above.
   vr: FINITE,
+  // Brins porteurs. Absent **is** one member, so a link older than the key reads as it always did.
+  bp: v.picklist(CARRYING_LINES),
   fam: v.picklist(FAMILY_TOKENS),
   d: FINITE, // Diamètre nominal, mm — acier (requis) *or* textile (optionnel); `fam` fixes which.
   r0: v.picklist(GRADES),

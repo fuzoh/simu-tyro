@@ -534,6 +534,16 @@ describe("searchToScenario — the read side of § 7's key table", () => {
     expect(decode("?L=250&reg=en15567").regime).toBe("en15567");
   });
 
+  it("reads `bp` absent as one Brin porteur — and neither completes nor names it (#84)", () => {
+    // A link from before the key: one member, and nothing in the strip or the address bar moves.
+    const { search, completed } = complete("?L=250&h=-40");
+    expect(searchToScenario(search).carryingLines).toBe(1);
+    expect(search.bp).toBeUndefined();
+    expect(completed).not.toContain("bp");
+    expect(decode("?L=250&bp=2").carryingLines).toBe(2);
+    expect(decode("?L=250&bp=1").carryingLines).toBe(1);
+  });
+
   it("turns the URL's daN back into the state's newtons — `te` and `mbl`", () => {
     expect(decode("?te=253.5").tightness).toEqual({ mode: "tension", H_target: 2535 });
     expect(decode("?fam=tx&cls=hmpe&mbl=10000&mu=0.1&k=22").material).toEqual({

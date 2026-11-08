@@ -164,6 +164,8 @@ describe("FIRST_RUN_SCENARIO — § 9's shipped inputs", () => {
     // opens the app in « Câble au sol ».
     expect(FIRST_RUN_SCENARIO.geometry).toEqual({ source: "manual", L: 150, h: -18 });
     expect(FIRST_RUN_SCENARIO.anchors).toEqual({ zA: 12, zB: 12 });
+    // One Brin porteur — `bp` absent, so § 9's link did not move when the key arrived (#84).
+    expect(FIRST_RUN_SCENARIO.carryingLines).toBe(1);
   });
 
   test("Flèche is the active Tightness segment, at 6,0 m", () => {

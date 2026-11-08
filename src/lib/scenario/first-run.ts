@@ -62,6 +62,8 @@ export const FIRST_RUN_SCENARIO = {
   geometry: { source: "manual", L: 150, h: -18 },
   /** `za=12` · `zb=12` — equal, which also puts the garde minimum mid-span where flèche explains it. */
   anchors: { zA: 12, zB: 12 },
+  /** One member, which is `bp` **absent**: the shipped link did not change when the key arrived. */
+  carryingLines: 1,
   /** `fl=6.0` — §7 mode 3, the only mode whose shipped value is exact at display precision. */
   tightness: { mode: "sag", D_target: 6 },
   /**

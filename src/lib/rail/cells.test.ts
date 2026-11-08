@@ -4,7 +4,7 @@ import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { clampX } from "@/lib/scenario/geometry.ts";
-import { sweepRider } from "@/lib/scenario/traverse.ts";
+import { sweepRider, sweepRiderOf } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import {
   evaluateClearance,
@@ -41,7 +41,7 @@ function riderOf(patch: (draft: ScenarioDraft) => void = () => {}): PlacedRider 
   patch(draft);
   const unloaded = deriveUnloaded(unloadedInputs(draft, null));
   if (!unloaded.ok) throw new Error("expected the line to solve");
-  const swept = sweepRider(unloaded, draft.rider);
+  const swept = sweepRider(unloaded, sweepRiderOf(draft));
   if (swept === null) throw new Error("expected the traverse to solve");
   const { input, state, span } = unloaded;
   const { L, h, terrain } = span;

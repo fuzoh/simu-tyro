@@ -205,7 +205,7 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
   SearchValues,
   "v" | "u" | "use" | "za" | "zb" | "ta" | "tb" | "na" | "nb" | "mp" | "hr" | "gm" | "daf" | "x"
 > &
-  Partial<Pick<SearchValues, "reg">> &
+  Partial<Pick<SearchValues, "reg" | "bp">> &
   CompletedTerrain &
   CompletedDriver &
   (CompletedSteel | CompletedTextile);
@@ -213,10 +213,12 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
 /**
  * The keys whose **absence is meaning**, never completed. `reg` absent is « — choisir — »,
  * `mbf`/`ea`/`mu` absent is « non surchargée », which differs from « equal to the formula value »,
- * and `mbl` absent — with `mu`, under `fam=tx` — is § 9's rope nobody typed.
+ * `mbl` absent — with `mu`, under `fam=tx` — is § 9's rope nobody typed, and `bp` absent is one
+ * Brin porteur: completing it would rewrite, and name in the strip, every link older than the key.
  */
 const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>([
   "reg",
+  "bp",
   "mbf",
   "ea",
   "mu",
@@ -265,10 +267,10 @@ export type Completion = {
  *
  * Three groups are exempt, all of them § 7's meanings of absence:
  *
- * 1. {@link NEVER_COMPLETED}: `reg`, the Overrides and the textile blanks. Under `fam=tx` **no rope
- *    is invented**: § 9 ships `MBL` and `μ` « vides et requis », because one made-up `MBL` decides
- *    the verdict, and those two blocking errors are the correct arrival state. Polyester's `k`
- *    stays blank too, because §13.2 publishes none.
+ * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, the Overrides and the textile blanks. Under `fam=tx`
+ *    **no rope is invented**: § 9 ships `MBL` and `μ` « vides et requis », because one made-up
+ *    `MBL` decides the verdict, and those two blocking errors are the correct arrival state.
+ *    Polyester's `k` stays blank too, because §13.2 publishes none.
  * 2. The **inactive** terrain source. `tr` present ⇒ imported: `L`/`h` are derived read-outs and
  *    are dropped rather than completed; `tr` absent ⇒ manual, and `sa`/`sb` never appear.
  * 3. The **inactive** family's keys, dropped the same way.
@@ -474,6 +476,8 @@ export function searchToScenario(search: CompletedSearch): ScenarioDraft {
         ? { source: "manual", L: search.L, h: search.h }
         : { source: "trace", trace: search.tr, sa: search.sa, sb: search.sb },
     anchors: { zA: search.za, zB: search.zb },
+    // Absent **is** one member — the meaning of absence, never a completed default.
+    carryingLines: search.bp ?? 1,
     tightness: tightness(search),
     material: search.fam === "tx" ? textile(search) : steel(search),
     terminations: {
@@ -522,6 +526,9 @@ export function scenarioToSearch(scenario: Scenario): CompletedSearch {
   const driver = tightnessDriver(scenario);
   const driverKey = DRIVER_KEY[driver.field];
   out[driverKey] = driverKey === "te" ? daNFromNewtons(driver.value) : driver.value;
+
+  // One member is `bp` **absent**, so the links written before the key stay string-identical.
+  if (scenario.carryingLines === 2) out.bp = 2;
 
   if (material.family === "steel") {
     out.fam = "ac";

@@ -19,6 +19,7 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { exaggeration, PLOT_ASPECT_BAND, PROFILE_ASPECT, VE_BAND } from "@/lib/layout/contract.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
+import { sweepRiderOf } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { CLEARANCE, evaluateClearance } from "@/lib/sim";
 
@@ -47,7 +48,7 @@ function frameOf(scenario: ScenarioDraft, trace: Trace | null = null) {
 /** The scenario's half, composed as the app root composes it: unloaded line, frame, traverse. */
 function baseOf(scenario: ScenarioDraft, trace: Trace | null = null) {
   const unloaded = deriveUnloaded(unloadedInputs(scenario, trace));
-  return buildSceneBase(buildSceneFrame(unloaded.span), unloaded, scenario.rider);
+  return buildSceneBase(buildSceneFrame(unloaded.span), unloaded, sweepRiderOf(scenario));
 }
 
 /** The scene's auto-fit at the elected plot aspect — `VE = 0,42 × (x span / z span)`. */
@@ -636,7 +637,7 @@ describe("the frame outlives the solve — § 8's « les entrées se dessinent t
     const unloaded = deriveUnloaded(unloadedInputs(firstRunDefaults(), null));
     const frame = buildSceneFrame(unloaded.span);
     if (frame === null) throw new Error("expected a frame");
-    const base = buildSceneBase(frame, unloaded, firstRunDefaults().rider);
+    const base = buildSceneBase(frame, unloaded, sweepRiderOf(firstRunDefaults()));
     if (base === null) throw new Error("expected a drawable base");
 
     // Same frame, field for field — the frame is not rebuilt with different numbers downstream.
@@ -686,7 +687,7 @@ describe("the split at x_D — § 7's « memo on the solve inputs »", () => {
     const base = sceneModule.buildSceneBase(
       sceneModule.buildSceneFrame(unloaded.span),
       unloaded,
-      draft.rider,
+      sweepRiderOf(draft),
     );
     expect(base).not.toBeNull();
     expect(spies.resolveL0).toHaveBeenCalledTimes(1);
@@ -789,6 +790,45 @@ describe("the load against the unloaded line, and its trajectory — the 2026-09
     expect(polylineAt(line, 10)).toBe(-2);
     expect(polylineAt(line, -5)).toBe(0);
     expect(polylineAt(line, 99)).toBe(4);
+  });
+});
+
+describe("Brins porteurs on the profile — one line, or two drawn apart (#84)", () => {
+  const single = first;
+  const pair = scene({ ...firstRunDefaults(), carryingLines: 2 });
+
+  it("one member is one line, drawn where it solved", () => {
+    expect(single.members).toEqual([{ line: "line", offsetPx: 0 }]);
+  });
+
+  it("two members are two offset lines: the ligne du haut above the ligne du bas", () => {
+    expect(pair.members.map((member) => member.line)).toEqual(["upperLine", "lowerLine"]);
+    const [upper, lower] = pair.members;
+    // SVG's y grows downward, so « du haut » is the smaller offset.
+    expect(upper.offsetPx).toBeLessThan(lower.offsetPx);
+    // The cable is `stroke-2`: centres 2 px apart would touch. Two more px are air between them.
+    expect(lower.offsetPx - upper.offsetPx).toBeGreaterThanOrEqual(2 + 2);
+    // Centred on the solved line, so the drawing moves the pair and not the node the rider is on.
+    expect(upper.offsetPx + lower.offsetPx).toBe(0);
+  });
+
+  it("the gap is pixels, not metres: a longer span draws the same offsets", () => {
+    const longer = scene({
+      ...firstRunDefaults(),
+      carryingLines: 2,
+      geometry: { source: "manual", L: 600, h: -18 },
+    });
+    expect(longer.members).toEqual(pair.members);
+  });
+
+  it("both lines are one member's solve under P/2 — higher and slacker than a single line", () => {
+    // 120 kg · 9,81 m/s² / 2 = 588,6 N on each member.
+    expect(pair.P).toBeCloseTo(588.6, 9);
+    expect(single.P).toBeCloseTo(1177.2, 9);
+    expect(pair.rider.step.zD).toBeGreaterThan(single.rider.step.zD);
+    expect(pair.rider.step.TA).toBeLessThan(single.rider.step.TA);
+    // The unloaded line is the same: both members are posed at the same tension.
+    expect(pair.unloaded).toEqual(single.unloaded);
   });
 });
 

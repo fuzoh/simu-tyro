@@ -41,7 +41,7 @@
 import * as v from "valibot";
 
 import type { QuantityId } from "@/lib/format/quantity.ts";
-import type { ForceUnit, TightnessDraft } from "@/lib/scenario/types.ts";
+import type { CarryingLines, ForceUnit, TightnessDraft } from "@/lib/scenario/types.ts";
 import type { SteelSpec, TextileSpec } from "@/lib/sim";
 import type { LabelId } from "@/lib/vocabulary/labels.ts";
 
@@ -66,6 +66,7 @@ export type FieldId =
   | "sa"
   | "sb"
   | "family"
+  | "carryingLines"
   | "d"
   | "R0"
   | "cst"
@@ -247,6 +248,17 @@ export const FIELDS = {
     quantity: null,
     rule: null,
     warning: null,
+    gate: "solve",
+  },
+  carryingLines: {
+    id: "carryingLines",
+    label: heading("carryingLines", "exact"),
+    // « nombre de Brins porteurs ignoré » — the strip prints this name, and the count agrees.
+    errorLabel: `Nombre de ${label("carryingLines", "exact")}`,
+    quantity: null,
+    rule: null,
+    warning: null,
+    // It sets the load each member is solved under.
     gate: "solve",
   },
   d: {
@@ -639,6 +651,18 @@ export const CONSTRUCTION_LABEL = {
 
 /** One picker entry. */
 export type PickerOption<Id extends string> = { readonly value: Id; readonly label: string };
+
+/**
+ * `Brins porteurs`'s two entries, in the glossary's words: one member is a « ligne », two are the
+ * « ligne du haut » and the « ligne du bas ». Keyed by the count as text, which a radio holds.
+ */
+export const CARRYING_LINES_OPTIONS = [
+  { value: "1", label: `1 ${label("line", "exact")}` },
+  {
+    value: "2",
+    label: `2 ${label("line", "exact")}s (${label("upperLine", "exact")}, ${label("lowerLine", "exact")})`,
+  },
+] as const satisfies readonly PickerOption<`${CarryingLines}`>[];
 
 export const ROPE_CLASS_OPTIONS = pickerOptions(ROPE_CLASS_LABEL);
 

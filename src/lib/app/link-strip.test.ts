@@ -63,6 +63,13 @@ describe("§ 8's first sentence — the `vr` and `gm` keys are named like every 
       "Une partie du lien a été ignorée : « vr » n'était pas un nombre (rapport V ignoré).",
     );
   });
+
+  test("a third Brin porteur is not a value the link can carry, and the clause says so", () => {
+    expect(strip("?L=250&bp=3")?.ignored).toBe(
+      "Une partie du lien a été ignorée : « bp » n'était pas une valeur reconnue " +
+        "(nombre de Brins porteurs ignoré).",
+    );
+  });
 });
 
 describe("§ 8's second sentence — the completion names the values", () => {
@@ -97,6 +104,8 @@ describe("§ 8's second sentence — the completion names the values", () => {
     const sentence = strip("?L=250&h=-40")?.completed ?? "";
     expect(sentence).not.toContain("régime");
     expect(sentence).not.toContain("charge de rupture");
+    // `bp` absent is one Brin porteur (#84): a link older than the key is not corrected for it.
+    expect(sentence).not.toContain("Brins porteurs");
   });
 });
 

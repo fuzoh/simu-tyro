@@ -66,7 +66,8 @@ export type Scene = {
  *   `useDeduced`, so the `L₀` bisection does not run twice per edit.
  */
 export function useScene(unloaded: Unloaded): Scene {
-  const { mp, hRider } = useAppState().scenario.rider;
+  const { rider, carryingLines } = useAppState().scenario;
+  const { mp, hRider } = rider;
 
   // Every dependency survives a scrub untouched: `scénario/modifié` merges its patch shallowly, so
   // a rider patch leaves the placement and the unloaded line identical.
@@ -74,8 +75,8 @@ export function useScene(unloaded: Unloaded): Scene {
   const frame = useMemo(() => buildSceneFrame(placed), [placed]);
 
   const solved = useMemo(
-    () => buildSceneBase(frame, unloaded, { mp, hRider }),
-    [frame, unloaded, mp, hRider],
+    () => buildSceneBase(frame, unloaded, { mp, hRider, carryingLines }),
+    [frame, unloaded, mp, hRider, carryingLines],
   );
 
   return { frame, solved };

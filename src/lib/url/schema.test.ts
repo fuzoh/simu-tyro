@@ -74,6 +74,7 @@ describe("the key table and canonical order", () => {
       "te",
       "lo",
       "vr",
+      "bp",
       "fam",
       "d",
       "r0",
@@ -358,6 +359,12 @@ describe("an unknown or unrepresentable key is ignored and named", () => {
       query: "?fam=ac&d=12&r0=1800&cst=iwrc",
       dropped: [{ key: "r0", reason: "valeur-non-représentable" }],
       kept: { fam: "ac", d: 12, cst: "iwrc" },
+    },
+    {
+      name: "a third Brin porteur, which the schema does not publish",
+      query: "?L=250&bp=3",
+      dropped: [{ key: "bp", reason: "valeur-non-représentable" }],
+      kept: { L: 250 },
     },
     {
       name: "a duplicate key, which arrives as an array",

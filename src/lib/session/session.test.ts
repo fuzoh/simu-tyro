@@ -536,6 +536,38 @@ describe("a textile spec carrying its diameter", () => {
   });
 });
 
+describe("Brins porteurs in the Session (#84)", () => {
+  test("two members survive a write and a read", () => {
+    const storage = memoryStorage();
+    writeSession(storage, {
+      ...bareSession(),
+      scenario: { ...firstRunDefaults(), carryingLines: 2 },
+    });
+    expect(readSession(storage)?.scenario.carryingLines).toBe(2);
+  });
+
+  test("a Session stored before the key is kept, and reads one member", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const older = { ...(blob.scenario as Record<string, unknown>) };
+    delete older.carryingLines;
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: older }));
+
+    const restored = readSession(storage);
+    // Not discarded: its cached Trace survives a key it could not have held.
+    expect(restored?.trace).not.toBeNull();
+    expect(restored?.scenario.carryingLines).toBe(1);
+  });
+
+  test("a third member is not a Session — the blob is discarded whole", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const scenario = { ...(blob.scenario as Record<string, unknown>), carryingLines: 3 };
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario }));
+    expect(readSession(storage)).toBeNull();
+  });
+});
+
 describe("ADR-0001 — a restored Session is kept as given, and the gates judge it", () => {
   test("a knot on HMPE comes back unchanged and blocks the verdict on Terminaison A", () => {
     const knotted: Scenario = {

@@ -389,6 +389,13 @@ Bethancourt et al. 2020 + SATRA; R1 C3 and R2 C3 agree on scope]`.
 - **Engine default:** rider mass a free input (default 120 kg, labelled "unconfirmed
   EN 15567 design mass — buy standard"), `P = m_p·g`. Simultaneity: single rider per
   span by default; multi-load solver exists (§6.1) for explicit multi-user scenarios.
+- **Brins porteurs** `[CONVENTION]` (decisions of 2026-11-08 on issues #4 and #69): with
+  two load-bearing members, both are strictly identical — same unloaded tension — and the
+  trolley shares the rider 50/50, so each member is one §6.1 span under `P/2` plus its own
+  weight. The vertical gap between them is constant and enters no computation. The split is
+  **not validated**: in the 2026-11-01 field trial (`docs/mesures dynamometre/`) the
+  instrumented lower line carried more than half. The app therefore also reports one member
+  under the whole `P` — « cas défavorable » — which the verdict never reads.
 
 ### 8.2 Dynamic amplification factor (C7 resolved — two regimes)
 

@@ -65,6 +65,7 @@ import { DOC_PAGES } from "@/lib/docs/pages.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { deducedRows } from "@/lib/rail/deduced.ts";
 import {
+  CARRYING_LINES_OPTIONS,
   checkField,
   commitField,
   CONSTRUCTION_OPTIONS,
@@ -528,6 +529,19 @@ export function RailInputs({
                   </div>
                 ) : null
               }
+              stacked
+            />
+            <Row
+              control={
+                <Choice
+                  name="carryingLines"
+                  onChange={(count) => patch({ ...scenario, carryingLines: count === "2" ? 2 : 1 })}
+                  options={CARRYING_LINES_OPTIONS}
+                  value={`${scenario.carryingLines}` as const}
+                />
+              }
+              help={FIELD_HELP.carryingLines}
+              label={FIELDS.carryingLines.label}
               stacked
             />
 

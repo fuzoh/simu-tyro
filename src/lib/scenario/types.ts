@@ -118,6 +118,13 @@ export type Rider = {
  */
 export type TightnessDraft = TightnessSpec | { mode: "ratio"; ratio: number };
 
+/**
+ * **Brins porteurs** — how many load-bearing members the Span carries (decision of #4). Two are
+ * strictly identical: same unloaded tension, the passager shared 50/50, each member carrying its
+ * own weight. The gap between them is constant and enters no computation.
+ */
+export type CarryingLines = 1 | 2;
+
 /** § 7's Scenario: everything a link transports, and nothing the Session keeps on the side. */
 export type Scenario = {
   unit: ForceUnit;
@@ -126,6 +133,8 @@ export type Scenario = {
   regime: RegimeId | null;
   geometry: Geometry;
   anchors: AnchorHeights;
+  /** `bp` in a link, and **absent there for one member** — so links older than the key read 1. */
+  carryingLines: CarryingLines;
   /**
    * §7's presence-encoded Tightness Driver — exactly one of flèche / prétension / `L₀` / rapport V.
    * The fourth is the app's, not the engine's: {@link TightnessDraft}.

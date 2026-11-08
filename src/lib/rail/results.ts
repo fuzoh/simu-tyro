@@ -88,7 +88,12 @@ export type ResultRowId =
   | "Tstatic"
   | "amplification"
   | "loadedSag"
-  | "coverage";
+  | "coverage"
+  // Two Brins porteurs only (#84): the share each member carries, the pair at the anchor, and the
+  // one-line case the 50/50 split does not cover.
+  | "memberLoad"
+  | "pairTotal"
+  | "soleCarrier";
 
 /**
  * One reported value. **A row that cannot be reported is absent from the list** — there is no
@@ -174,6 +179,12 @@ export type Results = {
 /** Channel one of the scope discipline: the block header, above every row. */
 export const TRAVERSE_SCOPE = "sur toute la traversée";
 
+/** With two Brins porteurs every row is one member's, and the header says so once (#4). */
+export const PER_LINE_SCOPE = `${TRAVERSE_SCOPE}, par ${label("line", "exact")}`;
+
+/** « une seule ligne porte tout » — #69's label, verbatim: what the row is, not a verdict. */
+export const SOLE_CARRIER_LABEL = `Cas défavorable : une seule ${label("line", "exact")} porte tout`;
+
 /** Channel two, on the header, so the reduction and the scope read in one glance. */
 export const NO_REGIME_ASIDE = "aucun régime choisi";
 
@@ -206,8 +217,13 @@ export type SolvedTraverse = {
   /** The unloaded line — `T_vide` at both ends. */
   readonly unloaded: SpanState;
   readonly material: DerivedMaterial;
+  /** The load one member carries, N. */
+  readonly P: number;
+  /** One member's traverse — what every row and the verdict report. */
   readonly traverse: SweepResult;
   readonly clearance: ClearanceResult;
+  /** One member under the whole load, with two Brins porteurs; `null` with one. Judges nothing. */
+  readonly soleCarrier: SweepResult | null;
 };
 
 /** What {@link deriveResults} reads. The scene is already solved: this module never solves. */
@@ -253,7 +269,7 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
   // « T max statique » stays, because that row needs no `DAF` at all.
   const amplify = Number.isFinite(DAF) && DAF > 0;
 
-  const envelope = envelopes(base, DAF);
+  const envelope = envelopes(base.traverse, base.unloaded, DAF);
   const headlineEnd = envelope.headline;
   const rows: ResultRow[] = [];
   const verdict =
@@ -295,7 +311,10 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
         "Tmax",
         "T max (traversée)",
         formatQuantity("Tdaf", envelope[headlineEnd].Tdaf, unit),
-        qualify(`ancrage ${headlineEnd}`, riderAt(base, envelope[headlineEnd].atStepIndex)),
+        qualify(
+          `ancrage ${headlineEnd}`,
+          riderAt(base.traverse, envelope[headlineEnd].atStepIndex),
+        ),
         "headline",
       ),
     );
@@ -314,7 +333,7 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
           breach
             ? `sous la garde exigée ${formatQuantity("h_clear_min", scenario.rider.hClearMin)}`
             : null,
-          riderAt(base, base.clearance.atStepIndex),
+          riderAt(base.traverse, base.clearance.atStepIndex),
         ),
         "headline",
       ),
@@ -359,6 +378,44 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
           `T max ancrage ${end}`,
           formatQuantity("Tdaf", envelope[end].Tdaf, unit),
           null,
+          "detail",
+        ),
+      );
+    }
+  }
+
+  // ── Two Brins porteurs (#4, #69) ──────────────────────────────────────────────────────────
+  // Every row above is one member's. These three are what the pair adds, and none of them reaches
+  // `evaluateVerdict`: the one-line case is #69's « cas défavorable », labelled and never judged.
+  if (base.soleCarrier !== null) {
+    rows.push(
+      row(
+        "memberLoad",
+        `Charge par ${label("line", "exact")}`,
+        formatQuantity("memberLoad", base.P, unit),
+        `moitié du ${label("passenger", "exact")}`,
+        "detail",
+      ),
+    );
+    // In the headline's own form, so a `DAF` the Verdict Gate refused is not multiplied in here
+    // either.
+    if (amplify) {
+      rows.push(
+        row(
+          "pairTotal",
+          "Total de la paire",
+          formatQuantity("Tdaf", 2 * envelope[headlineEnd].Tdaf, unit),
+          `ancrage ${headlineEnd}`,
+          "detail",
+        ),
+      );
+      const sole = envelopes(base.soleCarrier, base.unloaded, DAF);
+      rows.push(
+        row(
+          "soleCarrier",
+          SOLE_CARRIER_LABEL,
+          formatQuantity("Tdaf", sole[sole.headline].Tdaf, unit),
+          `ancrage ${sole.headline}, hors verdict`,
           "detail",
         ),
       );
@@ -415,7 +472,7 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
   const noRegime = scenario.regime === null;
 
   return {
-    scope: TRAVERSE_SCOPE,
+    scope: base.soleCarrier === null ? TRAVERSE_SCOPE : PER_LINE_SCOPE,
     aside: noRegime ? NO_REGIME_ASIDE : null,
     rows,
     // **Five things absent, not four**: the criteria × ends grid goes with the four rows, because
@@ -617,11 +674,11 @@ type Envelope = {
  * as the static one and the scan needs one pass. At `DAF ≤ 0` — a value a link can carry — the two
  * orderings part, which is why `staticHeadline` is picked on `Tstatic` and never through `Tdaf`.
  */
-function envelopes(base: SolvedTraverse, DAF: number): Envelope {
-  const Tvide = { A: base.unloaded.TA, B: base.unloaded.TB };
+function envelopes(traverse: SweepResult, unloaded: SpanState, DAF: number): Envelope {
+  const Tvide = { A: unloaded.TA, B: unloaded.TB };
   // §10.1's suspended denominator rides along on the same pass and is dropped here: § 9 never
   // prints it, and at a refused `DAF ≤ 0` it is a maximum of negatives with no meaning to print.
-  const scan = scanTensionEnvelope(base.traverse.steps, base.unloaded, DAF);
+  const scan = scanTensionEnvelope(traverse.steps, unloaded, DAF);
 
   const A: EndFigures = {
     Tstatic: scan.A.Tstatic,
@@ -683,8 +740,8 @@ function coverageValue(base: SolvedTraverse): string {
  * @returns `null` where the traverse has no such step — **never a « — »**, which is spent on
  *   `Indéterminé`. An absent position simply drops the clause.
  */
-function riderAt(base: SolvedTraverse, stepIndex: number): string | null {
-  const step = base.traverse.steps[stepIndex];
+function riderAt(traverse: SweepResult, stepIndex: number): string | null {
+  const step = traverse.steps[stepIndex];
   return step === undefined ? null : `passager ${formatAtX(step.xD)}`;
 }
 

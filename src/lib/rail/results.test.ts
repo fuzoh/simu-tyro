@@ -5,7 +5,7 @@ import type { RegimeId, SweepStep, VerdictInput } from "@/lib/sim";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
-import { sweepRider } from "@/lib/scenario/traverse.ts";
+import { sweepRider, sweepRiderOf } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { evaluateVerdict } from "@/lib/sim";
 import { proscribedIn } from "@/lib/vocabulary/labels.ts";
@@ -16,6 +16,7 @@ import {
   clearanceBreached,
   deriveResults,
   NO_REGIME_ASIDE,
+  PER_LINE_SCOPE,
   REGIME_PROMPT,
   TRAVERSE_SCOPE,
   verdictSentence,
@@ -55,11 +56,11 @@ const SHIPPED = firstRunDefaults();
 function solvedTraverseOf(scenario: ScenarioDraft): SolvedTraverse {
   const unloaded = deriveUnloaded(unloadedInputs(scenario, null));
   if (!unloaded.ok) throw new Error("the shipped scenario solves");
-  const swept = sweepRider(unloaded, scenario.rider);
+  const swept = sweepRider(unloaded, sweepRiderOf(scenario));
   if (swept === null) throw new Error("the shipped traverse solves");
   const { span, state, material } = unloaded;
-  const { traverse, clearance } = swept;
-  return { L: span.L, h: span.h, unloaded: state, material, traverse, clearance };
+  const { P, traverse, clearance, soleCarrier } = swept;
+  return { L: span.L, h: span.h, unloaded: state, material, P, traverse, clearance, soleCarrier };
 }
 
 function resultsOf(patch: Partial<ScenarioDraft> = {}): Results {
@@ -528,6 +529,94 @@ describe("what suppresses what — three gates, three different consequences", (
       expect(results.aside).toBeNull();
       expect(results.prompt).toBeNull();
     }
+  });
+});
+
+describe("two Brins porteurs — values per line, the pair, and the « cas défavorable » (#84)", () => {
+  const PAIR: Partial<ScenarioDraft> = { regime: "en15567", carryingLines: 2 };
+  const single = resultsOf({ regime: "en15567" });
+  const pair = resultsOf(PAIR);
+
+  test("the header says once that every row is one line's", () => {
+    expect(pair.scope).toBe(PER_LINE_SCOPE);
+    expect(pair.scope).toBe("sur toute la traversée, par ligne");
+    // One line is the shipped screen, and it does not move.
+    expect(single.scope).toBe(TRAVERSE_SCOPE);
+  });
+
+  test("three detail rows join the thirteen, and only with two lines", () => {
+    expect(rowIds(pair)).toEqual([
+      "verdict",
+      "FS",
+      "Tmax",
+      "clearance",
+      "reserve",
+      "TadmA",
+      "TadmB",
+      "TmaxA",
+      "TmaxB",
+      "memberLoad",
+      "pairTotal",
+      "soleCarrier",
+      "Tstatic",
+      "amplification",
+      "loadedSag",
+      "coverage",
+    ]);
+    for (const id of ["memberLoad", "pairTotal", "soleCarrier"] as const) {
+      expect(rowIds(single)).not.toContain(id);
+    }
+  });
+
+  test("each line carries half the passager: 120 kg · 9,81 / 2 = 588,6 N", () => {
+    expect(valueOf(pair, "memberLoad")).toBe("58,9 daN");
+  });
+
+  test("the tensions printed are one line's under P/2, below the single line's", () => {
+    const perLine = pair.verdict?.headline.Tdaf ?? Number.NaN;
+    const whole = single.verdict?.headline.Tdaf ?? Number.NaN;
+    expect(perLine).toBeLessThan(whole);
+    expect(valueOf(pair, "Tmax")).toBe(formatQuantity("Tdaf", perLine));
+  });
+
+  test("the pair total is both lines at the anchor: twice the envelope the verdict judges", () => {
+    const headline = pair.verdict?.headline;
+    if (headline === undefined) throw new Error("a régime is chosen");
+    expect(valueOf(pair, "pairTotal")).toBe(formatQuantity("Tdaf", 2 * headline.Tdaf));
+  });
+
+  test("the « cas défavorable » is one line carrying P whole — the single line's own T max", () => {
+    const row = pair.rows.find((candidate) => candidate.id === "soleCarrier");
+    expect(row?.label).toBe("Cas défavorable : une seule ligne porte tout");
+    expect(row?.qualifier).toBe("ancrage A, hors verdict");
+    // Same pose, the whole passager on one member: exactly the line a single member is.
+    expect(row?.value).toBe(valueOf(single, "Tmax"));
+    expect(row?.value).toBe("927,9 daN");
+  });
+
+  test("the « cas défavorable » changes neither the Verdict's state nor its cells", () => {
+    const base = solvedTraverseOf({ ...SHIPPED, ...PAIR });
+    const scenario: ScenarioDraft = { ...SHIPPED, ...PAIR };
+    const without = deriveResults({ scenario, trace: null, base: { ...base, soleCarrier: null } });
+    expect(pair.verdict).toEqual(without?.verdict);
+    expect(pair.grid).toEqual(without?.grid);
+    expect(pair.banner).toEqual(without?.banner);
+    // And the verdict is the per-line one: a line under P/2 has more margin than one under P.
+    const FS = (results: Results) => results.verdict?.ends.A.FS ?? Number.NaN;
+    expect(FS(pair)).toBeGreaterThan(FS(single));
+  });
+
+  test("a refused DAF takes the pair total and the « cas défavorable » with T max", () => {
+    const refused = resultsOf({ ...PAIR, rider: { ...SHIPPED.rider, DAF: -1 } });
+    expect(rowIds(refused)).toContain("memberLoad");
+    for (const id of ["Tmax", "pairTotal", "soleCarrier"] as const) {
+      expect(rowIds(refused)).not.toContain(id);
+    }
+  });
+
+  test("no new row says a word the interface never says", () => {
+    const printed = pair.rows.flatMap((row) => [row.label, row.value, row.qualifier ?? ""]);
+    expect(printed.flatMap((text) => proscribedIn(text))).toEqual([]);
   });
 });
 

@@ -38,6 +38,8 @@ export const FIELD_HELP: Record<FieldId, string> = {
   sb: "Position de l'ancrage B le long du profil importé, en mètres dans le repère du fichier. Avec la distance A, elle définit la portée L = sB − sA et le dénivelé h = (z(sB) + hauteur B) − (z(sA) + hauteur A). Elle doit être supérieure à la distance A et rester dans le profil.",
   family:
     "Famille de ligne : câble acier (famille A) ou corde textile (famille B). Les deux modèles physiques sont distincts : l'acier est quasi élastique et ses terminaisons sont normalisées (EN 13411) ; la corde textile flue, sa raideur est exprimée en EA = k · MBL, et §10.4 la réserve aux installations temporaires. La spécification de l'autre famille est conservée en mémoire et restaurée si vous revenez dessus.",
+  carryingLines:
+    "Nombre de lignes porteuses de la portée : une ligne, ou deux lignes identiques — ligne du haut et ligne du bas — à la même tension de pose. Avec deux lignes, le chariot partage le passager à 50/50 : chaque ligne porte la charge ponctuelle P / 2 = m_p · g / 2 (§6.1) en plus de son propre poids, et les tensions, la garde au sol et le verdict sont ceux d'une ligne, jugés avec les mêmes règles. L'écart entre les deux lignes est constant et n'entre dans aucun calcul. Lors de l'essai du 1er novembre 2026, la ligne du bas a porté plus de la moitié : le partage 50/50 n'est pas validé, d'où la ligne « Cas défavorable » dans les résultats.",
   d: "Diamètre nominal du câble acier, en millimètres. Il entre au carré dans les trois valeurs déduites : MBF = K · d² · R₀, EA = E_app · C · d² et μ = W · d² / 100 (§13.1, EN 12385-4). La bande usuelle des tyroliennes est 6 – 26 mm [CONVENTION] ; au-delà, un avertissement s'affiche.",
   R0: "Grade du fil d'acier R₀, en N/mm² : résistance à la traction nominale des fils (1770 ou 1960). Il multiplie la charge de rupture : MBF = K · d² · R₀ / 1000 (kN). Les facteurs K sont attestés pour ces deux grades exactement, d'où l'absence de grade libre.",
   cst: "Construction du câble : 6×19 ou 6×19 métallique (IWRC). Elle choisit le facteur K de la charge de rupture (0,330 pour 6×19, 0,356 pour 6×19 métallique — EN 12385-4) et pèse dans la raideur axiale et la masse linéique. Pour une autre construction (6×36…), saisissez directement MBF et μ dans « Valeurs déduites ».",
@@ -127,6 +129,12 @@ export const RESULT_HELP: Record<ResultRowId, string> = {
     "Flèche chargée maximale : le plus grand écart vertical entre la ligne A–B et le nœud du passager sur toute la traversée, en mètres. Le point anguleux de la chaînette chargée est son point bas ; c'est cette flèche qui consomme la garde au sol.",
   coverage:
     "Couverture du balayage : nombre de positions du passager résolues sur le nombre de positions tentées (grille uniforme plus pas géométriques resserrés près des ancrages). Sous 100 %, le verdict est « Indéterminé » : un pas non résolu peut cacher le pire cas.",
+  memberLoad:
+    "Charge ponctuelle que porte chacune des deux lignes : P / 2 = m_p · g / 2, le chariot partageant le passager à 50/50. Toutes les tensions, la garde au sol et le verdict de ce bloc sont calculés pour une ligne sous cette charge (§6.1).",
+  pairTotal:
+    "Somme des tensions des deux lignes à l'ancrage le plus chargé : 2 × T max (traversée), les deux lignes étant identiques. C'est ce que reprend l'ancrage qui les tient toutes deux ; le verdict, lui, juge chaque ligne.",
+  soleCarrier:
+    "Tension maximale majorée d'une ligne qui porterait seule tout le passager (P entier au lieu de P / 2), au pire pas de la traversée : T à vide + DAF · (T chargé − T à vide). Lors de l'essai du 1er novembre 2026, la ligne du bas a porté plus de la moitié : le partage 50/50 n'est pas validé et ce cas en est la borne haute. Ligne informative : elle ne change ni le verdict ni ses cellules.",
 };
 
 /** Help for the rows of the criteria × ends grid. */

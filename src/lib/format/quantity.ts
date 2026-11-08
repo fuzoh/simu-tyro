@@ -216,6 +216,11 @@ export const QUANTITIES = {
   Tstatic: { unit: "force", decimals: 1 },
   /** `Enveloppe DAF`, daN — the headline `T max`, and what `FS effectif` divides by. */
   Tdaf: { unit: "force", decimals: 1 },
+  /**
+   * `Charge par ligne`, daN — `m_p·g / 2` on each of two Brins porteurs (#84). Read beside the
+   * tensions it loads, so at their grain; whole kilograms halve to 0,49 daN steps, which it keeps.
+   */
+  memberLoad: { unit: "force", decimals: 1 },
   /** `Flèche chargée max`, m. */
   loadedSag: { unit: "m", decimals: 2 },
   /** `Garde min`, m — the app's central output. */

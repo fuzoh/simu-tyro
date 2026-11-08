@@ -1,8 +1,8 @@
 /**
- * **The rider's Sweep over the unloaded line** — the design load, the traverse at that load and
- * §11's clearance over it. One recipe, read by the chart scene and by the `Résultats` tests that
- * stand in for it, so the two cannot drift apart. Beside it, the Scenario as every Traverse-scope
- * reader takes it: the gates and the `Résultats`.
+ * **The rider's Sweep over the unloaded line** — the load one member carries, the traverse at that
+ * load and §11's clearance over it. One recipe, read by the chart scene and by the `Résultats`
+ * tests that stand in for it, so the two cannot drift apart. Beside it, the Scenario as every
+ * Traverse-scope reader takes it: the gates and the `Résultats`.
  *
  * `x_D` is not an input: a Sweep covers every rider position, and the slider only selects a step.
  */
@@ -12,7 +12,7 @@ import type { ClearanceResult, SweepResult } from "@/lib/sim";
 import { G } from "@/lib/format/quantity.ts";
 import { evaluateClearance, sweep } from "@/lib/sim";
 
-import type { Rider, ScenarioDraft } from "./types.ts";
+import type { CarryingLines, Rider, ScenarioDraft } from "./types.ts";
 import type { UnloadedLine } from "./unloaded.ts";
 
 /**
@@ -34,7 +34,17 @@ export type TraverseInputs = Readonly<Omit<ScenarioDraft, "rider"> & Omit<Rider,
  * that does not touch one — a scrub of `x_D` — leaves it identical and a memo keyed on them holds.
  */
 export function traverseInputs(scenario: ScenarioDraft): TraverseInputs {
-  const { unit, usage, regime, geometry, anchors, tightness, material, terminations } = scenario;
+  const {
+    unit,
+    usage,
+    regime,
+    geometry,
+    anchors,
+    carryingLines,
+    tightness,
+    material,
+    terminations,
+  } = scenario;
   const { mp, hRider, hClearMin, DAF } = scenario.rider;
   return {
     unit,
@@ -42,6 +52,7 @@ export function traverseInputs(scenario: ScenarioDraft): TraverseInputs {
     regime,
     geometry,
     anchors,
+    carryingLines,
     tightness,
     material,
     terminations,
@@ -63,29 +74,52 @@ export function traverseScenario({
   return { ...rest, rider: { mp, hRider, hClearMin, DAF } };
 }
 
-/** The rider fields the Sweep reads — its load and §11's envelope. */
-export type SweepRider = Pick<Rider, "mp" | "hRider">;
+/** What the Sweep reads beside the unloaded line — the rider's load and §11's envelope. */
+export type SweepRider = Pick<Rider, "mp" | "hRider"> & Pick<ScenarioDraft, "carryingLines">;
+
+/** A Scenario's {@link SweepRider}. */
+export function sweepRiderOf({ rider, carryingLines }: ScenarioDraft): SweepRider {
+  return { mp: rider.mp, hRider: rider.hRider, carryingLines };
+}
 
 /** A Sweep that solved at least one step, with §11 reduced over it. */
 export type RiderSweep = {
-  /** The rider's design load, N. */
+  /** The load **one member** carries, N — {@link memberLoad}. */
   readonly P: number;
-  /** The precomputed traverse. `coverage < 1` is `Indéterminé`. */
+  /** One member's traverse under `P`. Both are the same line. `coverage < 1` is `Indéterminé`. */
   readonly traverse: SweepResult;
   /** §11 over the traverse: the aggregate `h_min`, its `x`, and the per-step arrays. */
   readonly clearance: ClearanceResult;
+  /**
+   * « Cas défavorable : une seule ligne porte tout » — one member under the whole `m_p·g`, for
+   * its tensions alone: #69 measured the lower line carrying more than half, so 50/50 is not
+   * validated. Judges nothing. `null` with one member, whose `traverse` already is that case.
+   */
+  readonly soleCarrier: SweepResult | null;
 };
+
+/**
+ * The passager's weight on one member, N: `m_p·g`, shared 50/50 when two identical Brins porteurs
+ * carry the trolley (#4). The one place that split is made.
+ */
+export function memberLoad(mp: number, carryingLines: CarryingLines): number {
+  return (mp * G) / carryingLines;
+}
 
 /**
  * @returns `null` when the traverse lost every step: it has no picture and no `h_min`, and
  *   `atStepIndex` would be −1 — the flag § 2 says to check rather than reading a garde off a
  *   traverse that never happened.
  */
-export function sweepRider(unloaded: UnloadedLine, { mp, hRider }: SweepRider): RiderSweep | null {
+export function sweepRider(
+  unloaded: UnloadedLine,
+  { mp, hRider, carryingLines }: SweepRider,
+): RiderSweep | null {
   const { input, span } = unloaded;
-  const P = mp * G;
+  const P = memberLoad(mp, carryingLines);
   const traverse = sweep(input, P);
   if (traverse.steps.length === 0) return null;
   const clearance = evaluateClearance(input, P, traverse.steps, span.terrain, hRider);
-  return { P, traverse, clearance };
+  const soleCarrier = carryingLines === 1 ? null : sweep(input, memberLoad(mp, 1));
+  return { P, traverse, clearance, soleCarrier };
 }

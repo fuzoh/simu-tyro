@@ -287,6 +287,8 @@ const SCENARIO: v.GenericSchema<unknown, Scenario> = v.object({
   regime: v.nullable(v.picklist(REGIME_IDS)),
   geometry: GEOMETRY,
   anchors: v.object({ zA: FINITE, zB: FINITE }),
+  // Added with #84, optional with the shipped one member for the same reason as `hClearMin`.
+  carryingLines: v.optional(v.picklist([1, 2]), FIRST_RUN_SCENARIO.carryingLines),
   tightness: TIGHTNESS,
   material: MATERIAL_SPEC,
   terminations: v.object({ A: END_TERMINATION, B: END_TERMINATION }),

@@ -9,9 +9,10 @@
  *
  * Layer rules this file keeps:
  *
- * - **Always on**: terrain, the loaded cable, both anchors, the rider with its `h_rider` envelope,
- *   the clearance dimension line, the VE badge, and the danger bands *whenever a violation exists*.
- *   The bands **self-hide**, so they are never chrome.
+ * - **Always on**: terrain, the loaded cable — twice, a few pixels apart, with two Brins porteurs —
+ *   both anchors, the rider with its `h_rider` envelope, the clearance dimension line, the VE
+ *   badge, and the danger bands *whenever a violation exists*. The bands **self-hide**, so they
+ *   are never chrome.
  * - **Two clearance dimensions, and the second one self-hides too.** The governing dimension is
  *   drawn at §11's minimum wherever it sits; the passenger's own garde is drawn at `x_D`, and **only
  *   while `relabel` says the two are further apart than `max(1 m, 1 % de la portée)`** (ticket 41).
@@ -270,13 +271,16 @@ export function Profile({
             the five layers that go, and they are exactly these. */}
         {scene !== null && rider !== null && (
           <>
-            {layers.unloadedLine && (
-              <path
-                className="stroke-muted-foreground/70 fill-none"
-                d={pathOf(scene.unloadedCable, x, z) ?? undefined}
-                strokeDasharray="5 3"
-              />
-            )}
+            {layers.unloadedLine &&
+              scene.members.map((member) => (
+                <path
+                  className="stroke-muted-foreground/70 fill-none"
+                  d={pathOf(scene.unloadedCable, x, z) ?? undefined}
+                  key={member.line}
+                  strokeDasharray="5 3"
+                  transform={`translate(0 ${member.offsetPx})`}
+                />
+              ))}
 
             {/* « Trajectoire » — the load's own path over the whole traverse, **dotted** so it can
                 never be read as a cable: the loaded line touches it at exactly one point, the
@@ -294,13 +298,19 @@ export function Profile({
                 />
               ))}
 
-            <path
-              className={cn(
-                "fill-none stroke-2",
-                inViolation ? "stroke-destructive" : "stroke-foreground",
-              )}
-              d={pathOf(rider.cable, x, z) ?? undefined}
-            />
+            {/* One path per Brin porteur: both are the same solve, so two are told apart by a
+                pixel shift alone — the gap is not a parameter and measures nothing (#4). */}
+            {scene.members.map((member) => (
+              <path
+                className={cn(
+                  "fill-none stroke-2",
+                  inViolation ? "stroke-destructive" : "stroke-foreground",
+                )}
+                d={pathOf(rider.cable, x, z) ?? undefined}
+                key={member.line}
+                transform={`translate(0 ${member.offsetPx})`}
+              />
+            ))}
 
             {/* The dimension line is drawn **wherever the minimum actually sits**, so it visibly
                 steps sideways onto a bump the rider has already passed. A negative garde draws

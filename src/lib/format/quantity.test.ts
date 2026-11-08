@@ -43,12 +43,13 @@ const ALL_IDS = Object.keys(QUANTITIES) as QuantityId[];
 
 /**
  * One case per row of {@link QUANTITIES}, in its order, valued from the spec's own « Premier
- * lancement » column wherever it has one. That is **§ 3's table plus two rows**: `regimeK` is the
+ * lancement » column wherever it has one. That is **§ 3's table plus three rows**: `regimeK` is the
  * régime's safety divisor, which § 3 has no row for because it spends `k` on textile relative
  * stiffness — voir its own comment in the table, and ticket 37 defect 4 for why it is a
- * `QuantityId` rather than a second rounding site — and `unloadedGap`, the « Écart à vide » cell
- * added after § 3 was written. The four rows the column leaves empty or dashed
- * (`Station`, `MBL`, `T adm`, `Réserve de tension`) take § 3's or § 6's quoted figures instead.
+ * `QuantityId` rather than a second rounding site — `unloadedGap`, the « Écart à vide » cell
+ * added after § 3 was written, and `memberLoad`, the « Charge par ligne » of two Brins porteurs.
+ * The four rows the column leaves empty or dashed (`Station`, `MBL`, `T adm`, `Réserve de
+ * tension`) take § 3's or § 6's quoted figures instead.
  *
  * `value` is always the row's **canonical** unit — § 3's SI storage: metres, mm, kg, kg/m,
  * **newtons**, N/m, percent — so the N → daN → kN → kgf and N → MN conversions are exercised by
@@ -91,6 +92,8 @@ const ROWS: ReadonlyArray<{ id: QuantityId; value: number; expected: string }> =
   // Results and read-out cells.
   { id: "Tstatic", value: 8171.3, expected: "817,1 daN" },
   { id: "Tdaf", value: 9278.8, expected: "927,9 daN" },
+  // Not a § 3 row: half the shipped 120 kg on each of two Brins porteurs, 120 · 9,81 / 2 N (#84).
+  { id: "memberLoad", value: 588.6, expected: "58,9 daN" },
   { id: "loadedSag", value: 7.4831, expected: "7,48 m" },
   { id: "clearance", value: 2.4399, expected: "2,44 m" },
   // Not a § 3 row: the read-out cell of 2026-09-23, valued at the first-run line's own `x_D` 75.
@@ -251,7 +254,7 @@ describe("« le changement d'unité n'écrit jamais dans l'état ; daN→X→daN
     return kind === "force" || kind === "force/m";
   });
 
-  test("the eight force rows are the ones the selector moves", () => {
+  test("the nine force rows are the ones the selector moves", () => {
     expect(FORCE_IDS).toEqual([
       "H_target",
       "MBL",
@@ -259,6 +262,7 @@ describe("« le changement d'unité n'écrit jamais dans l'état ; daN→X→daN
       "w",
       "Tstatic",
       "Tdaf",
+      "memberLoad",
       "Tadm",
       "tensionReserve",
     ]);

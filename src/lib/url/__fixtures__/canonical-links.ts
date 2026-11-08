@@ -40,6 +40,9 @@ export const BRANCHES = [
   "x-clamped",
   "textile-blanks",
   "textile-diameter",
+  "carrying-lines-absent",
+  "carrying-lines-two",
+  "carrying-lines-one-explicit",
 ] as const;
 
 export type Branch = (typeof BRANCHES)[number];
@@ -47,7 +50,7 @@ export type Branch = (typeof BRANCHES)[number];
 /** A Scenario and the one link that encodes it — asserted in both directions. */
 export type CanonicalLinkFixture = {
   name: string;
-  source: typeof MEASURED | typeof MEASURED_83;
+  source: typeof MEASURED | typeof MEASURED_83 | typeof MEASURED_84;
   covers: readonly Branch[];
   scenario: Scenario;
   link: string;
@@ -61,13 +64,14 @@ export type CanonicalLinkFixture = {
  */
 export type DecodeOnlyFixture = {
   name: string;
-  source: typeof MEASURED | typeof MEASURED_83;
+  source: typeof MEASURED | typeof MEASURED_83 | typeof MEASURED_84;
   covers: readonly Branch[];
   link: string;
 } & ({ scenario: Scenario; canonical: string } | { scenario: ScenarioDraft; canonical: null });
 
 const MEASURED = "[MEASURED] issue #34, codec as of 2026-11-07";
 const MEASURED_83 = "[MEASURED] issue #83, codec as of 2026-11-08";
+const MEASURED_84 = "[MEASURED] issue #84, codec as of 2026-11-08";
 
 /** Three stations `(0,0) (50,-4) (100,-9)`, as `encodeP1` writes them. */
 export const TRACE_P1 = "p1.AwCQTpBOAJ8G5wcA";
@@ -78,6 +82,7 @@ const STEEL: Scenario = {
   regime: null,
   geometry: { source: "manual", L: 150, h: -18 },
   anchors: { zA: 12, zB: 12 },
+  carryingLines: 1,
   tightness: { mode: "sag", D_target: 6 },
   material: { family: "steel", d: 12, R0: 1770, construction: "iwrc" },
   terminations: {
@@ -112,9 +117,17 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
   {
     name: "first-run: steel, manual, sag driver, perm, no regime",
     source: MEASURED,
-    covers: ["steel", "manual", "driver-sag", "use-perm"],
+    // No `bp`, as before the key existed: one Brin porteur.
+    covers: ["steel", "manual", "driver-sag", "use-perm", "carrying-lines-absent"],
     scenario: STEEL,
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "two Brins porteurs: `bp=2`, after the driver",
+    source: MEASURED_84,
+    covers: ["carrying-lines-two"],
+    scenario: { ...STEEL, carryingLines: 2 },
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&bp=2&${STEEL_HEAD}&${TAIL}`,
   },
   {
     name: "tension driver, daN on the wire whatever u says",
@@ -342,6 +355,14 @@ export const DECODE_ONLY_LINKS: readonly DecodeOnlyFixture[] = [
     canonical:
       `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
       "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=0",
+  },
+  {
+    name: "`bp=1` is one Brin porteur, and the canonical link says so by omitting it",
+    source: MEASURED_84,
+    covers: ["carrying-lines-one-explicit"],
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&bp=1&${STEEL_HEAD}&${TAIL}`,
+    scenario: STEEL,
+    canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
   },
   {
     name: "textile with MBL and mu left blank",
