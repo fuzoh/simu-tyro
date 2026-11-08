@@ -129,7 +129,7 @@ export function Region({ title, children }: { title: string; children: ReactNode
  * it into `index.html` and `404.html` (ADR-0002). **Containers, not controls**: the groups'
  * headings, the tiles' labels and scopes over their empty value and note lines, the Chart Block's
  * empty bands with the terrain cells' labels, and the vue de dessus's frame — its control row, the
- * map's box and its caption's three lines, all empty — no value, no control, never a « — ».
+ * map's box and its caption's five lines, all empty — no value, no control, never a « — ».
  */
 export function StatiqueSkeleton() {
   return (

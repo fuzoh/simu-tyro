@@ -21,6 +21,7 @@
 
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { GeoJSONSource } from "maplibre-gl";
+import type { RefObject } from "react";
 
 import { Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl } from "maplibre-gl";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
@@ -38,7 +39,7 @@ import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.tsx";
 import { Toggle } from "@/components/ui/toggle.tsx";
-import { anchorReading, clickHint, FOND_LABEL, MAP_COPY } from "@/lib/map/copy.ts";
+import { anchorReading, clickHint, FOND_LABEL, MAP_COPY, windReading } from "@/lib/map/copy.ts";
 import { FONDS } from "@/lib/map/display.ts";
 import { clickTarget, drawnPositions, IDLE, stepGesture } from "@/lib/map/gesture.ts";
 import {
@@ -52,7 +53,10 @@ import {
   mapStyle,
   SWISSTOPO_COVERAGE,
 } from "@/lib/map/style.ts";
+import { LEVEL_REFERENCE, roseReference } from "@/lib/map/wind-rose.ts";
 import { geoadminNotice, loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
+
+import { WindRose } from "./wind-rose.tsx";
 
 // MapLibre cannot find its worker inside a bundle; Vite hands over the file's URL.
 setWorkerUrl(workerUrl);
@@ -74,6 +78,10 @@ export function TopMap() {
   const [health, setHealth] = useState<FondHealth>(() => freshHealth(display.fond));
 
   const plain = failed ? plainDrawing(drawn) : null;
+  // The plain drawing orients itself by the LV95 domain, so the rose reads the line as it is drawn.
+  const reference =
+    plain !== null && plain.unoriented !== null ? LEVEL_REFERENCE : roseReference(drawn);
+  const rose = useRef<HTMLDivElement>(null);
   const unavailable = failed || fondUnavailable(health, drawn);
 
   return (
@@ -85,6 +93,7 @@ export function TopMap() {
               {anchorReading(anchor, drawn)}
             </span>
           ))}
+          <span>{windReading(scenario.wind, reference)}</span>
           <span>
             {gesture.kind === "loading"
               ? MAP_COPY.loading
@@ -104,40 +113,46 @@ export function TopMap() {
         />
       }
       figure={
-        plain === null ? (
-          <>
-            <MapCanvas
-              display={display}
-              drawn={drawn}
-              gesture={gesture}
-              onFailed={() => setFailed(true)}
-              onHealth={setHealth}
-              send={send}
-              target={target}
-            />
-            <div className="pointer-events-none absolute top-2 left-2 flex gap-1">
-              {(["A", "B"] as const).map((anchor) => (
-                <Toggle
-                  className="bg-background pointer-events-auto"
-                  disabled={gesture.kind !== "idle"}
-                  key={anchor}
-                  onPressedChange={() => send({ type: "arm", anchor })}
-                  pressed={gesture.kind === "idle" && gesture.armed === anchor}
-                  size="sm"
-                  variant="outline"
-                >
-                  {anchor === "A" ? MAP_COPY.placeA : MAP_COPY.placeB}
-                </Toggle>
-              ))}
-            </div>
-            <Attribution fond={display.fond} />
-          </>
-        ) : (
-          <>
-            {plain.figure}
-            <Attribution fond={display.fond} />
-          </>
-        )
+        <>
+          {plain === null ? (
+            <>
+              <MapCanvas
+                display={display}
+                drawn={drawn}
+                gesture={gesture}
+                onFailed={() => setFailed(true)}
+                onHealth={setHealth}
+                rose={rose}
+                send={send}
+                target={target}
+              />
+              <div className="pointer-events-none absolute top-2 left-2 flex gap-1">
+                {(["A", "B"] as const).map((anchor) => (
+                  <Toggle
+                    className="bg-background pointer-events-auto"
+                    disabled={gesture.kind !== "idle"}
+                    key={anchor}
+                    onPressedChange={() => send({ type: "arm", anchor })}
+                    pressed={gesture.kind === "idle" && gesture.armed === anchor}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {anchor === "A" ? MAP_COPY.placeA : MAP_COPY.placeB}
+                  </Toggle>
+                ))}
+              </div>
+            </>
+          ) : (
+            plain.figure
+          )}
+          <WindRose
+            hostRef={rose}
+            onWind={(next) => dispatch({ type: "scénario/modifié", patch: { wind: next } })}
+            reference={reference}
+            wind={scenario.wind}
+          />
+          <Attribution fond={display.fond} />
+        </>
       }
     />
   );
@@ -228,6 +243,7 @@ function MapCanvas({
   drawn,
   gesture,
   target,
+  rose,
   send,
   onHealth,
   onFailed,
@@ -236,6 +252,8 @@ function MapCanvas({
   drawn: Positions;
   gesture: MapGesture;
   target: Anchor | null;
+  /** The rose's host: the map keeps it on the line's midpoint as the view moves. */
+  rose: RefObject<HTMLDivElement | null>;
   send: (event: MapEvent) => void;
   onHealth: (update: (health: FondHealth) => FondHealth) => void;
   onFailed: () => void;
@@ -249,6 +267,14 @@ function MapCanvas({
   const applied = useRef<string | null>(null);
   // What a style built later must draw: the line where it is **now**, not where it was at mount.
   const line = useRef(drawn);
+
+  // The rose follows the line's midpoint through every pan and zoom: it runs on every frame, so it
+  // moves the host's style rather than render.
+  const placeRose = useCallback(() => {
+    if (map.current !== null && rose.current !== null) {
+      placeRoseHost(map.current, rose.current, line.current);
+    }
+  }, [rose]);
 
   useEffect(() => {
     const node = container.current;
@@ -275,6 +301,8 @@ function MapCanvas({
     }
     created.touchZoomRotate.disableRotation();
     created.addControl(new NavigationControl({ showCompass: false }), "top-right");
+    created.on("move", placeRose);
+    created.on("resize", placeRose);
     created.on("click", (event) =>
       send({ type: "click", at: { lat: event.lngLat.lat, lon: event.lngLat.lng } }),
     );
@@ -290,6 +318,7 @@ function MapCanvas({
       }
     });
     map.current = created;
+    placeRose();
     applied.current = styleKey(display, vector.current);
     return () => {
       created.remove();
@@ -354,6 +383,7 @@ function MapCanvas({
       }
       markers.current[anchor]?.setDraggable(draggable);
     }
+    placeRose();
     // A line placed elsewhere — an imported CSV, a typed Position — may stand outside the view;
     // one placed on the map never does, so the camera stays where the reader put it.
     const shown = live.getBounds();
@@ -365,7 +395,7 @@ function MapCanvas({
       if (view.bounds !== undefined) live.fitBounds(view.bounds, FIT);
       else live.jumpTo(view);
     }
-  }, [drawn, draggable, send]);
+  }, [drawn, draggable, send, placeRose]);
 
   // A crosshair while a click would place an anchor; MapLibre's own hand otherwise.
   useEffect(() => {
@@ -379,6 +409,17 @@ function MapCanvas({
       <div aria-label={MAP_COPY.title} className="h-full w-full" ref={container} role="region" />
     </div>
   );
+}
+
+/**
+ * Puts the rose's host on the line's midpoint in the map's box. With no line it goes back to the
+ * middle of the box, where its own CSS stands it.
+ */
+function placeRoseHost(live: MapLibreMap, host: HTMLElement, { A, B }: Positions) {
+  const at =
+    A === null || B === null ? null : live.project([(A.lon + B.lon) / 2, (A.lat + B.lat) / 2]);
+  host.style.left = at === null ? "" : `${at.x}px`;
+  host.style.top = at === null ? "" : `${at.y}px`;
 }
 
 /** One anchor's marker: a lettered disc the map moves under the pointer while it is dragged. */

@@ -10,7 +10,8 @@ import { describe, expect, test } from "vitest";
 import { TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
 import { exactTermsIn, proscribedIn } from "@/lib/vocabulary/labels.ts";
 
-import { anchorReading, clickHint, mapLabelTable } from "./copy.ts";
+import { anchorReading, clickHint, describeRelative, mapLabelTable, windReading } from "./copy.ts";
+import { roseReference } from "./wind-rose.ts";
 
 const PARIS = { lat: 48.85, lon: 2.35 };
 
@@ -41,9 +42,44 @@ describe("an anchor's reading", () => {
   });
 });
 
+describe("the wind's reading", () => {
+  const trial = roseReference(TRIAL_ENDS);
+  const level = roseReference({ A: null, B: null });
+
+  test("says where a relative direction comes from, from the rider's seat", () => {
+    expect(describeRelative(0)).toBe("de face");
+    expect(describeRelative(90)).toBe("par la droite");
+    expect(describeRelative(180)).toBe("dans le dos");
+    expect(describeRelative(270)).toBe("par la gauche");
+    expect(describeRelative(45)).toBe("par la droite à l'avant");
+    expect(describeRelative(108)).toBe("par la droite à l'arrière");
+    expect(describeRelative(225)).toBe("par la gauche à l'arrière");
+    expect(describeRelative(300)).toBe("par la gauche à l'avant");
+  });
+
+  test("gives the azimuth and the relative direction on the trial's line", () => {
+    expect(windReading({ speedKmh: 25, directionDeg: 108 }, trial)).toBe(
+      "Vent de nord-est (60°), 25 km/h : par la droite à l'arrière, 108° par rapport à la ligne A → B.",
+    );
+  });
+
+  test("gives the relative direction alone where north is unknown", () => {
+    expect(windReading({ speedKmh: 25, directionDeg: 108 }, level)).toBe(
+      "Vent à 25 km/h : par la droite à l'arrière, 108° par rapport à la ligne A → B (nord inconnu).",
+    );
+  });
+
+  test("says there is no wind, and what to do about it", () => {
+    expect(windReading({ speedKmh: 0, directionDeg: 0 }, trial)).toMatch(/^Pas de vent\./);
+  });
+});
+
 describe("every line the map prints stays in the terrain register", () => {
   const lines = [
     ...mapLabelTable(),
+    windReading({ speedKmh: 25, directionDeg: 108 }, roseReference(TRIAL_ENDS)),
+    windReading({ speedKmh: 25, directionDeg: 108 }, roseReference({ A: null, B: null })),
+    windReading({ speedKmh: 0, directionDeg: 0 }, roseReference({ A: null, B: null })),
     ...(["A", "B"] as const).flatMap((anchor) => [
       anchorReading(anchor, TRIAL_ENDS) ?? "",
       anchorReading(anchor, { A: PARIS, B: PARIS }) ?? "",

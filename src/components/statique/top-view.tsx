@@ -107,7 +107,7 @@ function at({ x, y }: TopViewPoint): CSSProperties {
 
 /**
  * The figure's box, shared with the Skeleton: one control row, the map at 3 : 2 — capped so a
- * desktop column does not spend its whole height on it — then three caption lines, reserved so the
+ * desktop column does not spend its whole height on it — then five caption lines, reserved so the
  * live lines land in the Skeleton's space. The Skeleton passes no occupant, only the heights.
  */
 export function TopViewFrame({
@@ -125,7 +125,7 @@ export function TopViewFrame({
       <div className="border-border relative aspect-[3/2] w-full overflow-hidden border">
         {figure}
       </div>
-      <div className="text-muted-foreground flex min-h-12 flex-col text-xs">{caption}</div>
+      <div className="text-muted-foreground flex min-h-20 flex-col text-xs">{caption}</div>
     </div>
   );
 }
