@@ -41,6 +41,8 @@ export const MAP_COPY = {
   roseCalm: "Pas de vent. Glissez la poignée de la rose pour en régler la direction et la force.",
   /** Where the line is drawn level the reading says why it gives no azimuth. */
   roseNorthUnknown: "nord inconnu",
+  /** The ambient note under a drawn Banane (#96): a shape, never a distance. */
+  bananeNote: "Banane : allure, pas une distance.",
   /** The switch that puts the Vue 3D in the vue de dessus's place (#95). */
   view3d: "3D",
   /** The Vue 3D's accessible name. */
@@ -49,6 +51,15 @@ export const MAP_COPY = {
   /** No network, no WebGL: the vue de dessus is back, and this says why. */
   vue3dUnavailable: "Vue 3D indisponible",
 } as const;
+
+/**
+ * What the Banane is, on hover: drawn rather than computed, its amplitude a `[CONVENTION]` — a
+ * drawing choice proportional to the wind's cross component — and no distance behind it.
+ */
+export const BANANE_HELP =
+  `La ${label("banana", "terrain")} est dessinée, pas calculée : la ligne à vide s'incurve du côté sous le vent, d'autant plus que le vent souffle en travers. ` +
+  "Le facteur de proportionnalité est un choix de dessin [CONVENTION], jamais une sortie du moteur. " +
+  "Elle donne une allure, pas une distance : ni déport latéral ni garde au sol sous vent avec passager n'en sont lus.";
 
 /** Why the switch to the Vue 3D is off, said under the map. */
 export const VUE_3D_BLOCKED = {
@@ -125,6 +136,7 @@ export function mapLabelTable(): readonly string[] {
     ...Object.values(FOND_LABEL),
     ...Object.values(MAP_COPY),
     ...Object.values(VUE_3D_BLOCKED),
+    BANANE_HELP,
     ...[0, 90, 180, 270, 45, 108].map(describeRelative),
     ...new Set([...FONDS.map(fondAttribution), ...FONDS.map(drapedAttribution)]),
     ...(["A", "B"] as const).flatMap((anchor) => [

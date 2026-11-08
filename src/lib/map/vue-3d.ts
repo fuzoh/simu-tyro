@@ -15,6 +15,9 @@
  *   dénivelé. swisstopo's terrain answers within 0,2 m of the profil at the trial's anchors
  *   (prototype #63: 1 415,9 / 1 442,5 m against the CSV's 1 415,7 / 1 442,6 m), so profil altitudes
  *   are drawn as the relief's heights, with no datum shift.
+ * - **The Ligne à vide wears the Banane** (#96): its vertices keep their altitude and are pushed
+ *   sideways by the drawn bow (`./banane.ts`); the loaded line and the Fils à plomb stay straight —
+ *   the bow is the unloaded line's, and says nothing of the line under a passager.
  * - **No profil, no Vue 3D.** Manual geometry has a span and a dénivelé but no altitude to stand
  *   them on; placing them on the relief would be a rule nobody decided, so the switch says why it
  *   is off instead, as it does without the two Positions.
@@ -26,6 +29,7 @@ import type { Position, Positions } from "@/lib/scenario/types.ts";
 import type { Fond } from "./display.ts";
 import type { WmtsLayer } from "./style.ts";
 
+import { bananePoint } from "./banane.ts";
 import { RASTER_FONDS } from "./style.ts";
 
 /**
@@ -141,18 +145,23 @@ export type Vue3dScene = {
  *
  * @param solved the solved half, or `null` under « Aucun résultat ».
  * @param rider the passager placed at the Scenario's `x_D`, or `null`.
+ * @param across the wind's cross component, m/s: the Ligne à vide's bow, nil without it.
  */
 export function vue3dScene({
   placement: { ends, frame, bases },
   solved,
   rider,
+  across,
 }: {
   placement: Vue3dPlacement;
   solved: SceneBase | null;
   rider: SceneRider | null;
+  across: number;
 }): Vue3dScene {
   const { L, h, anchors } = frame;
-  const onEarth = earthFrame({ ends, L, topA: bases.zBaseA + anchors.zA });
+  const topA = bases.zBaseA + anchors.zA;
+  const onEarth = earthFrame({ ends, L, topA });
+  const onBanane = earthFrame({ ends, L, topA, across });
   const fil = (x: number, top: number, height: number): FilAPlomb => {
     const foot = onEarth(x, top - height);
     return { foot, anchor: onEarth(x, top), top: { ...foot, altitude: foot.altitude + FIL_RISE } };
@@ -160,7 +169,7 @@ export function vue3dScene({
   return {
     ends,
     fils: { A: fil(0, 0, anchors.zA), B: fil(L, h, anchors.zB) },
-    unloaded: solved === null ? null : alongLine(onEarth, solved.unloadedCable),
+    unloaded: solved === null ? null : alongLine(onBanane, solved.unloadedCable),
     loaded:
       solved === null || rider === null
         ? null
@@ -172,26 +181,23 @@ export function vue3dScene({
 /**
  * The engine's frame on the earth: `x` metres from A along the ligne A–B, `z` metres above anchor
  * A. Interpolated linearly in degrees: over a span of a few kilometres the error is millimetres.
+ * With a cross wind the frame is the Banane's: each point pushed sideways by the drawn bow.
  */
 export function earthFrame({
-  ends: { A, B },
+  ends,
   L,
   topA,
+  across = 0,
 }: {
   ends: Ends;
   /** Portée, m: `x` runs from 0 at A to `L` at B. */
   L: number;
   /** Anchor A's altitude, m. */
   topA: number;
+  /** The wind's cross component, m/s; the line is straight without it. */
+  across?: number;
 }): (x: number, z: number) => EarthPoint {
-  return (x, z) => {
-    const t = x / L;
-    return {
-      lon: A.lon + t * (B.lon - A.lon),
-      lat: A.lat + t * (B.lat - A.lat),
-      altitude: topA + z,
-    };
-  };
+  return (x, z) => ({ ...bananePoint(ends, x / L, across), altitude: topA + z });
 }
 
 function alongLine(onEarth: (x: number, z: number) => EarthPoint, line: Polyline): EarthPoint[] {

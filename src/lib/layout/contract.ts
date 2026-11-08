@@ -822,3 +822,12 @@ export function clearanceTickLabel(tick: number, withUnit: boolean): string {
     : rounded.toFixed((rounded * 10) % 1 === 0 ? 1 : 2);
   return `${text.replace(".", ",").replace("-", "−")}${withUnit ? " m" : ""}`;
 }
+
+/**
+ * How far the **Banane** bows, per m/s of the wind's cross component: a fraction of the drawn
+ * line's length. `[CONVENTION]` — a drawing choice that makes more wind read as more bow, never an
+ * engine output, never a length in metres: no lateral scale, no `Cd` stands behind it (decision of
+ * #6, amendment of 2026-11-08; research #9 gives the shape and no coefficient). Changing it changes
+ * how a bow looks, not what the app computes.
+ */
+export const BANANE_FACTOR = 0.01;

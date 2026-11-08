@@ -20,6 +20,8 @@ import {
   fondAttribution,
   fondUnavailable,
   freshHealth,
+  BANANE_SOURCE,
+  bananeData,
   isFondSource,
   LINE_SOURCE,
   lineData,
@@ -64,7 +66,7 @@ function rasterTiles(style: MapStyle, source: string): readonly string[] {
   return spec.tiles;
 }
 
-describe("every Fond and the Couche pentes keep the ligne A–B", () => {
+describe("every Fond and the Couche pentes keep the ligne A–B and the Banane", () => {
   test.each(
     DISPLAYS.flatMap(
       (display) =>
@@ -74,28 +76,57 @@ describe("every Fond and the Couche pentes keep the ligne A–B", () => {
         ] as const,
     ),
   )("%o, vector style %#", (display, vector) => {
-    const style = mapStyle({ display, vector, positions: TRIAL_ENDS });
+    const style = mapStyle({ display, vector, positions: TRIAL_ENDS, across: 0 });
     const ids = style.layers.map((layer) => layer.id);
 
     // Plain background first — what shows wherever no tile does.
     expect(style.layers[0]).toEqual(expect.objectContaining({ type: "background" }));
-    // The line last, from the one source that holds it, at the anchors' Positions.
-    expect(style.layers.slice(-2).map((layer) => "source" in layer && layer.source)).toEqual([
+    // The line then the Banane last, each from the one source that holds it.
+    expect(style.layers.slice(-4).map((layer) => "source" in layer && layer.source)).toEqual([
       LINE_SOURCE,
       LINE_SOURCE,
+      BANANE_SOURCE,
+      BANANE_SOURCE,
     ]);
     expect(style.sources[LINE_SOURCE]).toEqual({
       type: "geojson",
       data: lineData(TRIAL_ENDS),
     });
-    // The Couche pentes right under it when asked for, absent otherwise.
-    expect(ids.indexOf(PENTES_SOURCE)).toBe(display.pentes ? ids.length - 3 : -1);
+    // The Couche pentes right under them when asked for, absent otherwise.
+    expect(ids.indexOf(PENTES_SOURCE)).toBe(display.pentes ? ids.length - 5 : -1);
+  });
+});
+
+describe("the Banane's source", () => {
+  test("is the bowed line for a cross wind, and carries it into the style", () => {
+    const data = bananeData(TRIAL_ENDS, 8);
+    expect(data).toMatchObject({ features: [{ geometry: { type: "LineString" } }] });
+    const style = mapStyle({
+      display: DEFAULT_MAP_DISPLAY,
+      vector: null,
+      positions: TRIAL_ENDS,
+      across: 8,
+    });
+    expect(style.sources[BANANE_SOURCE]).toEqual({ type: "geojson", data });
+  });
+
+  test("is empty without a cross wind and while a Position is missing", () => {
+    expect(bananeData(TRIAL_ENDS, 0)).toEqual({ type: "FeatureCollection", features: [] });
+    expect(bananeData({ A: TRIAL_ENDS.A, B: null }, 8)).toEqual({
+      type: "FeatureCollection",
+      features: [],
+    });
   });
 });
 
 describe("the three Fonds de carte", () => {
   test("the carte claire is swisstopo's light vector map, under its own glyphs and sprite", () => {
-    const style = mapStyle({ display: DEFAULT_MAP_DISPLAY, vector: VECTOR, positions: TRIAL_ENDS });
+    const style = mapStyle({
+      display: DEFAULT_MAP_DISPLAY,
+      vector: VECTOR,
+      positions: TRIAL_ENDS,
+      across: 0,
+    });
     expect(DEFAULT_MAP_DISPLAY.fond).toBe("carte-claire");
     expect(style.sources["base_v1.0.0"]).toEqual(VECTOR.sources["base_v1.0.0"]);
     expect(style.layers.map((layer) => layer.id)).toContain("landcover");
@@ -107,10 +138,21 @@ describe("the three Fonds de carte", () => {
     expect(style.zoom).toBeUndefined();
   });
 
-  test("the carte claire without its style is the plain background and the line alone", () => {
-    const style = mapStyle({ display: DEFAULT_MAP_DISPLAY, vector: null, positions: TRIAL_ENDS });
-    expect(Object.keys(style.sources)).toEqual([LINE_SOURCE]);
-    expect(style.layers.map((layer) => layer.type)).toEqual(["background", "line", "line"]);
+  test("the carte claire without its style is the plain background, the line and the Banane", () => {
+    const style = mapStyle({
+      display: DEFAULT_MAP_DISPLAY,
+      vector: null,
+      positions: TRIAL_ENDS,
+      across: 0,
+    });
+    expect(Object.keys(style.sources)).toEqual([LINE_SOURCE, BANANE_SOURCE]);
+    expect(style.layers.map((layer) => layer.type)).toEqual([
+      "background",
+      "line",
+      "line",
+      "line",
+      "line",
+    ]);
   });
 
   test.each([
@@ -121,6 +163,7 @@ describe("the three Fonds de carte", () => {
       display: { fond, pentes: false, view: "2d" },
       vector: VECTOR,
       positions: TRIAL_ENDS,
+      across: 0,
     });
     expect(rasterTiles(style, "fond")).toEqual([
       `https://wmts.geo.admin.ch/1.0.0/${layer}/default/current/3857/{z}/{x}/{y}.${format}`,
@@ -131,6 +174,8 @@ describe("the three Fonds de carte", () => {
       "fond",
       "ligne-ab-halo",
       "ligne-ab",
+      "banane-halo",
+      "banane",
     ]);
     // A raster Fond takes nothing from the vector style.
     expect(style.sources["base_v1.0.0"]).toBeUndefined();
@@ -141,6 +186,7 @@ describe("the three Fonds de carte", () => {
       display: { fond: "orthophoto", pentes: true, view: "2d" },
       vector: null,
       positions: TRIAL_ENDS,
+      across: 0,
     });
     expect(rasterTiles(style, PENTES_SOURCE)).toEqual([
       "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.hangneigung-ueber_30/default/current/3857/{z}/{x}/{y}.png",
@@ -151,6 +197,7 @@ describe("the three Fonds de carte", () => {
     // An overlay: its tiles never decide whether the Fond arrived.
     expect(isFondSource(PENTES_SOURCE)).toBe(false);
     expect(isFondSource(LINE_SOURCE)).toBe(false);
+    expect(isFondSource(BANANE_SOURCE)).toBe(false);
     expect(isFondSource("fond")).toBe(true);
   });
 

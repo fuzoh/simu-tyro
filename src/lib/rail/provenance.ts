@@ -465,7 +465,7 @@ export function warningLadder(scenario: ScenarioDraft, deduced: Deduced): readon
 export const NOT_COMPUTED_LINES = [
   "La combinaison de charges normative EN 15567 n'est pas appliquée — texte payant.",
   "L'essai de charge 2× (WorkSafe QLD) n'est pas évalué.",
-  "Vent et déport latéral : hors périmètre (§8.4, modèle 2-D).",
+  "Déport latéral chiffré et garde au sol sous vent avec passager : hors périmètre (§8.4, modèle 2-D). La Banane n'est qu'une allure dessinée.",
   "Dynamique, vitesse et freinage : hors périmètre (§12).",
   "Aucune attestation de conformité.",
 ] as const;

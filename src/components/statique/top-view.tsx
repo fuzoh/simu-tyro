@@ -17,6 +17,7 @@ import type { CSSProperties, ReactNode } from "react";
 import type { Positions } from "@/lib/scenario/types.ts";
 import type { TopViewPoint } from "@/lib/statique/top-view.ts";
 
+import { bananeOnDrawing } from "@/lib/map/banane.ts";
 import { TOP_VIEW, UNORIENTED } from "@/lib/statique/copy.ts";
 import { topView } from "@/lib/statique/top-view.ts";
 
@@ -26,8 +27,16 @@ export const TOP_VIEW_BOX = { width: 330, height: 220, pad: 28 } as const;
 /** Where the north arrow stands, in the drawing's units: the top-right corner. */
 const NORTH = { x: TOP_VIEW_BOX.width - 14, y: 14 } as const;
 
-/** The plain drawing, and why it cannot say where north is — `null` when it can. */
-export function plainDrawing(positions: Positions): {
+/**
+ * The plain drawing, and why it cannot say where north is — `null` when it can.
+ *
+ * @param across the wind's cross component, m/s: the Banane is drawn dashed beside the line when it
+ *   is not nil (#96).
+ */
+export function plainDrawing(
+  positions: Positions,
+  across: number,
+): {
   figure: ReactNode;
   unoriented: string | null;
 } {
@@ -48,6 +57,17 @@ export function plainDrawing(positions: Positions): {
         >
           <title>{TOP_VIEW.title}</title>
           <line stroke="currentColor" strokeWidth={2} x1={A.x} x2={B.x} y1={A.y} y2={B.y} />
+          {across !== 0 && (
+            <polyline
+              fill="none"
+              points={bananeOnDrawing(A, B, across)
+                .map(({ x, y }) => `${x},${y}`)
+                .join(" ")}
+              stroke="currentColor"
+              strokeDasharray="6 4"
+              strokeWidth={2}
+            />
+          )}
           {anchors.map(([name, point]) => (
             <circle
               className="fill-background"

@@ -88,6 +88,7 @@ describe("what each Fond de carte drapes", () => {
         display: { fond, pentes: false, view: "3d" },
         vector: null,
         positions: TRIAL_ENDS,
+        across: 0,
       });
       const source = style.sources.fond;
       expect(source?.type === "raster" ? source.tiles : null).toEqual([wmtsTiles(DRAPED[fond])]);
@@ -103,7 +104,12 @@ describe("what each Fond de carte drapes", () => {
 
 describe("the line on the earth", () => {
   const scene = solved(trial());
-  const drawn = vue3dScene({ placement: placed(scene), solved: scene, rider: scene.rider });
+  const drawn = vue3dScene({
+    placement: placed(scene),
+    solved: scene,
+    rider: scene.rider,
+    across: 0,
+  });
   const { loaded, unloaded } = drawn;
   if (loaded === null || unloaded === null) throw new Error("both lines are drawn");
 
@@ -140,6 +146,7 @@ describe("the line on the earth", () => {
       placement: placed(symmetric),
       solved: symmetric,
       rider: symmetric.rider,
+      across: 0,
     }).loaded;
     const lowest = line?.reduce((low, point) => (point.altitude < low.altitude ? point : low));
     // Half-way from A to B: (6,525035 + 6,520783) / 2 and (46,843556 + 46,846166) / 2.
@@ -159,7 +166,12 @@ describe("the line on the earth", () => {
   test("two Brins porteurs are two members the coupe's gap apart, one is one", () => {
     expect(drawn.membersPx).toEqual([0]);
     const two = solved(trial({ carryingLines: 2 }));
-    const { membersPx } = vue3dScene({ placement: placed(two), solved: two, rider: two.rider });
+    const { membersPx } = vue3dScene({
+      placement: placed(two),
+      solved: two,
+      rider: two.rider,
+      across: 0,
+    });
     expect(membersPx).toHaveLength(2);
     expect((membersPx[1] ?? 0) - (membersPx[0] ?? 0)).toBe(MEMBER_GAP_PX);
   });
@@ -173,15 +185,54 @@ describe("the line on the earth", () => {
       placement: placed(scene),
       solved: null,
       rider: null,
+      across: 0,
     });
     expect([none, neither]).toEqual([null, null]);
     expect(fils.A.anchor.altitude).toBeCloseTo(1455.2, 9);
   });
 });
 
+describe("the Banane on the Ligne à vide", () => {
+  const scene = solved(trial());
+  const windy = vue3dScene({
+    placement: placed(scene),
+    solved: scene,
+    rider: scene.rider,
+    across: 10,
+  });
+  const calm = vue3dScene({
+    placement: placed(scene),
+    solved: scene,
+    rider: scene.rider,
+    across: 0,
+  });
+
+  test("bows the Ligne à vide sideways at the profil's altitudes, anchors fixed", () => {
+    const [bowed, straight] = [windy.unloaded, calm.unloaded];
+    if (bowed === null || straight === null) throw new Error("both lines are drawn");
+    expect(bowed).toHaveLength(straight.length);
+    expect(bowed.map((point) => point.altitude)).toEqual(straight.map((point) => point.altitude));
+    expect(bowed[0]).toEqual(straight[0]);
+    const middle = Math.floor(bowed.length / 2);
+    expect(bowed[middle]?.lat).not.toBeCloseTo(straight[middle]?.lat ?? 0, 6);
+    expect(bowed.at(-1)?.lon).toBeCloseTo(straight.at(-1)?.lon ?? 0, 9);
+    expect(bowed.at(-1)?.lat).toBeCloseTo(straight.at(-1)?.lat ?? 0, 9);
+  });
+
+  test("leaves the loaded line and the Fils à plomb straight", () => {
+    expect(windy.loaded).toEqual(calm.loaded);
+    expect(windy.fils).toEqual(calm.fils);
+  });
+});
+
 describe("the Fils à plomb", () => {
   const scene = solved(trial());
-  const { fils } = vue3dScene({ placement: placed(scene), solved: scene, rider: scene.rider });
+  const { fils } = vue3dScene({
+    placement: placed(scene),
+    solved: scene,
+    rider: scene.rider,
+    across: 0,
+  });
 
   test.each([
     ["A", TRIAL_ENDS.A, 1453.7, 1.5],

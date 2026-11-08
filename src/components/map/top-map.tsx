@@ -17,6 +17,9 @@
  *   exactly where they are; the line is inside every style for the same reason.
  * - **Every network call goes through one `fetch`**, the platform's own, passed to the two pure
  *   loaders — the profil geo.admin and the carte claire's style.
+ * - **The Banane is drawn, not computed** (#96): the wind's cross component alone sets how far the
+ *   line bows (`@/lib/map/banane.ts`). It has its own source in every style, redrawn with the wind
+ *   and with the anchors during a drag, and the note under the map says it is a shape, not a distance.
  * - **The Vue 3D is behind one door** (#95): the « 3D » switch stands it in the map's place, and its
  *   renderer is fetched through `./load-vue-3d.ts` the first time it is chosen — never imported
  *   here. Whatever stops it (no network, no WebGL) brings the vue de dessus back with « Vue 3D
@@ -46,8 +49,10 @@ import { Label } from "@/components/ui/label.tsx";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.tsx";
 import { Toggle } from "@/components/ui/toggle.tsx";
 import { placeRider } from "@/lib/chart/scene.ts";
+import { bananeAcross } from "@/lib/map/banane.ts";
 import {
   anchorReading,
+  BANANE_HELP,
   clickHint,
   FOND_LABEL,
   MAP_COPY,
@@ -57,6 +62,8 @@ import {
 import { FONDS } from "@/lib/map/display.ts";
 import { clickTarget, drawnPositions, IDLE, stepGesture } from "@/lib/map/gesture.ts";
 import {
+  BANANE_SOURCE,
+  bananeData,
   fondAttribution,
   fondUnavailable,
   freshHealth,
@@ -105,14 +112,19 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
   const shows3d = display.view === "3d" && placement.ok && !lost3d;
   const lose3d = useCallback(() => setLost3d(true), [setLost3d]);
   const renderer = useVue3dRenderer(shows3d, lose3d);
-  const scene3d = useVue3dScene(shows3d, frame, solved);
+  const across = bananeAcross(scenario.wind);
+  const scene3d = useVue3dScene(shows3d, frame, solved, across);
 
-  const plain = failed ? plainDrawing(drawn) : null;
+  const plain = failed ? plainDrawing(drawn, across) : null;
   // The plain drawing orients itself by the LV95 domain, so the rose reads the line as it is drawn.
   const reference =
     plain !== null && plain.unoriented !== null ? LEVEL_REFERENCE : roseReference(drawn);
   const rose = useRef<HTMLDivElement>(null);
   const unavailable = failed || fondUnavailable(health, drawn);
+  // The Banane is on screen when there is a cross wind and a line for it to bow: the map's, or the
+  // Ligne à vide the Vue 3D drew.
+  const bananeShown =
+    across !== 0 && (shows3d ? scene3d?.unloaded != null : drawn.A !== null && drawn.B !== null);
 
   return (
     <TopViewFrame
@@ -138,6 +150,7 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
               )}
             </>
           )}
+          {bananeShown && <span title={BANANE_HELP}>{MAP_COPY.bananeNote}</span>}
           {placement.ok ? (
             lost3d && <span>{MAP_COPY.vue3dUnavailable}</span>
           ) : (
@@ -183,6 +196,7 @@ export function TopMap({ frame, solved }: { frame: SceneFrame | null; solved: Sc
                   gesture={gesture}
                   onFailed={() => setFailed(true)}
                   onHealth={setHealth}
+                  across={across}
                   rose={rose}
                   send={send}
                   target={target}
@@ -329,7 +343,12 @@ function Vue3dHost({
  * What the Vue 3D draws, while it is shown: the coupe's line placed on the two Positions, the
  * passager where the Scenario puts it.
  */
-function useVue3dScene(shown: boolean, frame: SceneFrame | null, solved: SceneBase | null) {
+function useVue3dScene(
+  shown: boolean,
+  frame: SceneFrame | null,
+  solved: SceneBase | null,
+  across: number,
+) {
   const { positions, rider } = useAppState().scenario;
   const { xD } = rider;
   return useMemo(() => {
@@ -337,8 +356,8 @@ function useVue3dScene(shown: boolean, frame: SceneFrame | null, solved: SceneBa
     const at = vue3dPlacement(positions, frame);
     if (!at.ok) return null;
     const placed = solved === null ? null : placeRider(solved, xD);
-    return vue3dScene({ placement: at.placement, solved, rider: placed });
-  }, [shown, positions, frame, solved, xD]);
+    return vue3dScene({ placement: at.placement, solved, rider: placed, across });
+  }, [shown, positions, frame, solved, xD, across]);
 }
 
 function MapControls({
@@ -438,6 +457,7 @@ function MapCanvas({
   drawn,
   gesture,
   target,
+  across,
   rose,
   send,
   onHealth,
@@ -447,6 +467,8 @@ function MapCanvas({
   drawn: Positions;
   gesture: MapGesture;
   target: Anchor | null;
+  /** The wind's cross component, m/s: the Banane's only input. */
+  across: number;
   /** The rose's host: the map keeps it on the line's midpoint as the view moves. */
   rose: RefObject<HTMLDivElement | null>;
   send: (event: MapEvent) => void;
@@ -462,6 +484,7 @@ function MapCanvas({
   const applied = useRef<string | null>(null);
   // What a style built later must draw: the line where it is **now**, not where it was at mount.
   const line = useRef(drawn);
+  const bow = useRef(across);
 
   // The rose follows the line's midpoint through every pan and zoom: it runs on every frame, so it
   // moves the host's style rather than render.
@@ -478,7 +501,12 @@ function MapCanvas({
     try {
       created = new MapLibreMap({
         container: node,
-        style: mapStyle({ display, vector: vector.current, positions: line.current }),
+        style: mapStyle({
+          display,
+          vector: vector.current,
+          positions: line.current,
+          across: bow.current,
+        }),
         attributionControl: false,
         // A vue de dessus: north stays up, so the drawing reads like the plan it is.
         dragRotate: false,
@@ -533,9 +561,15 @@ function MapCanvas({
       const key = styleKey(display, vector.current);
       if (applied.current === key) return;
       applied.current = key;
-      live.setStyle(mapStyle({ display, vector: vector.current, positions: line.current }), {
-        diff: true,
-      });
+      live.setStyle(
+        mapStyle({
+          display,
+          vector: vector.current,
+          positions: line.current,
+          across: bow.current,
+        }),
+        { diff: true },
+      );
     };
     apply();
     const fresh = freshHealth(display.fond);
@@ -591,6 +625,13 @@ function MapCanvas({
       else live.jumpTo(view);
     }
   }, [drawn, draggable, send, placeRose]);
+
+  // The Banane follows the wind and the line: a source of its own, so a drag or a typed wind never
+  // touches the camera.
+  useEffect(() => {
+    bow.current = across;
+    void map.current?.getSource<GeoJSONSource>(BANANE_SOURCE)?.setData(bananeData(drawn, across));
+  }, [drawn, across]);
 
   // A crosshair while a click would place an anchor; MapLibre's own hand otherwise.
   useEffect(() => {

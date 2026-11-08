@@ -10,7 +10,15 @@ import { describe, expect, test } from "vitest";
 import { TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
 import { exactTermsIn, proscribedIn } from "@/lib/vocabulary/labels.ts";
 
-import { anchorReading, clickHint, describeRelative, mapLabelTable, windReading } from "./copy.ts";
+import {
+  anchorReading,
+  BANANE_HELP,
+  clickHint,
+  describeRelative,
+  MAP_COPY,
+  mapLabelTable,
+  windReading,
+} from "./copy.ts";
 import { roseReference } from "./wind-rose.ts";
 
 const PARIS = { lat: 48.85, lon: 2.35 };
@@ -71,6 +79,21 @@ describe("the wind's reading", () => {
 
   test("says there is no wind, and what to do about it", () => {
     expect(windReading({ speedKmh: 0, directionDeg: 0 }, trial)).toMatch(/^Pas de vent\./);
+  });
+});
+
+describe("the Banane's words", () => {
+  test("say a shape, not a distance, with no figure and no length attached", () => {
+    expect(MAP_COPY.bananeNote).toBe("Banane : allure, pas une distance.");
+    for (const text of [MAP_COPY.bananeNote, BANANE_HELP]) {
+      expect(text).not.toMatch(/\d/);
+      expect(text).not.toMatch(/\bm\b|mètre/);
+    }
+  });
+
+  test("the help names the proportionality factor a [CONVENTION], not an engine output", () => {
+    expect(BANANE_HELP).toContain("[CONVENTION]");
+    expect(BANANE_HELP).toContain("jamais une sortie du moteur");
   });
 });
 
