@@ -876,11 +876,11 @@ export const PICKER_COPY = { empty: "— choisir —", unavailable: "indisponibl
 /** A stale Override's badge, before the formula's value, and the action that restores it. */
 export const OVERRIDE_COPY = { stale: "la formule donne", recalculate: "Recalculer" } as const;
 
-/** The line's two families, as each register names them: Avancé names the material as well. */
+/** The line's two families — « câble » and « corde » on every Page, Avancé included. */
 export const FAMILY_LABEL = {
-  exact: { steel: "Câble acier", textile: "Corde textile" },
-  terrain: { steel: heading("cable", "terrain"), textile: heading("rope", "terrain") },
-} as const satisfies Record<Register, Record<"steel" | "textile", string>>;
+  steel: heading("cable", "terrain"),
+  textile: heading("rope", "terrain"),
+} as const satisfies Record<"steel" | "textile", string>;
 
 /** `Installation`'s two entries, in a Page's vocabulary. */
 export function usageOptions(register: Register): readonly PickerOption<UseClass>[] {

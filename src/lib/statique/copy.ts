@@ -120,7 +120,7 @@ export function statiqueLabelTable(): readonly string[] {
     heading("span", "terrain"),
     heading("elevationDifference", "terrain"),
     DEVICE_LABEL,
-    ...Object.values(FAMILY_LABEL.terrain),
+    ...Object.values(FAMILY_LABEL),
     ...usageOptions("terrain").map((option) => option.label),
     ...Object.values(PICKER_COPY),
     ...Object.values(OVERRIDE_COPY),

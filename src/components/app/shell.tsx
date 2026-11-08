@@ -72,7 +72,7 @@ export const RIGHT_SECTIONS = [
 ] as const;
 
 /**
- * The read-out cells — § 5's five, plus « Garde passager » and « Écart à vide » (2026-09-23). **All
+ * The read-out cells — § 5's five, plus « Garde au sol » and « Écart à vide » (2026-09-23). **All
  * of them at every width, no subset and no horizontal scroll** — a subset would delete the printed
  * number that justified drawing a sub-pixel rider envelope at 1500 m in the first place, and
  * horizontal scroll would hide « Garde min » behind a gesture that competes with the scrub.

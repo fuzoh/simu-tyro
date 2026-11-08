@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import { exactTermsIn, proscribedIn } from "@/lib/vocabulary/labels.ts";
 
 import { ridesUnder } from "./__fixtures__/rides.ts";
-import { dynamiqueLabelTable, ESTIMATE } from "./copy.ts";
+import { CURVE_CAPTION, dynamiqueLabelTable, ESTIMATE } from "./copy.ts";
 
 /**
  * The Page Dynamique's label table against #61's two lists (#92): no word the interface never says,
@@ -30,5 +30,10 @@ describe("the Page Dynamique's label table", () => {
 
   test("names the word that qualifies every value", () => {
     expect(ESTIMATE).toBe("estimation");
+  });
+
+  test("the curve says « estimation » in both lengths of its caption", () => {
+    expect(CURVE_CAPTION.full).toContain(ESTIMATE);
+    expect(CURVE_CAPTION.short).toContain(ESTIMATE);
   });
 });

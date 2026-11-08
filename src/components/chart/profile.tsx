@@ -42,6 +42,7 @@ import { coupeLines, coupeReading, RIDER_REACH_PX } from "@/lib/chart/hover.ts";
 import { polylineAt } from "@/lib/chart/scene.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { cn } from "@/lib/utils.ts";
+import { label } from "@/lib/vocabulary/labels.ts";
 
 import { HoverRule, HoverTip } from "./hover.tsx";
 import { metresOn, useHover } from "./use-hover.ts";
@@ -191,14 +192,14 @@ export function Profile({
 
   return (
     <svg
-      aria-label="Profil du terrain et du câble"
+      aria-label="Profil du terrain et de la ligne"
       className="block h-full w-full touch-pan-y select-none"
       height={bandHeight}
       role="img"
       width={x.width}
     >
       <defs>
-        {/* Everything drawn in metres is clipped to the plot area — the ×1 clamp's « câble hors
+        {/* Everything drawn in metres is clipped to the plot area — the ×1 clamp's « ligne hors
             cadre » is a *visible* cut, and the badge is what names it. */}
         <clipPath id="scoutech-plot">
           <rect height={plot.height} width={x.width} x={0} y={plot.top} />
@@ -489,7 +490,7 @@ const TIP_WIDTH = { wide: 150, narrow: 96 } as const;
 
 /**
  * « distances » — the two numbers **beside the handle**, moving with it: the passenger's garde (the
- * « Garde passager » cell) and the load's gap to the unloaded line (« Écart à vide »). Labels in the
+ * « Garde au sol » cell) and the load's gap to the unloaded line (« Écart à vide »). Labels in the
  * app's sans and values in mono, the call-site rule the read-out cells keep.
  *
  * Right of the handle and above it, flipped left near the right edge and below near the frame's
@@ -523,7 +524,7 @@ function RiderTip({
     ...(clearance
       ? [
           {
-            label: wide ? "garde passager" : "garde",
+            label: wide ? label("groundClearance", "terrain") : "garde",
             value: formatQuantity("clearance", rider.underRider),
           },
         ]

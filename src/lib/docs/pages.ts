@@ -35,7 +35,7 @@ export const DOC_PAGES: readonly DocPage[] = [
     slug: "modele",
     title: "Modèle mathématique et algorithme",
     summary:
-      "La référence consolidée du moteur : chaînette élastique, solveur, charge du passager, DAF, cadre normatif, garde au sol, données matériaux. C'est le document que les « § » des infobulles désignent.",
+      "La référence consolidée du moteur : chaînette élastique, solveur, passager, majoration au départ, cadre normatif, garde au sol, données matériaux. C'est le document que les « § » des infobulles désignent.",
     lang: "en",
     path: "docs/simulation-theory.md",
   },
@@ -57,7 +57,7 @@ export const DOC_PAGES: readonly DocPage[] = [
   },
   {
     slug: "cable",
-    title: "Tyrolienne sur câble acier — normes et dimensionnement",
+    title: "Tyrolienne sur câble — normes et dimensionnement",
     summary:
       "Portées > 50 m sur câble métallique : NF EN 15567, charge de rupture, facteurs de sécurité, terminaisons et ancrages.",
     lang: "fr",
@@ -65,7 +65,7 @@ export const DOC_PAGES: readonly DocPage[] = [
   },
   {
     slug: "corde",
-    title: "Tyrolienne sur corde textile — normes et dimensionnement",
+    title: "Tyrolienne sur corde — normes et dimensionnement",
     summary:
       "Portées > 50 m sur corde : statique vectorielle, résistance des cordes, travail en hauteur et secours technique.",
     lang: "fr",

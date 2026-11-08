@@ -47,7 +47,7 @@ describe("manual ground", () => {
   test("and it carries the measured consequence, not only the model", () => {
     // Without this sentence a user modelling a gorge by hand reads a failure that does not exist.
     expect(lines[0].detail).toContain("le dénivelé ne gagne aucune garde");
-    expect(lines[0].detail).toContain("garde min 2,43 / 2,42 / 2,34 / 2,22 m");
+    expect(lines[0].detail).toContain("garde au sol minimale 2,43 / 2,42 / 2,34 / 2,22 m");
     expect(lines[0].detail).toContain("−62,8 m sur une ligne de 1109 m");
   });
 });

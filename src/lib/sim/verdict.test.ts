@@ -497,7 +497,7 @@ describe("the refusals — a prohibition survives an ample margin", () => {
     expect(Number.isFinite(v.ends.A.Tdaf)).toBe(true);
   });
 
-  test("« Secours textile 10:1 » presupposes family B under a temporary use class", () => {
+  test("« Secours sur corde 10:1 » presupposes family B under a temporary use class", () => {
     expect(isRegimeAvailable("secours10", "steel", "TEMPORAIRE")).toBe(false);
     expect(isRegimeAvailable("secours10", "textile", "PERMANENTE")).toBe(false);
     expect(isRegimeAvailable("secours10", "textile", "TEMPORAIRE")).toBe(true);
@@ -514,7 +514,7 @@ describe("the refusals — a prohibition survives an ample margin", () => {
 });
 
 describe("`regimeMismatch` — which of a régime's requirements the line misses", () => {
-  test("only « Secours textile 10:1 » ever mismatches, and it names each clause it misses", () => {
+  test("only « Secours sur corde 10:1 » ever mismatches, and it names each clause it misses", () => {
     expect(regimeMismatch("secours10", "steel", "TEMPORAIRE")).toEqual({
       family: true,
       usage: false,

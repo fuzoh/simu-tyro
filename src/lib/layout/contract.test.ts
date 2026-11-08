@@ -472,7 +472,7 @@ describe("amendment F — the plot's ceiling at wide widths", () => {
     expect(wide.peekEnabled).toBe(false);
     // **VE never compresses, at any width** — the guarantee the cap may not touch. § 5's seven all
     // stay inside the published band, and the flattest-drawing of them (the `k` 3,696 row) is the one
-    // that reaches « câble hors cadre » at 2560 px.
+    // that reaches « ligne hors cadre » at 2560 px.
     for (const wInner of [342, 432, 1104, 1264, 1584, 2224, 10_000]) {
       for (const scenario of SCENARIOS) {
         const ve = veAt(plotAspect(wInner), scenario);
@@ -726,7 +726,7 @@ describe("§ 5 — vertical exaggeration", () => {
     // Clamped to ×1 the plot shows less z than the data has, so the belly leaves the frame.
     expect(ve.zVisibleSpan).toBeLessThan(DEEP_SLACK.zSpan);
     expect(ve.state).toBe("true-scale-clipped");
-    expect(veBadgeLabel(ve)).toBe("Éch. verticale ×1 — vraie échelle · câble hors cadre");
+    expect(veBadgeLabel(ve)).toBe("Éch. verticale ×1 — vraie échelle · ligne hors cadre");
     // « Disabled whenever the ×1 clamp is already in force » — it cannot peek at what it is doing.
     expect(ve.peekEnabled).toBe(false);
     for (const aspect of [PLOT_ASPECT_BAND.min, PLOT_ASPECT_BAND.max]) {
@@ -857,11 +857,11 @@ describe("amendment F, cost 2 — the peek where the cap cuts the cable (décisi
 
   it("the held badge names the compression rather than borrowing the ×1 row's words", () => {
     expect(peekBadgeLabel(boxClipped)).toBe(
-      "Éch. verticale ×0,8 — sous la vraie échelle · câble entier",
+      "Éch. verticale ×0,8 — sous la vraie échelle · ligne entière",
     );
-    // « câble entier » where the resting row reads « câble hors cadre »: the badge describes what is
+    // « ligne entière » where the resting row reads « ligne hors cadre »: the badge describes what is
     // drawn, and the two rows describe two different pictures of the same line.
-    expect(veBadgeLabel(boxClipped)).toBe("Éch. verticale ×1 — vraie échelle · câble hors cadre");
+    expect(veBadgeLabel(boxClipped)).toBe("Éch. verticale ×1 — vraie échelle · ligne hors cadre");
     // A `"fit"` factor can never round to « ×0,0 »: the mode requires the line to be whole at 0,42,
     // i.e. `k ≥ 1 / (1,24 × 0,42)` = 1,92, so the factor is bounded below by `plotAspect × 1,92`.
     expect(1 / ((1 + 2 * Z_MARGIN) * PROFILE_ASPECT)).toBeCloseTo(1.92, 2);

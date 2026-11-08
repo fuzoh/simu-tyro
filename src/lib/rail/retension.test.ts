@@ -14,7 +14,7 @@ describe("« Pourquoi on retend » quotes the trial and predicts nothing (#104, 
   });
 
   test("it says the loss was observed once, on textile", () => {
-    expect(RETENSION.text).toContain("observée une fois sur textile");
+    expect(RETENSION.text).toContain("observée une fois sur corde");
   });
 
   test("it carries the measured orders of magnitude, in kN, and when", () => {

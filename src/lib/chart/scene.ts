@@ -139,7 +139,7 @@ export type SceneRider = {
    */
   readonly worst: { readonly hClear: number; readonly atX: number };
   /**
-   * « Garde sous le passager », m — `z_D − z_ground(x_D) − h_rider`, the clearance under the rider's
+   * « Garde au sol », m — `z_D − z_ground(x_D) − h_rider`, the clearance under the rider's
    * **own feet** rather than at {@link worst}'s governing point.
    *
    * It is **not** a second criterion and nothing judges it: it exists because it is the quantity the

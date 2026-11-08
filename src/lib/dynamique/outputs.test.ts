@@ -96,3 +96,16 @@ describe("a ride that never settles", () => {
     expect(drawn.curve?.markers).toEqual([]);
   });
 });
+
+describe("every dynamic output is an « estimation »", () => {
+  test.each([
+    [0, 0],
+    [50, 0],
+    [30, 90],
+  ])("the rides under %d km/h from %d° say so", (speed, direction) => {
+    expect(ridesUnder(speed, direction).outputs.rides.map((ride) => ride.estimate)).toEqual([
+      "estimation",
+      "estimation",
+    ]);
+  });
+});

@@ -52,7 +52,7 @@ export const RIDE_SHORT = {
 export const OUTPUT_LABEL = {
   stop: heading("stopPoint", "terrain"),
   arrival: heading("arrivalSpeed", "terrain"),
-  duration: "Durée de la descente",
+  duration: "Durée de la traversée",
 } as const;
 
 /** « estimation » — beside every dynamic value, since the Page's numbers are all one (#6). */

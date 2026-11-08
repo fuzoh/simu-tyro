@@ -25,7 +25,7 @@ export const NO_SPAN_LINE = "Portée invalide — aucun dessin possible.";
 export const PEEK_LABEL: Record<PeekMode, { full: string; short: string }> = {
   off: { full: "×1 vraie échelle", short: "×1" },
   "true-scale": { full: "×1 vraie échelle", short: "×1" },
-  fit: { full: "voir tout le câble", short: "tout" },
+  fit: { full: label("seeWholeLine", "terrain"), short: "tout" },
 };
 
 /** Each layer toggle's two labels. `full` is also its `aria-label` and `title`. */

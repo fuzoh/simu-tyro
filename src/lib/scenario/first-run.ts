@@ -131,7 +131,7 @@ export const FIRST_RUN_SCENARIO = {
  * {@link firstRunDefaults} overwrite a spec the user typed — and the Scenario is the *active*
  * configuration by § 7's one governing rule, so the retained alternate is the Session's anyway.
  *
- * Flipping to `Corde textile` under `TEMPORAIRE` therefore lands on two blank required fields.
+ * Flipping to `Corde` under `TEMPORAIRE` therefore lands on two blank required fields.
  * That is **not** « Saisie en cours »: a field the user never filled is not mid-edit, so it raises
  * blocking errors attributed through the culprit table, and no stale picture is kept.
  */

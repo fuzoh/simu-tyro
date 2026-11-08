@@ -583,7 +583,7 @@ function requiredDivisor(verdict: VerdictResult): number | null {
 const EXACT_REFUSAL_COPY = {
   "serre-cables-sur-ligne-portant-des-personnes":
     "serre-câbles sur une ligne portant des passagers",
-  "textile-en-installation-permanente": "corde textile en installation permanente (§10.4)",
+  "textile-en-installation-permanente": "corde en installation permanente (§10.4)",
   "regime-indisponible-pour-cette-ligne": "régime indisponible pour cette ligne",
 } as const satisfies Record<NonNullable<VerdictResult["refusal"]>, string>;
 

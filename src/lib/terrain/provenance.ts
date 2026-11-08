@@ -134,9 +134,9 @@ export function terrainDisclosure(source: TerrainSource): readonly DisclosureLin
         tier: "info",
         text: "Terrain — ligne droite entre les pieds d'ancrage (aucun profil importé)",
         detail:
-          "Sur un sol plan, garde ≈ lerp(hauteurs d'ancrage) − flèche chargée − gabarit " +
+          "Sur un sol plan, garde au sol ≈ hauteurs d'ancrage interpolées − flèche chargée − gabarit " +
           "du passager : le dénivelé ne gagne aucune garde. Mesuré, à L, flèche et hauteurs " +
-          "constantes : garde min 2,43 / 2,42 / 2,34 / 2,22 m pour h = 0 / −18 / −40 / −60 m. " +
+          "constantes : garde au sol minimale 2,43 / 2,42 / 2,34 / 2,22 m pour h = 0 / −18 / −40 / −60 m. " +
           "Une traversée de gorge modélisée à la main lit donc un échec qui n'existe pas — " +
           "mesuré −62,8 m sur une ligne de 1109 m. Importez un profil pour le relief réel.",
       },

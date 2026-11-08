@@ -148,7 +148,7 @@ export const REGIMES = {
   },
   secours10: {
     id: "secours10",
-    label: "Secours textile — 10:1",
+    label: "Secours sur corde — 10:1",
     tag: "[CONVENTION]",
     criteria: [{ basis: "tension-totale", k: 10, tag: "[CONVENTION]" }],
     obligations: [],
@@ -368,7 +368,7 @@ export type RefusalId =
   | "serre-cables-sur-ligne-portant-des-personnes"
   /** §10.4 — family B is disqualified for permanent public attractions. */
   | "textile-en-installation-permanente"
-  /** § 6 — « Secours textile 10:1 » presupposes family B under a temporary use class. */
+  /** § 6 — « Secours sur corde 10:1 » presupposes family B under a temporary use class. */
   | "regime-indisponible-pour-cette-ligne";
 
 /**
@@ -454,7 +454,7 @@ export type VerdictResult = {
 export type RegimeMismatch = { readonly family: boolean; readonly usage: boolean };
 
 /**
- * § 6's one availability rule, as data. Only « Secours textile 10:1 » carries a requirement —
+ * § 6's one availability rule, as data. Only « Secours sur corde 10:1 » carries a requirement —
  * family B under a temporary use class — and a régime that is merely conservative for the line is
  * **not** unavailable: the app has no authority to refuse it. The sentences that explain a mismatch
  * are the app's; this returns which clauses failed.

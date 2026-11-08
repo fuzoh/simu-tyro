@@ -125,16 +125,16 @@ describe("§10.4 — the use-class gate, family first, two Fix Actions", () => {
     expect(report.errors[0]).toMatchObject({
       gate: "solve",
       field: "family",
-      message: "⛔ Corde textile impossible en installation permanente (§10.4).",
+      message: "⛔ Corde impossible en installation permanente (§10.4).",
     });
     expect(report.passed.solve).toBe(false);
   });
 
-  test("two Fix Actions, `Passer à l'acier` first — neither repair is privileged on a link", () => {
+  test("two Fix Actions, `Passer au câble` first — neither repair is privileged on a link", () => {
     // Withholding the second forces a recipient to discard the Material Spec the link was sent to
     // show them; an auto-switch would discard it without asking.
     expect(report.errors[0].fixes.map((fix) => fix.label)).toEqual([
-      "Passer à l'acier",
+      "Passer au câble",
       "Passer à l'installation temporaire",
     ]);
   });
@@ -160,7 +160,7 @@ describe("§10.4 — the use-class gate, family first, two Fix Actions", () => {
 });
 
 describe("the Verdict Gate's régime × famille rule", () => {
-  test("« Secours textile 10:1 » on a steel cable is a Verdict breach with a focus action", () => {
+  test("« Secours sur corde 10:1 » on a steel cable is a Verdict breach with a focus action", () => {
     const report = evaluateGates({
       scenario: scenario((draft) => {
         draft.regime = "secours10";
@@ -174,7 +174,7 @@ describe("the Verdict Gate's régime × famille rule", () => {
     // The shipped line is steel **and** `PERMANENTE`: it misses both of the régime's clauses, and
     // the message names both, family first.
     expect(report.errors[0].message).toBe(
-      "⛔ Régime « Secours textile — 10:1 » indisponible avec un câble acier et en installation permanente.",
+      "⛔ Régime « Secours sur corde — 10:1 » indisponible avec un câble et en installation permanente.",
     );
     // A bad régime never blocks the solve: `T max` and `Garde min` stay on screen.
     expect(report.passed.solve).toBe(true);
@@ -184,7 +184,7 @@ describe("the Verdict Gate's régime × famille rule", () => {
   test("under `PERMANENTE` the clause names the **use class**, never the régime's own rope", () => {
     // § 10.1 disables this entry « sous acier, **ou** sous `PERMANENTE` », and ticket 34 found the
     // second condition printing the first condition's shape: on `textile` + `PERMANENTE` the app
-    // read « indisponible avec une corde textile », blaming the family this régime *requires*. The
+    // read « indisponible avec une corde », blaming the family this régime *requires*. The
     // rope is never the cause here — § 10.4's own breach, filed alongside, is the one that names it.
     const report = evaluateGates({
       scenario: scenario((draft) => {
@@ -194,7 +194,7 @@ describe("the Verdict Gate's régime × famille rule", () => {
     });
     const regimeError = report.errors.find((error) => error.field === "regime");
     expect(regimeError?.message).toBe(
-      "⛔ Régime « Secours textile — 10:1 » indisponible en installation permanente.",
+      "⛔ Régime « Secours sur corde — 10:1 » indisponible en installation permanente.",
     );
     expect(regimeError?.message).not.toContain("corde textile");
   });
@@ -216,7 +216,7 @@ describe("the Verdict Gate's régime × famille rule", () => {
 describe("§ 10.1 — the régime select's note shows the reason", () => {
   test("steel under `TEMPORAIRE` names the family alone, and the gate agrees", () => {
     expect(regimeUnavailableNote("secours10", "steel", "TEMPORAIRE")).toBe(
-      "Indisponible — ce régime suppose une corde textile ; la famille active est l'acier.",
+      "Indisponible — ce régime suppose une corde ; la famille active est le câble.",
     );
     const report = evaluateGates({
       scenario: scenario((draft) => {
@@ -225,7 +225,7 @@ describe("§ 10.1 — the régime select's note shows the reason", () => {
       }),
     });
     expect(report.errors.find((error) => error.field === "regime")?.message).toBe(
-      "⛔ Régime « Secours textile — 10:1 » indisponible avec un câble acier.",
+      "⛔ Régime « Secours sur corde — 10:1 » indisponible avec un câble.",
     );
   });
 
@@ -237,7 +237,7 @@ describe("§ 10.1 — the régime select's note shows the reason", () => {
 
   test("both clauses failing is **one** sentence naming both, not two notes", () => {
     expect(regimeUnavailableNote("secours10", "steel", "PERMANENTE")).toBe(
-      "Indisponible — ce régime suppose une corde textile et une installation temporaire.",
+      "Indisponible — ce régime suppose une corde et une installation temporaire.",
     );
   });
 
@@ -561,26 +561,26 @@ describe("the culprit table — static, indexed by (grandeur × mode), never inf
     // `MBF` depends on all three inputs; `EA` and `μ` depend on **`d` alone**, because `E_app`, `C`
     // and `W` are pinned midpoints and not construction-indexed. Listing Grade and Construction as
     // culprits for `EA` would send a user to two fields that cannot move the number.
-    expect(culprits("MBF", "acier")).toEqual(["d", "R0", "cst"]);
-    expect(culprits("EA", "acier")).toEqual(["d"]);
-    expect(culprits("mu", "acier")).toEqual(["d"]);
+    expect(culprits("MBF", "câble")).toEqual(["d", "R0", "cst"]);
+    expect(culprits("EA", "câble")).toEqual(["d"]);
+    expect(culprits("mu", "câble")).toEqual(["d"]);
   });
 
   test("an overridden derived value is its own culprit", () => {
-    expect(culprits("MBF", "acier surchargé")).toEqual(["mbfOverride"]);
-    expect(culprits("EA", "acier surchargé")).toEqual(["eaOverride"]);
-    expect(culprits("mu", "acier surchargé")).toEqual(["muOverride"]);
+    expect(culprits("MBF", "câble surchargé")).toEqual(["mbfOverride"]);
+    expect(culprits("EA", "câble surchargé")).toEqual(["eaOverride"]);
+    expect(culprits("mu", "câble surchargé")).toEqual(["muOverride"]);
   });
 
   test("textile's two rows", () => {
-    expect(culprits("EA", "textile")).toEqual(["k", "MBL"]);
-    expect(culprits("mu", "textile")).toEqual(["muTextile"]);
+    expect(culprits("EA", "corde")).toEqual(["k", "MBL"]);
+    expect(culprits("mu", "corde")).toEqual(["muTextile"]);
   });
 
   test("no row exists for a quantity with no hard check", () => {
     // `flèche à vide`, `H à vide`, `tension permanente`, `corde` and `FS effectif` are solve
     // outputs judged by warnings and by the verdict, so they never need a culprit.
-    expect(culprits("L", "acier")).toEqual([]);
+    expect(culprits("L", "câble")).toEqual([]);
   });
 });
 
@@ -659,7 +659,7 @@ describe("ADR-0001 — an end of the other family is kept as given and blocks th
         kind: "invalid",
         field: "ta",
         alsoOutlined: [],
-        message: "⛔ Terminaison de corde textile impossible sur un câble acier (§10.2).",
+        message: "⛔ Terminaison de corde impossible sur un câble (§10.2).",
         fixes: [
           {
             id: "passer-a-la-terminaison-de-depart",
@@ -686,7 +686,7 @@ describe("ADR-0001 — an end of the other family is kept as given and blocks th
         kind: "invalid",
         field: "tb",
         alsoOutlined: [],
-        message: "⛔ Terminaison de câble acier impossible sur une corde textile (§10.3).",
+        message: "⛔ Terminaison de câble impossible sur une corde (§10.3).",
         fixes: [TO_SPLICED_EYE],
       },
     ]);
@@ -772,7 +772,7 @@ describe("the terrain register (#91)", () => {
       {
         field: "regime",
         message:
-          "⛔ Marge exigée « Secours textile — 10:1 » indisponible avec un câble acier et en installation permanente.",
+          "⛔ Marge exigée « Secours sur corde — 10:1 » indisponible avec un câble et en installation permanente.",
         fixes: [{ id: "choisir-un-autre-regime", label: "Choisir une autre marge exigée" }],
       },
     ]);

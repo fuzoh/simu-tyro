@@ -16,9 +16,8 @@
  * - **A quantity a simplified Page does not show still has a terrain string.** `hiddenOnTerrain`
  *   says so (« masqué » in #61's table, « supposé, non saisi » for the start multiplier); the
  *   string is then the exact one and a Page must not render it.
- * - **Never on screen**: montage, usage, conforme, hors norme, tension cible, tension permanente,
- *   station, tracé, coeff, pourcentage, charge du passager, personne — `labels.test.ts` walks both
- *   registers and refuses them.
+ * - **Never on screen**: {@link PROSCRIBED_WORDS} — `labels.test.ts` walks both registers, then every
+ *   string the app's source prints, and refuses them.
  */
 
 import type { VerdictState } from "@/lib/sim";
@@ -145,7 +144,10 @@ function exactOnly(word: string): Wording {
  * What the interface never says, in either register — #61's « jamais » list. Matched as lowercase
  * word starts. « conforme » and « hors norme » are the two Verdict words the five states replace;
  * « charge du passager » and « personne » are the passager. « prétension cible » is « tension cible »
- * with a prefix a word-start match cannot see through.
+ * with a prefix a word-start match cannot see through. « validé » is never said of the engine: the
+ * essai makes it « cohérent », and what it does not show is « pas confirmé ». The rest are
+ * GLOSSARY's _Avoid_ words for a corde or a câble (textile, acier, âme, gaine), an ancrage
+ * (amarrage), the Banane (déport), the flèche, the longueur à vide, the marge exigée and the garde.
  */
 export const PROSCRIBED_WORDS = [
   "montage",
@@ -162,6 +164,21 @@ export const PROSCRIBED_WORDS = [
   "charge du passager",
   "charge passager",
   "personne",
+  "validé",
+  "textile",
+  "acier",
+  "âme",
+  "gaine",
+  "amarrage",
+  "déport",
+  "flèche cible",
+  "longueur de corde",
+  "marge de sécurité",
+  "câble à vide",
+  "corde à vide",
+  "garde minimale",
+  "garde passager",
+  "garde sous le passager",
 ] as const;
 
 /**
@@ -280,17 +297,24 @@ export const LABELS = {
 } as const satisfies Record<LabelId, Wording>;
 
 /**
+ * The symbols of the physics that name an exact-register quantity: `η` is the rendement and `DAF`
+ * the majoration au départ, and neither has a wording of its own in {@link LABELS} to be caught by.
+ */
+const EXACT_SYMBOLS = ["η", "DAF"] as const;
+
+/**
  * The wordings a terrain Page must not print: every entry Avancé alone names (`hiddenOnTerrain`)
  * and every exact wording that differs from its terrain one — « prétension », « flèche à vide »,
  * « régime de sécurité », « FS »…
  */
 const EXACT_ONLY_WORDINGS: readonly string[] = [
-  ...new Set(
-    (Object.keys(LABELS) as LabelId[])
+  ...new Set([
+    ...(Object.keys(LABELS) as LabelId[])
       .map((id): Wording => LABELS[id])
       .filter((wording) => wording.hiddenOnTerrain === true || wording.exact !== wording.terrain)
       .map((wording) => wording.exact),
-  ),
+    ...EXACT_SYMBOLS,
+  ]),
 ];
 
 /**

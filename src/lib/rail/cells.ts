@@ -1,6 +1,6 @@
 /**
  * The read-out cells under the charts, as data — « v1 build spec » § 5's five plus « Garde
- * passager » and « Écart à vide » (2026-09-23), « à la position du passager ».
+ * au sol » and « Écart à vide » (2026-09-23), « à la position du passager ».
  *
  * The cells are keyed by {@link CellId}, never by their French label: the shell's layout table and
  * the help table are records over the same id, so a renamed label cannot leave a lookup behind.
@@ -48,16 +48,16 @@ export const CELL_LABEL: Record<CellId, string> = {
   TA: "T anc. A",
   TB: "T anc. B",
   slope: "Pente",
-  sag: "Flèche",
-  underRider: "Garde passager",
+  sag: heading("loadedSag", "exact"),
+  underRider: heading("groundClearance", "exact"),
   belowUnloaded: "Écart à vide",
 };
 
 /**
  * The cells a simplified Page prints, and their terrain labels (#61). « Garde min. ligne » is
  * Avancé's alone — the creux that is not under the passager — so the row there starts on the
- * passager's own garde au sol; « Flèche » at the passager's position is the line loaded, a flèche
- * chargée.
+ * passager's own garde au sol; the cell at the passager's position is the line loaded, a flèche
+ * chargée at every register — a bare « flèche » is the unloaded one.
  */
 const TERRAIN_CELL_LABEL: Partial<Record<CellId, string>> = {
   underRider: heading("groundClearance", "terrain"),
@@ -105,7 +105,7 @@ export type PlacedRider = {
   readonly underRider: number;
   /** The loaded cable's drop below the unloaded one, at `x_D`. */
   readonly belowUnloaded: number;
-  /** « Flèche » at this position: the drop below the A–B chord, m. */
+  /** « Flèche chargée » at this position: the drop below the A–B chord, m. */
   readonly sagAtRider: number;
 };
 

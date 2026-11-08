@@ -493,7 +493,7 @@ export type VeBadgeState =
   /** The ×1 clamp is in force and everything still fits — peek **disabled, already in force**. */
   | "true-scale"
   /**
-   * The clamp is in force and the sag leaves the frame — « · câble hors cadre ». The peek is disabled
+   * The clamp is in force and the sag leaves the frame — « · ligne hors cadre ». The peek is disabled
    * where the **data** put the cable out of frame and **enabled** where the cap did, which is one bit
    * this three-row state cannot carry: voir {@link ClipCause} and {@link peekMode}.
    */
@@ -701,7 +701,7 @@ export function createZScale({
 }
 
 /**
- * The badge's text — « Éch. verticale ×4,7 », « … ×1 — vraie échelle », « … · câble hors cadre ».
+ * The badge's text — « Éch. verticale ×4,7 », « … ×1 — vraie échelle », « … · ligne hors cadre ».
  *
  * The clamped rows read « ×1 » and never « ×1,0 »: the floor is exact, and a decimal on it would
  * suggest a measurement where there is a rule.
@@ -711,7 +711,7 @@ export function veBadgeLabel(exaggerationValue: Pick<Exaggeration, "state" | "ve
     return `Éch. verticale ×${exaggerationValue.ve.toFixed(1).replace(".", ",")}`;
   }
   const base = "Éch. verticale ×1 — vraie échelle";
-  return exaggerationValue.state === "true-scale-clipped" ? `${base} · câble hors cadre` : base;
+  return exaggerationValue.state === "true-scale-clipped" ? `${base} · ligne hors cadre` : base;
 }
 
 /**
@@ -724,7 +724,7 @@ export function veBadgeLabel(exaggerationValue: Pick<Exaggeration, "state" | "ve
  * - `"fit"` — the user's **decision 4** hold, which draws the whole cable at {@link
  *   Exaggeration.autofit} and is therefore **below true scale**. That is the one drawing in the app
  *   that compresses, so the badge names both halves of it: the factor, « sous la vraie échelle », and
- *   « câble entier » where the resting row read « câble hors cadre ». It is reachable only under the
+ *   « ligne entière » where the resting row read « ligne hors cadre ». It is reachable only under the
  *   control — **held** on a fine pointer, **latched until the next press** from the keyboard and on a
  *   coarse pointer — and the printed « Garde min » — § 5's non-positional signal — is unaffected by
  *   any of it.
@@ -736,7 +736,7 @@ export function veBadgeLabel(exaggerationValue: Pick<Exaggeration, "state" | "ve
 export function peekBadgeLabel(exaggerationValue: Pick<Exaggeration, "peek" | "autofit">): string {
   if (exaggerationValue.peek !== "fit") return "Éch. verticale ×1 — vraie échelle";
   const factor = exaggerationValue.autofit.toFixed(1).replace(".", ",");
-  return `Éch. verticale ×${factor} — sous la vraie échelle · câble entier`;
+  return `Éch. verticale ×${factor} — sous la vraie échelle · ligne entière`;
 }
 
 // ─── The clearance strip's vertical domain — quantised, with a reserved negative band ──────────

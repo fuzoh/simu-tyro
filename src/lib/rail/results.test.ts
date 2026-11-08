@@ -541,7 +541,7 @@ describe("what suppresses what — three gates, three different consequences", (
   });
 
   test("a Verdict Gate breach removes the banner and the grid together", () => {
-    // « Secours textile — 10:1 » presupposes family B: unavailable on steel, and the régime row
+    // « Secours sur corde — 10:1 » presupposes family B: unavailable on steel, and the régime row
     // breaches the Verdict Gate rather than the solve.
     const results = resultsOf({ regime: "secours10" });
     expect(results.banner).toBeNull();

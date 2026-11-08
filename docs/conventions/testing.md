@@ -17,6 +17,10 @@ The `test` block lives in `vite.config.ts`.
   client build in memory (`build.write: false`) and reads its chunks — the Vue 3D's CesiumJS behind
   a dynamic import, the size of what `/` downloads (#95). A chunk graph is the only place that
   contract is observable, and it is still `node`, no DOM.
+- **One test reads the whole app's copy**: `src/lib/vocabulary/labels.test.ts` walks every `.ts` and
+  `.tsx` under `src/` for the words the interface never says, and checks the glossary names the
+  wordings it prints (#102). A scan of every string is observable nowhere else; it is the one
+  suite spanning several modules, and it is still `node`, no DOM.
 
 ## What deserves a test
 
@@ -37,8 +41,8 @@ Decided in the wayfinder ticket _Engine API, execution model and module layout_.
 - **Colocated.** `solve.test.ts` sits beside `solve.ts` in `src/lib/sim/`. Keeps each
   assertion in eyeshot of the `docs/simulation-theory.md` § citation it verifies.
 - **One test file per source file**, same basename. **No `tests/` directory, and no suite file
-  spanning several modules.** This survives every app layer unchanged — `first-run.test.ts` beside
-  `first-run.ts`, `p1.test.ts` beside `p1.ts`; no exception was needed to keep it.
+  spanning several modules** (bar the two exceptions above). This survives every app layer
+  unchanged — `first-run.test.ts` beside `first-run.ts`, `p1.test.ts` beside `p1.ts`.
 - **Physics fixtures live in one place**: `src/lib/sim/__fixtures__/theory-15.ts`, exporting `F1`,
   `Z1`–`Z6` and `Z8` from `docs/simulation-theory.md` §15 as typed consts. Every fixture carries
   a `source` field naming its § (e.g. `"simulation-theory.md §15 Z4"`). The golden canonical

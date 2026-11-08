@@ -272,6 +272,27 @@ the two scales are *deliberately mismatched*, which is the whole point (« v1 bu
 - `visx`'s low-level primitives are the **pre-approved fallback** if the hand-rolled path logic
   becomes unwieldy; it is not a new decision.
 
+## Wording
+
+Two registers, one table: Terrain, Statique and Dynamique speak as people do on site; Avancé keeps
+the exact term. A quantity is named by its id in `src/lib/vocabulary/labels.ts`, never by a string
+typed where it is shown — `label(id, register)` — so renaming is one edit. `GLOSSARY.md` holds
+each term's meaning and its _Avoid_ words; `PROSCRIBED_WORDS` is those words as a guard, and
+`labels.test.ts` reads every string in `src/` against it, whichever Page prints it.
+
+- **A new term enters the glossary in the same change.** `labels.test.ts` fails on a wording of the
+  vocabulary table that neither the glossary nor §1 of `docs/simulation-theory.md` mentions, and on
+  a short list of terms printed outside the table (Écart à vide, Cas défavorable, Réserve de tension,
+  Pilote de tension, trajet, ligne hors cadre, ligne entière) that is not a bold glossary name. A term
+  printed anywhere else is held by this rule and by review, not by the test.
+- **The exact register stays on Avancé.** Prétension, régime de sécurité, FS, rapport V,
+  terminaison, rendement, η and DAF appear in no table a simplified Page consumes.
+- **« Estimation » rides every dynamic value** (Point d'arrêt, vitesse d'arrivée, durée, the
+  curves, the coupe's dynamic marks), and no static one.
+- **The essai is « cohérent », never « validé »**; what it does not show is « pas confirmé ».
+- **The interface never prints** a lateral drift in metres, a garde au sol under wind with a
+  passager, a predicted retension, or a rendement or a rapport V off Avancé.
+
 ## Forms
 
 **`@tanstack/react-form` owns field state; per-field validators are `valibot` Standard Schemas**

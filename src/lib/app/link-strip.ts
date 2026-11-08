@@ -60,7 +60,7 @@ import {
   terminationIdFromToken,
 } from "@/lib/url/scenario.ts";
 import { POSITION_KEY_PAIRS } from "@/lib/url/schema.ts";
-import { heading, isHiddenTerm } from "@/lib/vocabulary/labels.ts";
+import { heading, isHiddenTerm, label } from "@/lib/vocabulary/labels.ts";
 
 /** The three sentences, each `null` when this arrival has nothing to say with it. */
 export type LinkStrip = {
@@ -219,7 +219,7 @@ const TOKENS: Record<StripKey, Readonly<Record<string, string>> | null> = {
   cp: labelsByToken(TENSIONING_SIDE_TOKEN_BY_ID, TENSIONING_SIDE_LABEL),
   bp: null,
   mt: labelsByToken(TENSIONING_DEVICE_TOKEN_BY_ID, TENSIONING_DEVICE_LABEL),
-  fam: { ac: "acier", tx: "textile" },
+  fam: { ac: label("cable", "terrain"), tx: label("rope", "terrain") },
   d: null,
   r0: null,
   cst: labelsByToken(CONSTRUCTION_TOKEN_BY_ID, CONSTRUCTION_LABEL),

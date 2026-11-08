@@ -21,7 +21,7 @@
  *   pointed at the chart's legibility. What ships is a **toggle** « ×1 vraie échelle » — a press
  *   switches the drawing to true scale, the next press switches it back — and it is **disabled
  *   whenever the ×1 clamp is already in force** — *except* where amendment F's plot cap is what cut
- *   the cable out of that ×1 frame, where it reads « voir tout le câble » and shows the whole cable
+ *   the cable out of that ×1 frame, where it reads « voir toute la ligne » and shows the whole cable
  *   instead (the user's **decision 4**; voir `peekMode` in `@/lib/layout/contract.ts`). § 5 had it
  *   as a hold-to-peek on fine pointers; the user asked for a plain toggle on 2026-09-23, so the
  *   drawing now stays at ×1 until it is switched back, on every pointer and from the keyboard alike.

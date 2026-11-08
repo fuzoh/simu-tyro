@@ -76,11 +76,11 @@ export const PROVENANCE_COPY = {
     "Rendement de terminaison — chaque plage §10.2/§10.3 est prise à son extrémité conservatrice.\n§10.2, §10.3 · docs/simulation-theory.md",
   EAtextile:
     "EA = k·MBL — la raideur relative §13.2 [DATASHEET], mesurée hors de la bande où une tyrolienne travaille.\n§13.2 · docs/simulation-theory.md",
-  CdA: "C_dA 0,45 m² — ajustement de la SSF sur sa ligne instrumentée de 1109 m [FIELD:SSF] : une campagne, un spéléologue en harnais sur corde textile. La plage 0,30–0,60 m² du champ n'est pas sur la page SSF [CONVENTION].\n§12.2 · docs/simulation-theory.md",
+  CdA: "C_dA 0,45 m² — ajustement de la SSF sur sa ligne instrumentée de 1109 m [FIELD:SSF] : une campagne, un spéléologue en harnais sur corde. La plage 0,30–0,60 m² du champ n'est pas sur la page SSF [CONVENTION].\n§12.2 · docs/simulation-theory.md",
   trolleyFriction:
-    "F₀ 15 N et k_v 1,5 kg/s — ajustement mesuré par la SSF sur textile [FIELD:SSF], indépendant du poids du passager. La page SSF ne nomme aucune poulie.\n§12.2 · docs/simulation-theory.md",
+    "F₀ 15 N et k_v 1,5 kg/s — ajustement mesuré par la SSF sur corde [FIELD:SSF], indépendant du poids du passager. La page SSF ne nomme aucune poulie.\n§12.2 · docs/simulation-theory.md",
   trolleyMu:
-    "μ 0,015 — repli à μ constant, extrémité basse de la plage 0,015–0,02, sans source primaire ouverte [CONVENTION]. Aucune source ouverte ne sépare l'acier du textile.\n§12.2 · docs/simulation-theory.md",
+    "μ 0,015 — repli à μ constant, extrémité basse de la plage 0,015–0,02, sans source primaire ouverte [CONVENTION]. Aucune source ouverte ne sépare le câble de la corde.\n§12.2 · docs/simulation-theory.md",
   rho: "ρ — atmosphère type (ISA), ρ = p/(R_s·T) à l'altitude moyenne du profil importé, 1,225 kg/m³ sans profil ; [R1] et [R2] concordent. Une valeur saisie la remplace.\n§12.2 · docs/simulation-theory.md",
 } as const;
 
@@ -471,7 +471,7 @@ export function warningLadder(scenario: ScenarioDraft, deduced: Deduced): readon
 export const NOT_COMPUTED_LINES = [
   "La combinaison de charges normative EN 15567 n'est pas appliquée — texte payant.",
   "L'essai de charge 2× (WorkSafe QLD) n'est pas évalué.",
-  "Déport latéral chiffré et garde au sol sous vent avec passager : hors périmètre (§8.4, modèle 2-D). La Banane n'est qu'une allure dessinée.",
+  "Banane chiffrée en mètres et garde au sol sous vent avec passager : hors périmètre (§8.4, modèle 2-D). La Banane n'est qu'une allure dessinée.",
   "Freinage et tension dynamique de la ligne : hors périmètre (§12.2, §12.3). La dynamique du passager n'est qu'une estimation, hors verdict.",
   "Aucune attestation de conformité.",
 ] as const;

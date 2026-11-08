@@ -261,7 +261,7 @@ export function useFieldRows({
 
   function runFix(id: FixActionId, breach: BlockingError) {
     switch (id) {
-      case "passer-a-l-acier":
+      case "passer-au-cable":
         dispatch({ type: "matériau/famille", family: "steel" });
         return;
       case "passer-en-usage-temporaire":
@@ -1201,7 +1201,6 @@ export function FamilyRow() {
   const dispatch = useAppDispatch();
   const { register, breaches, runFix } = useRailRowContext();
   const breach = breaches.get("family");
-  const labels = FAMILY_LABEL[register];
   return (
     <Row
       control={
@@ -1209,10 +1208,10 @@ export function FamilyRow() {
           name="family"
           onChange={(family: "steel" | "textile") => dispatch({ type: "matériau/famille", family })}
           options={[
-            { value: "steel", label: labels.steel },
+            { value: "steel", label: FAMILY_LABEL.steel },
             {
               value: "textile",
-              label: labels.textile,
+              label: FAMILY_LABEL.textile,
               // **Visible but disabled, with the reason inline** — hiding it leaves a user who
               // came to compare families with no explanation.
               disabled: !isFamilyAllowed("textile", scenario.usage),

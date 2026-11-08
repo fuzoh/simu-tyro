@@ -102,7 +102,7 @@ const GATE_RANK: Record<GateId, number> = { solve: 0, clearance: 1, verdict: 2 }
  * the first frame of a link.
  */
 export type FixActionId =
-  | "passer-a-l-acier"
+  | "passer-au-cable"
   | "passer-en-usage-temporaire"
   | "choisir-un-autre-regime"
   | "passer-a-la-terminaison-de-depart";
@@ -111,7 +111,7 @@ export type FixAction = { readonly id: FixActionId; readonly label: string };
 
 /** The fifth names the end it sets, which depends on the family, so it is built at the gate. */
 const FIX: Record<Exclude<FixActionId, "passer-a-la-terminaison-de-depart">, FixAction> = {
-  "passer-a-l-acier": { id: "passer-a-l-acier", label: "Passer à l'acier" },
+  "passer-au-cable": { id: "passer-au-cable", label: `Passer au ${label("cable", "terrain")}` },
   "passer-en-usage-temporaire": {
     id: "passer-en-usage-temporaire",
     label: `Passer à l'${label("temporaryInstallation", "exact")}`,
@@ -203,9 +203,9 @@ export type CulpritMode =
   | "mode Prétension"
   | "mode Tension horizontale"
   | "mode Rapport V"
-  | "acier"
-  | "acier surchargé"
-  | "textile";
+  | "câble"
+  | "câble surchargé"
+  | "corde";
 
 const CULPRITS: Partial<Record<`${Grandeur}/${CulpritMode}`, readonly FieldId[]>> = {
   "L/manuel": ["L"],
@@ -217,14 +217,14 @@ const CULPRITS: Partial<Record<`${Grandeur}/${CulpritMode}`, readonly FieldId[]>
   "L0/mode Prétension": ["T_target"],
   "L0/mode Tension horizontale": ["H_target"],
   "L0/mode Rapport V": ["vRatio"],
-  "MBF/acier": ["d", "R0", "cst"],
-  "MBF/acier surchargé": ["mbfOverride"],
-  "EA/acier": ["d"],
-  "EA/acier surchargé": ["eaOverride"],
-  "EA/textile": ["k", "MBL"],
-  "mu/acier": ["d"],
-  "mu/acier surchargé": ["muOverride"],
-  "mu/textile": ["muTextile"],
+  "MBF/câble": ["d", "R0", "cst"],
+  "MBF/câble surchargé": ["mbfOverride"],
+  "EA/câble": ["d"],
+  "EA/câble surchargé": ["eaOverride"],
+  "EA/corde": ["k", "MBL"],
+  "mu/câble": ["d"],
+  "mu/câble surchargé": ["muOverride"],
+  "mu/corde": ["muTextile"],
 };
 
 /**
@@ -248,8 +248,7 @@ export function culprits(grandeur: Grandeur, mode: CulpritMode): readonly FieldI
  */
 function unavailabilityCause(mismatch: RegimeMismatch, family: "steel" | "textile"): string {
   const causes: string[] = [];
-  if (mismatch.family)
-    causes.push(family === "steel" ? "avec un câble acier" : "avec une corde textile");
+  if (mismatch.family) causes.push(`avec ${FAMILY_REQUIRED[family]}`);
   if (mismatch.usage) causes.push("en installation permanente");
   return causes.join(" et ");
 }
@@ -261,13 +260,19 @@ const THIS_REGIME: Record<Register, string> = {
 };
 
 /** What a régime's `requires` asks for, as the noun the select note needs. */
-const FAMILY_REQUIRED = { steel: "un câble acier", textile: "une corde textile" } as const;
+const FAMILY_REQUIRED = {
+  steel: `un ${label("cable", "terrain")}`,
+  textile: `une ${label("rope", "terrain")}`,
+} as const;
 const USAGE_REQUIRED = {
   PERMANENTE: `une ${label("permanentInstallation", "exact")}`,
   TEMPORAIRE: `une ${label("temporaryInstallation", "exact")}`,
 } as const;
 /** And what is currently selected, for the clause that names it. */
-const FAMILY_ACTIVE = { steel: "l'acier", textile: "le textile" } as const;
+const FAMILY_ACTIVE = {
+  steel: `le ${label("cable", "terrain")}`,
+  textile: `la ${label("rope", "terrain")}`,
+} as const;
 
 /**
  * § 10.1 — « une entrée indisponible **montre sa raison** »: the régime select's note, `null` where
@@ -296,9 +301,9 @@ export function regimeUnavailableNote(
   return `Indisponible — ${subject} ne couvre pas ${USAGE_REQUIRED[usage]}.`;
 }
 
-/** §10.4, stated where `Corde textile` is disabled — the rule is a fact worth teaching. */
+/** §10.4, stated where `Corde` is disabled — the rule is a fact worth teaching. */
 export const TEXTILE_UNAVAILABLE_REASON =
-  "§10.4 : fluage, UV/abrasion et fusion par friction (HMPE ~144–152 °C) ⇒ acier seul en installation permanente.";
+  "§10.4 : fluage, UV/abrasion et fusion par friction (HMPE ~144–152 °C) ⇒ câble seul en installation permanente.";
 
 /** §10.3, likewise: not forbidden — there is simply no efficiency to multiply by. */
 const KNOT_ON_HMPE_REASON =
@@ -360,8 +365,8 @@ function terminationFaultMessage(fault: TerminationFault, family: Family): strin
     return "⛔ Nœud impossible sur HMPE — il y glisse, sans rendement défendable (§10.3).";
   }
   return family === "steel"
-    ? "⛔ Terminaison de corde textile impossible sur un câble acier (§10.2)."
-    : "⛔ Terminaison de câble acier impossible sur une corde textile (§10.3).";
+    ? "⛔ Terminaison de corde impossible sur un câble (§10.2)."
+    : "⛔ Terminaison de câble impossible sur une corde (§10.3).";
 }
 
 /** Manual or imported geometry — the mode half of every (grandeur × mode) row. */
@@ -433,8 +438,8 @@ export function evaluateGates({
       kind: "invalid",
       field: "family",
       alsoOutlined: ["usage"],
-      message: "⛔ Corde textile impossible en installation permanente (§10.4).",
-      fixes: [FIX["passer-a-l-acier"], FIX["passer-en-usage-temporaire"]],
+      message: "⛔ Corde impossible en installation permanente (§10.4).",
+      fixes: [FIX["passer-au-cable"], FIX["passer-en-usage-temporaire"]],
     });
   }
 
@@ -502,7 +507,7 @@ export function evaluateGates({
       // An unset Override is « non surchargée »: it shows the formula and judges nothing. The other
       // blanks are the textile ones the *state* can hold. **No rope ships**: one invented `MBL`
       // decides the verdict (100 kN ⇒ FS 11,94 « dans les limites »; 60 kN ⇒ 7,63 « hors limites »
-      // on the same line). Flipping to `Corde textile` under `TEMPORAIRE` therefore lands on two
+      // on the same line). Flipping to `Corde` under `TEMPORAIRE` therefore lands on two
       // blank required fields — which is **not** « Saisie en cours »: a field the user never
       // filled is not mid-edit, so it blocks and keeps no stale picture. Polyester adds a third,
       // and its message carries the reason rather than the hole.

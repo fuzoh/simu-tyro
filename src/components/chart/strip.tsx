@@ -47,6 +47,7 @@ import type { SharedX } from "@/lib/layout/contract.ts";
 
 import { clearanceDomain, clearanceTickLabel } from "@/lib/layout/contract.ts";
 import { zGroundAt } from "@/lib/sim";
+import { heading } from "@/lib/vocabulary/labels.ts";
 
 /**
  * One point of the curve: a rider position, the garde **under the rider** there (`y`), and the
@@ -231,9 +232,11 @@ export function ClearanceStrip({
       width={x.width}
     >
       <text className="fill-muted-foreground text-[10px]" x={x.gutter} y={12}>
-        {/* The caption names the quantity's scope — « sous le passager » — because the previous
-            curve was the line's envelope and was read as this one (ticket 41). */}
-        {wide ? "Garde sous le passager (m) selon sa position" : "Garde sous le passager (m)"}
+        {/* The caption names the quantity's scope at every width — « position du passager » wide,
+            « passager » narrow — because the previous curve was the line's envelope and was read
+            as this one (ticket 41). */}
+        {heading("groundClearance", "terrain")}
+        {wide ? " (m) selon la position du passager" : ", passager (m)"}
         {onScrub !== undefined && (wide ? " — glisser pour déplacer" : " — glisser")}
       </text>
 

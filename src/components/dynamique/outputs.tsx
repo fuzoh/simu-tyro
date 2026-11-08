@@ -11,7 +11,7 @@ import type { DynamiqueOutputs, RideOutput } from "@/lib/dynamique/outputs.ts";
 
 import { GroupHeading } from "@/components/rail/controls.tsx";
 import { TileFrame } from "@/components/statique/outputs.tsx";
-import { COINCIDE_NOTE, ESTIMATE, OUTPUT_LABEL, RIDE_LABEL } from "@/lib/dynamique/copy.ts";
+import { COINCIDE_NOTE, OUTPUT_LABEL, RIDE_LABEL } from "@/lib/dynamique/copy.ts";
 import { RIDE_IDS } from "@/lib/dynamique/outputs.ts";
 
 /**
@@ -23,8 +23,8 @@ export function RideGrid({ children }: { children: ReactNode }) {
 }
 
 /** The note every tile carries. */
-function Estimate() {
-  return <span className="text-muted-foreground text-xs">{ESTIMATE}</span>;
+function Estimate({ ride }: { ride: RideOutput }) {
+  return <span className="text-muted-foreground text-xs">{ride.estimate}</span>;
 }
 
 export function DynamiqueOutputTiles({ model }: { model: DynamiqueOutputs }) {
@@ -38,7 +38,7 @@ export function DynamiqueOutputTiles({ model }: { model: DynamiqueOutputs }) {
             <ArrivalTile ride={ride} />
             <TileFrame
               label={OUTPUT_LABEL.duration}
-              note={<Estimate />}
+              note={<Estimate ride={ride} />}
               value={<span className="font-mono text-base">{ride.duration}</span>}
             />
           </RideGrid>
@@ -59,7 +59,7 @@ function StopTile({ ride }: { ride: RideOutput }) {
   return (
     <TileFrame
       label={OUTPUT_LABEL.stop}
-      note={<Estimate />}
+      note={<Estimate ride={ride} />}
       // An abscissa is a number; « arrive au bout » is the engine saying there is none.
       value={
         <span className={ride.stopX === null ? "text-base" : "font-mono text-base"}>
@@ -74,7 +74,7 @@ function ArrivalTile({ ride }: { ride: RideOutput }) {
   return (
     <TileFrame
       label={OUTPUT_LABEL.arrival}
-      note={<Estimate />}
+      note={<Estimate ride={ride} />}
       value={
         ride.arrival === null ? (
           <span className="text-base">{ride.noArrival}</span>

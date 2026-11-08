@@ -20,6 +20,7 @@ import { msToKmh } from "@/lib/sim";
 import {
   ARRIVES_AT_END,
   CONSTANTS_NOTE,
+  ESTIMATE,
   NEVER_SETTLES,
   NO_ARRIVAL,
   RIDE_LABEL,
@@ -44,6 +45,8 @@ export type RideOutput = {
   /** « pas d'arrivée » — why {@link arrival} is `null`, `null` when it is not. */
   readonly noArrival: string | null;
   readonly duration: string;
+  /** « estimation » — what each of the three values above is read with (#6). */
+  readonly estimate: string;
 };
 
 export type DynamiqueOutputs = {
@@ -92,5 +95,6 @@ function rideOutput(id: RideId, { end }: Ride): RideOutput {
       : null,
     noArrival: arrives ? null : NO_ARRIVAL,
     duration: formatQuantity("duration", end.t),
+    estimate: ESTIMATE,
   };
 }

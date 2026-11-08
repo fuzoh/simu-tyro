@@ -140,7 +140,7 @@ function directReading(directM: number, dz: number): string {
 export const BANANE_HELP =
   `La ${label("banana", "terrain")} est dessinée, pas calculée : la ligne à vide s'incurve du côté sous le vent, d'autant plus que le vent souffle en travers. ` +
   "Le facteur de proportionnalité est un choix de dessin [CONVENTION], jamais une sortie du moteur. " +
-  "Elle donne une allure, pas une distance : ni déport latéral ni garde au sol sous vent avec passager n'en sont lus.";
+  "Elle donne une allure, pas une distance : aucune valeur chiffrée, ni garde au sol sous vent avec passager, n'en est lue.";
 
 /** Why the switch to the Vue 3D is off, said under the map. */
 export const VUE_3D_BLOCKED = {

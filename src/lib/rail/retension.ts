@@ -13,7 +13,7 @@ export const RETENSION = {
   text:
     "Pendant l'essai du 2026-11-01, la prétension de la ligne du bas a baissé de 0,1 à 0,15 kN par " +
     "passage, et de ≈ 0,35 kN entre 16:04 et 16:57 sans retension. Une perte observée une fois sur " +
-    "textile : c'est pourquoi on retend. Rien n'en est calculé ici, et aucune longueur à reprendre " +
+    "corde : c'est pourquoi on retend. Rien n'en est calculé ici, et aucune longueur à reprendre " +
     "n'est proposée.",
   source: "Relevés du dynamomètre, essai du 2026-11-01 : docs/mesures dynamometre/",
 } as const;

@@ -27,7 +27,7 @@ export const DYNAMICS_HEADING = `Dynamique du ${label("passenger", "exact")}`;
  * fire always and mean nothing.
  */
 export const STEEL_TROLLEY_NOTE =
-  "Loi à μ constant sur câble, non confirmée (§12.2) : aucune source ouverte ne sépare l'acier du textile.";
+  "Loi à μ constant sur câble, non confirmée (§12.2) : aucune source ouverte ne sépare le câble de la corde.";
 
 /**
  * The câble's `μ` is an Unconfirmed Default (§12.2, `[CONVENTION]`): « non confirmé » as shipped,
