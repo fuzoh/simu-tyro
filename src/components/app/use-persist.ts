@@ -8,7 +8,9 @@
  * keystroke, `readSession` can never return anything, and the store's synchronous lazy initialiser
  * has nothing to initialise from.
  *
- * Every decision below is § 7's, and each one is load-bearing:
+ * Which writes happen and in which order is `@/lib/app/persist.ts`'s decision; the timers, the
+ * suspension and the performing are `@/lib/app/write-side.ts`'s. This hook only arms them on change
+ * and disarms them on cleanup. What stays here is React's:
  *
  * - **`replace: true`, never `push`.** Back is not undo — history restores search params but
  *   neither the retained inactive Material Spec nor the retained manual geometry, so a pushed entry
@@ -18,30 +20,23 @@
  *   navigation that *is* legitimate belongs to `RewriteOnLoad`, which fires only when something was
  *   dropped or completed. The guard is an identity check on that Scenario rather than a
  *   mount-once flag, because the client entry hydrates under `<StrictMode>`.
- * - **Both writes suspend together** under « Saisie en cours » (A11 owns the flag): the address bar
- *   keeps the last complete Scenario rather than publishing a half-typed one, and a browser crash
- *   mid-edit loses the *edit* rather than the line.
- * - **The debounce is a trailing timer per change**, so a burst of keystrokes writes once. The
- *   cleanup clears it, which is what makes « the last state wins » true without a queue.
+ * - **The address-bar timer re-arms on a Scenario change only**, the Session timer on any state
+ *   change. The address-bar write reads the state when it fires (`useEffectEvent`), because an
+ *   oversize draft stores the Session with it.
  * - **Nothing here reads the address bar**, and « Copier le lien » does not go through it either
  *   (`@/lib/app/persist.ts`). That is why the debounce grain is a performance question rather than
  *   a correctness one.
  */
 
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
 
 import type { AppState } from "@/lib/app/state.ts";
+import type { WriteEffects } from "@/lib/app/write-side.ts";
 import type { SessionStorage } from "@/lib/session/session.ts";
 
-import {
-  addressBarSearch,
-  SESSION_WRITE_DEBOUNCE_MS,
-  sessionOf,
-  URL_WRITE_DEBOUNCE_MS,
-} from "@/lib/app/persist.ts";
 import { siteOrigin } from "@/lib/app/site.ts";
-import { writeSession } from "@/lib/session/session.ts";
+import { armAddressBarWrite, armSessionWrite } from "@/lib/app/write-side.ts";
 
 /**
  * `localStorage`, or `null` where the origin refuses it outright — Safari private mode and a
@@ -77,34 +72,29 @@ export function usePersist({
   // object, so identity is exactly « still the state we opened on ».
   const seed = useRef<AppState["scenario"] | null>(null);
 
+  // The state when the address-bar timer fires, without re-arming it on every non-Scenario change.
+  const read = useEffectEvent(() => state);
+
   useEffect(() => {
     if (seed.current === null) seed.current = scenario;
     if (seed.current === scenario) return;
-    if (suspended) return;
-    const timer = setTimeout(() => {
-      // Built inside the timer, so a burst of keystrokes serialises once rather than once per
-      // frame. A draft with § 9's textile blanks is not publishable and holds the address bar at
-      // the last complete Scenario, which is the same rule « Saisie en cours » applies. An
-      // oversize one writes a bare `/` (`addressBarSearch`), leaving the Trace to the Session.
-      const search = addressBarSearch(scenario, siteOrigin());
-      if (search === null) return;
-      // A **plain object**, never a function and never a spread of `useSearch()`: `applyNext` hands
-      // a non-function updater to the location verbatim, so this bag replaces the whole search.
-      void navigate({ replace: true, search, to: "/" });
-    }, URL_WRITE_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
+    return armAddressBarWrite({ read, suspended, effects: browserEffects(navigate) });
   }, [scenario, suspended, navigate]);
 
-  useEffect(() => {
-    if (suspended) return;
-    const timer = setTimeout(() => {
-      const storage = browserStorage();
-      const session = sessionOf(state);
-      if (storage === null || session === null) return;
-      // The outcome matters — « sans-tracé » is § 7's quota rule, and the app has to *say so*. A11
-      // owns that line; what this hook guarantees is that the write happens at all.
-      writeSession(storage, session);
-    }, SESSION_WRITE_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [state, suspended]);
+  useEffect(
+    () => armSessionWrite({ state, suspended, effects: browserEffects(navigate) }),
+    [state, suspended, navigate],
+  );
+}
+
+/** The write side's three effects, against the real browser and router. */
+function browserEffects(navigate: ReturnType<typeof useNavigate>): WriteEffects {
+  return {
+    origin: siteOrigin,
+    storage: browserStorage,
+    // `replace: true`, never `push` — see the header. The search is a **plain object**, never a
+    // function and never a spread of `useSearch()`: `applyNext` hands a non-function updater to the
+    // location verbatim, so this bag replaces the whole search.
+    navigate: (search) => void navigate({ replace: true, search, to: "/" }),
+  };
 }

@@ -1,10 +1,11 @@
 /**
  * The write side — « v1 build spec » § 7 (*The write side*, *The Session*, *Oversize refuses at
  * « Copier le lien »*). `node`, no router and no clipboard: the timers and the two side effects are
- * `@/components/app/use-persist.ts`'s, and their *timing* belongs to ticket 31 (amendment B).
+ * `./write-side.ts`'s, and their *timing* is asserted in `./write-side.test.ts`.
  *
- * What is asserted here is the pure half — the bag the app publishes, the Session it stores, and
- * the one refusal the copy button can produce out of its own arithmetic.
+ * What is asserted here is the pure half — the bag the app publishes, the Session it stores, which
+ * writes each timer performs and in which order, and the one refusal the copy button can produce
+ * out of its own arithmetic.
  */
 
 import { describe, expect, it } from "vitest";
@@ -24,12 +25,13 @@ import { FIRST_RUN_LINK, scenarioToSearch } from "@/lib/url/scenario.ts";
 import type { AppState } from "./state.ts";
 
 import {
-  addressBarSearch,
+  addressBarWrites,
   completeScenario,
   copyLink,
   publishable,
   publishedSearch,
   sessionOf,
+  sessionWrites,
 } from "./persist.ts";
 import { initialAppState } from "./state.ts";
 
@@ -205,14 +207,18 @@ describe("one gate for both writers — an oversize import never reaches the add
     expect(restored.scenario.geometry).toEqual(scenario.geometry);
   });
 
-  it("writes a bare `/`, which load never rewrites, and the Session write is unaffected", () => {
+  it("writes the Session, then a bare `/`, which load never rewrites", () => {
     const { trace, scenario } = imported(600);
-    const search = addressBarSearch(scenario, ORIGIN);
-    expect(search).toEqual({});
+    const state = appState(scenario, trace);
+    const session = sessionOf(state);
+    expect(session).not.toBeNull();
+    // The order is the point (#57): `/` means « restore the Session », so the Session goes first.
+    expect(addressBarWrites(state, ORIGIN)).toEqual([
+      { to: "session", session },
+      { to: "address-bar", search: {} },
+    ]);
 
     const storage = memoryStorage();
-    const session = sessionOf(appState(scenario, trace));
-    expect(session).not.toBeNull();
     if (session !== null) writeSession(storage, session);
     const reloaded = initialAppState({ query: "", session: readSession(storage) });
     expect(reloaded.link.rewrite).toBeNull();
@@ -222,7 +228,8 @@ describe("one gate for both writers — an oversize import never reaches the add
 
   it("leaves the address bar untouched while a textile draft has blanks", () => {
     expect(publishable(blankTextile(), ORIGIN)).toEqual({ ok: false, reason: "incomplete" });
-    expect(addressBarSearch(blankTextile(), ORIGIN)).toBeNull();
+    expect(addressBarWrites(appState(blankTextile()), ORIGIN)).toEqual([]);
+    expect(sessionWrites(appState(blankTextile()))).toEqual([]);
   });
 
   it("publishes a fitting draft as the canonical bag and href copy uses", () => {
@@ -231,7 +238,10 @@ describe("one gate for both writers — an oversize import never reaches the add
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.search).toEqual(publishedSearch(scenario));
-    expect(addressBarSearch(scenario, ORIGIN)).toEqual(result.search);
+    // The address bar alone: an in-budget Session keeps its own, slower timer.
+    expect(addressBarWrites(appState(scenario), ORIGIN)).toEqual([
+      { to: "address-bar", search: result.search },
+    ]);
     expect(copyLink({ scenario, trace: null, origin: ORIGIN })).toEqual({
       ok: true,
       href: result.href,
