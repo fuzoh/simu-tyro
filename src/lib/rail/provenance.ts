@@ -45,6 +45,7 @@ import type { RegimeId, TerminationId, VerdictWarningId } from "@/lib/sim";
 import { equalAtDisplayPrecision, formatQuantity } from "@/lib/format/quantity.ts";
 import { FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 import { lineWarnings, REGIMES, TERMINATIONS } from "@/lib/sim";
+import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 import type { StrengthSymbol } from "./fields.ts";
 
@@ -63,11 +64,11 @@ export const PROVENANCE_COPY = {
     "Le régime choisi multiplie dans chaque marge de la grille. Trois des cinq entrées sont [CONVENTION] ou [UNVERIFIED:R1], et [R1] et [R2] se contredisent sur le rapport ACCT.\n§10.1 · docs/simulation-theory.md",
   mp: "120 kg attribué à EN 15567-1 §4.1.2 mais introuvable dans le texte primaire [UNVERIFIED:R1]. Acheter la norme.\n§8.1 · docs/simulation-theory.md",
   hRider:
-    "Enveloppe passager 2,1 m — [CONVENTION]. Aucune valeur normative publiée.\n§11 · docs/simulation-theory.md",
-  DAF: "Coefficient dynamique 1,2 — [FIELD:SSF], le tag de plus haute confiance de la référence. Configurable, et sans pastille « non confirmé ».\n§8.2 · docs/simulation-theory.md",
+    "Gabarit du passager 2,1 m — [CONVENTION]. Aucune valeur normative publiée.\n§11 · docs/simulation-theory.md",
+  DAF: "Majoration au départ 1,2 — [FIELD:SSF], le tag de plus haute confiance de la référence. Configurable, et sans pastille « non confirmé ».\n§8.2 · docs/simulation-theory.md",
   EA: "EA = E_app·C·d² avec E_app 115 GPa et C 0,4165, les milieux des plages §13.1 (100–130 GPa, 0,384–0,449). La plage complète donne 5,53–8,41 MN à 12 mm, soit ×1,52.\n§13.1 · docs/simulation-theory.md",
   mu: "μ = W·d²/100 avec W 0,3795, le milieu de la plage §13.1 (0,359–0,400) [STD-ATTESTED].\n§13.1 · docs/simulation-theory.md",
-  MBF: "MBF = K·d²·R₀/1000, K 0,330 (âme textile) / 0,356 (âme métallique) [STD-ATTESTED]. Les tables EN 12385-4 complètes sont [PAYWALLED].\n§13.1 · docs/simulation-theory.md",
+  MBF: "MBF = K·d²·R₀/1000, K 0,330 (6×19) / 0,356 (6×19 métallique) [STD-ATTESTED]. Les tables EN 12385-4 complètes sont [PAYWALLED].\n§13.1 · docs/simulation-theory.md",
   k: "k = EA/MBL — §13.2 publie 22 à 10 % MBL et 31 à 30 % MBL, et une tyrolienne n'entre jamais dans cette bande (0,6 % à vide, 6,3 % chargée).\n§13.2 · docs/simulation-theory.md",
   termination:
     "Rendement de terminaison — chaque plage §10.2/§10.3 est prise à son extrémité conservatrice.\n§10.2, §10.3 · docs/simulation-theory.md",
@@ -151,7 +152,7 @@ export function provenanceAggregate(scenario: ScenarioDraft, deduced?: Deduced):
   });
   entries.push({
     id: "hRider",
-    label: "Enveloppe passager",
+    label: heading("riderEnvelope", "exact"),
     value: formatQuantity("h_rider", scenario.rider.hRider),
     chip: edited("h_rider", scenario.rider.hRider, FIRST_RUN_SCENARIO.rider.hRider)
       ? "valeur utilisateur"
@@ -285,7 +286,7 @@ export type WarningTier =
   | "ambiant"
   /** ⚠ inline on the row it qualifies. Conditional on something the user controls. */
   | "avertissement"
-  /** The banner, state `Refusé`. A `[REGULATOR]` prohibition, not advice. */
+  /** The banner, state `Interdit`. A `[REGULATOR]` prohibition, not advice. */
   | "verdict";
 
 /**
@@ -348,7 +349,7 @@ const LINE_WARNING_RUNGS: Record<
   "tension-permanente-sur-30-pct-mbl": {
     row: "standingTension",
     text: (strength) =>
-      `tension permanente au-dessus de 30 % ${strength} — fluage et durée de vie (§9.2), pas résistance.`,
+      `${label("standingTension", "exact")} au-dessus de 30 % ${strength} — fluage et durée de vie (§9.2), pas résistance.`,
   },
   "fleche-sur-portee-sous-3-pct": {
     row: "sagRatio",

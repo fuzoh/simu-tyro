@@ -47,6 +47,7 @@ import type { VerdictState } from "@/lib/sim";
 import { FIELDS, lowerFirst } from "@/lib/rail/fields.ts";
 import { blockingSummary } from "@/lib/rail/gates.ts";
 import { NO_REGIME_BANNER } from "@/lib/rail/results.ts";
+import { label } from "@/lib/vocabulary/labels.ts";
 
 import { REFUSAL_CAUSE } from "./refusals.ts";
 
@@ -178,10 +179,11 @@ export function noResultCause({
   /** Mid-edit suppresses nothing: the output half **freezes** on the last valid Sweep instead. */
   readonly saisie?: SaisieEnCours | null;
 }): string | null {
-  if (refusal !== null) return `Aucun résultat — ${REFUSAL_CAUSE[refusal.id]}.`;
+  if (refusal !== null)
+    return `${label("aucun-resultat", "exact")} — ${REFUSAL_CAUSE[refusal.id]}.`;
   const first = standingReport(report, saisie).errors.find((error) => error.gate === "solve");
   if (first === undefined) return null;
-  return `Aucun résultat — ${fieldCause(first)}.`;
+  return `${label("aucun-resultat", "exact")} — ${fieldCause(first)}.`;
 }
 
 /**

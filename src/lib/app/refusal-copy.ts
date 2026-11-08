@@ -31,10 +31,10 @@ export const REFUSAL_ACTION = "Ouvrir l'application sans ce lien";
  */
 const REASON: Record<RefusalKind, (received: unknown) => string> = {
   "version-inconnue": (received) => `Version de schéma inconnue (v = ${format(received)}).`,
-  "tracé-illisible": () => "Tracé illisible.",
-  "tracé-hors-budget": () => "Tracé trop volumineux pour cette adresse.",
+  "tracé-illisible": () => "Profil illisible.",
+  "tracé-hors-budget": () => "Profil trop volumineux pour cette adresse.",
   "deux-directeurs": () =>
-    "Flèche à vide cible, prétension cible, longueur non tendue et rapport V cible : deux valeurs de tension dans le même lien.",
+    "Flèche à vide, prétension, longueur non tendue et rapport V : deux valeurs de tension dans le même lien.",
 };
 
 /**

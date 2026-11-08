@@ -67,6 +67,7 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { formatAtX, formatQuantity, formatValue } from "@/lib/format/quantity.ts";
 import { amplifiedTension, evaluateVerdict, REGIMES, scanTensionEnvelope } from "@/lib/sim";
+import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 import type { GateReport } from "./gates.ts";
 
@@ -102,7 +103,7 @@ export type ResultRow = {
   readonly qualifier: string | null;
   /** § 6's « quatre en tête, aucun accordéon »: a larger body at the top of the same block. */
   readonly rank: "headline" | "detail";
-  /** « ↳ majoration dynamique » hangs under « T max statique ». */
+  /** « ↳ majoration au départ » hangs under « T max statique ». */
   readonly indent: boolean;
   /**
    * « hors-limites » on the one row that carries its own threshold — « Garde min (traversée) »
@@ -275,7 +276,7 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
 
   // ── The four headline rows ────────────────────────────────────────────────────────────────
   if (banner !== null && verdict !== null) {
-    rows.push(row("verdict", "Verdict", banner.text, null, "headline"));
+    rows.push(row("verdict", label("verdict", "exact"), banner.text, null, "headline"));
     const required = requiredDivisor(verdict);
     rows.push(
       row(
@@ -307,11 +308,11 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
     rows.push({
       ...row(
         "clearance",
-        "Garde min (traversée)",
+        heading("traverseClearance", "exact"),
         formatQuantity("clearance", base.clearance.hMin),
         qualify(
           breach
-            ? `sous la garde admise ${formatQuantity("h_clear_min", scenario.rider.hClearMin)}`
+            ? `sous la garde exigée ${formatQuantity("h_clear_min", scenario.rider.hClearMin)}`
             : null,
           riderAt(base, base.clearance.atStepIndex),
         ),
@@ -382,10 +383,10 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
   if (amplify) {
     rows.push({
       id: "amplification",
-      label: "↳ majoration dynamique",
+      label: `↳ ${label("startMultiplier", "exact")}`,
       // Decomposition of the row above it, so it hangs off the **same** end that row reports.
       value: signed("Tdaf", envelope[staticEnd].Tdaf - envelope[staticEnd].Tstatic, unit),
-      qualifier: `(DAF ${formatValue("DAF", DAF)})`,
+      qualifier: `(× ${formatValue("DAF", DAF)})`,
       rank: "detail",
       // The one indented row in the block: it is a decomposition of the row above it, not a
       // fourteenth quantity.
@@ -436,29 +437,29 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
  * repair it), and `Indéterminé` reports that nothing was judged at all.
  */
 export function verdictSentence(verdict: VerdictResult): string {
-  const label = REGIMES[verdict.regime].label;
+  const regimeLabel = REGIMES[verdict.regime].label;
 
   if (verdict.state === "refuse-usage-interdit") {
-    return `Refusé — ${REFUSAL_COPY[verdict.refusal ?? "serre-cables-sur-ligne-portant-des-personnes"]}`;
+    return `${label(verdict.state, "exact")} — ${REFUSAL_COPY[verdict.refusal ?? "serre-cables-sur-ligne-portant-des-personnes"]}`;
   }
   if (verdict.state === "indetermine") {
     const total = verdict.coverage === 0 ? 0 : Math.round(verdict.stepsSolved / verdict.coverage);
-    return `Indéterminé — ${verdict.stepsSolved} des ${total} pas résolus`;
+    return `${label(verdict.state, "exact")} — ${verdict.stepsSolved} des ${total} pas résolus`;
   }
 
   const cell = verdict.governing;
-  if (cell === null) return `Indéterminé — ${verdict.stepsSolved} pas résolus`;
+  if (cell === null) return `${label("indetermine", "exact")} — ${verdict.stepsSolved} pas résolus`;
 
   if (verdict.state === "hors-limites") {
-    return `Hors limites — ${label}, critère ${criterionName(cell)}`;
+    return `${label(verdict.state, "exact")} — ${regimeLabel}, critère ${criterionName(cell)}`;
   }
   if (verdict.state === "marge-faible") {
     // § 6's own copy reads « Marge faible — FS effectif 3,05 pour k = 3,0 » and names no régime;
     // the grammar rule — « nomme **toujours** le régime choisi à l'intérieur de la phrase » — is
     // the mechanism, and it is the stricter of the two. Hence the régime, then the spec's clause.
-    return `Marge faible — ${label} : FS effectif ${formatQuantity("FS", cell.FS)} pour k = ${divisor(cell.k)}`;
+    return `${label(verdict.state, "exact")} — ${regimeLabel} : FS effectif ${formatQuantity("FS", cell.FS)} pour k = ${divisor(cell.k)}`;
   }
-  return `Dans les limites — ${label} (k = ${divisor(cell.k)})`;
+  return `${label(verdict.state, "exact")} — ${regimeLabel} (k = ${divisor(cell.k)})`;
 }
 
 /**
@@ -473,7 +474,7 @@ export function verdictSentence(verdict: VerdictResult): string {
  * who divides finds the app contradicting itself. The banner still names the governing cell — the
  * two answer different questions, and only this row is a ratio the reader can re-derive.
  *
- * It is also what keeps the row whole under `Refusé` and `Indéterminé`, where `governing` is `null`
+ * It is also what keeps the row whole under `Interdit` and `Indéterminé`, where `governing` is `null`
  * **by contract** while a régime is very much chosen: § 6 defines the headline as « `FS effectif`
  * …, affiché contre le `k` exigé par le régime », and a lone safety factor invites the reader to
  * supply their own `k`. The cells survive both states, and `REGIMES` covers the empty traverse.
@@ -494,7 +495,7 @@ function requiredDivisor(verdict: VerdictResult): number | null {
 /** § 6's three refusals, each a `[REGULATOR]` rule or a use-class boundary — never a margin. */
 const REFUSAL_COPY = {
   "serre-cables-sur-ligne-portant-des-personnes":
-    "serre-câbles sur une ligne portant des personnes",
+    "serre-câbles sur une ligne portant des passagers",
   "textile-en-installation-permanente": "corde textile en installation permanente (§10.4)",
   "regime-indisponible-pour-cette-ligne": "régime indisponible pour cette ligne",
 } as const;

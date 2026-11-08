@@ -10,6 +10,7 @@ import type { ForceUnit } from "@/lib/scenario/types.ts";
 import type { SweepStep } from "@/lib/sim";
 
 import { formatAtX, formatQuantity } from "@/lib/format/quantity.ts";
+import { heading } from "@/lib/vocabulary/labels.ts";
 
 import { GATE_CONSEQUENCE } from "./gates.ts";
 import { clearanceBreached } from "./results.ts";
@@ -39,7 +40,7 @@ export type CellId = (typeof CELL_IDS)[number];
  * 16 px line in the 44 px `pinned` row at 390 px.
  */
 export const CELL_LABEL: Record<CellId, string> = {
-  clearance: "Garde min. ligne",
+  clearance: heading("lineClearance", "exact"),
   TA: "T anc. A",
   TB: "T anc. B",
   slope: "Pente",

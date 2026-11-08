@@ -121,7 +121,7 @@ describe("§10.4 — the use-class gate, family first, two Fix Actions", () => {
     // show them; an auto-switch would discard it without asking.
     expect(report.errors[0].fixes.map((fix) => fix.label)).toEqual([
       "Passer à l'acier",
-      "Passer en usage temporaire",
+      "Passer à l'installation temporaire",
     ]);
   });
 
@@ -222,13 +222,13 @@ describe("§ 10.1 — the régime select's note shows the reason", () => {
 
   test("textile under `PERMANENTE` names the use class that blocks it", () => {
     expect(regimeUnavailableNote("secours10", "textile", "PERMANENTE")).toBe(
-      "Indisponible — ce régime ne couvre pas un usage permanent.",
+      "Indisponible — ce régime ne couvre pas une installation permanente.",
     );
   });
 
   test("both clauses failing is **one** sentence naming both, not two notes", () => {
     expect(regimeUnavailableNote("secours10", "steel", "PERMANENTE")).toBe(
-      "Indisponible — ce régime suppose une corde textile et un usage temporaire.",
+      "Indisponible — ce régime suppose une corde textile et une installation temporaire.",
     );
   });
 
@@ -322,7 +322,7 @@ describe("imported placement — the hard checks run on **derived** values", () 
     expect(report.errors[0]).toMatchObject({
       gate: "solve",
       field: "sb",
-      message: "⛔ Station hors du tracé (0,0 – 224,0 m). Valeur : 260,0 m.",
+      message: "⛔ Distance hors du profil (0,0 – 224,0 m). Valeur : 260,0 m.",
     });
   });
 
@@ -512,11 +512,11 @@ describe("« Saisie en cours » — a required field empty **and holding focus**
       ),
     ).toEqual({
       field: "D_target",
-      message: "Saisie en cours — ces valeurs correspondent à Flèche à vide cible 6,00 m.",
+      message: "Saisie en cours — ces valeurs correspondent à Flèche à vide 6,00 m.",
     });
   });
 
-  test("on « Rapport V cible » it names the ratio the Scenario still holds", () => {
+  test("on « Rapport V » it names the ratio the Scenario still holds", () => {
     const state = scenario((draft) => {
       draft.tightness = { mode: "ratio", ratio: 0.46 };
     });
@@ -528,7 +528,7 @@ describe("« Saisie en cours » — a required field empty **and holding focus**
     const committed = committedValue(state, "vRatio", deduceValues(state, null));
     expect(saisieEnCours(midEdit, "vRatio", committed)).toEqual({
       field: "vRatio",
-      message: "Saisie en cours — ces valeurs correspondent à Rapport V cible 0,46.",
+      message: "Saisie en cours — ces valeurs correspondent à Rapport V 0,46.",
     });
   });
 

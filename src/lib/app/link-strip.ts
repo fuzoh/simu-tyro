@@ -90,7 +90,7 @@ type StripKey = Exclude<SearchKey, "v">;
 
 const KEYS: Record<StripKey, KeyRow> = {
   u: { label: "Unité de force", genre: "f", quantity: null },
-  use: fromField("usage", "m"),
+  use: fromField("usage", "f"),
   reg: fromField("regime", "m"),
   L: fromField("L", "f"),
   h: fromField("h", "m"),
@@ -117,11 +117,11 @@ const KEYS: Record<StripKey, KeyRow> = {
   na: fromField("etaA", "m"),
   nb: fromField("etaB", "m"),
   mp: fromField("mp", "f"),
-  hr: fromField("hRider", "f"),
+  hr: fromField("hRider", "m"),
   gm: fromField("hClearMin", "f"),
-  daf: fromField("DAF", "m"),
+  daf: fromField("DAF", "f"),
   x: fromField("xD", "f"),
-  tr: { label: "Tracé", genre: "m", quantity: null },
+  tr: { label: "Profil", genre: "m", quantity: null },
   // `v` is deliberately absent: it is the schema version, not a champ of the scenario, and naming
   // « version de schéma 1 » among the completed fields buries the numbers the sentence exists for.
   // An unrecognised `v` refuses the link whole, so it never reaches the first sentence either.

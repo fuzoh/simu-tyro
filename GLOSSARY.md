@@ -41,6 +41,12 @@ prétension.
 _Avoid_: tension cible, tension permanente, pretension setting, tension horizontale (as the
 simplified label)
 
+**Tension à vide**:
+The largest anchor tension of the unloaded line, as a share of the breaking load. A
+reading of the line as installed, not a wanted value and not the tension de pose. Named only
+on Avancé.
+_Avoid_: tension permanente, tension de pose
+
 **Majoration au départ**:
 The multiplier on the passager's extra tension because a controlled step-off sets the passager in motion. Not the static supplement the weight already produces, and not a limit. Default 1,2. Simplified Pages assume it and do not ask. Avancé names the field majoration au départ.
 _Avoid_: coefficient dynamique, DAF, limite, marge

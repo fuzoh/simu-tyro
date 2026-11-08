@@ -60,7 +60,7 @@ describe("an imported profile", () => {
       tier: "plain",
       text: "Profil importé · 200 points · pas max 0,9 m",
     });
-    expect(lines[1]).toEqual({ tier: "ok", text: "Tracé rectiligne (écart max 0,01 m)" });
+    expect(lines[1]).toEqual({ tier: "ok", text: "Profil rectiligne (écart max 0,01 m)" });
   });
 
   test("the real trace1 reads exactly as § 6's clean case", () => {
@@ -73,7 +73,7 @@ describe("an imported profile", () => {
 
     const lines = terrainDisclosure({ kind: "trace", trace: result.trace });
     expect(lines[0].text).toBe("Profil importé · 200 points · pas max 1,0 m");
-    expect(lines[1]).toEqual({ tier: "ok", text: "Tracé rectiligne (écart max 0,01 m)" });
+    expect(lines[1]).toEqual({ tier: "ok", text: "Profil rectiligne (écart max 0,01 m)" });
   });
 
   test("a coarse import warns, and the copy states the cap is per export", () => {
@@ -106,16 +106,16 @@ describe("straightness — three states, and the third is about a missing check"
   test("✓ rectiligne names the measured deviation", () => {
     expect(linesFor(0.009)[1]).toEqual({
       tier: "ok",
-      text: "Tracé rectiligne (écart max 0,01 m)",
+      text: "Profil rectiligne (écart max 0,01 m)",
     });
   });
 
   test("⚠ non rectiligne says L is therefore overestimated", () => {
     expect(linesFor(34)[1]).toEqual({
       tier: "warn",
-      text: "Tracé non rectiligne (écart max 34,00 m sur 220,0 m).",
+      text: "Profil non rectiligne (écart max 34,00 m sur 220,0 m).",
       detail:
-        "La portée L est mesurée le long du tracé, pas en ligne droite — elle est surestimée.",
+        "La portée L est mesurée le long du profil, pas en ligne droite — elle est surestimée.",
     });
   });
 

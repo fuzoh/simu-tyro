@@ -77,7 +77,7 @@ import { ViewStrip } from "./view-strip.tsx";
  * where there is no shared x domain, so nothing can be drawn against it and nothing can be pointed
  * at. Every other failure keeps its frame.
  */
-const NO_SPAN_LINE = "Portée invalide — aucun tracé possible.";
+const NO_SPAN_LINE = "Portée invalide — aucun dessin possible.";
 
 /**
  * `Indéterminé`'s one legal glyph — *tenté, indisponible*. It is **not** the empty state and it is

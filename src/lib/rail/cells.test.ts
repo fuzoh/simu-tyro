@@ -93,7 +93,7 @@ describe("`readOutCells` — every cell by id, as the chart block printed it", (
     expect(cells.underRider.value).toBe("6,68 m");
   });
 
-  test("a garde under « Garde min. admise » is the one breach, and only on that cell", () => {
+  test("a garde under « Garde exigée » is the one breach, and only on that cell", () => {
     // 2,42 m against a 3 m threshold.
     const cells = readOutCells(riderOf(), { clearance: true, hClearMin: 3, unit: "daN" });
     expect(Object.entries(cells).filter(([, cell]) => cell.breach)).toEqual([

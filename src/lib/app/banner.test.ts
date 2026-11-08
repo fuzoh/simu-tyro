@@ -144,7 +144,7 @@ describe("rank 3 — « Saisie en cours », and it has to be reachable", () => {
       rank: 3,
       kind: "saisie",
       field: "D_target",
-      text: "Saisie en cours — ces valeurs correspondent à Flèche à vide cible 6,00 m.",
+      text: "Saisie en cours — ces valeurs correspondent à Flèche à vide 6,00 m.",
     });
   });
 

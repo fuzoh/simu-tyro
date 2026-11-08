@@ -98,6 +98,7 @@ import { isFamilyAllowed, isRegimeAvailable, REGIMES, TERMINATIONS } from "@/lib
 import { parseFailureMessage, parseProfileCsv, readFailure } from "@/lib/terrain/csv.ts";
 import { encodeP1 } from "@/lib/url/p1.ts";
 import { cn } from "@/lib/utils.ts";
+import { heading } from "@/lib/vocabulary/labels.ts";
 
 import type { ClampEvent } from "./controls.tsx";
 
@@ -338,15 +339,21 @@ export function RailInputs({
     <RailRow.Provider value={row}>
       <RailSection title="Paramètres">
         <div className="mt-2 flex flex-col gap-3">
-          <Group title="Usage">
+          <Group title="Installation et régime">
             <Row
               control={
                 <Choice
                   name="usage"
                   onChange={(value: UseClass) => patch({ ...scenario, usage: value })}
                   options={[
-                    { value: "PERMANENTE", label: "Permanente (public)" },
-                    { value: "TEMPORAIRE", label: "Temporaire — secours & expédition" },
+                    {
+                      value: "PERMANENTE",
+                      label: heading("permanentInstallation", "exact"),
+                    },
+                    {
+                      value: "TEMPORAIRE",
+                      label: heading("temporaryInstallation", "exact"),
+                    },
                   ]}
                   value={scenario.usage}
                 />
@@ -592,7 +599,7 @@ export function RailInputs({
               ropeClass={textileSpec?.ropeClass ?? null}
               selected={scenario.terminations.A.id}
             />
-            <NumericRow id="etaA" label="Rendement η_A" />
+            <NumericRow id="etaA" label={`${FIELDS.etaA.label}_A`} />
             <TerminationRow
               end="B"
               family={scenario.material.family}
@@ -608,7 +615,7 @@ export function RailInputs({
               ropeClass={textileSpec?.ropeClass ?? null}
               selected={scenario.terminations.B.id}
             />
-            <NumericRow id="etaB" label="Rendement η_B" />
+            <NumericRow id="etaB" label={`${FIELDS.etaB.label}_B`} />
           </Group>
 
           <Group title="Tension de la ligne">
@@ -694,35 +701,35 @@ export function RailInputs({
                 }
                 formula={deduced.material.formula?.MBF ?? null}
                 id="mbfOverride"
-                label="Charge de rupture"
+                label={FIELDS.mbfOverride.label}
                 onRecalculate={() => patch(clearOverride(scenario, "MBF"))}
                 quantity="MBF"
                 stale={deduced.material.stale.MBF}
                 unit={unit}
               >
-                <NumericRow hint={unit} id="mbfOverride" label="Charge de rupture" />
+                <NumericRow hint={unit} id="mbfOverride" />
               </DerivedRow>
               <DerivedRow
                 formula={deduced.material.formula?.EA ?? null}
                 id="eaOverride"
-                label="Raideur axiale"
+                label={FIELDS.eaOverride.label}
                 onRecalculate={() => patch(clearOverride(scenario, "EA"))}
                 quantity="EA"
                 stale={deduced.material.stale.EA}
                 unit={unit}
               >
-                <NumericRow hint="MN" id="eaOverride" label="Raideur axiale" />
+                <NumericRow hint="MN" id="eaOverride" />
               </DerivedRow>
               <DerivedRow
                 formula={deduced.material.formula?.mu ?? null}
                 id="muOverride"
-                label="Masse linéique"
+                label={FIELDS.muOverride.label}
                 onRecalculate={() => patch(clearOverride(scenario, "mu"))}
                 quantity="mu"
                 stale={deduced.material.stale.mu}
                 unit={unit}
               >
-                <NumericRow hint="kg/m" id="muOverride" label="Masse linéique" />
+                <NumericRow hint="kg/m" id="muOverride" />
               </DerivedRow>
             </>
           )}
@@ -736,8 +743,8 @@ export function RailInputs({
           {/* § 7's third echo. The cause sentence is written **once** and repeated in each
               suppressed region, because the Rail is one scrolling column and a rail reader may
               never have the banner in view. It replaces the five solve-dependent rows — `L₀`,
-              `H à vide`, la flèche à vide, `flèche / portée`, la tension permanente — and never
-              `corde` or `w`, which are independent of a solve and stay above it. */}
+              `H à vide`, la flèche à vide, `flèche / portée`, la tension à vide — and never
+              `ligne A–B` or `w`, which are independent of a solve and stay above it. */}
           {cause !== null && <p className="text-muted-foreground mt-1 text-xs">{cause}</p>}
         </div>
       </RailSection>
@@ -964,7 +971,7 @@ export function RailHeaderControls({
                 decision: a dialog on a non-destructive action trains the user to click through the
                 one that guards real data loss. */}
             <span className="text-muted-foreground block text-xs font-normal">
-              Revient aux valeurs de départ. Le tracé importé est retiré du terrain mais reste en
+              Revient aux valeurs de départ. Le profil importé est retiré du terrain mais reste en
               mémoire.
             </span>
           </Button>
@@ -975,10 +982,10 @@ export function RailHeaderControls({
               if (storage === null) return;
               // The **only destructive control**, so the only confirmation — and it warns harder
               // when the cached Trace arrived by link, because that one cannot be re-imported from
-              // a file: `fileName === null` **is** « tracé reçu par lien ».
+              // a file: `fileName === null` **is** « profil reçu par lien ».
               const extra =
                 state.trace !== null && state.trace.fileName === null
-                  ? "\n\nCe tracé est arrivé par lien : il ne pourra pas être réimporté depuis un fichier."
+                  ? "\n\nCe profil est arrivé par lien : il ne pourra pas être réimporté depuis un fichier."
                   : "";
               if (!window.confirm(`${CLEAR_SESSION_CONFIRM}${extra}`)) return;
               clearSession(storage);
@@ -989,7 +996,7 @@ export function RailHeaderControls({
           >
             <span className="font-medium">Effacer la session</span>
             <span className="text-muted-foreground block text-xs font-normal">
-              Supprime le tracé en mémoire, la spec conservée et les préférences d'affichage.
+              Supprime le profil en mémoire, la spec conservée et les préférences d'affichage.
             </span>
           </Button>
           <Separator className="my-1" />
@@ -1025,7 +1032,7 @@ export function RailHeaderControls({
 
 /** § 9's confirmation for the one control that destroys data. */
 const CLEAR_SESSION_CONFIRM =
-  "Effacer la session supprime le tracé en mémoire, la Material Spec conservée et les préférences d'affichage. Continuer ?";
+  "Effacer la session supprime le profil en mémoire, la Material Spec conservée et les préférences d'affichage. Continuer ?";
 
 /**
  * One of § 3's five `Paramètres` groups.
@@ -1075,24 +1082,24 @@ function FileControls({
         </Button>
         {active && (
           <Button onClick={onRemove} size="sm" type="button" variant="outline">
-            Retirer le tracé
+            Retirer le profil
           </Button>
         )}
         {cached && (
           <Button onClick={onReuse} size="sm" type="button" variant="outline">
-            Réutiliser ce tracé
+            Réutiliser ce profil
           </Button>
         )}
       </div>
       <p className="text-muted-foreground text-xs">
         {active
           ? // A link carries the payload but not the filename.
-            (name ?? "tracé reçu par lien")
+            (name ?? "profil reçu par lien")
           : cached
             ? name === null || name === undefined
-              ? "tracé reçu par lien (non utilisé)"
-              : `Tracé en mémoire : ${name} (non utilisé)`
-            : "(aucun tracé)"}
+              ? "profil reçu par lien (non utilisé)"
+              : `Profil en mémoire : ${name} (non utilisé)`
+            : "(aucun profil)"}
       </p>
       {failure !== null && (
         <div className="flex flex-col gap-1">

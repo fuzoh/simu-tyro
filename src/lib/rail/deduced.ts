@@ -14,7 +14,7 @@
  *
  * Rules this module exists to keep:
  *
- * - **`corde` and `w` are the only two rows independent of a solve**, which is why they survive
+ * - **`ligne A–B` and `w` are the only two rows independent of a solve**, which is why they survive
  *   « Aucun résultat » while every other row is replaced by the cause line. They are returned
  *   separately from {@link Deduced.solve} for exactly that reason.
  * - **The stale Override badge is derived, never carried as state.** The URL has no staleness key,
@@ -42,6 +42,7 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 import { equalAtDisplayPrecision, formatAtX, formatQuantity } from "@/lib/format/quantity.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { resolveSteelValues, STEEL, steelFormula, TEXTILE } from "@/lib/sim";
+import { heading } from "@/lib/vocabulary/labels.ts";
 
 import { strengthSymbol, TIGHTNESS_FIELD } from "./fields.ts";
 import { warningLadder } from "./provenance.ts";
@@ -204,7 +205,7 @@ export type ReadOutRow = {
  *   rider-free chain is derived from the Scenario, which cannot hold a committed-invalid « −5 » or
  *   an emptied `m_p`, so under a Solve Gate breach it still resolves — and printing `L₀ 151,64 m`
  *   beside « aucun résultat » is the stale number invariant 3 forbids. The five solve rows go and
- *   `corde` and `w`, which need no solve, stay.
+ *   `ligne A–B` and `w`, which need no solve, stay.
  */
 export function deducedRows(
   scenario: ScenarioDraft,
@@ -227,8 +228,8 @@ export function deducedRows(
 
   // In manual mode `L` and `h` are fields, so only an imported profile prints them here.
   if (span !== null && scenario.geometry.source === "trace") {
-    push("L", "Portée", formatQuantity("L", span.L), "placement");
-    push("h", "Dénivelé", formatQuantity("h", span.h), "placement");
+    push("L", heading("span", "exact"), formatQuantity("L", span.L), "placement");
+    push("h", heading("elevationDifference", "exact"), formatQuantity("h", span.h), "placement");
     // One row per base rather than § 4's « · »-joined line: the Rail is a 255 px column.
     if (span.bases !== null) {
       push("zBaseA", "Alt. base A", formatQuantity("zBase", span.bases.zBaseA), "placement");
@@ -237,27 +238,35 @@ export function deducedRows(
   }
 
   if (material.family === "textile" && material.strength !== null) {
-    push("MBL", "Charge de rupture", formatQuantity("MBL", material.strength, unit));
+    push("MBL", heading("breakingLoad", "exact"), formatQuantity("MBL", material.strength, unit));
     if (material.EA !== null) {
-      push("EAtextile", "Raideur axiale", formatQuantity("EA", material.EA));
+      push("EAtextile", heading("axialStiffness", "exact"), formatQuantity("EA", material.EA));
     }
   }
 
-  if (material.w !== null) push("w", "Poids linéique", formatQuantity("w", material.w, unit));
-  if (span !== null) push("chord", "Corde", formatQuantity("chord", span.chord));
+  if (material.w !== null)
+    push("w", heading("linearWeight", "exact"), formatQuantity("w", material.w, unit));
+  if (span !== null)
+    push("chord", heading("anchorLine", "exact"), formatQuantity("chord", span.chord));
 
   if (solve === null || cause !== null) return rows;
   // The driving quantity is a field, so its read-out would print the same number twice.
   const driver = TIGHTNESS_FIELD[scenario.tightness.mode];
-  if (driver !== "L0") push("L0", "Longueur non tendue", formatQuantity("L0", solve.L0));
-  if (driver !== "H_target") push("H", "Prétension", formatQuantity("H_target", solve.H, unit));
+  if (driver !== "L0")
+    push("L0", heading("unstretchedLength", "exact"), formatQuantity("L0", solve.L0));
+  if (driver !== "H_target")
+    push("H", heading("pretension", "exact"), formatQuantity("H_target", solve.H, unit));
   if (driver !== "D_target") {
     const sag = `${formatQuantity("sag", solve.sag)} (${formatAtX(solve.sagAtX)})`;
-    push("sag", "Flèche à vide", sag);
+    push("sag", heading("sag", "exact"), sag);
   }
-  push("sagRatio", "Flèche / portée", formatQuantity("sagRatio", solve.sagRatio));
+  push("sagRatio", heading("sagRatio", "exact"), formatQuantity("sagRatio", solve.sagRatio));
   const standing = formatQuantity("standingTension", solve.standingTension);
-  push("standingTension", "Tension permanente", `${standing} ${strengthSymbol(material.family)}`);
+  push(
+    "standingTension",
+    heading("standingTension", "exact"),
+    `${standing} ${strengthSymbol(material.family)}`,
+  );
   return rows;
 }
 

@@ -154,7 +154,7 @@ describe("oversize refuses at « Copier le lien » — it never degrades", () =>
     // « 4 812 » with a narrow no-break space, so the count cannot wrap into two numbers.
     expect(result).toEqual({
       ok: false,
-      message: "Tracé trop volumineux pour un lien (4 812 points). Partagez le fichier CSV.",
+      message: "Profil trop volumineux pour un lien (4 812 points). Partagez le fichier CSV.",
     });
   });
 

@@ -80,7 +80,7 @@ describe("snapStation — § 4's pointer rule", () => {
 
   test("clamps to the extent, which is what makes the pointer path's error state unreachable", () => {
     // § 4: « poignée glissée au-delà de l'extrémité ⇒ bornée à l'extrémité du tracé ». A typed 320
-    // still blocks with « Station hors du tracé » — that asymmetry is the whole rule.
+    // still blocks with « Distance hors du profil » — that asymmetry is the whole rule.
     expect(snapStation(RAMP, -40)).toBe(0);
     expect(snapStation(RAMP, 320)).toBe(300);
   });

@@ -87,8 +87,8 @@ export function terrainDisclosure(source: TerrainSource): readonly DisclosureLin
         tier: "info",
         text: "Terrain — ligne droite entre les pieds d'ancrage (aucun profil importé)",
         detail:
-          "Sur un sol plan, garde ≈ lerp(hauteurs d'ancrage) − flèche chargée − enveloppe " +
-          "passager : le dénivelé ne gagne aucune garde. Mesuré, à L, flèche et hauteurs " +
+          "Sur un sol plan, garde ≈ lerp(hauteurs d'ancrage) − flèche chargée − gabarit " +
+          "du passager : le dénivelé ne gagne aucune garde. Mesuré, à L, flèche et hauteurs " +
           "constantes : garde min 2,43 / 2,42 / 2,34 / 2,22 m pour h = 0 / −18 / −40 / −60 m. " +
           "Une traversée de gorge modélisée à la main lit donc un échec qui n'existe pas — " +
           "mesuré −62,8 m sur une ligne de 1109 m. Importez un profil pour le relief réel.",
@@ -133,12 +133,12 @@ function straightnessLine(dev: number | null, extent: number): DisclosureLine {
     return { tier: "info", text: "Rectitude non vérifiable (coordonnées absentes)." };
   }
   if (isStraight(dev, extent)) {
-    return { tier: "ok", text: `Tracé rectiligne (écart max ${fr(dev, 2)} m)` };
+    return { tier: "ok", text: `Profil rectiligne (écart max ${fr(dev, 2)} m)` };
   }
   return {
     tier: "warn",
-    text: `Tracé non rectiligne (écart max ${fr(dev, 2)} m sur ${fr(extent, 1)} m).`,
-    detail: "La portée L est mesurée le long du tracé, pas en ligne droite — elle est surestimée.",
+    text: `Profil non rectiligne (écart max ${fr(dev, 2)} m sur ${fr(extent, 1)} m).`,
+    detail: "La portée L est mesurée le long du profil, pas en ligne droite — elle est surestimée.",
   };
 }
 

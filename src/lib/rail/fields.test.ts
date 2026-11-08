@@ -84,12 +84,12 @@ describe("§ 7's message table — committed invalid, ⛔ and blocking", () => {
     [
       "D_target",
       "0",
-      "⛔ Flèche à vide cible — une flèche strictement positive est requise. Valeur : 0,00 m.",
+      "⛔ Flèche à vide — une flèche strictement positive est requise. Valeur : 0,00 m.",
     ],
     [
       "H_target",
       "0",
-      "⛔ Prétension cible — une tension strictement positive est requise. Valeur : 0,0 daN.",
+      "⛔ Prétension — une tension strictement positive est requise. Valeur : 0,0 daN.",
     ],
     [
       "L0",
@@ -104,12 +104,12 @@ describe("§ 7's message table — committed invalid, ⛔ and blocking", () => {
     [
       "hRider",
       "0",
-      "⛔ Enveloppe passager — une hauteur strictement positive est requise. Valeur : 0,0 m.",
+      "⛔ Gabarit du passager — une hauteur strictement positive est requise. Valeur : 0,0 m.",
     ],
     [
       "DAF",
       "0",
-      "⛔ Coefficient dynamique — une valeur strictement positive est requise. Valeur : 0,0.",
+      "⛔ Majoration au départ — une valeur strictement positive est requise. Valeur : 0,0.",
     ],
     [
       "d",
@@ -167,7 +167,7 @@ describe("§ 7's message table — committed invalid, ⛔ and blocking", () => {
     expect(checkField("sa", "260", { extent })).toEqual({
       field: "sa",
       kind: "invalid",
-      message: "⛔ Station hors du tracé (0,0 – 224,0 m). Valeur : 260,0 m.",
+      message: "⛔ Distance hors du profil (0,0 – 224,0 m). Valeur : 260,0 m.",
     });
     expect(checkField("sb", "224", { extent })).toBeNull();
   });
@@ -342,8 +342,35 @@ describe("the option labels the Rail and the link strip share", () => {
       { value: "polyester", label: "Polyester semi-statique" },
     ]);
     expect(CONSTRUCTION_OPTIONS).toEqual([
-      { value: "fibre-core", label: "6×19 âme textile" },
-      { value: "iwrc", label: "6×19 âme métallique" },
+      { value: "fibre-core", label: "6×19" },
+      { value: "iwrc", label: "6×19 métallique" },
     ]);
+  });
+});
+
+describe("the Rail labels its fields in the exact register", () => {
+  const LABELS_BY_FIELD: readonly (readonly [FieldId, string])[] = [
+    ["usage", "Installation"],
+    ["regime", "Régime de sécurité"],
+    ["sa", "Distance A"],
+    ["sb", "Distance B"],
+    ["D_target", "Flèche à vide"],
+    ["H_target", "Prétension"],
+    ["L0", "Longueur non tendue"],
+    ["vRatio", "Rapport V"],
+    ["hRider", "Gabarit du passager"],
+    ["hClearMin", "Garde exigée"],
+    ["DAF", "Majoration au départ"],
+    ["cst", "Construction"],
+    ["ta", "Terminaison A"],
+    ["etaA", "Rendement η"],
+  ];
+
+  test.each(LABELS_BY_FIELD)("%s reads « %s »", (id, expected) => {
+    expect(FIELDS[id].label).toBe(expected);
+  });
+
+  test("the passenger's mass is named a passager's in a message, never a charge", () => {
+    expect(FIELDS.mp.errorLabel).toBe("Masse du passager");
   });
 });

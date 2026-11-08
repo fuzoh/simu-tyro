@@ -348,13 +348,13 @@ describe("an imported link's absent stations complete to the Trace's ends — #5
     expect(errorsOf(`?tr=${OFFSET_TRACE}&sa=40`, OFFSET_TRACE)).toEqual([]);
   });
 
-  test("an explicit `sb` past the Trace's end is kept as given and raises « Station hors du tracé »", () => {
+  test("an explicit `sb` past the Trace's end is kept as given and raises « Distance hors du profil »", () => {
     // ADR-0001: a station the link carries is never moved back onto the Trace.
     const { search, completed } = complete(`?tr=${OFFSET_TRACE}&sb=300`);
     expect(search).toMatchObject({ sa: 20, sb: 300 });
     expect(completed).not.toContain("sb");
     expect(errorsOf(`?tr=${OFFSET_TRACE}&sb=300`, OFFSET_TRACE)).toEqual([
-      { field: "sb", message: "⛔ Station hors du tracé (20,0 – 120,0 m). Valeur : 300,0 m." },
+      { field: "sb", message: "⛔ Distance hors du profil (20,0 – 120,0 m). Valeur : 300,0 m." },
     ]);
   });
 
@@ -412,7 +412,7 @@ describe("the first-run link", () => {
     // display-only: state holds a number whose value equals the displayed value, so the URL
     // serialises `6` ». So 141 − 4 = **137**, measured against the installed router; the two
     // absence meanings the count exists to lock are asserted below, unchanged. **142 since
-    // 2026-09-23**: `&gm=1` — « Garde min. admise » — is five more characters.
+    // 2026-09-23**: `&gm=1` — « Garde exigée » — is five more characters.
     expect(FIRST_RUN_LINK).toHaveLength(142);
     expect(FIRST_RUN_LINK).not.toContain("reg=");
     expect(FIRST_RUN_LINK).not.toContain("mbf=");

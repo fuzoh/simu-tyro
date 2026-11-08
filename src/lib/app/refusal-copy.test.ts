@@ -47,12 +47,12 @@ describe("§ 8 — the refusal page's copy", () => {
   });
 
   it("has one line per cause, and the three that quote nothing quote nothing", () => {
-    expect(refusalReasonLine(marker("tracé-illisible", "p1.zzz"))).toBe("Tracé illisible.");
+    expect(refusalReasonLine(marker("tracé-illisible", "p1.zzz"))).toBe("Profil illisible.");
     expect(refusalReasonLine(marker("tracé-hors-budget", "p1.zzz"))).toBe(
-      "Tracé trop volumineux pour cette adresse.",
+      "Profil trop volumineux pour cette adresse.",
     );
     expect(refusalReasonLine(marker("deux-directeurs", ["fl", "lo"]))).toBe(
-      "Flèche à vide cible, prétension cible, longueur non tendue et rapport V cible : deux valeurs de tension dans le même lien.",
+      "Flèche à vide, prétension, longueur non tendue et rapport V : deux valeurs de tension dans le même lien.",
     );
   });
 

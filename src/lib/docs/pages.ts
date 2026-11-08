@@ -59,7 +59,7 @@ export const DOC_PAGES: readonly DocPage[] = [
     slug: "cable",
     title: "Tyrolienne sur câble acier — normes et dimensionnement",
     summary:
-      "Portées > 50 m sur câble métallique : NF EN 15567, charge de rupture, coefficients de sécurité, terminaisons, ancrages et montages.",
+      "Portées > 50 m sur câble métallique : NF EN 15567, charge de rupture, facteurs de sécurité, terminaisons et ancrages.",
     lang: "fr",
     path: "docs/references/tyrolienne sur cable.md",
   },

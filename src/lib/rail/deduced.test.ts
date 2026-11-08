@@ -46,7 +46,7 @@ describe("§ 9's opening `VALEURS DÉDUITES`, from the shipped defaults", () => 
     expect(formatQuantity("w", material.w ?? NaN)).toBe("0,536 daN/m");
   });
 
-  test("« Corde 151,08 m » — the row §5.4's bound compares `L₀` against", () => {
+  test("« Ligne A–B 151,08 m » — the row §5.4's bound compares `L₀` against", () => {
     expect(formatQuantity("chord", span?.chord ?? NaN)).toBe("151,08 m");
   });
 
@@ -387,11 +387,11 @@ describe("`deducedRows` — the rows the Rail prints, decided outside the compon
     const rows = deducedRows(opening, deduceValues(opening, null), null);
     expect(shown(rows)).toEqual([
       ["Poids linéique", "0,536 daN/m", null],
-      ["Corde", "151,08 m", null],
+      ["Ligne A–B", "151,08 m", null],
       ["Longueur non tendue", "151,64 m", null],
       ["Prétension", "253,5 daN", null],
       ["Flèche / portée", "4,00 %", null],
-      ["Tension permanente", "2,90 % MBF", null],
+      ["Tension à vide", "2,90 % MBF", null],
     ]);
     expect(rows.every((row) => row.group === "line")).toBe(true);
   });
@@ -406,7 +406,7 @@ describe("`deducedRows` — the rows the Rail prints, decided outside the compon
       ["Charge de rupture", "2200 daN", null],
       ["Raideur axiale", "0,03 MN", null],
       ["Poids linéique", "0,069 daN/m", null],
-      ["Corde", "151,08 m", null],
+      ["Ligne A–B", "151,08 m", null],
       ["Longueur non tendue", "140,23 m", null],
       ["Flèche à vide", "0,71 m (à x 75,0 m)", null],
       [
@@ -414,7 +414,7 @@ describe("`deducedRows` — the rows the Rail prints, decided outside the compon
         "0,47 %",
         "flèche / portée sous 3 % — la ligne se raidit et le modèle rapporte mal la réponse dynamique (§8.2).",
       ],
-      ["Tension permanente", "11,63 % MBL", null],
+      ["Tension à vide", "11,63 % MBL", null],
     ]);
   });
 
@@ -427,14 +427,14 @@ describe("`deducedRows` — the rows the Rail prints, decided outside the compon
     expect(rows).toContainEqual(["Flèche à vide", "2,14 m (à x 74,9 m)", null]);
   });
 
-  test("under a cause the five solve rows go, and `w` and `corde` stay", () => {
+  test("under a cause the five solve rows go, and `w` and `ligne A–B` stay", () => {
     const opening = scenario();
     const rows = deducedRows(
       opening,
       deduceValues(opening, null),
       "Aucun résultat — portée invalide.",
     );
-    expect(rows.map((row) => row.label)).toEqual(["Poids linéique", "Corde"]);
+    expect(rows.map((row) => row.label)).toEqual(["Poids linéique", "Ligne A–B"]);
   });
 
   test("an imported profile puts `Portée`, `Dénivelé` and both base altitudes first", () => {
@@ -452,6 +452,6 @@ describe("`deducedRows` — the rows the Rail prints, decided outside the compon
       ["Alt. base B", "500,0 m", null],
     ]);
     expect(rows.slice(0, 4).every((row) => row.group === "placement")).toBe(true);
-    expect(rows.find((row) => row.label === "Corde")?.value).toBe("170,93 m");
+    expect(rows.find((row) => row.label === "Ligne A–B")?.value).toBe("170,93 m");
   });
 });

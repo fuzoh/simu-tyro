@@ -48,6 +48,7 @@ import { formatValue } from "@/lib/format/quantity.ts";
 import { keepCaret } from "@/lib/layout/collapse.ts";
 import { riderPositionEntry } from "@/lib/rail/fields.ts";
 import { cn } from "@/lib/utils.ts";
+import { label } from "@/lib/vocabulary/labels.ts";
 
 /**
  * One control's label at the three widths of chart column: **full** from 768 px, **short** from B1,
@@ -112,9 +113,9 @@ const LAYERS = [
 
 /** Each layer toggle's two labels. `full` is also its `aria-label` and `title`. */
 const LAYER_LABEL: Record<keyof LayerToggles, { full: string; short: string }> = {
-  unloadedLine: { full: "ligne à vide", short: "à vide" },
-  chordAB: { full: "corde A–B", short: "corde" },
-  trajectory: { full: "trajectoire", short: "trajet" },
+  unloadedLine: { full: label("unloadedLine", "exact"), short: "à vide" },
+  chordAB: { full: label("anchorLine", "exact"), short: "A–B" },
+  trajectory: { full: label("trajectory", "exact"), short: "trajet" },
   riderTip: { full: "distances", short: "dist." },
 };
 

@@ -173,7 +173,7 @@ function HeadlineRow({ row }: { row: ResultRow }) {
         <InfoTip label={row.label} text={RESULT_HELP[row.id]} />
       </span>
       <div className="flex flex-wrap items-baseline gap-1">
-        {/* « Garde min (traversée) » under « Garde min. admise » is the one headline that judges
+        {/* « Garde min (traversée) » under « Garde exigée » is the one headline that judges
             itself; the colour is the verdict grid's own « hors limites » tint. */}
         <span
           className={cn("font-mono text-base", row.state === "hors-limites" && "text-destructive")}
@@ -188,7 +188,7 @@ function HeadlineRow({ row }: { row: ResultRow }) {
   );
 }
 
-/** One detail row. « ↳ majoration dynamique » is a decomposition of the row above it. */
+/** One detail row. « ↳ majoration au départ » is a decomposition of the row above it. */
 function DetailRow({ row }: { row: ResultRow }) {
   return (
     <div className={cn("flex items-baseline gap-1 py-0.5", row.indent && "pl-3")}>

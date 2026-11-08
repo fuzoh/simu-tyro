@@ -206,7 +206,7 @@ export function copyLink({
     message:
       points === null
         ? "Lien trop volumineux pour être partagé."
-        : `Tracé trop volumineux pour un lien (${count(points)} points). Partagez le fichier CSV.`,
+        : `Profil trop volumineux pour un lien (${count(points)} points). Partagez le fichier CSV.`,
   };
 }
 

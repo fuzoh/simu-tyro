@@ -8,6 +8,7 @@ import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { sweepRider } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { evaluateVerdict } from "@/lib/sim";
+import { proscribedIn } from "@/lib/vocabulary/labels.ts";
 
 import type { ResultRowId, Results, SolvedTraverse } from "./results.ts";
 
@@ -178,6 +179,10 @@ describe("the thirteen reported values, on the shipped line under EN 15567-1", (
     expect(headline?.rank).toBe("headline");
     expect(results.rows.find((row) => row.id === "Tstatic")?.rank).toBe("detail");
     expect(results.rows.find((row) => row.id === "amplification")?.indent).toBe(true);
+    expect(results.rows.find((row) => row.id === "amplification")?.label).toBe(
+      "↳ majoration au départ",
+    );
+    expect(results.rows.find((row) => row.id === "amplification")?.qualifier).toBe("(× 1,2)");
   });
 
   test("the margin is a safety factor against the required k, never a percentage", () => {
@@ -414,7 +419,7 @@ describe("the five verdict states and their grammar", () => {
     );
   });
 
-  test("Refusé — a prohibition survives an ample margin, and names no régime", () => {
+  test("Interdit — a prohibition survives an ample margin, and names no régime", () => {
     const verdict = verdictOf({
       steps: [step(3000, 2900)],
       terminations: { A: "serre-cables-etrier", B: "cosse-oeil-flamand" },
@@ -425,8 +430,17 @@ describe("the five verdict states and their grammar", () => {
     // what is wrong.
     expect(verdict.ends.A.FS).toBeGreaterThan(3);
     expect(verdictSentence(verdict)).toBe(
-      "Refusé — serre-câbles sur une ligne portant des personnes",
+      "Interdit — serre-câbles sur une ligne portant des passagers",
     );
+  });
+
+  test("no printed row, qualifier or banner says a word the interface never says", () => {
+    const results = resultsOf({ regime: "en15567" });
+    const printed = [
+      ...results.rows.flatMap((row) => [row.label, row.value, row.qualifier ?? ""]),
+      results.banner?.text ?? "",
+    ];
+    expect(printed.flatMap((text) => proscribedIn(text))).toEqual([]);
   });
 
   test("Indéterminé — the verdict is suppressed, and the count is against 260", () => {
@@ -517,7 +531,7 @@ describe("what suppresses what — three gates, three different consequences", (
   });
 });
 
-describe("« Garde min. admise » — the clearance row judges itself (2026-09-23)", () => {
+describe("« Garde exigée » — the clearance row judges itself (2026-09-23)", () => {
   test("clearanceBreached: under the threshold only, and a threshold of 0 disables the check", () => {
     expect(clearanceBreached(2.42, 1)).toBe(false);
     expect(clearanceBreached(0.8, 1)).toBe(true);

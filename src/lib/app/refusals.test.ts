@@ -299,7 +299,7 @@ describe("`[ Copier le diagnostic ]` — evidence, not UI copy", () => {
   test("it carries **no terrain**, and that is not an omission", () => {
     // `solveSpan` is terrain-free and clearance is a reducer above it, so a solve failure is fully
     // reproducible without the 200-row trace.
-    expect(payload).not.toMatch(/terrain|trace|tracé/i);
+    expect(payload).not.toMatch(/terrain|trace|tracé|profil/i);
   });
 
   test("a link that would be refused says so rather than omitting the field", () => {
@@ -312,7 +312,7 @@ describe("`[ Copier le diagnostic ]` — evidence, not UI copy", () => {
       derived: null,
       address: null,
     });
-    expect(oversize).toContain("[address]   (non partageable — tracé hors budget)");
+    expect(oversize).toContain("[address]   (non partageable — profil hors budget)");
     expect(oversize).toContain("hFloored    -169.67");
   });
 

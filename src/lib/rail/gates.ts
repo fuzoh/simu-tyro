@@ -52,6 +52,7 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { isFamilyAllowed, REGIMES, regimeMismatch, TERMINATIONS } from "@/lib/sim";
+import { label } from "@/lib/vocabulary/labels.ts";
 
 import type { Deduced } from "./deduced.ts";
 import type { FieldId, FieldIssue, FieldIssueKind, GateId } from "./fields.ts";
@@ -106,7 +107,7 @@ const FIX: Record<Exclude<FixActionId, "passer-a-la-terminaison-de-depart">, Fix
   "passer-a-l-acier": { id: "passer-a-l-acier", label: "Passer à l'acier" },
   "passer-en-usage-temporaire": {
     id: "passer-en-usage-temporaire",
-    label: "Passer en usage temporaire",
+    label: `Passer à l'${label("temporaryInstallation", "exact")}`,
   },
   // A **focus** action, not a value-setting one: no single correct régime exists.
   "choisir-un-autre-regime": { id: "choisir-un-autre-regime", label: "Choisir un autre régime" },
@@ -238,8 +239,8 @@ function unavailabilityCause(mismatch: RegimeMismatch, family: "steel" | "textil
 /** What a régime's `requires` asks for, as the noun the select note needs. */
 const FAMILY_REQUIRED = { steel: "un câble acier", textile: "une corde textile" } as const;
 const USAGE_REQUIRED = {
-  PERMANENTE: "un usage permanent",
-  TEMPORAIRE: "un usage temporaire",
+  PERMANENTE: `une ${label("permanentInstallation", "exact")}`,
+  TEMPORAIRE: `une ${label("temporaryInstallation", "exact")}`,
 } as const;
 /** And what is currently selected, for the clause that names it. */
 const FAMILY_ACTIVE = { steel: "l'acier", textile: "le textile" } as const;
@@ -552,7 +553,7 @@ export function blockingSummary(report: GateReport, refused = false): string | n
 /** What « Saisie en cours » says, and the value it attributes every number on screen to. */
 export type SaisieEnCours = {
   readonly field: FieldId;
-  /** « Saisie en cours — ces valeurs correspondent à Flèche à vide cible 6,00 m. » */
+  /** « Saisie en cours — ces valeurs correspondent à Flèche à vide 6,00 m. » */
   readonly message: string;
 };
 
@@ -585,7 +586,7 @@ export function saisieEnCours(
   const value = lastCommitted === null ? "" : ` ${lastCommitted}`;
   return {
     field: focused,
-    message: `Saisie en cours — ces valeurs correspondent à ${FIELDS[focused].label}${value}.`,
+    message: `${label("saisie-en-cours", "exact")} — ces valeurs correspondent à ${FIELDS[focused].label}${value}.`,
   };
 }
 

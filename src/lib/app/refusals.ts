@@ -42,10 +42,11 @@ import type { EngineFailure } from "@/lib/scenario/unloaded.ts";
 import type { SolveError, SolveNote } from "@/lib/sim";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
-import { FIELDS } from "@/lib/rail/fields.ts";
+import { FIELDS, lowerFirst } from "@/lib/rail/fields.ts";
 import { tightnessDriver } from "@/lib/rail/values.ts";
 import { SOLVER } from "@/lib/sim";
 import { CONSTRUCTION_TOKEN_BY_ID } from "@/lib/url/scenario.ts";
+import { label } from "@/lib/vocabulary/labels.ts";
 
 /** The three surfaces § 7 names. Three, not two: `no-convergence` has two origins. */
 export type RefusalId = "tension-impossible" | "cible-inatteignable" | "calcul-impossible";
@@ -70,21 +71,20 @@ type EngineError = Extract<EngineFailure, { readonly error: SolveError }>;
 export const DIAGNOSTIC_ACTION = "Copier le diagnostic";
 
 /** Both mode-specific messages open on this sentence — the physics, stated once. */
-const TENSION_LEAD = "⛔ Tension impossible — la ligne casserait avant d'atteindre cette tension.";
+const TENSION_LEAD = `⛔ ${label("tension-impossible", "exact")} — la ligne casserait avant d'atteindre cette tension.`;
 
 /** One surface, two kinds, same user action. It is thin on purpose: no residual, no note. */
 const CALCUL_IMPOSSIBLE: EngineRefusal = {
   id: "calcul-impossible",
-  message:
-    "⛔ Calcul impossible pour cette configuration. Le solveur n'a pas convergé — ce cas n'est pas censé se produire. Modifiez légèrement la tension ou la géométrie.",
+  message: `⛔ ${label("calcul-impossible", "exact")} pour cette configuration. Le solveur n'a pas convergé — ce cas n'est pas censé se produire. Modifiez légèrement la tension ou la géométrie.`,
   diagnostic: true,
 };
 
 /** The short clause « Aucun résultat » echoes — voir `./banner.ts`, which writes that sentence. */
 export const REFUSAL_CAUSE: Record<RefusalId, string> = {
-  "tension-impossible": "tension impossible",
-  "cible-inatteignable": "cible inatteignable",
-  "calcul-impossible": "calcul impossible",
+  "tension-impossible": lowerFirst(label("tension-impossible", "exact")),
+  "cible-inatteignable": lowerFirst(label("cible-inatteignable", "exact")),
+  "calcul-impossible": lowerFirst(label("calcul-impossible", "exact")),
 };
 
 /**
@@ -151,7 +151,7 @@ export function engineRefusal(
   if (error.kind === "no-convergence" && stage === "L0" && tightness.mode !== "length") {
     return {
       id: "cible-inatteignable",
-      message: `⛔ Cible inatteignable — aucune longueur non tendue ne donne ${target(
+      message: `⛔ ${label("cible-inatteignable", "exact")} — aucune longueur non tendue ne donne ${target(
         tightness,
         unit,
       )}.`,
@@ -237,7 +237,7 @@ export function diagnosticPayload(input: DiagnosticInput): string {
   }
 
   lines.push(tag("material", materialLine(scenario.material, derived?.strength ?? null)));
-  lines.push(tag("address", address ?? "(non partageable — tracé hors budget)"));
+  lines.push(tag("address", address ?? "(non partageable — profil hors budget)"));
   return lines.join("\n");
 }
 

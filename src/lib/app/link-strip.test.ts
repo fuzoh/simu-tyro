@@ -36,6 +36,12 @@ describe("§ 8's first sentence — each dropped key with its reason", () => {
     );
   });
 
+  test("French agreement holds for the fields whose gender changed with the vocabulary", () => {
+    expect(strip("?L=150&use=zz")?.ignored).toContain("(installation ignorée)");
+    expect(strip("?L=150&hr=abc")?.ignored).toContain("(gabarit du passager ignoré)");
+    expect(strip("?L=150&daf=abc")?.ignored).toContain("(majoration au départ ignorée)");
+  });
+
   test("a token-valued key is not a number, and the clause does not claim it was", () => {
     // « n'était pas un nombre » is § 8's wording for `za`; saying it of `?fam=zz` would be a lie in
     // the one sentence whose job is to tell a typo apart from a value we could not read.
@@ -48,13 +54,13 @@ describe("§ 8's first sentence — each dropped key with its reason", () => {
 describe("§ 8's first sentence — the `vr` and `gm` keys are named like every other key", () => {
   test("an unreadable `gm` names the minimum clearance", () => {
     expect(strip("?L=250&gm=abc")?.ignored).toBe(
-      "Une partie du lien a été ignorée : « gm » n'était pas un nombre (garde min. admise ignorée).",
+      "Une partie du lien a été ignorée : « gm » n'était pas un nombre (garde exigée ignorée).",
     );
   });
 
   test("an unreadable `vr` names Rapport V", () => {
     expect(strip("?L=250&vr=abc")?.ignored).toBe(
-      "Une partie du lien a été ignorée : « vr » n'était pas un nombre (rapport V cible ignoré).",
+      "Une partie du lien a été ignorée : « vr » n'était pas un nombre (rapport V ignoré).",
     );
   });
 });
@@ -64,25 +70,25 @@ describe("§ 8's second sentence — the completion names the values", () => {
     const sentence = strip("?L=250&h=-40")?.completed ?? "";
     expect(sentence).toMatch(/^Champs absents du lien, complétés depuis le scénario par défaut : /);
     expect(sentence).toContain("masse du passager 120 kg");
-    expect(sentence).toContain("enveloppe passager 2,1 m");
-    expect(sentence).toContain("coefficient dynamique 1,2");
+    expect(sentence).toContain("gabarit du passager 2,1 m");
+    expect(sentence).toContain("majoration au départ 1,2");
     // § 9's `x` is the one non-literal completion: `L/2` of the **completed** span.
     expect(sentence).toContain("position du passager 125,0 m");
     expect(sentence).toMatch(/\.$/);
   });
 
   test("the minimum clearance, a safety criterion, is named with its value", () => {
-    expect(strip("?L=250&h=-40")?.completed).toContain("garde min. admise 1,0 m");
+    expect(strip("?L=250&h=-40")?.completed).toContain("garde exigée 1,0 m");
   });
 
   test("a token-valued completion is French, never the wire token", () => {
-    expect(strip("?L=250&h=-40")?.completed).toContain("type d'installation permanente");
+    expect(strip("?L=250&h=-40")?.completed).toContain("installation permanente");
   });
 
   test("a force is undone from the URL's daN into the unit the screen reads", () => {
     // § 7 serialises every force in daN; the strip prints what the recipient's own field shows.
     expect(strip("?te=900&L=150")?.completed).not.toContain("prétension");
-    expect(strip("?L=150&h=-18")?.completed).toContain("flèche à vide cible 6,00 m");
+    expect(strip("?L=150&h=-18")?.completed).toContain("flèche à vide 6,00 m");
   });
 
   test("what absence *means* is never completed, so the strip never names it", () => {
@@ -124,9 +130,9 @@ describe("an unknown rope class is ignored and the default class is named, never
 
   test("an imported link with no stations names the two it was given", () => {
     const query = `?tr=${TRACE_P1}`;
-    expect(strip(query)?.completed).toContain("station A 0,0 m");
-    // The Trace's own end — TRACE_P1 runs 0 → 100 m — and no longer « station A + 150 m » (#55).
-    expect(strip(query)?.completed).toContain("station B 100,0 m");
+    expect(strip(query)?.completed).toContain("distance A 0,0 m");
+    // The Trace's own end — TRACE_P1 runs 0 → 100 m — and no longer « distance A + 150 m » (#55).
+    expect(strip(query)?.completed).toContain("distance B 100,0 m");
   });
 
   test("each token reads in the French of its domain value", () => {
@@ -140,8 +146,8 @@ describe("an unknown rope class is ignored and the default class is named, never
     expect(completedLabel({ cls: "pes" }, "cls")).toContain(
       "classe de corde polyester semi-statique",
     );
-    expect(completedLabel({ cst: "tc" }, "cst")).toContain("construction âme textile");
-    expect(completedLabel({ cst: "iwrc" }, "cst")).toContain("construction âme métallique");
+    expect(completedLabel({ cst: "tc" }, "cst")).toContain("construction 6×19");
+    expect(completedLabel({ cst: "iwrc" }, "cst")).toContain("construction 6×19 métallique");
   });
 });
 
@@ -149,7 +155,7 @@ describe("a completed force is converted from the URL's daN into the screen's un
   test("`te=900` daN prints as 9,000 kN under the kN selector", () => {
     const base = initialAppState({ query: "", session: null }).link;
     const link = { ...base, completed: ["te" as const], rewrite: { te: 900 } };
-    expect(linkStrip(link, "kN")?.completed).toContain("prétension cible 9,000 kN");
+    expect(linkStrip(link, "kN")?.completed).toContain("prétension 9,000 kN");
   });
 });
 
