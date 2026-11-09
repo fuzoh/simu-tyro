@@ -67,7 +67,7 @@ export function OutputGrid({
         className={cn(
           "grid grid-cols-2 gap-2",
           block
-            ? "min-[1024px]:grid-cols-[repeat(2,minmax(0,var(--tile-max)))]"
+            ? "three-columns:grid-cols-[repeat(2,minmax(0,var(--tile-max)))]"
             : "@min-[56rem]:grid-cols-5",
         )}
         style={block ? ({ "--tile-max": `${STATIQUE_TILE_MAX_PX}px` } as CSSProperties) : undefined}

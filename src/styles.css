@@ -21,6 +21,15 @@
 @custom-variant dark (&:is(.dark *));
 
 /**
+ * B2 — `THREE_COLUMN_PX` in `src/lib/layout/contract.ts`, declared here once rather than retyped as
+ * a `min-[1024px]:` at every call site, as B3 is below. From it Avancé stands on three columns and
+ * Statique's first row puts the vue de dessus beside the tiles (#109). `contract.test.ts` holds the
+ * number to the constant. Declared **before** `wide-rail`, so B3's classes come later in the sheet
+ * and win where both match (`three-columns:w-72 wide-rail:w-144`).
+ */
+@custom-variant three-columns (@media (width >= 1024px));
+
+/**
  * B3 — `WIDE_RAIL_PX` in `src/lib/layout/contract.ts`, declared here once rather than retyped as a
  * `min-[1920px]:` at every call site (#112). From it Avancé's left column is 576 px (`w-144`, the
  * contract's `WIDE_RAIL_WIDTH`) and `Paramètres` stands its groups on two columns, the left one
@@ -36,7 +45,7 @@
  *
  * **Each variant has two arms, and the split is the whole of § 5's width-versus-height argument:**
  *
- * - **Below B2** — the same 1024 px the shell's `min-[1024px]:` classes use (`THREE_COLUMN_PX`) —
+ * - **Below B2** — the same 1024 px the `three-columns` variant spells (`THREE_COLUMN_PX`) —
  *   triggers (a) and (b) reduce the block. Above B2 they must not: the Rail's two columns sit
  *   *beside* the block, all three are co-visible, and a Rail field taking focus has to cost the
  *   chart nothing. The derived state still changes there, it simply has no consumer.

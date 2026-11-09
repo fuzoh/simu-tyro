@@ -236,7 +236,7 @@ export const RIGHT_COLUMN_WIDTH = 288;
 export const SHELL_MAX_PX = 1728;
 
 /**
- * Does Avancé stand on three columns at this viewport width? The `min-[1024px]:` classes decide the
+ * Does Avancé stand on three columns at this viewport width? The `three-columns:` classes decide the
  * layout; this is the same threshold for what the CSS cannot decide — whether to **start** an
  * occupant only the middle column shows, the vue de dessus (#104), rather than leave it running in
  * a `display: none` box. It sizes nothing.

@@ -224,8 +224,10 @@ The Page Avancé (`/avance`) stands on **three columns from 1024 px of viewport*
 it, and spans **the whole width of the window** (#110). The numbers are `THREE_COLUMN_PX`,
 `RAIL_WIDTH` (left), `WIDE_RAIL_PX` and `WIDE_RAIL_WIDTH` (the left column from 1920, #112),
 `RIGHT_COLUMN_WIDTH`, `AVANCE_BLOCK_MAX_PX` and `AVANCE_PLOT_MAX` in
-`src/lib/layout/contract.ts`; the classes spell them as `min-[1024px]:`, `w-72`, `wide-rail:w-144`
-and `max-w-[1984px]`, and `contract.test.ts` holds the two together.
+`src/lib/layout/contract.ts`; the classes spell them as `three-columns:`, `w-72`, `wide-rail:w-144`
+and `max-w-[1984px]`, and `contract.test.ts` holds the two together. B2 and B3 are each **one**
+`@custom-variant` in `src/styles.css` — `three-columns` and `wide-rail` — never an arbitrary
+`min-[…px]:` retyped at a call site, so moving the constant moves every Page that switches on it.
 
 - **Left** — the Rail Header and `Paramètres`. **Middle** — Statique's vue de dessus (`TopMap`, the
   same component and the same gestures — the rose des vents, the draggable anchors, « Mesure »,
@@ -358,8 +360,8 @@ From **1024 px of viewport** — `THREE_COLUMN_PX`, Avancé's own switch — the
 Page Statique (`/`) is two rows (#109). The one number of it in `src/lib/layout/contract.ts` is
 `STATIQUE_TILE_MAX_PX`, which reaches the CSS as the block's own `--tile-max` (the
 `minmax(0, var(--tile-max))` of its two tracks), so no class spells it a second time. The switch is
-written `min-[1024px]:`, as Avancé's. The rest — what the row leaves the map — is arithmetic over the
-shell, measured by `agent-browser` (`docs/conventions/routing.md`, 2026-11-09), not modelled.
+written `three-columns:`, Avancé's own variant. The rest — what the row leaves the map — is
+arithmetic over the shell, measured by `agent-browser` (`docs/conventions/routing.md`, 2026-11-09), not modelled.
 
 - **Row 1: the vue de dessus, then `Résultats`.** The map takes the rest of the column; the tiles
   stand on its right as a **block of 2 × 3** — the four value tiles in a 2 × 2, the Verdict across

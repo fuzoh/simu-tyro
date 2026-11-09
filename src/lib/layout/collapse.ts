@@ -224,7 +224,7 @@ export function heightBindsBlock(viewportWidth: number): boolean {
  *   bar. Above B2 the block always fits, because nothing there is fitted to the window (#110).
  *   **That comparison is not a layout branch**: the tree, the bands and every band height are
  *   identical either way — it names which of § 5's two budget shapes is in force, on the same
- *   {@link THREE_COLUMN_PX} the shell's `min-[1024px]:` classes use.
+ *   {@link THREE_COLUMN_PX} the shell's `three-columns:` classes use.
  *
  * Unmeasured is « it fits »: before the observer reports there is no width to derive a height from,
  * and the Skeleton opens whole.

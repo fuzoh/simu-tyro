@@ -63,9 +63,9 @@ export function StatiqueFrame({
           the first row; the coupe across the second. The DOM keeps the phone's reading order, so
           from B2 focus visits the coupe before the map above it: the accepted cost, in ui.md's
           « Statique's first row ». */}
-      <div className="contents min-[1024px]:grid min-[1024px]:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="three-columns:grid three-columns:grid-cols-[minmax(0,1fr)_auto] contents">
         <Region
-          className="min-[1024px]:col-start-2 min-[1024px]:row-start-1 min-[1024px]:border-l"
+          className="three-columns:col-start-2 three-columns:row-start-1 three-columns:border-l"
           title={SECTION.outputs}
         >
           <div className="px-3">{outputs}</div>
@@ -73,7 +73,7 @@ export function StatiqueFrame({
         {/* `min-w-0`: the two regions whose occupant is sized off a measured width, so a grid item
             that is never narrower than its drawing cannot hold the column open as it narrows. */}
         <Region
-          className="min-[1024px]:col-span-full min-[1024px]:row-start-2 min-[1024px]:min-w-0 min-[1024px]:border-b-0"
+          className="three-columns:col-span-full three-columns:row-start-2 three-columns:min-w-0 three-columns:border-b-0"
           title={SECTION.section}
         >
           {/* No horizontal padding: the gutter lives inside the two SVGs, as on Avancé. */}
@@ -88,7 +88,7 @@ export function StatiqueFrame({
             narrow map's wrapped lines must land in the Skeleton's space, not push the coupe down:
             ui.md's « Statique's first row ». */}
         <Region
-          className="min-[1024px]:col-start-1 min-[1024px]:row-start-1 min-[1024px]:min-w-0 min-[1024px]:[--top-view-caption:7rem] min-[1024px]:[--top-view-max-h:none] min-[1024px]:last:border-b"
+          className="three-columns:col-start-1 three-columns:row-start-1 three-columns:min-w-0 three-columns:[--top-view-caption:7rem] three-columns:[--top-view-max-h:none] three-columns:last:border-b"
           title={SECTION.topView}
         >
           <div className="px-3">{topView}</div>

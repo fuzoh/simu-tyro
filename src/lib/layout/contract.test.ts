@@ -568,7 +568,9 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     const shell = readFileSync(join(root, "src/components/app/shell.tsx"), "utf8");
     // The views' box: `display: none` until B2, and the same B2 the predicate reads. Its hairline
     // is under it since #110, between the vue de dessus and the Chart Block it now stands above.
-    expect(shell).toContain(`hidden border-b px-3 py-3 min-[${THREE_COLUMN_PX}px]:block`);
+    expect(
+      /aria-label=\{SECTION\.topView\}\s+className="([^"]*)"/.exec(shell)?.[1].split(" "),
+    ).toEqual(expect.arrayContaining(["hidden", "border-b", "three-columns:block"]));
   });
 
   it("the vue de dessus heads the middle column, above the Chart Block, in the DOM too (#110)", () => {
@@ -849,7 +851,7 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     const read = (path: string) => readFileSync(join(root, path), "utf8");
     const shell = read("src/components/app/shell.tsx");
     const styles = readFileSync(join(root, "src/styles.css"), "utf8");
-    const wide = `min-[${THREE_COLUMN_PX}px]:`;
+    const wide = "three-columns:";
     // `w-72` is 18 rem: the two columns' 288 px, written as a Tailwind step.
     expect(RAIL_WIDTH).toBe(18 * 16);
     expect(RIGHT_COLUMN_WIDTH).toBe(18 * 16);
@@ -911,6 +913,33 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     expect(reordering).toStrictEqual([]);
     // The only `wide-rail:` classes in the Rail are this wrapper's: no group is placed by hand.
     expect(inputs.match(/className="[^"]*\bwide-rail:[^"]*"/g)).toHaveLength(1);
+  });
+
+  it("B2 is declared once, as the contract's constant and one CSS variant", () => {
+    // As B3 below: the `three-columns` variant spells `THREE_COLUMN_PX`, and no class in `src/` —
+    // the shell's, Statique's first row (#109) — retypes it as `min-[1024px]:`, so moving the
+    // constant moves every Page's switch with `threeColumns()` and the `width < 1024px` arms.
+    const root = fileURLToPath(new URL("../../..", import.meta.url));
+    const styles = readFileSync(join(root, "src/styles.css"), "utf8");
+    expect(styles).toContain(
+      `@custom-variant three-columns (@media (width >= ${THREE_COLUMN_PX}px));`,
+    );
+    expect(styles.match(/@custom-variant three-columns\b/g)).toHaveLength(1);
+    // Declared before `wide-rail`, so B3's classes come later in the sheet and win where both match.
+    expect(styles.indexOf("@custom-variant three-columns")).toBeLessThan(
+      styles.indexOf("@custom-variant wide-rail"),
+    );
+    const sources = readdirSync(join(root, "src"), { recursive: true, encoding: "utf8" }).filter(
+      (path) => /\.tsx?$/.test(path) && !path.endsWith(".test.ts"),
+    );
+    const retyped = sources.filter((path) =>
+      readFileSync(join(root, "src", path), "utf8").includes(`min-[${THREE_COLUMN_PX}px]`),
+    );
+    expect(retyped).toStrictEqual([]);
+    // And the two Pages that switch at B2 do so through it.
+    for (const path of ["components/app/shell.tsx", "components/statique/frame.tsx"]) {
+      expect(readFileSync(join(root, "src", path), "utf8")).toContain("three-columns:");
+    }
   });
 
   it("B3 is declared once, as the contract's constant and one CSS variant (#112)", () => {
@@ -1670,7 +1699,7 @@ describe("§ 5 — the two mechanisms the layout may not use", () => {
     // From B2 up the wrapper is `display: contents` and each of the three columns is its own
     // scroller — the middle one, which scrolls the vue de dessus and the block under it (#104,
     // #110) — so each spends the same pair on itself.
-    const wide = `min-[${THREE_COLUMN_PX}px]:`;
+    const wide = "three-columns:";
     expect(tokens.has(`${wide}contents`)).toBe(true);
     for (const token of ["pb-[var(--kb,0px)]", "scroll-pb-[var(--kb,0px)]", "overflow-y-auto"]) {
       expect(shell.split(`${wide}${token}`).length - 1).toBe(3);

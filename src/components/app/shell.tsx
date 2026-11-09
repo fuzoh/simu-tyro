@@ -186,7 +186,7 @@ export const AVANCE_LAYOUT_VARS = {
  * `window.scrollY` *and* survive iOS's document-scroll-under-keyboard behaviour, where a fixed
  * shell plus `interactive-widget=resizes-content` gives the same result with one known scroller.
  *
- * B2 is `THREE_COLUMN_PX`, spelled `min-[1024px]:` below — from it the row is **three columns**: the
+ * B2 is `THREE_COLUMN_PX`, spelled `three-columns:` below — from it the row is **three columns**: the
  * Rail's `Paramètres` on the left, the Chart Block in the middle, the Rail's reports on the right.
  * Under it the row becomes a column and both Rail halves go `order-last` inside one scroller, in
  * flow, pushing rather than covering. No bottom sheet: Base UI 1.6.0 ships a
@@ -208,9 +208,9 @@ export const AVANCE_LAYOUT_VARS = {
  * height there, and the Rail is the chart column's sibling.
  *
  * **Which of the two absorbs the residual flips at B2, and that is § 5's budget A, not styling.**
- * In a row the two Rail columns are the fixed 288 px each (`min-[1024px]:w-72`) — the left one
+ * In a row the two Rail columns are the fixed 288 px each (`three-columns:w-72`) — the left one
  * 576 px from B3 (`wide-rail:w-144`, `WIDE_RAIL_PX`, #112), where `Paramètres` stands its groups on
- * two columns — and the chart column takes the rest of the *width* (`min-[1024px]:flex-1`). **The scroller wrapper is
+ * two columns — and the chart column takes the rest of the *width* (`three-columns:flex-1`). **The scroller wrapper is
  * `display: contents` there**, so the two columns are the chart's own flex siblings and each scrolls
  * itself, while below B2 the same wrapper is the one Rail scroller the collapse reads. A focus or
  * blur inside either column still bubbles to it. In a column the Chart Block keeps its **budgeted height**
@@ -313,7 +313,7 @@ export function Shell({
           capped at 1728 px (`SHELL_MAX_PX`, the other Pages' cap) while the plot's ceiling was
           amendment F's; Avancé's is raised now (`AVANCE_PLOT_MAX`), and the block's own cap is what
           keeps it whole in a 1440 px window. */}
-      <div className="flex min-h-0 w-full flex-1 flex-col min-[1024px]:flex-row">
+      <div className="three-columns:flex-row flex min-h-0 w-full flex-1 flex-col">
         {/* The Rail is not becoming interactive: `focusin`, `focusout` and `scroll` are **observed**
             here, on the one element that is both the collapse's scroller (below B2) and the ancestor
             of every field it watches. None of the three adds an affordance, a role or a keyboard
@@ -340,7 +340,7 @@ export function Shell({
           // piece 3's `{ block: 'center' }` / `behavior: auto` exactly as § 5 writes them, and § 7's
           // jump primitive — the same {@link CENTRE_IN_RAIL} object — inherits the correction. The
           // two columns spend the same pair on their own scroller from B2 up.
-          className="order-last flex min-h-0 w-full min-w-0 flex-1 scroll-pb-[var(--kb,0px)] flex-col overflow-y-auto pb-[var(--kb,0px)] min-[1024px]:contents"
+          className="three-columns:contents order-last flex min-h-0 w-full min-w-0 flex-1 scroll-pb-[var(--kb,0px)] flex-col overflow-y-auto pb-[var(--kb,0px)]"
           // React's `onBlur` is `focusout`, so it bubbles and `relatedTarget` is where focus is
           // *going*. Reporting `null` only when that lands outside the Rail is what makes a move
           // from one field to the next a single continuous focus rather than a gap.
@@ -380,7 +380,7 @@ export function Shell({
         >
           <aside
             aria-label="Paramètres"
-            className="border-border wide-rail:w-144 flex w-full shrink-0 flex-col min-[1024px]:order-first min-[1024px]:min-h-0 min-[1024px]:w-72 min-[1024px]:scroll-pb-[var(--kb,0px)] min-[1024px]:overflow-y-auto min-[1024px]:border-r min-[1024px]:pb-[var(--kb,0px)]"
+            className="border-border wide-rail:w-144 three-columns:order-first three-columns:min-h-0 three-columns:w-72 three-columns:scroll-pb-[var(--kb,0px)] three-columns:overflow-y-auto three-columns:border-r three-columns:pb-[var(--kb,0px)] flex w-full shrink-0 flex-col"
           >
             {left}
           </aside>
@@ -390,7 +390,7 @@ export function Shell({
           {right !== undefined && (
             <aside
               aria-label="Valeurs déduites et résultats"
-              className="border-border flex w-full shrink-0 flex-col min-[1024px]:order-last min-[1024px]:min-h-0 min-[1024px]:w-72 min-[1024px]:scroll-pb-[var(--kb,0px)] min-[1024px]:overflow-y-auto min-[1024px]:border-l min-[1024px]:pb-[var(--kb,0px)] min-[1024px]:[&>section:first-child]:border-t-0"
+              className="border-border three-columns:order-last three-columns:min-h-0 three-columns:w-72 three-columns:scroll-pb-[var(--kb,0px)] three-columns:overflow-y-auto three-columns:border-l three-columns:pb-[var(--kb,0px)] three-columns:[&>section:first-child]:border-t-0 flex w-full shrink-0 flex-col"
             >
               {right}
             </aside>
@@ -407,7 +407,7 @@ export function Shell({
             leave the map 116 px at 1024 × 768 (#104). The gutter is reserved so a scrollbar that
             comes and goes cannot move the width every band is a function of. It spends the `--kb`
             pair like the two side columns. */}
-        <div className="min-w-0 flex-none overflow-hidden min-[1024px]:min-h-0 min-[1024px]:flex-1 min-[1024px]:scroll-pb-[var(--kb,0px)] min-[1024px]:[scrollbar-gutter:stable] min-[1024px]:overflow-y-auto min-[1024px]:pb-[var(--kb,0px)]">
+        <div className="three-columns:min-h-0 three-columns:flex-1 three-columns:scroll-pb-[var(--kb,0px)] three-columns:[scrollbar-gutter:stable] three-columns:overflow-y-auto three-columns:pb-[var(--kb,0px)] min-w-0 flex-none overflow-hidden">
           {/* The vue de dessus heads the column from B2 (#110), above the Chart Block, in the DOM
               too, so the focus order is the order on screen. Below B2 there is no middle column and
               the box is `display: none`, so the stacked shape — the block over the Rail — is the
@@ -415,7 +415,7 @@ export function Shell({
           {views !== undefined && (
             <section
               aria-label={SECTION.topView}
-              className="border-border hidden border-b px-3 py-3 min-[1024px]:block"
+              className="border-border three-columns:block hidden border-b px-3 py-3"
             >
               {views}
             </section>
