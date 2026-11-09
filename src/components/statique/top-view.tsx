@@ -51,8 +51,10 @@ export function plainDrawing(
   return {
     unoriented: unoriented === null ? null : UNORIENTED[unoriented],
     ends: { A, B },
+    // The drawing stands in a 3 : 2 box of its own, centred in the frame: the frame is 3 : 2 only
+    // up to its height cap, and the letters, placed by percentage, must share the drawing's box.
     figure: (
-      <>
+      <div className="absolute inset-y-0 left-1/2 aspect-[3/2] h-full -translate-x-1/2">
         <svg
           className="text-foreground absolute inset-0 h-full w-full"
           role="img"
@@ -115,7 +117,7 @@ export function plainDrawing(
             </span>
           )}
         </div>
-      </>
+      </div>
     ),
   };
 }
@@ -132,6 +134,11 @@ function at({ x, y }: TopViewPoint): CSSProperties {
  * The figure's box, shared with the Skeleton: one control row, the map at 3 : 2 — capped so a
  * desktop column does not spend its whole height on it — then five caption lines, reserved so the
  * live lines land in the Skeleton's space. The Skeleton passes no occupant, only the heights.
+ *
+ * **The cap is on the height, not the width** (#115): the box spans its region, so its edges are
+ * the tiles', the region titles' and the coupe's on every Page, and it stops growing taller at the
+ * 448 px it had when it was capped at `max-w-2xl`. Past 672 px of width the map is wider than
+ * 3 : 2; the plain drawing keeps its own 3 : 2, centred.
  */
 export function TopViewFrame({
   controls,
@@ -143,9 +150,9 @@ export function TopViewFrame({
   caption?: ReactNode;
 }) {
   return (
-    <div className="flex max-w-2xl flex-col gap-2">
+    <div className="flex w-full flex-col gap-2">
       <div className="flex h-7 items-center gap-2">{controls}</div>
-      <div className="border-border relative aspect-[3/2] w-full overflow-hidden border">
+      <div className="border-border relative aspect-[3/2] max-h-112 w-full overflow-hidden border">
         {figure}
       </div>
       <div className="text-muted-foreground flex min-h-20 flex-col text-xs">{caption}</div>

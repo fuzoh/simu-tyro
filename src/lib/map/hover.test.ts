@@ -49,6 +49,24 @@ describe("the pointer on the line drawn in either frame", () => {
     expect(pointerOnLine(ends, box, { x: 300, y: 100 + LINE_PICK_PX * 2 })).toBeNull();
   });
 
+  test("on a box wider than the drawing, the drawing stays 3 : 2 and centred, as the SVG draws it", () => {
+    // By hand: a 900 × 400 box holds a 300 × 200 drawing at `min(900 / 300, 400 / 200) = 2`, i.e.
+    // 600 × 400, with `(900 − 600) / 2 = 150` px spare each side. The same line therefore runs from
+    // (150, 0) to (750, 200), where a stretched full-width scale would run it from the box's corner
+    // (0, 0) to (900, 200).
+    const ends = {
+      kind: "drawing",
+      A: { x: 0, y: 0 },
+      B: { x: 300, y: 100 },
+      view: { width: 300, height: 200 },
+    } as const;
+    const wide = { width: 900, height: 400 };
+    expect(pointerOnLine(ends, wide, { x: 150, y: 0 })).toEqual({ t: 0, at: { x: 150, y: 0 } });
+    expect(pointerOnLine(ends, wide, { x: 750, y: 200 })).toEqual({ t: 1, at: { x: 750, y: 200 } });
+    // A stretched scale would put A on the box's corner; the drawing has nothing there.
+    expect(pointerOnLine(ends, wide, { x: 0, y: 0 })).toBeNull();
+  });
+
   test("on the map, the projected ends are already the box's pixels", () => {
     const ends = { kind: "projected", A: { x: 100, y: 50 }, B: { x: 500, y: 50 } } as const;
     expect(pointerOnLine(ends, box, { x: 300, y: 52 })?.t).toBeCloseTo(0.5, 12);

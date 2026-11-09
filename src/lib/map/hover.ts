@@ -46,15 +46,21 @@ export type LineEnds =
  * Where a pointer stands on the drawn line, whichever frame it is drawn in — `null` off it, and
  * while the ends are not known (no map yet, or no anchor placed).
  *
+ * **The plain drawing keeps its own proportions** — SVG's default `xMidYMid meet`: one scale, the
+ * smaller of the two ratios, and the drawing centred in what is left over. The box is the drawing's
+ * 3 : 2 up to its height cap and wider past it (#115, the vue de dessus spans its region), so the
+ * spare width is a margin each side of the drawing, never a stretch of it.
+ *
  * @param pointer the pointer in the box's own pixels, its top-left corner the origin.
  * @param box the box the line is drawn in, px.
  */
 export function pointerOnLine(ends: LineEnds | null, box: Size, pointer: Px): LinePick | null {
   if (ends === null) return null;
   if (ends.kind === "projected") return alongLine(ends.A, ends.B, pointer);
-  const scale = ({ x, y }: Px): Px => ({
-    x: (x / ends.view.width) * box.width,
-    y: (y / ends.view.height) * box.height,
-  });
-  return alongLine(scale(ends.A), scale(ends.B), pointer);
+  const { view } = ends;
+  const scale = Math.min(box.width / view.width, box.height / view.height);
+  const left = (box.width - view.width * scale) / 2;
+  const top = (box.height - view.height * scale) / 2;
+  const place = ({ x, y }: Px): Px => ({ x: left + x * scale, y: top + y * scale });
+  return alongLine(place(ends.A), place(ends.B), pointer);
 }
