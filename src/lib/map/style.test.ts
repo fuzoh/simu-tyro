@@ -400,22 +400,21 @@ describe("the Repères d'ancrage: a cross through A and through B, in every mode
     ]);
   });
 
-  test("a dragged anchor's cross is where the anchor is drawn, not where it stood", () => {
-    // B 20 m east, as the marker shows it under the pointer while the drag lasts.
-    const dragged = {
-      A: TRIAL_ENDS.A,
-      B: { lat: TRIAL_ENDS.B.lat, lon: TRIAL_ENDS.B.lon + 0.00026 },
-    };
+  // That the map hands over the line as drawn — a dragged anchor where its marker is, on every move
+  // — is MapCanvas's wiring, not this drawing's: the #107 smoke row in docs/conventions/routing.md
+  // drags B and watches its cross follow.
+  test("out of the Mesure, the drawing crosses the anchors it is handed", () => {
     const anchors = measureDrawing({
       points: [],
       pointer: null,
-      anchors: dragged,
+      anchors: TRIAL_ENDS,
       reperes: true,
       measuring: false,
       readOnly: false,
     }).anchors;
-    expectCrossOn(crossesThrough({ anchors }, "B"), dragged.B);
-    expect(crossesThrough({ anchors }, "B")[0][0][0]).not.toBe(TRIAL_ENDS.B.lon);
+    expect(described({ anchors })).toEqual(["croix A", "croix A", "croix B", "croix B"]);
+    expectCrossOn(crossesThrough({ anchors }, "A"), TRIAL_ENDS.A);
+    expectCrossOn(crossesThrough({ anchors }, "B"), TRIAL_ENDS.B);
   });
 
   test("are dotted like the Mesure's crosses: one layer draws every cross alike", () => {
