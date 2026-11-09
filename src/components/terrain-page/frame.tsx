@@ -39,12 +39,20 @@ export function TerrainFrame({
     >
       {strip}
       <div className="border-border mx-auto flex min-h-0 w-full max-w-[1728px] flex-1 flex-col min-[1730px]:border-x">
-        <section aria-label={SECTION.visualisation} className="min-h-0 flex-1 overflow-y-auto py-3">
+        {/* The visualisation scrolls and the tiles do not, so a classic scrollbar would narrow the
+            vue de dessus and the coupe alone and move their right edges off the tiles' (#115). Both
+            sections reserve the same scrollbar gutter: `overflow-hidden` makes the tiles' section a
+            scroll container, the one kind of box `scrollbar-gutter` applies to. Overlay scrollbars
+            reserve nothing, on either. */}
+        <section
+          aria-label={SECTION.visualisation}
+          className="min-h-0 flex-1 [scrollbar-gutter:stable] overflow-y-auto py-3"
+        >
           {visualisation}
         </section>
         <section
           aria-label={SECTION.tiles}
-          className="border-border @container shrink-0 border-t px-3 py-3"
+          className="border-border @container shrink-0 [scrollbar-gutter:stable] overflow-hidden border-t px-3 py-3"
         >
           {tiles}
         </section>

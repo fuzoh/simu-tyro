@@ -111,7 +111,11 @@ fixes that and nothing else needs to move.
   therefore stand on the same verticals as the region titles, the tiles and the vue de dessus — left
   edges and right edges, on Statique, Avancé, Dynamique and Terrain. A chart label that needs room
   takes it **inside the plot** (`axisLabel()`), never in the gutter, and the vue de dessus spans
-  its region and caps its height rather than its width.
+  its region and caps its height rather than its width. Where the aligned boxes stand in two
+  sibling scrollers — Terrain's visualisation, which scrolls, and its tiles, which do not — both
+  reserve the same scrollbar gutter (`scrollbar-gutter: stable`, the tiles' section
+  `overflow-hidden` so that it applies), or a classic scrollbar would pull one set of right edges
+  its width in from the other.
 - **gap:** `gap-1` inside a row (label → control → hint) · `gap-2` between rows in a section ·
   `gap-3` between sections.
 - **vertical:** a Rail row is `h-7` inside a `py-1` wrapper; a Page region — a titled section, the
