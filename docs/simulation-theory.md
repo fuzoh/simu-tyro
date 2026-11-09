@@ -609,11 +609,16 @@ F_c = m·v²/R,  R = (1+z'²)^{3/2}/|z''|   (usually < 2 % — include optionall
 ```
 
 `θ` is taken positive downhill here, and friction and drag oppose the motion. **Wind enters as a
-vector projected on the tangent** (research #8): `u_∥` is the horizontal wind's component along
+longitudinal scalar closure using wind projected on the tangent** (research #8): `u_∥` is the horizontal wind's component along
 the line's plan direction (tail wind positive) and `u_∥·cosθ` its projection on the tangent. The
 published `(v ± v_wind)²` is the collinear special case; putting the whole entered wind speed in the
-`±` overstates the longitudinal drag, and the cross component changes the line's geometry, not the
-rider's speed — another physics, out of this equation (§16 item 13).
+`±` does not implement this scalar closure. The current equation omits the direct effect of the
+cross component; this is not a general physical claim that crosswind cannot change rider speed.
+A spatial quadratic force uses the full relative-air-speed norm before tangent projection and may
+therefore change longitudinal drag under crosswind. Neither that vector law nor an isotropic use
+of the SSF `C_dA` calibration is validated here. See the preparatory
+[rider aerodynamics review](references/spatial-wind/rider-aerodynamics-review.md), §5; the spatial
+line shape is separately out of this equation (§16 item 13).
 
 Outputs, once the trajectory and the constants are given (research #8): speed and acceleration
 along the span, the **Point d'arrêt** — where the speed returns to zero and the local slope, wind
