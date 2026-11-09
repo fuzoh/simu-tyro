@@ -43,20 +43,15 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { area, line } from "d3-shape";
 
 import type { ChartScene, SceneFrame } from "@/lib/chart/scene.ts";
+import type { StripSample as Sample } from "@/lib/chart/strip-curve.ts";
 import type { SharedX } from "@/lib/layout/contract.ts";
 
+import { onDeficitStroke, onPlainStroke, stripCurve } from "@/lib/chart/strip-curve.ts";
 import { axisLabel, clearanceDomain, clearanceTickLabel } from "@/lib/layout/contract.ts";
 import { zGroundAt } from "@/lib/sim";
 import { heading } from "@/lib/vocabulary/labels.ts";
 
 import { AnchorZoneBands } from "./anchor-zones.tsx";
-
-/**
- * One point of the curve: a rider position, the garde **under the rider** there (`y`), the line's
- * envelope minimum at that same step (`envelope`), and whether that position is judged at all —
- * `false` inside a Zone d'ancrage (#106) — or a hole where a step failed.
- */
-type Sample = { x: number; y: number | null; envelope: number | null; judged: boolean };
 
 /**
  * The curve, over the **grid** rather than over the solved steps. `sweep` copies each grid value
@@ -118,37 +113,6 @@ function samples(frame: SceneFrame, scene: ChartScene): Sample[] {
   });
 }
 
-/**
- * The curve with a point inserted at every zero crossing of `y`, so the red and the `foreground`
- * strokes meet exactly on the zero line instead of stopping one sample short of it. A hole on
- * either side is not a crossing.
- */
-function withZeroCrossings(points: Sample[]): Sample[] {
-  const out: Sample[] = [];
-  for (let i = 0; i < points.length; i++) {
-    const point = points[i];
-    const previous = points[i - 1];
-    if (
-      previous !== undefined &&
-      previous.y !== null &&
-      point.y !== null &&
-      previous.y < 0 !== point.y < 0 &&
-      previous.y !== 0 &&
-      point.y !== 0
-    ) {
-      const t = previous.y / (previous.y - point.y);
-      out.push({
-        x: previous.x + t * (point.x - previous.x),
-        y: 0,
-        envelope: null,
-        judged: previous.judged && point.judged,
-      });
-    }
-    out.push(point);
-  }
-  return out;
-}
-
 export function ClearanceStrip({
   clearance = true,
   frame,
@@ -180,7 +144,7 @@ export function ClearanceStrip({
   /** Absent on the Page Terrain (#101): the strip is read, and its caption asks for no drag. */
   onScrub?: (metres: number) => void;
 }) {
-  const points = scene === null || !clearance ? [] : withZeroCrossings(samples(frame, scene));
+  const points = scene === null || !clearance ? [] : stripCurve(samples(frame, scene));
   // The y domain is sized on the curve, plus the envelope's **negative** side only — that fill must
   // fit, and its positive side is exactly what ticket 41 measured must not share this axis.
   const values = points.flatMap((point) => [
@@ -197,21 +161,22 @@ export function ClearanceStrip({
   const axis = axisLabel(x, "left");
 
   // Two strokes over one point set, split at zero: `foreground` where the passenger is above the
-  // ground, `destructive` where they are in it. The inserted crossings belong to both, so the two
-  // meet on the zero line. Inside a Zone d'ancrage nothing is judged (#106): the curve still draws,
-  // in `foreground` whatever its sign, and no red starts there.
+  // ground, `destructive` where they are in it. Inside a Zone d'ancrage nothing is judged (#106):
+  // the curve still draws, in `foreground` whatever its sign, and no red starts there. Which point
+  // belongs to which stroke — and the points that belong to both, so the strokes meet — is
+  // `stripCurve`'s.
   const above = line<Sample>()
-    .defined((point) => point.y !== null && (point.y >= 0 || !point.judged))
+    .defined(onPlainStroke)
     .x((point) => x.x(point.x))
     .y((point) => y(point.y ?? 0))(points);
   const below = line<Sample>()
-    .defined((point) => point.y !== null && point.y <= 0 && point.judged)
+    .defined(onDeficitStroke)
     .x((point) => x.x(point.x))
     .y((point) => y(point.y ?? 0))(points);
 
   // Signal 2 — red fill below zero: « de combien, et où sur la traversée ? ».
   const deficit = area<Sample>()
-    .defined((point) => point.y !== null && point.y <= 0 && point.judged)
+    .defined(onDeficitStroke)
     .x((point) => x.x(point.x))
     .y0(zero)
     .y1((point) => y(point.y ?? 0))(points);
