@@ -242,6 +242,32 @@ it. The numbers are `THREE_COLUMN_PX`, `RAIL_WIDTH` (left), `RIGHT_COLUMN_WIDTH`
 - **`Valeurs déduites` holds editable rows**, so it shares `Paramètres`' field-row context: `RailInputs`
   owns the context and hands the two sections back through a render prop.
 
+## Statique's first row
+
+From **1024 px of viewport** — `THREE_COLUMN_PX`, Avancé's own switch — the right column of the
+Page Statique (`/`) is two rows (#109). The numbers are `FIELDS_WIDTH`, `STATIQUE_TILE_MAX_PX`,
+`STATIQUE_TILE_BLOCK_PX` and `statiqueTopViewWidth()` in `src/lib/layout/contract.ts`; the classes
+spell them as `min-[1024px]:` and `minmax(0,180px)`, and `contract.test.ts` holds the two together.
+
+- **Row 1: the vue de dessus, then `Résultats`.** The map takes the rest of the column; the tiles
+  stand on its right as a **block of 2 × 3** — the four value tiles in a 2 × 2, the Verdict across
+  both columns of the third row — each capped at 180 px, so the block is `2 × 180 + 8 = 368` px with
+  its `gap-2`. The tiles stand at the top of the row. A hairline between the two regions, as one
+  under each stacked region; both keep their `px-3`, so the map's left edge and the tiles' right
+  edge are the coupe's (#115).
+- **Row 2: the coupe**, across the column — the same width, and so the same bands, as before.
+- **Below 1024 nothing moves.** The regions' wrapper is `display: contents` there, so `Résultats`,
+  the coupe and the vue de dessus stack in the column as they always have. The DOM keeps that
+  order at every width: from 1024 a screen reader reads the tiles before the map it sees first.
+- **The block is Statique's alone** (`<OutputGrid block>`, its Verdict `wide`): two columns at every
+  width. Terrain's grid keeps its row of five from a 56 rem column. Statique dropped that arm with
+  nothing lost below 1024 — its column, `md:w-80` short of the viewport, is 703 px at the most there.
+- **The vue de dessus keeps its frame**: 3 : 2 up to the 448 px height cap (#115), its height never
+  read off the window. **What it costs**: at the switch the map is 287 px wide (191 px tall),
+  narrower than the block; it is the wider from 1106 px of viewport, 703 px at 1440, and 991 px
+  from the shell's cap — wider than 3 : 2 there, under the cap.
+- **The Skeleton is the same tree** (`StatiqueFrame`), so it lands in the same boxes at every width.
+
 ## Charts
 
 **Hand-rolled SVG in React with `d3-shape` for the paths, and one hand-written affine scale per
