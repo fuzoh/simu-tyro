@@ -12,7 +12,7 @@
 
 import type { DynamicsReading } from "@/lib/scenario/dynamics.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
-import type { Ride } from "@/lib/sim";
+import type { Ride, RideSample } from "@/lib/sim";
 
 import { formatAtX, formatQuantity } from "@/lib/format/quantity.ts";
 import { msToKmh } from "@/lib/sim";
@@ -24,7 +24,10 @@ import {
   ESTIMATE,
   NEVER_SETTLES,
   NO_ARRIVAL,
+  OUTPUT_LABEL,
   RIDE_LABEL,
+  SWING_THEN,
+  SWING_UNSETTLED,
   WARNING_COPY,
 } from "./copy.ts";
 
@@ -46,6 +49,13 @@ export type RideOutput = {
   /** « pas d'arrivée » — why {@link arrival} is `null`, `null` when it is not. */
   readonly noArrival: string | null;
   readonly duration: string;
+  /** « Durée de la traversée » when the ride arrives, « Durée jusqu'à l'arrêt » when it does not. */
+  readonly durationLabel: string;
+  /**
+   * What follows the first pass when the ride swings back: « puis oscille jusqu'à l'arrêt à x 229,3 m,
+   * 85,1 s » — `null` when the first pass is the whole ride.
+   */
+  readonly swing: string | null;
   /** « estimation » — what each of the three values above is read with (#6). */
   readonly estimate: string;
   /**
@@ -65,6 +75,8 @@ export type DynamiqueOutputs = {
    * line » would say the wrong thing.
    */
   readonly coincideNote: string | null;
+  /** One line per ride that swings back, « Sans vent : puis … » — unnamed when the rides are one. */
+  readonly swingLines: readonly string[];
   /** The sentences of the engine's warnings this Page words, quasi-staticity first. */
   readonly warnings: readonly string[];
   /** The constants' provenance, in one line. */
@@ -81,16 +93,23 @@ export function dynamiqueOutputs(
   family: ScenarioDraft["material"]["family"],
   windNotice: string | null = null,
 ): DynamiqueOutputs {
+  const rides = [
+    rideOutput("calm", reading.calm, null),
+    rideOutput("windy", reading.windy, windNotice),
+  ] as const;
   return {
-    rides: [rideOutput("calm", reading.calm, null), rideOutput("windy", reading.windy, windNotice)],
+    rides,
     coincide: reading.windless,
     coincideNote: reading.windless && windNotice === null ? COINCIDE_NOTE : null,
+    swingLines: (reading.windless ? [rides[0]] : rides).flatMap(({ label, swing }) =>
+      swing === null ? [] : [reading.windless ? swing : `${label} : ${swing}`],
+    ),
     warnings: reading.warnings.flatMap((id) => WARNING_COPY[id] ?? []),
     constants: CONSTANTS_NOTE[family],
   };
 }
 
-function rideOutput(id: RideId, { end }: Ride, notice: string | null): RideOutput {
+function rideOutput(id: RideId, { end, samples }: Ride, notice: string | null): RideOutput {
   const arrives = end.kind === "arrival";
   return {
     id,
@@ -110,7 +129,30 @@ function rideOutput(id: RideId, { end }: Ride, notice: string | null): RideOutpu
       : null,
     noArrival: arrives ? null : NO_ARRIVAL,
     duration: formatQuantity("duration", end.t),
+    durationLabel: arrives ? OUTPUT_LABEL.duration : OUTPUT_LABEL.durationToStop,
+    swing: swingAfter(samples, end),
     estimate: ESTIMATE,
     notice,
   };
+}
+
+/**
+ * The ride's **first pass**: from the start to the first time the speed is back to zero — the
+ * farthest point reached — or to B. A ride that swings back would otherwise loop over itself on a
+ * chart plotted against x. A ride that arrives is kept whole: it never turns before B.
+ */
+export function firstPass({ samples, end }: Ride): readonly RideSample[] {
+  if (end.kind === "arrival") return samples;
+  const turn = samples.findIndex((sample, i) => i > 0 && sample.v <= 0);
+  return turn === -1 ? samples : samples.slice(0, turn + 1);
+}
+
+/** What the chart leaves out after the first pass, in words; `null` when it leaves nothing out. */
+function swingAfter(samples: readonly RideSample[], end: Ride["end"]): string | null {
+  if (end.kind === "arrival") return null;
+  const left = samples.length - firstPass({ samples, end }).length;
+  if (left === 0) return null;
+  return end.kind === "stop"
+    ? `${SWING_THEN} ${formatAtX(end.x)}, ${formatQuantity("duration", end.t)}`
+    : SWING_UNSETTLED;
 }

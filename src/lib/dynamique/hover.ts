@@ -17,7 +17,7 @@ import { DYNAMICS } from "@/lib/sim";
 import type { DynamiqueOutputs, RideId } from "./outputs.ts";
 
 import { ESTIMATE, HOVER_LABEL, RIDE_SHORT } from "./copy.ts";
-import { RIDE_IDS } from "./outputs.ts";
+import { firstPass, RIDE_IDS } from "./outputs.ts";
 
 /**
  * The ride's sample nearest an abscissa, or `null` when the ride never gets there: samples are at
@@ -48,7 +48,8 @@ export function curveHover(
   ];
   // Without a wind both rides are one, and the rows need no ride's name.
   const read = (coincide ? (["windy"] as const) : RIDE_IDS).flatMap((id) => {
-    const sample = sampleNear(rides[id], metres);
+    // The curve draws the first pass only: the hover reads what is drawn.
+    const sample = sampleNear({ ...rides[id], samples: firstPass(rides[id]) }, metres);
     return sample === null ? [] : [{ id, ...sample }];
   });
   const named = (quantity: string, id: RideId) =>

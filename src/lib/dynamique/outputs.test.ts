@@ -1,20 +1,24 @@
 import { describe, expect, test } from "vitest";
 
-import type { Ride } from "@/lib/sim";
+import type { Ride, RideSample } from "@/lib/sim";
 
 import { formatAtX, formatQuantity } from "@/lib/format/quantity.ts";
 import { WIND_UNPLACED } from "@/lib/rail/gates.ts";
 import { msToKmh } from "@/lib/sim";
 
-import { ridesUnder } from "./__fixtures__/rides.ts";
+import { ridesUnder, SHIPPED } from "./__fixtures__/rides.ts";
 import {
   ARRIVES_AT_END,
   COINCIDE_NOTE,
   CONSTANTS_NOTE,
   NEVER_SETTLES,
   NO_ARRIVAL,
+  OUTPUT_LABEL,
+  RIDE_LABEL,
+  SWING_THEN,
+  SWING_UNSETTLED,
 } from "./copy.ts";
-import { dynamiqueOutputs } from "./outputs.ts";
+import { dynamiqueOutputs, firstPass } from "./outputs.ts";
 import { dynamiqueScene } from "./scene.ts";
 
 /**
@@ -137,5 +141,106 @@ describe("every dynamic output is an « estimation »", () => {
       "estimation",
       "estimation",
     ]);
+  });
+});
+
+/** A sample by hand: only the fields the cut reads carry a meaning. */
+const at = (t: number, x: number, v: number): RideSample => ({ t, x, z: 0, v, a: 0 });
+
+describe("the first pass of a ride", () => {
+  const arrival: Ride = {
+    samples: [at(0, 0, 0), at(1, 10, 2), at(2, 20, 3)],
+    end: { kind: "arrival", v: 3, t: 2 },
+  };
+  // Out to x 30 and back to 10 before settling at 20: the second leg has a negative speed.
+  const swing: Ride = {
+    samples: [at(0, 0, 0), at(1, 20, 4), at(2, 30, 0), at(2, 30, 0), at(3, 20, -3), at(4, 10, 0)],
+    end: { kind: "stop", x: 10, t: 4 },
+  };
+
+  test("a ride that arrives is kept whole", () => {
+    expect(firstPass(arrival)).toEqual(arrival.samples);
+  });
+
+  test("a swinging ride stops at the first zero speed, the farthest point reached", () => {
+    const pass = firstPass(swing);
+    expect(pass).toEqual(swing.samples.slice(0, 3));
+    expect(pass.at(-1)?.x).toBe(30);
+    expect(pass.every((sample) => sample.v >= 0)).toBe(true);
+    expect(pass.map((sample) => sample.x)).toEqual([0, 20, 30]);
+  });
+
+  test("a ride that stops without turning back is kept whole", () => {
+    const straight: Ride = {
+      samples: [at(0, 0, 0), at(1, 20, 4), at(2, 30, 0)],
+      end: { kind: "stop", x: 30, t: 2 },
+    };
+    expect(firstPass(straight)).toEqual(straight.samples);
+  });
+
+  test("on a real line the pass ends at the farthest x of the whole swing, with nothing after it", () => {
+    // 150 m, B 3 m below A, a head wind: both rides swing back before they settle.
+    const gentle = { ...SHIPPED, geometry: { source: "manual", L: 150, h: -3 } } as typeof SHIPPED;
+    const { reading } = ridesUnder(40, 0, gentle);
+    for (const ride of [reading.calm, reading.windy]) {
+      const pass = firstPass(ride);
+      expect(pass.length).toBeLessThan(ride.samples.length);
+      expect(pass.at(-1)?.v).toBe(0);
+      expect(pass.at(-1)?.x).toBe(Math.max(...ride.samples.map((sample) => sample.x)));
+      expect(pass.slice(1, -1).every((sample) => sample.v > 0)).toBe(true);
+    }
+  });
+});
+
+describe("what follows the first pass, and what the duration is called", () => {
+  const gentle = { ...SHIPPED, geometry: { source: "manual", L: 150, h: -3 } } as typeof SHIPPED;
+
+  test("a ride that arrives keeps « Durée de la traversée » and has nothing to add", () => {
+    const { outputs } = ridesUnder(0, 0);
+    expect(outputs.rides.map((ride) => ride.durationLabel)).toEqual([
+      "Durée de la traversée",
+      "Durée de la traversée",
+    ]);
+    expect(OUTPUT_LABEL.duration).toBe("Durée de la traversée");
+    expect(outputs.swingLines).toEqual([]);
+  });
+
+  test("a ride that swings back and stops is « Durée jusqu'à l'arrêt », with one line", () => {
+    const { outputs, reading } = ridesUnder(0, 0, gentle);
+    const [calm] = outputs.rides;
+    if (reading.calm.end.kind !== "stop") throw new Error("the gentle line stops the passager");
+    expect(calm.arrival).toBeNull();
+    expect(calm.durationLabel).toBe("Durée jusqu'à l'arrêt");
+    expect(calm.swing).toBe(`${SWING_THEN} ${formatAtX(reading.calm.end.x)}, ${calm.duration}`);
+    expect(calm.swing).toMatch(/^puis oscille jusqu'à l'arrêt à x \d+,\d m, \d+,\d s$/);
+    // No wind: the rides are one, so one unnamed line.
+    expect(outputs.swingLines).toEqual([calm.swing]);
+  });
+
+  test("when the Vent makes the rides differ, each line names its ride", () => {
+    const { outputs } = ridesUnder(40, 0, gentle);
+    const [calm, windy] = outputs.rides;
+    expect(outputs.coincide).toBe(false);
+    expect(calm.swing).not.toBe(windy.swing);
+    expect(outputs.swingLines).toEqual([
+      `${RIDE_LABEL.calm} : ${calm.swing}`,
+      `${RIDE_LABEL.windy} : ${windy.swing}`,
+    ]);
+  });
+
+  test("only the ride that swings back is told: the other arrives", () => {
+    // The shipped line arrives; a head wind stops the windy ride, which carries on without turning back.
+    const { outputs } = ridesUnder(50, 0);
+    expect(outputs.rides[0].durationLabel).toBe(OUTPUT_LABEL.duration);
+    expect(outputs.rides[1].durationLabel).toBe(OUTPUT_LABEL.durationToStop);
+    expect(outputs.swingLines.every((line) => line.includes(RIDE_LABEL.windy))).toBe(true);
+  });
+
+  test("a swing that never settles says so, without a time", () => {
+    const base = ridesUnder(0, 0, gentle);
+    const never: Ride = { ...base.reading.calm, end: { kind: "unsettled", t: 120 } };
+    const { rides } = dynamiqueOutputs({ ...base.reading, calm: never, windy: never }, "steel");
+    expect(rides[0].swing).toBe(SWING_UNSETTLED);
+    expect(rides[0].durationLabel).toBe(OUTPUT_LABEL.durationToStop);
   });
 });

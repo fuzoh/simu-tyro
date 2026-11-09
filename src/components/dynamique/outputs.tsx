@@ -38,7 +38,7 @@ export function DynamiqueOutputTiles({ model }: { model: DynamiqueOutputs }) {
             <StopTile ride={ride} />
             <ArrivalTile ride={ride} />
             <TileFrame
-              label={OUTPUT_LABEL.duration}
+              label={ride.durationLabel}
               note={<Estimate ride={ride} />}
               value={<span className="font-mono text-base">{ride.duration}</span>}
             />

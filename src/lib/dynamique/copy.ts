@@ -62,7 +62,10 @@ export const RIDE_SHORT = {
 export const OUTPUT_LABEL = {
   stop: heading("stopPoint", "terrain"),
   arrival: heading("arrivalSpeed", "terrain"),
+  /** The ride reaches B: it is a traversée. */
   duration: "Durée de la traversée",
+  /** No arrival: the time until the passager stops is not a traversée's. */
+  durationToStop: "Durée jusqu'à l'arrêt",
 } as const;
 
 /** « estimation » — beside every dynamic value, since the Page's numbers are all one (#6). */
@@ -82,6 +85,15 @@ export const NEVER_SETTLES = "oscille sans s'arrêter";
 
 /** The arrival's absence on a ride that stops before B. */
 export const NO_ARRIVAL = "pas d'arrivée";
+
+/**
+ * What the curve leaves out when a ride swings back: the chart keeps the first pass, from A to the
+ * farthest point reached, and this says the rest — « puis oscille jusqu'à l'arrêt », then where and when.
+ */
+export const SWING_THEN = "puis oscille jusqu'à l'arrêt";
+
+/** The same, when the swing never settles: no Point d'arrêt to give. */
+export const SWING_UNSETTLED = `puis ${NEVER_SETTLES}`;
 
 /** Why there is no ride to read when the traverse solved only in part. */
 export const INCOMPLETE = "Traversée incomplète : ni point d'arrêt ni vitesse d'arrivée calculés.";
@@ -148,6 +160,8 @@ export function dynamiqueLabelTable(): readonly string[] {
     ...Object.values(ARRIVAL_LABEL),
     NEVER_SETTLES,
     NO_ARRIVAL,
+    SWING_THEN,
+    SWING_UNSETTLED,
     COINCIDE_NOTE,
     INCOMPLETE,
     ...Object.values(CURVE_CAPTION),

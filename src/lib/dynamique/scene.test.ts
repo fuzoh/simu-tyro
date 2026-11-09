@@ -7,6 +7,7 @@ import type { DynamiqueScene } from "./scene.ts";
 
 import { ridesUnder, SHIPPED } from "./__fixtures__/rides.ts";
 import { ARRIVAL_LABEL, ESTIMATE } from "./copy.ts";
+import { firstPass } from "./outputs.ts";
 import { dynamiqueScene } from "./scene.ts";
 
 const WIDTH = 1000;
@@ -51,7 +52,7 @@ describe("the coupe and the curve share one x scale", () => {
   test("every point of the curve stands at the column the coupe gives its abscissa", () => {
     const curve = scene.curve;
     if (curve === null) throw new Error("a solved line has a curve");
-    HEAD.reading.windy.samples.forEach((sample, i) => {
+    firstPass(HEAD.reading.windy).forEach((sample, i) => {
       expect(curve.speed.windy[i][0]).toBe(scene.x.x(sample.x));
       expect(curve.acceleration[i][0]).toBe(scene.x.x(sample.x));
     });
@@ -227,5 +228,52 @@ describe("an incomplete traverse keeps the loaded line and the trajectory, and l
     expect(incomplete.coupe.members).not.toBeNull();
     expect(incomplete.coupe.markers).toEqual([]);
     expect(incomplete.curve).toBeNull();
+  });
+});
+
+describe("the curve draws the first pass only", () => {
+  // A head wind on a gentle line: both rides swing back before they settle.
+  const swinging = ridesUnder(40, 0, GENTLE);
+  const drawn = dynamiqueScene({ width: WIDTH, frame: swinging.frame, solved: swinging.solved });
+  const curve = drawn.curve;
+  if (curve === null) throw new Error("a solved line has a curve");
+
+  test("each ride's speed line ends at its farthest point, after which nothing is drawn", () => {
+    for (const id of ["calm", "windy"] as const) {
+      const ride = swinging.reading[id];
+      const pass = firstPass(ride);
+      expect(pass.length).toBeLessThan(ride.samples.length);
+      expect(curve.speed[id]).toHaveLength(pass.length);
+      const farthest = Math.max(...ride.samples.map((sample) => sample.x));
+      const columns = curve.speed[id].map(([column]) => column);
+      expect(columns.at(-1)).toBe(drawn.x.x(farthest));
+      // x only grows along the pass: the line never loops back over itself.
+      expect(columns.every((column, i) => i === 0 || column >= columns[i - 1])).toBe(true);
+    }
+    expect(curve.acceleration).toHaveLength(firstPass(swinging.reading.windy).length);
+  });
+
+  test("the speed line never goes below the zero line", () => {
+    for (const id of ["calm", "windy"] as const) {
+      expect(curve.speed[id].every(([, y]) => y <= curve.zero)).toBe(true);
+    }
+  });
+
+  test("the farthest point is marked on the zero line, at the engine's farthest abscissa", () => {
+    const farthest = Math.max(...swinging.reading.windy.samples.map((sample) => sample.x));
+    const turn = curve.farthest.find(({ id }) => id === "windy");
+    expect(turn?.x).toBe(drawn.x.x(farthest));
+    expect(turn?.y).toBe(curve.zero);
+  });
+
+  test("a ride that arrives draws whole and marks no farthest point", () => {
+    const arriving = ridesUnder(0, 0);
+    const whole = dynamiqueScene({
+      width: WIDTH,
+      frame: arriving.frame,
+      solved: arriving.solved,
+    }).curve;
+    expect(whole?.speed.windy).toHaveLength(arriving.reading.windy.samples.length);
+    expect(whole?.farthest).toEqual([]);
   });
 });

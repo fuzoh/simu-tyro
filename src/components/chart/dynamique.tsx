@@ -144,6 +144,15 @@ export function DynamiqueCharts({
           </div>
         )}
       </StripBand>
+      {solved?.rides != null &&
+        solved.rides.outputs.swingLines.map((text) => (
+          <p
+            className="text-muted-foreground pinned:hidden px-[var(--gutter)] pt-1 text-xs"
+            key={text}
+          >
+            {text}
+          </p>
+        ))}
     </>
   );
 }
@@ -368,6 +377,16 @@ function Curve({
 
       {scene.markers.map((marker) => (
         <MarkerRule bottom={plot.bottom} key={marker.id} marker={marker} top={plot.top} />
+      ))}
+
+      {scene.farthest.map((turn) => (
+        <circle
+          className={turn.id === "calm" ? "fill-muted-foreground" : "fill-foreground"}
+          cx={turn.x}
+          cy={turn.y}
+          key={turn.id}
+          r={3.5}
+        />
       ))}
 
       {hover !== null && <HoverRule at={x.x(hover)} bottom={plot.bottom} top={plot.top} />}

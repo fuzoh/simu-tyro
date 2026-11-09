@@ -22,7 +22,7 @@
 import type { ChartScene, Polyline, SceneBase, SceneFrame } from "@/lib/chart/scene.ts";
 import type { SharedX, ZScale } from "@/lib/layout/contract.ts";
 import type { DynamicsReading } from "@/lib/scenario/dynamics.ts";
-import type { Ride, RideSample } from "@/lib/sim";
+import type { RideSample } from "@/lib/sim";
 
 import { placeRider } from "@/lib/chart/scene.ts";
 import { formatValue } from "@/lib/format/quantity.ts";
@@ -42,7 +42,7 @@ import {
 import type { DynamiqueOutputs, RideId } from "./outputs.ts";
 
 import { ARRIVAL_LABEL, ESTIMATE, MARKER_LABEL } from "./copy.ts";
-import { RIDE_IDS } from "./outputs.ts";
+import { firstPass, RIDE_IDS } from "./outputs.ts";
 
 /** A point in an SVG's user units. */
 export type PxPoint = readonly [x: number, y: number];
@@ -111,6 +111,11 @@ export type CurveScene = {
   readonly speedTicks: readonly Tick[];
   readonly accelerationTicks: readonly Tick[];
   readonly markers: readonly Pick<StopMarker, "id" | "metres" | "x" | "label" | "row">[];
+  /**
+   * Where each ride that swings back turns — the farthest point reached, where its first pass ends
+   * and its speed is zero. Absent for a ride that arrives or stops without turning back.
+   */
+  readonly farthest: readonly { readonly id: RideId; readonly x: number; readonly y: number }[];
 };
 
 /** The two rides and what they come to. */
@@ -266,8 +271,10 @@ function curveScene(
 ): CurveScene {
   const top = CURVE_TOP;
   const bottom = height - CURVE_BOTTOM;
-  const speeds = RIDE_IDS.flatMap((id) => reading[id].samples.map((sample) => sample.v));
-  const accelerations = reading.windy.samples.map((sample) => sample.a);
+  // Only the first pass is drawn: the swing back would loop the curves over themselves.
+  const passes = { calm: firstPass(reading.calm), windy: firstPass(reading.windy) };
+  const speeds = RIDE_IDS.flatMap((id) => passes[id].map((sample) => sample.v));
+  const accelerations = passes.windy.map((sample) => sample.a);
   const [speed, acceleration] = alignedDomains(signedExtent(speeds), signedExtent(accelerations));
 
   const scale = (domain: Domain) => (value: number) =>
@@ -276,8 +283,11 @@ function curveScene(
   const yAcceleration = scale(acceleration);
   const zero = ySpeed(0);
 
-  const path = (ride: Ride, read: (sample: RideSample) => number, y: (value: number) => number) =>
-    ride.samples.map((sample): PxPoint => [x.x(sample.x), y(read(sample))]);
+  const path = (
+    samples: readonly RideSample[],
+    read: (sample: RideSample) => number,
+    y: (value: number) => number,
+  ) => samples.map((sample): PxPoint => [x.x(sample.x), y(read(sample))]);
 
   // The gutter holds four characters at the axis' 9 px: from 10 on the decimal is dropped, so
   // « -12,3 » reads « -12 » rather than running past the SVG's edge.
@@ -296,10 +306,10 @@ function curveScene(
     height,
     plot: { top, bottom },
     speed: {
-      calm: path(reading.calm, (sample) => sample.v, ySpeed),
-      windy: path(reading.windy, (sample) => sample.v, ySpeed),
+      calm: path(passes.calm, (sample) => sample.v, ySpeed),
+      windy: path(passes.windy, (sample) => sample.v, ySpeed),
     },
-    acceleration: path(reading.windy, (sample) => sample.a, yAcceleration),
+    acceleration: path(passes.windy, (sample) => sample.a, yAcceleration),
     zero,
     speedTicks: [
       { y: zero, text: "0" },
@@ -309,6 +319,14 @@ function curveScene(
       tick(acceleration.pos, yAcceleration, "acceleration"),
       tick(-acceleration.neg, yAcceleration, "acceleration"),
     ]),
+    farthest: RIDE_IDS.flatMap((id) => {
+      const turn = passes[id].at(-1);
+      return reading[id].end.kind === "arrival" ||
+        turn === undefined ||
+        passes[id].length === reading[id].samples.length
+        ? []
+        : [{ id, x: x.x(turn.x), y: ySpeed(turn.v) }];
+    }),
     markers: markers.map(({ id, metres, label, row }) => ({
       id,
       metres,
