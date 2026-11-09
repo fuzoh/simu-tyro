@@ -457,10 +457,32 @@ _Avoid_: slope layer, hillshade, relief
 
 **Vue 3D**:
 The relief view of the line: swisstopo terrain and imagery, both anchors on their Fils à
-plomb, Ligne à vide and loaded line from the engine, and the Banane. Context, not
-measurement: it states nothing the coupe does not. Anchors drag there as on the carte: the
-line follows the pointer, the recalculation waits for the release. Loaded only when chosen.
+plomb, the loaded line from the engine and, as the View Strip's layers say, the Ligne à vide
+with its Banane, the Ligne A–B and the Trajectoire — the coupe's curves, with no picker of its
+own. Context, not measurement: it states nothing the coupe does not. Anchors drag there as on
+the carte: the line follows the pointer, the recalculation waits for the release. The camera
+moves by the Gimbal, by the keys once the view has the focus, and to the two Vues
+prédéfinies. Loaded only when chosen.
 _Avoid_: 3D map, globe, scene, viewer
+
+**Gimbal**:
+The camera's controls over the corner of the Vue 3D: a north needle that turns with the
+camera and puts north up when pressed, a turn left or right around the line's centre, the
+inclinaison up or down, the zoom, and the two Vues prédéfinies. Each button has its key, and
+its hover names it. It moves the camera and nothing else: no anchor, no Scenario.
+_Avoid_: boussole (the Rose des vents's word), navigation control, widget
+
+**Vue du départ**:
+The Vue prédéfinie on the platform at A: the eye 4,5 m to the left of A when one looks
+toward B, 1,7 m above the ground at A's foot, looking along A → B and aimed at anchor B — to
+see the line run away from the start and the Banane bow it. Key 1.
+_Avoid_: vue passager, vue subjective
+
+**Vue latérale**:
+The Vue prédéfinie square across the line, A on the left of the screen as on the coupe, looking
+10° down, just far enough back for the whole line, both anchors and both feet included, to fit
+with a margin. The view the Vue 3D opens on. Key 2.
+_Avoid_: vue de profil, vue de côté
 
 **Rose des vents**:
 The compass rose drawn on the vue de dessus, with a handle that sets the Vent's direction and force by dragging. It edits the azimuth directly: on the north-up map the handle stands where the wind comes from. Its reading gives that azimuth and, from the line's bearing, where the wind comes from relative to the line A → B (« Vent d'ouest (264°), 30 km/h : par la gauche à l'avant, 312° par rapport à la ligne A → B »). Without A and B on the map it has no handle and says why. On Terrain it is read-only. It sets the wind that draws the Banane.
