@@ -1390,42 +1390,12 @@ describe("§ 5 — the two mechanisms the layout may not use", () => {
 /**
  * #115 — **one container margin**. The coupe's frame is `GUTTER` in from its column's edges and every
  * other container on the simplified Pages is `px-3` in from the same edges, so the two must be one
- * number: Tailwind's spacing step is 4 px, and `px-3` is 12. The pixel alignment itself is
- * `agent-browser`'s to measure (`docs/conventions/testing.md`); what is source is the spelling.
+ * number: Tailwind's spacing step is 4 px, and `px-3` is 12. The pixel alignment itself — titles,
+ * tiles, vue de dessus and coupe at 1440 and 2560, scrollbars shown — is `agent-browser`'s to
+ * measure (`docs/conventions/testing.md`), not a spelling of class names to grep.
  */
 describe("#115 — the coupe's gutter is the containers' margin", () => {
-  const root = fileURLToPath(new URL("../../..", import.meta.url));
-  const read = (path: string) => readFileSync(join(root, path), "utf8");
-
   it("GUTTER is px-3, the margin of the titles, the tiles and the vue de dessus", () => {
     expect(GUTTER).toBe(3 * 4);
-    const statique = read("src/components/statique/frame.tsx");
-    // The region titles, and the boxes the tiles and the vue de dessus stand in.
-    expect(statique).toContain('<h2 className="font-heading text-muted-foreground px-3');
-    expect(statique.match(/<div className="px-3">/g)).toHaveLength(2);
-    expect(read("src/components/statique/top-view.tsx")).toContain(
-      '<div className="px-3">{map}</div>',
-    );
-  });
-
-  it("the vue de dessus spans its region, so its right edge is the tiles' and the coupe's", () => {
-    // It was `max-w-2xl`: 672 px wide in a 1096 px region at 1440, its right edge 424 px short of
-    // every other one. The box now takes the region's width and caps its height instead.
-    const frame = /export function TopViewFrame[\s\S]*?\n}\n/.exec(
-      read("src/components/statique/top-view.tsx"),
-    )?.[0];
-    expect(frame).toBeDefined();
-    expect(frame).not.toMatch(/max-w-/);
-    expect(frame).toContain("w-full");
-  });
-
-  it("Terrain's tiles have Statique's vertical padding", () => {
-    // Statique's tiles stand in a `Region`, `py-3`; Terrain's in their own section, which was `py-2`.
-    expect(read("src/components/statique/frame.tsx")).toContain(
-      '<section className="border-border flex flex-col gap-2 border-b py-3',
-    );
-    expect(read("src/components/terrain-page/frame.tsx")).toContain(
-      'className="border-border @container shrink-0 border-t px-3 py-3"',
-    );
   });
 });
