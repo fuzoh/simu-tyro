@@ -138,7 +138,9 @@ function ResultsSection({ cause, results }: { cause: string | null; results: Res
             </p>
           )}
 
-          <div className="mt-2">
+          {/* `gap-2` between the detail rows — the rhythm's step between rows in a section, as the
+              headline rows above — rather than a `py-0.5` on each row, which no rule names (#115). */}
+          <div className="mt-2 flex flex-col gap-2">
             {results.rows
               .filter((row) => row.rank === "detail")
               .map((row) => (
@@ -191,7 +193,7 @@ function HeadlineRow({ row }: { row: ResultRow }) {
 /** One detail row. « ↳ majoration au départ » is a decomposition of the row above it. */
 function DetailRow({ row }: { row: ResultRow }) {
   return (
-    <div className={cn("flex items-baseline gap-1 py-0.5", row.indent && "pl-3")}>
+    <div className={cn("flex items-baseline gap-1", row.indent && "pl-3")}>
       <span className="flex min-w-0 flex-1 items-center gap-1">
         <span className="text-muted-foreground min-w-0 text-xs" title={row.label}>
           {row.label}

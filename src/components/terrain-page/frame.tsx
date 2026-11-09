@@ -44,7 +44,7 @@ export function TerrainFrame({
         </section>
         <section
           aria-label={SECTION.tiles}
-          className="border-border @container shrink-0 border-t px-3 py-2"
+          className="border-border @container shrink-0 border-t px-3 py-3"
         >
           {tiles}
         </section>
