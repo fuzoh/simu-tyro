@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 
+import type { CableShape } from "./catenary.ts";
 import type { SpanInput, SweepStep, Terrain } from "./types.ts";
 
 import {
@@ -729,14 +730,46 @@ describe("the Zones d'ancrage — nothing is judged within z of either anchor (#
     expect(none.whole).toEqual({ hMin: none.hMin, atX: none.atX, atStepIndex: none.atStepIndex });
   });
 
-  test("with z = 10 m the minimum leaves [0, 10] ∪ [140, 150], point and rider alike", () => {
+  test("with z = 10 m the minimum leaves the zones' insides, point and rider alike", () => {
     const zoned = reduce(valley(), 10);
-    expect(zoned.atX).toBeGreaterThan(10);
-    expect(zoned.atX).toBeLessThan(L - 10);
+    // The judged span is the open interval `(10, 140)`; its minimum is read up to its edges.
+    expect(zoned.atX).toBeGreaterThanOrEqual(10);
+    expect(zoned.atX).toBeLessThanOrEqual(L - 10);
     const rider = traverse.steps[zoned.atStepIndex].xD;
     expect(rider).toBeGreaterThan(10);
     expect(rider).toBeLessThan(L - 10);
     expect(zoned.hMin).toBeGreaterThan(reduce(valley(), 0).hMin);
+  });
+
+  test("where the garde rises away from a zone, the minimum is read on its edge, not a step past it", () => {
+    // The valley falls from A faster than the line does, so the judged garde is least at the edge
+    // of A's zone: a boundary minimum, with a slope there. The uniform grid never lands on `x = 10`;
+    // reading the first sample past it was optimistic by up to one spacing times that slope.
+    const zoned = reduce(valley(), 10);
+    expect(zoned.atX).toBe(10);
+    // The value is the line's own at `x = 10` on the governing step, read off `x(s)` and `z(s)`
+    // by a bisection of this test's own rather than by the reducer.
+    const step = traverse.steps[zoned.atStepIndex];
+    const shape: CableShape = {
+      H: step.H,
+      V0: step.V0,
+      w: span.w,
+      EA: span.EA,
+      loads: [{ P: given.P, s: step.sD }],
+    };
+    let lo = 0;
+    let hi = span.L0;
+    for (let it = 0; it < 200; it++) {
+      const mid = (lo + hi) / 2;
+      if (xAt(shape, mid) < 10) lo = mid;
+      else hi = mid;
+    }
+    const atEdge = zAt(shape, lo) - zGroundAt(valley(), 10) - hRider;
+    expect(zoned.hMin).toBeCloseTo(atEdge, 6);
+    // And the scan's resolution no longer moves it: ten times the samples, the same garde.
+    const fine = evaluateClearance(span, given.P, traverse.steps, valley(), hRider, 600, 10);
+    expect(fine.hMin).toBeCloseTo(zoned.hMin, 6);
+    expect(fine.atX).toBe(10);
   });
 
   test("`whole` is the no-zone reduction whatever z is, so Avancé still has what the zones hide", () => {

@@ -562,6 +562,17 @@ for bit. Two zones that meet (`2z ≥ L`) leave nothing to judge and are a Block
 so are zones whose gap holds no sweep step (`2z` within one step spacing, ≈ `L₀/241`, of
 `L`), since the reduction is over the sweep's own `x_P` and its judged minimum is then empty.
 
+The inner interval is open, so its minimum is an infimum: where the garde rises away from a zone —
+a valley falling from the anchor faster than the line — it is the **limit at the edge**, `x → z⁺`
+(or `x → (L − z)⁻`), a boundary minimum with a non-zero slope. No sample of the scan lands there,
+and the first one past the edge reads up to one spacing late — 2 to 9 cm optimistic on a 150 to
+435 m line, measured against a 4800-step, 600-sample scan. So each step also evaluates the line
+**at** `x = z` and `x = L − z`, inverting `x(s)` between the two samples that bracket the edge;
+the judged minimum is then the edge's own value, to the nanometre in `x`, at any scan resolution,
+and its `atX` reads exactly `z`. Only the judged fields read the edges: the minimum with nothing left
+out keeps its vertices. `z = 0` has no edge, which is why it stays bit-exact. What stays at the scan's
+resolution is the outer minimum over `x_P`, on the sweep's own load positions, as for every `z`.
+
 `h_rider` default 2.1 m `[CONVENTION]` (§6.3). Normative EN 15567 free-space/fall-space
 numbers, lateral wind corridor and design wind speed: `[PAYWALLED]` — [R1 B12]'s
 "≥ 2.0 m, 1.0→1.5 m corridor at 28.3 m/s wind" are `[UNVERIFIED:R1]` (R2: _not found_).

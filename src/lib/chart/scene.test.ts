@@ -888,7 +888,8 @@ describe("the Zones d'ancrage — grey on the coupe, never red (#106)", () => {
     const zoned = scene(lowAtA(10));
     expect(zoned.violating).toEqual([]);
     expect(zoned.clearance.contact).toBe("none");
-    expect(zoned.clearance.atX).toBeGreaterThan(10);
+    // On the judged span — at its edge at most, the limit the open interval's minimum reaches.
+    expect(zoned.clearance.atX).toBeGreaterThanOrEqual(10);
     // The contact is still read — as the whole traverse's minimum, which judges nothing.
     expect(zoned.clearance.whole.hMin).toBeLessThan(0);
     expect(zoned.clearance.whole.hMin).toBe(bare.clearance.hMin);
@@ -906,11 +907,12 @@ describe("the Zones d'ancrage — grey on the coupe, never red (#106)", () => {
   it("« Garde min. ligne » leaves the zones out for a passager at mid-span", () => {
     // The cell's `worst` is the line's minimum outside the zones, not the platform under A: with
     // the zones dropped the same rider at x_D 75 reads A's anchor, at x ≈ 0, where the ground is
-    // 0,4 m under the envelope. Structural, in the shipped 150 m span's [0, 10] and [140, 150].
+    // 0,4 m under the envelope. Structural, in the shipped 150 m span's [0, 10] and [140, 150]: the
+    // judged span is the open interval between them, read up to its edges (`evaluateClearance`).
     const L = 150;
     const zoned = scene(lowAtA(10, 75)).rider.worst;
-    expect(zoned.atX).toBeGreaterThan(10);
-    expect(zoned.atX).toBeLessThan(L - 10);
+    expect(zoned.atX).toBeGreaterThanOrEqual(10);
+    expect(zoned.atX).toBeLessThanOrEqual(L - 10);
     expect(zoned.hClear).toBeGreaterThan(0);
     // The control: without zones the cell does read the platform, so this case tells them apart.
     const bare = scene(lowAtA(0, 75)).rider.worst;
