@@ -300,10 +300,10 @@ each term's meaning and its _Avoid_ words; `PROSCRIBED_WORDS` is those words as 
 negotiable, and both are why `src/lib/rail/` exists as pure modules rather than as hook bodies:
 
 - **Form validators own exactly tier one** — what needs no physics. `src/lib/rail/fields.ts` is
-  that tier: emptiness, readability, a sign rule. **The three gates are not form validators**:
-  Solve / Clearance / Verdict are cross-field predicates over the derived Scenario
-  (`src/lib/rail/gates.ts`), because a per-field validator would split one gate across seventeen
-  fields.
+  that tier: emptiness, readability, a sign rule. **The five gates are not form validators**:
+  Solve / Clearance / Verdict, then the Wind and Ride gates the passager's ride adds, are
+  cross-field predicates over the derived Scenario (`src/lib/rail/gates.ts`, `GATE_IDS`), because a
+  per-field validator would split one gate across seventeen fields.
 - **§5.4's chord bound stays in the engine.** No form validator re-derives it, and « Tension
   impossible » is an engine refusal the UI surfaces, never a field error.
 

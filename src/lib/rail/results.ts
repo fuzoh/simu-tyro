@@ -335,7 +335,7 @@ export function deriveResults({
   }
 
   // A Clearance Gate breach removes the garde **and its curve alone** — the cable still draws and
-  // every tension row stands. That is the whole reason the three gates are three.
+  // every tension row stands. That is the whole reason Clearance is a gate of its own.
   if (gates.passed.clearance) {
     const breach = clearanceBreached(base.clearance.hMin, scenario.rider.hClearMin);
     rows.push({

@@ -4,7 +4,7 @@
  * the installation and the garde it is judged against.
  *
  * **No second writer.** Every row here is the Rail's own — `NumericRow` and the shared choice rows,
- * the same `useFieldRows` context, the same `commitPageText`, the same three gates and Fix Actions
+ * the same `useFieldRows` context, the same `commitPageText`, the same five gates and Fix Actions
  * — so a value typed on this Page lands in the Scenario, the address bar and the Session exactly as
  * on Avancé, and is refused with the same message on the field responsible. What changes is the
  * vocabulary (`terrain`) and which fields are shown; the rest of the Scenario stays as the link or

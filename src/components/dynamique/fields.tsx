@@ -1,7 +1,7 @@
 /**
  * The Page Dynamique's fields (#92): the passager's mass, and the Vent — its speed and its
  * direction. **No second writer**: every row is the Rail's own `NumericRow`, through the same
- * `useFieldRows` context, the same commit and the same three gates as on Avancé and Statique, so a
+ * `useFieldRows` context, the same commit and the same five gates as on Avancé and Statique, so a
  * value typed here lands in the Scenario, the address bar and the Session exactly as on those Pages.
  *
  * The ride's constants — `C_dA`, the trolley's friction, `ρ` — are not asked for here: they are

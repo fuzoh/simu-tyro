@@ -127,7 +127,7 @@ function usePublished({
   /**
    * **The gates are applied here and nowhere else.** The scene is derived from the store, which
    * holds numbers, while a committed-invalid « −5 » lives in the form, which holds text — so the
-   * raw derivation goes in and only what survives § 7's three gates comes out.
+   * raw derivation goes in and only what survives the five gates comes out.
    */
   const surfaces = useErrorSurfaces({
     deduced,

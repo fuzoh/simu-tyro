@@ -40,7 +40,7 @@ const CLEAN = report((draft) => {
   draft.regime = "en15567";
 });
 
-describe("the three gates, each removing exactly what § 7 says it does", () => {
+describe("the gates, each removing exactly what § 7 says it does", () => {
   test("a clean line suppresses nothing", () => {
     expect(suppression({ report: CLEAN, refusal: null })).toEqual({
       geometry: false,

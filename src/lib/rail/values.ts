@@ -72,7 +72,7 @@ export type NumericFieldId = {
   [K in FieldId]: (typeof FIELDS)[K]["quantity"] extends null ? never : K;
 }[FieldId];
 
-/** The numeric fields a gate reads: all but `x_D`, which sits in no gate. */
+/** The numeric fields a gate reads: all but `x_D` and the Positions, which sit in no gate. */
 export type GatedFieldId = {
   [K in NumericFieldId]: (typeof FIELDS)[K]["gate"] extends null ? never : K;
 }[NumericFieldId];

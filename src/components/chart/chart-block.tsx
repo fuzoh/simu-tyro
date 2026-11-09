@@ -109,7 +109,7 @@ export function ChartBlock({
   /**
    * May the garde au sol be shown? A Clearance Gate breach removes **the garde and its curve
    * alone** — the cable, the unloaded line, both tensions and the slope all stand, which is the
-   * whole reason § 7's three gates are three. The strip keeps its axes and stays a scrub track:
+   * whole reason Clearance is a gate of its own. The strip keeps its axes and stays a scrub track:
    * `x` maps to rider position whether or not clearance data exists.
    */
   clearance?: boolean;

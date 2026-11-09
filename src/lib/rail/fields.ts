@@ -5,7 +5,7 @@
  * [amendment D](../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md).
  *
  * **Form validators own exactly tier one — what needs no physics.** That boundary is amendment D's
- * and it is not negotiable: the three gates are cross-field predicates over the derived Scenario
+ * and it is not negotiable: the five gates are cross-field predicates over the derived Scenario
  * (`./gates.ts`), and §5.4's chord bound stays in the engine, where « Tension impossible » is an
  * engine refusal the UI surfaces rather than a field error. Nothing in this module derives a
  * physical quantity, and nothing in it reads `@/lib/sim` for a formula.
@@ -444,7 +444,7 @@ export const FIELDS = {
     quantity: null,
     rule: null,
     warning: null,
-    // Descriptive: it crosses none of the three gates — see {@link TensioningDevice}.
+    // Descriptive: it crosses none of the five gates — see {@link TensioningDevice}.
     gate: null,
   },
   tensioningSide: {

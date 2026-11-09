@@ -21,7 +21,7 @@ import {
 import { applyRopeClass, applyShippedTerminations } from "./values.ts";
 
 /**
- * The three gates — « v1 build spec » § 7 (*Les trois grilles de validation*, *Le résumé bloquant*,
+ * The gates — « v1 build spec » § 7 (*Les trois grilles de validation*, *Le résumé bloquant*,
  * *« Saisie en cours »*, *La table des champs responsables*) and § 3 (*The three validation
  * gates*).
  *
@@ -32,6 +32,8 @@ import { applyRopeClass, applyShippedTerminations } from "./values.ts";
  * | Solve | `L`, `h`, le champ de tension directeur, famille + Material Spec, famille × usage (§10.4), `m_p` |
  * | Clearance | hauteurs d'ancrage A / B, terrain, `h_rider` |
  * | Verdict | régime, les deux terminaisons, `DAF` |
+ *
+ * The Wind and Ride gates were added after § 7 (#87, #89 and the ride-gates fix).
  */
 
 function scenario(patch: (draft: ScenarioDraft) => void = () => {}): ScenarioDraft {

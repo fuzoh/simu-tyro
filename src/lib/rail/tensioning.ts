@@ -151,7 +151,7 @@ export const MAESTRO_ROPE_ONLY = "Les Maestro S et L ne se posent que sur une co
 
 /**
  * The Avertissement for a Maestro held on a câble, without its glyph, or `null`. No Blocking Error:
- * the device crosses none of the three gates, so it has no effect on any result.
+ * the device crosses none of the five gates, so it has no effect on any result.
  */
 export function deviceOnCableWarning(
   scenario: Pick<ScenarioDraft, "material" | "tensioningDevice">,

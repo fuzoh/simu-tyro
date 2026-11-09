@@ -1,5 +1,5 @@
 /**
- * **The three gates** — « v1 build spec » § 7 (*Les trois grilles de validation*, *Le résumé
+ * **The gates** — « v1 build spec » § 7 (*Les trois grilles de validation*, *Le résumé
  * bloquant nomme la pire grille franchie*, *« Saisie en cours »*, *La table des champs
  * responsables*) and § 3 (*The three validation gates*, *Champ responsable*), under
  * [amendment D](../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md).
@@ -26,12 +26,14 @@
  *   cannot pre-empt the rank-4 neutral prompt and the picker carries no field message. The
  *   régime × famille/usage clash is a different thing: that one **is** a blocking error with its
  *   `[ Choisir un autre régime ]`, and § 8's message table has a row for it.
- * - **`x_D` sits in no gate.** It clamps on every path, and a clamp produces no error state.
- * - **The passager's ride has two gates of its own**, past the three: the Wind Gate (the Vent) and
- *   the Ride Gate (§12.2's constants). Their fields reach no statics number, but ADR-0001 keeps
- *   them as they arrive **and** gates them, so a negative wind speed withholds the Banane, the
- *   rose's reading and the ride rather than blowing the other way, and a negative `C_dA` withholds
- *   the ride rather than speeding it up. A Wind breach removes the ride too, since it reads the Vent.
+ * - **`x_D` and the Positions sit in no gate.** `x_D` clamps on every path, and a clamp produces no
+ *   error state; no computation reads a Position.
+ * - **The passager's ride has two gates of its own**, past the three: the Wind Gate (the Vent, #87)
+ *   and the Ride Gate (§12.2's constants, #89 and the ride-gates fix). Their fields reach no
+ *   statics number, but ADR-0001 keeps them as they arrive **and** gates them, so a negative wind
+ *   speed withholds the Banane, the rose's reading and the ride rather than blowing the other way,
+ *   and a negative `C_dA` withholds the ride rather than speeding it up. A Wind breach removes the
+ *   ride too, since it reads the Vent.
  * - **§5.4's chord bound is not here.** `L₀ > chord/(1 + T_break/EA)` needs `EA` and `MBF`, so
  *   evaluating it would re-derive physics in the UI. It stays in the engine and surfaces as
  *   « Tension impossible », an engine refusal — never a field error and never a gate.

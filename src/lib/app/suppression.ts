@@ -1,6 +1,7 @@
 /**
  * **What a standing breach removes from the screen** — « v1 build spec » § 7 (*Les trois grilles de
- * validation*, *« Aucun résultat » — une cause, trois échos*, *L'exception géométrique*).
+ * validation*, *« Aucun résultat » — une cause, trois échos*, *L'exception géométrique*). The spec
+ * knew three gates; the Wind and Ride gates came after it (#87, #89 and the ride-gates fix).
  *
  * § 7's gate table has a third column — « ce que l'échec supprime » — and until A11 nothing read
  * it: the scene and the results were derived from the **store**, which holds numbers, while the

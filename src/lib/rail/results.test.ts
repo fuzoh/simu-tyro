@@ -518,7 +518,7 @@ describe("the five verdict states and their grammar", () => {
   }
 });
 
-describe("what suppresses what — three gates, three different consequences", () => {
+describe("what suppresses what — Solve, Clearance, Verdict: three consequences", () => {
   test("a Solve Gate breach is « Aucun résultat »: no rows at all, and no dashes", () => {
     // A textile draft with § 9's two blanks. The cause line that replaces the block is A11's, and
     // it is a sentence — never a set of dashed rows.

@@ -2,7 +2,8 @@
  * The app's error surfaces, composed — « v1 build spec » § 7 (*Les trois grilles de validation*,
  * *Le bandeau : un occupant, quatre rangs*, *« Saisie en cours »*, *« Aucun résultat »*, *Les
  * trois refus*), with rank 2 as
- * [amendment E](../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md) leaves it.
+ * [amendment E](../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md) leaves it. The spec
+ * knew three gates; the Wind and Ride gates came after it (#87, #89 and the ride-gates fix).
  *
  * **Nothing is decided here.** The precedence is `./banner.ts`'s reducer, the three refusal
  * surfaces are `./refusals.ts`'s mapping, « Saisie en cours »'s firing rule is
@@ -91,7 +92,7 @@ export type SurfaceInput = {
   readonly frame: SceneFrame | null;
   /** The Page's vocabulary, which words every sentence the surfaces carry. */
   readonly register: Register;
-  /** The three gates over the Scenario and the form's text. */
+  /** The five gates over the Scenario and the form's text. */
   readonly report: GateReport;
   /** The raw solved half, from the app's one `useSweep` seam. */
   readonly solved: SceneBase | null;

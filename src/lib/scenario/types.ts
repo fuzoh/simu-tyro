@@ -178,8 +178,9 @@ export type Position = {
 /**
  * The two anchors' {@link Position}s, `null` where unknown (manual geometry, or a CSV with no
  * coordinates). In a link the four numbers are `lata` / `lona` / `latb` / `lonb`, **all absent for
- * unknown**. Only « Charger le profil geo.admin » reads them (#103), and only when pressed: statics,
- * the ride and the Verdict never do.
+ * unknown**. They place the anchors on the map and in the Vue 3D and give Mesure its distances; the
+ * `ph` link key (`offPositions`) says whether the profil runs between them; and « Charger le profil
+ * geo.admin » (#103) reads them, only when pressed. Statics, the ride and the Verdict never do.
  */
 export type Positions = { A: Position | null; B: Position | null };
 

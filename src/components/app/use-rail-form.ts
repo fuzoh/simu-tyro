@@ -63,7 +63,7 @@ export type RailFormState = {
   readonly setFocused: (id: FieldId | null) => void;
   /** Tier one's standing failures in the gated fields: text a Scenario of numbers cannot hold. */
   readonly issues: readonly FieldIssue[];
-  /** The three gates over the Scenario **and** that text — the one report every surface reads. */
+  /** The five gates over the Scenario **and** that text — the one report every surface reads. */
   readonly report: GateReport;
 };
 

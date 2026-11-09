@@ -95,7 +95,7 @@ export const REFUSAL_CAUSE: Record<RefusalId, string> = {
  *   the user is editing reads in, which is the whole of « in the driving field's own quantity ».
  * @returns `null` when the failure is **not** one of the three refusals: stages `geometry` and
  *   `material` are « nothing to solve yet », and `invalid-input` on `L`, `h`, `w`, `EA` or
- *   `strength` is a statement about the span — the three gates own both as a blocking error on an
+ *   `strength` is a statement about the span — the five gates own both as a blocking error on an
  *   editable field. A refusal never doubles a field message.
  */
 export function engineRefusal(
