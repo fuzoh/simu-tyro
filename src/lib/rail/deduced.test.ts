@@ -50,24 +50,25 @@ describe("§ 9's opening `VALEURS DÉDUITES`, from the shipped defaults", () => 
     expect(formatQuantity("chord", span?.chord ?? NaN)).toBe("151,08 m");
   });
 
-  test("the solved rows: 151,64 m · 253,5 daN · 6,00 m (à x 74,8 m) · 4,00 % · 2,90 %", () => {
+  test("the solved rows: 151,64 m · 253,6 daN · 6,00 m (à x 74,8 m) · 4,00 % · 2,90 %", () => {
     expect(solve).not.toBeNull();
     expect(formatQuantity("L0", solve?.L0 ?? NaN)).toBe("151,64 m");
-    expect(formatQuantity("H_target", solve?.H ?? NaN)).toBe("253,5 daN");
+    expect(formatQuantity("H_target", solve?.H ?? NaN)).toBe("253,6 daN");
     expect(formatQuantity("sag", solve?.sag ?? NaN)).toBe("6,00 m");
     expect(formatQuantity("extremumX", solve?.sagAtX ?? NaN)).toBe("74,8 m");
     expect(formatQuantity("sagRatio", solve?.sagRatio ?? NaN)).toBe("4,00 %");
     expect(formatQuantity("standingTension", solve?.standingTension ?? NaN)).toBe("2,90 %");
   });
 
-  test("`flèche à vide` is exact at display precision — why `Flèche` ships as the segment", () => {
-    // A direct-`L₀` default would ship a rounded 151,64 m and cost 0,21 m of flèche and 0,20 m of
-    // garde: 8 % of the shipped margin. 6,0 m costs nothing.
+  test("the tension de pose drives, and the flèche it holds reads 6,0 m at display precision", () => {
+    // The simplified Pages drive the tension de pose, so that is the segment first run ships. A
+    // direct-`L₀` default would ship a rounded 151,64 m and cost 0,21 m of flèche and 0,20 m of
+    // garde: 8 % of the shipped margin. 263,4 daN costs nothing: the line it asks for is the one
+    // the 6,0 m flèche used to ask for, read at the grain a mode switch prefills at.
     const draft = scenario();
-    if (draft.tightness.mode !== "sag") throw new Error("expected the flèche segment");
-    // At display precision, which is the grain a mode switch prefills at — not at float equality,
-    // which would be an assertion about §5.3's solver tolerance and not about the shipped screen.
-    expect(roundToDisplay("D_target", solve?.sag ?? NaN)).toBe(draft.tightness.D_target);
+    if (draft.tightness.mode !== "anchor") throw new Error("expected the tension de pose segment");
+    expect(roundToDisplay("T_target", draft.tightness.T_target)).toBe(draft.tightness.T_target);
+    expect(roundToDisplay("sag", solve?.sag ?? NaN)).toBe(6);
   });
 
   test("nothing is overridden on first run, so nothing is stale", () => {
@@ -382,17 +383,19 @@ describe("`deducedRows` — the rows the Rail prints, decided outside the compon
     rows.map(({ label, value, warning }) => [label, value, warning]);
 
   test("the opening screen's eight read-only rows", () => {
-    // Read off the running app at `/` with an empty Session. `Flèche` drives, so its read-out is
-    // the field and not a row; the three steel Override rows are fields of their own. Since #85
-    // the prétension is read at A, where the Mise en tension ships, and `H` sits beside it.
+    // Read off the running app at `/` with an empty Session. The prétension drives, so its
+    // read-out is the field and not a row; the three steel Override rows are fields of their own.
+    // Since #85 the prétension is read at A, where the Mise en tension ships, and `H` sits beside
+    // the field. Re-pinned when first run moved from the flèche to the tension de pose: `H` reads
+    // 253,6 against 253,5 (263,4 daN is the displayed value, not the exact one) and the flèche is a row.
     const opening = scenario();
     const rows = deducedRows(opening, deduceValues(opening, null), null);
     expect(shown(rows)).toEqual([
       ["Poids linéique", "0,536 daN/m", null],
       ["Ligne A–B", "151,08 m", null],
       ["Longueur non tendue", "151,64 m", null],
-      ["Prétension", "263,4 daN", null],
-      ["Tension horizontale", "253,5 daN", null],
+      ["Tension horizontale", "253,6 daN", null],
+      ["Flèche à vide", "6,00 m (à x 74,8 m)", null],
       ["Rapport V", "0,46", null],
       ["Flèche / portée", "4,00 %", null],
       ["Tension à vide", "2,90 % MBF", null],
@@ -500,8 +503,12 @@ describe("#85 — the prétension is read at the tensioning anchor, `H` beside i
 
   test("A ↔ B moves the prétension read on the inclined first-run span, and nothing else", () => {
     // `h = −18`: A is the higher anchor, where §2 puts the unloaded line's greater tension.
-    const atA = scenario();
+    // Driven by the flèche, so the prétension is a row to read rather than the field itself.
+    const atA = scenario((draft) => {
+      draft.tightness = { mode: "sag", D_target: 6 };
+    });
     const atB = scenario((draft) => {
+      draft.tightness = { mode: "sag", D_target: 6 };
       draft.tensioningSide = "B";
     });
     expect(valueOf(atA, "Prétension")).toBe("263,4 daN");

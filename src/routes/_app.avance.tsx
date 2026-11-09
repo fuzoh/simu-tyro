@@ -24,7 +24,7 @@ export const Route = createFileRoute("/_app/avance")({
    * layout's navigation bar stay server-rendered.
    *
    * Full SSR was rejected on **provenance, not cost**: for a bare `/` the server would paint the
-   * shipped defaults (Portée 150,0 m, Flèche 6,0 m) and the Session read would replace them a tick
+   * shipped defaults (Portée 150,0 m, tension de pose 263,4 daN) and the Session read would replace them a tick
    * later. A flash of somebody else's numbers is the exact failure this app exists to refuse, and
    * it lands on the input half too — a rigger who glances at a painted 150,0 m and then sees
    * 250,0 m has been shown a number with no provenance. Two more, both measured: a *genuine* throw

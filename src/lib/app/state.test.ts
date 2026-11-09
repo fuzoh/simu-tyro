@@ -112,13 +112,14 @@ describe("initialAppState — § 8's mount order", () => {
     it("completes the recognised keys it omits, literally, from § 9", () => {
       const state = initialAppState({ query: "?L=250&h=-40", session: null });
 
-      expect(state.link.completed).toContain("fl");
+      expect(state.link.completed).toContain("tp");
+      expect(state.link.completed).not.toContain("fl");
       expect(state.link.completed).toContain("mp");
       // `reg` and the three overrides are exempt: their absence **is** the meaning.
       expect(state.link.completed).not.toContain("reg");
       expect(state.link.completed).not.toContain("mbf");
       expect(state.scenario.regime).toBeNull();
-      expect(state.scenario.tightness).toEqual({ mode: "sag", D_target: 6 });
+      expect(state.scenario.tightness).toEqual({ mode: "anchor", T_target: 2634 });
     });
   });
 
@@ -357,7 +358,7 @@ describe("appReducer — the Rail's five structural actions", () => {
 
     it("returns the active configuration to the shipped defaults", () => {
       expect(reset.scenario.geometry).toEqual({ source: "manual", L: 150, h: -18 });
-      expect(reset.scenario.tightness).toEqual({ mode: "sag", D_target: 6 });
+      expect(reset.scenario.tightness).toEqual({ mode: "anchor", T_target: 2634 });
       // « — choisir — » again: the régime is part of the active configuration.
       expect(reset.scenario.regime).toBeNull();
     });

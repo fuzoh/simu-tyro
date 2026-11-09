@@ -5,7 +5,7 @@
  * link that omits keys is filled from. *Not three copies* — a reset and a partial link must land
  * on exactly the values a fresh visit does (§ 10, P2).
  *
- * Shipped line: **150,0 m · −18,0 m · hauteurs 12,0 / 12,0 m · flèche à vide cible 6,0 m** on
+ * Shipped line: **150,0 m · −18,0 m · hauteurs 12,0 / 12,0 m · tension de pose 263,4 daN** on
  * 12 mm 1770 6×19 âme métallique, cosse à sertir at both ends, a 120 kg rider at `x` 75,0 m.
  *
  * Rules this module exists to keep:
@@ -17,10 +17,12 @@
  *   (12/6 m measures −1,04 m). Hence 12,0 / 12,0 m, read as « 12 m of clear air beneath each
  *   anchor » rather than « build two towers », which is a claim § 6's terrain-provenance copy has
  *   to keep making.
- * - **Flèche is the active Tightness segment because its value is exact at display precision.**
- *   § 9's *Finding 2*: a prefill writes the *displayed* value into state, so a direct-`L₀`
- *   default would ship 151,64 m and cost 0,21 m of flèche and 0,20 m of garde — **8 % of the
- *   shipped margin**. 6,0 m costs nothing.
+ * - **Tension de pose is the active Tightness segment because the simplified Pages drive it, and
+ *   its value is exact at display precision.** A first-run line driven by the flèche held 6 m of
+ *   sag through a span change and moved the tension de pose silently. § 9's *Finding 2*: a prefill
+ *   writes the *displayed* value into state, so a direct-`L₀` default would ship 151,64 m and cost
+ *   0,21 m of flèche and 0,20 m of garde — **8 % of the shipped margin**. 263,4 daN costs
+ *   nothing (the flèche reads 6,00 m).
  * - **The absences are meaning, not omissions.** `regime: null` is « — choisir — » (struck from
  *   the solve tier, so the app opens **verdict-less** and still computes); no `overrides` key on
  *   the steel spec is « non surchargée », because an override on first run would ship the one
@@ -32,7 +34,7 @@
  * - **No worked example ships** — no named scenario, no bundled trace, no « charger un exemple ».
  *   The first-run scenario *is* the worked example, and the three CSVs stay fixtures.
  * - **This module holds inputs only.** The opening state § 9 records — `L₀` 151,644 m, `H`
- *   253,5 daN, garde 2,42 m, FS 8,80 / 9,06 — is *computed* from these by the engine, never
+ *   253,6 daN, garde 2,42 m, FS 8,80 / 9,06 — is *computed* from these by the engine, never
  *   stored beside them: a second copy is a copy that can disagree with the solver. `first-run.test.ts`
  *   is where those figures are locked.
  */
@@ -68,8 +70,15 @@ export const FIRST_RUN_SCENARIO = {
   tensioningSide: "A",
   /** The mouflage, which is `mt` **absent**: the shipped link did not change either. */
   tensioningDevice: "pulley",
-  /** `fl=6.0` — §7 mode 3, the only mode whose shipped value is exact at display precision. */
-  tightness: { mode: "sag", D_target: 6 },
+  /**
+   * `tp=263.4` — the tension de pose, per member, at the anchor of the Mise en tension (A), 2634 N.
+   * The simplified Pages drive only that field, so a first-run line driven by the flèche would hold
+   * 6 m of sag through a span change and let the tension de pose jump (263,4 → 2119 daN on the 435 m
+   * trial trace). 263,4 daN is the figure the 6 m line shows at A, at display precision — and exact
+   * there, which is the same reason `fl=6` was once chosen. The flèche is now the read-out: 6,00 m
+   * on the shipped line, to display precision. Links that carry `fl`/`te`/`lo`/`vr` open as given.
+   */
+  tightness: { mode: "anchor", T_target: 2634 },
   /**
    * `fam=ac&d=12&r0=1770&cst=iwrc`, **no `mbf`/`ea`/`mu`**. §13.1 then gives MBF 9074 daN, `EA`
    * 6,90 MN and `μ` 0,5465 kg/m from `K` 0,356 and the pinned midpoints the provenance popover
@@ -164,8 +173,8 @@ export const FIRST_RUN_RETAINED_TEXTILE = {
  * Two completion rules that live at the call site rather than here, both § 9's: keys whose
  * **absence carries meaning** are exempt (`reg`, `mbf`/`ea`/`mu`, the terrain and inactive-family
  * keys), and `x` completes to `L/2` of the *completed* span — 125,0 m for `?L=250&h=-40` — not to
- * the constant 75,0. Everything else completes **literally**: `fl` completes to 6,0 m and never
- * to 4 % of the arriving span, which measured 1,25 m of garde against a « smart » completion's
+ * the constant 75,0. Everything else completes **literally**: `tp` completes to 263,4 daN and never
+ * to a flèche of 4 % of the arriving span, which measured 1,25 m of garde against a « smart » completion's
  * −2,39 m, i.e. a hand-authored link on the ground.
  */
 export function firstRunDefaults(): Scenario {

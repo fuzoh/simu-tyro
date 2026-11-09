@@ -59,6 +59,12 @@ function scenario(patch: (draft: ScenarioDraft) => void = () => {}): ScenarioDra
   return draft;
 }
 
+/**
+ * A line driven by its flèche — what a link carrying `fl` opens as, and what the switch tests
+ * start from. First run itself drives by the tension de pose, so these say so.
+ */
+const onFlèche = (draft: ScenarioDraft) => void (draft.tightness = { mode: "sag", D_target: 6 });
+
 describe("railValues — the read direction of the force selector", () => {
   test("§ 9's opening screen, field by field", () => {
     const values = railValues(scenario());
@@ -67,7 +73,9 @@ describe("railValues — the read direction of the force selector", () => {
       h: "-18,0",
       zA: "12,0",
       zB: "12,0",
-      D_target: "6,00",
+      // The tension de pose drives and the flèche is a read-out, so its field is blank.
+      T_target: "263,4",
+      D_target: "",
       d: "12,0",
       etaA: "0,90",
       etaB: "0,90",
@@ -80,7 +88,7 @@ describe("railValues — the read direction of the force selector", () => {
 
   test("a field the current mode, family or driver does not render is blank", () => {
     const values = railValues(scenario());
-    // Steel has no rope class; `Flèche` is the driver.
+    // Steel has no rope class; the tension de pose is the driver.
     expect(values.MBL).toBe("");
     expect(values.L0).toBe("");
     expect(values.H_target).toBe("");
@@ -391,7 +399,7 @@ describe("Override — steel only, per value, and « Recalculer » drops the key
 });
 
 describe("the Tightness Spec — one editable field, prefilled from its own read-out", () => {
-  const first = scenario();
+  const first = scenario(onFlèche);
   const deduced = deduceValues(first, null);
 
   test("« Flèche » → « Longueur » lands on the length just achieved, at 2 decimals", () => {
@@ -482,7 +490,7 @@ describe("#85 — the prétension's lens and the tensioning side", () => {
     });
     expect(FIELD_ACCESS.T_target.read(driven)).toBe(2600);
     expect(FIELD_ACCESS.H_target.read(driven)).toBeUndefined();
-    expect(FIELD_ACCESS.T_target.read(scenario())).toBeUndefined();
+    expect(FIELD_ACCESS.T_target.read(scenario(onFlèche))).toBeUndefined();
   });
 
   test("writing the prétension makes it the driver and leaves the side where it stands", () => {
@@ -496,8 +504,9 @@ describe("#85 — the prétension's lens and the tensioning side", () => {
 
   test("A ↔ B changes the prétension the switch prefills on the inclined first-run span", () => {
     // `h = −18`: one line, two readings — the higher anchor A reads more, as §2 says it must.
-    const atA = scenario();
+    const atA = scenario(onFlèche);
     const atB = scenario((draft) => {
+      onFlèche(draft);
       draft.tensioningSide = "B";
     });
     const fromA = switchTightness(atA, "anchor", deduceValues(atA, null));
@@ -511,7 +520,7 @@ describe("#85 — the prétension's lens and the tensioning side", () => {
       draft.tensioningSide = "B";
       draft.tightness = { mode: "sag", D_target: 0.01 };
     });
-    const lastGood = deduceValues(scenario(), null).solve;
+    const lastGood = deduceValues(scenario(onFlèche), null).solve;
     const switched = switchTightness(atB, "anchor", deduceValues(atB, null), lastGood);
     expect(switched.tightness).toEqual({ mode: "anchor", T_target: 2537 });
   });
@@ -726,8 +735,9 @@ describe("commitText — the one write path every Page's fields share (#91)", ()
 });
 
 describe("the driver a Page offers alone takes the line over (#91)", () => {
-  // The shipped line hangs on its flèche; Statique offers the tension de pose alone.
-  const sagged = scenario();
+  // A line that hangs on its flèche — a link carrying `fl` — while Statique offers the tension de
+  // pose alone. First run drives by the tension de pose, so it never needs this takeover.
+  const sagged = scenario(onFlèche);
   const deduced = deduceValues(sagged, null);
   const solve = deduced.solve;
   if (solve === null) throw new Error("the shipped line solves");

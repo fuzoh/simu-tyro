@@ -496,7 +496,7 @@ function refuse(raw: Record<string, unknown>): LinkRefusal | undefined {
 
   // Presence, not value: « two present keys are not a bad value but two contradictory models of
   // the same line ». Composed with completion-from-defaults, dropping both would silently supply
-  // our own Flèche 6,0 m in the one quantity that scales every tension in the criteria grid.
+  // our own tension de pose in the one quantity that scales every tension in the criteria grid.
   const drivers = TIGHTNESS_KEYS.filter((key) => key in raw);
   if (drivers.length > 1) {
     return {

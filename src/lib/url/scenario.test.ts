@@ -66,7 +66,7 @@ const ALWAYS_COMPLETED = [
   "use",
   "za",
   "zb",
-  "fl",
+  "tp",
   "fam",
   "ta",
   "tb",
@@ -102,7 +102,7 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
       h: -40,
       za: 12,
       zb: 12,
-      fl: 6,
+      tp: 263.4,
       fam: "ac",
       d: 12,
       r0: 1770,
@@ -123,7 +123,7 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
       "use",
       "za",
       "zb",
-      "fl",
+      "tp",
       "fam",
       "d",
       "r0",
@@ -138,8 +138,20 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
       "daf",
       "x",
     ]);
-    // § 7's measurement: `fl` completes to 6,0 m literally and never to 4 % of the arriving span.
-    expect(search.fl).toBe(FIRST_RUN_SCENARIO.tightness.D_target);
+    // § 7's measurement: the driver completes literally — never to a flèche of 4 % of the arriving
+    // span. It is the tension de pose, 263,4 daN, and no `fl` rides along beside it.
+    expect(search.tp).toBe(263.4);
+    expect("fl" in search).toBe(false);
+  });
+
+  test("a link that carries its own driver keeps it, and `tp` is not added beside it", () => {
+    // ADR-0001: a link opens as given. Two drivers would be a contradiction the link is refused for.
+    for (const key of ["fl=6", "te=253.5", "lo=151.64", "vr=0.82"]) {
+      const { search, completed } = complete(`?L=250&h=-40&${key}`);
+      expect("tp" in search).toBe(false);
+      expect(completed).not.toContain("tp");
+    }
+    expect(complete("?L=250&h=-40&fl=6").search.fl).toBe(6);
   });
 
   test("`reg` is exempt — its absence is « — choisir — », never a value waiting to be filled", () => {
@@ -356,12 +368,12 @@ describe("the token tables", () => {
 describe("the first-run link", () => {
   test("is § 9's shipped scenario, in canonical order", () => {
     expect(FIRST_RUN_LINK).toBe(
-      "/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&fam=ac&d=12&r0=1770" +
+      "/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&tp=263.4&fam=ac&d=12&r0=1770" +
         "&cst=iwrc&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=75",
     );
   });
 
-  test("is 142 characters — `reg` absent, `mbf`/`ea`/`mu` absent", () => {
+  test("is 146 characters — `reg` absent, `mbf`/`ea`/`mu` absent", () => {
     // § 7/§ 9/§ 11 quote **141**, counted off § 9's *printed* sketch, which spells `fl=6.0` and
     // `x=75.0`. That sketch is not emittable: the spec keeps the router's default codecs, and
     // `stringifySearchWith(JSON.stringify, JSON.parse)` renders the number 6 as `6` and the
@@ -369,8 +381,9 @@ describe("the first-run link", () => {
     // display-only: state holds a number whose value equals the displayed value, so the URL
     // serialises `6` ». So 141 − 4 = **137**, measured against the installed router; the two
     // absence meanings the count exists to lock are asserted below, unchanged. **142 since
-    // 2026-09-23**: `&gm=1` — « Garde exigée » — is five more characters.
-    expect(FIRST_RUN_LINK).toHaveLength(142);
+    // 2026-09-23**: `&gm=1` — « Garde exigée » — is five more characters. **146 since the first-run
+    // driver became the tension de pose**: `tp=263.4` is four characters longer than `fl=6`.
+    expect(FIRST_RUN_LINK).toHaveLength(146);
     expect(FIRST_RUN_LINK).not.toContain("reg=");
     expect(FIRST_RUN_LINK).not.toContain("mbf=");
     expect(FIRST_RUN_LINK).not.toContain("ea=");
@@ -703,8 +716,8 @@ describe("searchToScenario — the read side of § 7's key table", () => {
   it("is total over a completed link — every field is filled or blank on purpose", () => {
     const scenario = decode("?L=250&h=-40");
     expect(scenario.geometry).toEqual({ source: "manual", L: 250, h: -40 });
-    // § 7 completes `fl` **literally** to 6,0 m, and `x` to `L/2` of the *completed* span.
-    expect(scenario.tightness).toEqual({ mode: "sag", D_target: 6 });
+    // § 7 completes the driver **literally** — `tp` 263,4 daN — and `x` to `L/2` of the *completed* span.
+    expect(scenario.tightness).toEqual({ mode: "anchor", T_target: 2634 });
     expect(scenario.rider.xD).toBe(125);
   });
 });

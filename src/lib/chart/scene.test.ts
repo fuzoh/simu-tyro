@@ -862,5 +862,8 @@ function riderContact(): Scenario {
     ...firstRunDefaults(),
     geometry: { source: "manual", L: 200, h: -25 },
     anchors: { zA: 12, zB: 6 },
+    // Measured at flèche 6,0 — the first-run line now holds a tension de pose instead, which on
+    // this span would hang a different sag.
+    tightness: { mode: "sag", D_target: 6 },
   };
 }

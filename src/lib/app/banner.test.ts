@@ -130,6 +130,8 @@ describe("rank 3 — « Saisie en cours », and it has to be reachable", () => {
   /** A required field emptied **while the caret is in it**: the form's issue, not the Scenario's. */
   const state = scenario((draft) => {
     draft.regime = "en15567";
+    // The flèche has to be the driver for its field to be the one emptied.
+    draft.tightness = { mode: "sag", D_target: 6 };
   });
   const report = evaluateGates({
     scenario: state,
@@ -159,6 +161,7 @@ describe("rank 3 — « Saisie en cours », and it has to be reachable", () => {
     const withInvalid = evaluateGates({
       scenario: scenario((draft) => {
         draft.regime = "en15567";
+        draft.tightness = { mode: "sag", D_target: 6 };
         draft.rider.mp = -1;
       }),
       issues: [{ field: "D_target", kind: "empty", message: "valeur requise" }],

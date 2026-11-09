@@ -310,9 +310,10 @@ export type Completion = {
  * is listed in {@link Completion.completed}, so the link strip names it: completion is the one
  * rewrite ADR-0001 admits, and only because it is never silent.
  *
- * Literally, and that is measured, not stylistic: `?L=250&h=-40` completed with `fl=6.0` lands
- * clear at garde 1,25 m with an honest 2,40 % ⚠, while a "smart" 4 %-of-span completion lands at
- * **−2,39 m — on the ground**.
+ * Literally, and that is measured, not stylistic: `?L=250&h=-40` completed with a literal 6,0 m
+ * flèche (the first-run driver before it became the tension de pose) lands clear at garde 1,25 m
+ * with an honest 2,40 % ⚠, while a "smart" 4 %-of-span completion lands at **−2,39 m — on the
+ * ground**.
  *
  * The values come from the **active family's** shipped default: `FIRST_RUN_SCENARIO` for steel,
  * and for textile the retained textile default, so `?fam=tx` completes the rope class and both ends
@@ -716,7 +717,8 @@ const SHIPPED_BY_FAMILY: Readonly<
  * itself stays **bare** on first run: a bare Page *means* « restore the Session », so it is never
  * rewritten on load.
  *
- * **142 characters, measured against the installed router** — 137 before `gm` (2026-09-23).
+ * **146 characters, measured against the installed router** — 137 before `gm` (2026-09-23), 142
+ * with it and `fl=6`, 146 since first run drives by `tp=263.4` (four characters longer).
  * § 7, § 9 and § 11 all quote **141**,
  * counted off § 9's *printed* sketch, which spells `fl=6.0` and `x=75.0` — and that sketch is not
  * emittable. The spec keeps the router's default codecs (« no global codec override »), and

@@ -428,7 +428,7 @@ describe("the injected chain — `vi.mock` on the collaborator, never a widened 
     expect(mapped(failure!, { tightness: draft.tightness })).toEqual({
       id: "cible-inatteignable",
       message:
-        "⛔ Cible inatteignable — aucune longueur non tendue ne donne cette flèche à vide (6,00 m).",
+        "⛔ Cible inatteignable — aucune longueur non tendue ne donne cette prétension (263,4 daN).",
       diagnostic: false,
     });
     vi.doUnmock("@/lib/sim");

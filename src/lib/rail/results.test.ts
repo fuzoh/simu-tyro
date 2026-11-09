@@ -36,7 +36,7 @@ import {
  * - **The gate: « Résultats sans régime » makes five things absent, not dashed.** The four
  *   `k`-dependent rows *and* the criteria × ends grid, because one gate suppresses both. No string
  *   this module emits ever contains « — »: that glyph is `Indéterminé`'s alone.
- * - **The headline `T max` is the amplified envelope**, 927,9 daN and not 817,1 — the quantity
+ * - **The headline `T max` is the amplified envelope**, 928,0 daN and not 817,2 — the quantity
  *   `FS effectif` divides by. The static envelope is a detail row with its amplification beside it.
  * - **The app's own envelope agrees with `evaluateVerdict`'s**, which is the check that earns
  *   `amplifiedTension` its place in the barrel: the reduced row set prints `T max` in a state where
@@ -128,7 +128,7 @@ describe("« Résultats sans régime » — the reduced row set", () => {
     // Garde min is geometric fact — no `k` appears anywhere in §11 — and the tension envelope is
     // physics. All a régime adds is a divisor.
     expect(valueOf(results, "clearance")).toBe("2,42 m");
-    expect(valueOf(results, "Tmax")).toBe("927,9 daN");
+    expect(valueOf(results, "Tmax")).toBe("928,0 daN");
   });
 });
 
@@ -158,14 +158,14 @@ describe("the thirteen reported values, on the shipped line under EN 15567-1", (
   test("§ 9's canonical sketch, row by row", () => {
     expect(valueOf(results, "verdict")).toBe("Dans les limites — EN 15567-1 (k = 3,0)");
     expect(valueOf(results, "FS")).toBe("8,80");
-    expect(valueOf(results, "Tmax")).toBe("927,9 daN");
+    expect(valueOf(results, "Tmax")).toBe("928,0 daN");
     expect(valueOf(results, "clearance")).toBe("2,42 m");
     expect(valueOf(results, "reserve")).toBe("+1794 daN");
     expect(valueOf(results, "TadmA")).toBe("2722 daN");
     expect(valueOf(results, "TadmB")).toBe("2722 daN");
-    expect(valueOf(results, "TmaxA")).toBe("927,9 daN");
-    expect(valueOf(results, "TmaxB")).toBe("901,5 daN");
-    expect(valueOf(results, "Tstatic")).toBe("817,1 daN");
+    expect(valueOf(results, "TmaxA")).toBe("928,0 daN");
+    expect(valueOf(results, "TmaxB")).toBe("901,6 daN");
+    expect(valueOf(results, "Tstatic")).toBe("817,2 daN");
     expect(valueOf(results, "amplification")).toBe("+110,8 daN");
     expect(valueOf(results, "loadedSag")).toBe("7,48 m");
     // `résolus / grid.length`, and the denominator is **260**: 240 uniform steps plus 10
@@ -174,7 +174,7 @@ describe("the thirteen reported values, on the shipped line under EN 15567-1", (
   });
 
   test("the headline is the amplified envelope, and the static one is a detail row", () => {
-    // A headline of 817,1 lets a reader compute 0,9·9074/817 = 10,00 against a printed 8,80 — a
+    // A headline of 817,2 lets a reader compute 0,9·9074/817 = 10,00 against a printed 8,80 — a
     // reconciliation failure invisible in exactly the state that ships.
     expect(valueOf(results, "Tmax")).not.toBe(valueOf(results, "Tstatic"));
     const headline = results.rows.find((row) => row.id === "Tmax");
@@ -203,6 +203,9 @@ describe("the thirteen reported values, on the shipped line under EN 15567-1", (
     const thin = resultsOf({
       regime: "wsqld",
       material: { family: "steel", d: 6, R0: 1770, construction: "iwrc" },
+      // The grid quoted here was measured with the 6 m flèche holding; under the tension de pose
+      // first run now drives, a lighter cable hangs a different line.
+      tightness: { mode: "sag", D_target: 6 },
     });
     expect(thin.verdict?.governing?.criterion).toBe("charge-suspendue");
     const fs = thin.rows.find((row) => row.id === "FS");
@@ -258,7 +261,7 @@ describe("the thirteen reported values, on the shipped line under EN 15567-1", (
 
   test("the force selector moves every force row and touches no other", () => {
     const kN = resultsOf({ regime: "en15567", unit: "kN" });
-    expect(valueOf(kN, "Tmax")).toBe("9,279 kN");
+    expect(valueOf(kN, "Tmax")).toBe("9,280 kN");
     expect(valueOf(kN, "TadmA")).toBe("27,22 kN");
     // Lengths, percentages and the dimensionless `FS` are not forces.
     expect(valueOf(kN, "clearance")).toBe("2,42 m");
@@ -294,10 +297,10 @@ describe("the app's envelope against the engine's", () => {
     // At `DAF ≤ 0` the amplified ordering inverts — `T_DAF,A` −290,3 against `T_DAF,B` −286,1 — so
     // an envelope headline chosen on `Tdaf` would make the **one tension number left on screen**
     // report the lesser anchor under the other one's name: 793,5 daN « ancrage B » where the true
-    // static envelope is 817,1 at A, as every other state prints it.
+    // static envelope is 817,2 at A, as every other state prints it.
     const results = resultsOf({ rider: { ...SHIPPED.rider, DAF: -1 } });
     const Tstatic = results.rows.find((row) => row.id === "Tstatic");
-    expect(Tstatic?.value).toBe("817,1 daN");
+    expect(Tstatic?.value).toBe("817,2 daN");
     expect(Tstatic?.qualifier).toBe("ancrage A");
   });
 });
@@ -626,7 +629,7 @@ describe("two Brins porteurs — values per line, the pair, and the « cas défa
     expect(row?.qualifier).toBe("ancrage A, hors verdict");
     // Same pose, the whole passager on one member: exactly the line a single member is.
     expect(row?.value).toBe(valueOf(single, "Tmax"));
-    expect(row?.value).toBe("927,9 daN");
+    expect(row?.value).toBe("928,0 daN");
   });
 
   test("the « cas défavorable » changes neither the Verdict's state nor its cells", () => {

@@ -78,9 +78,13 @@ describe("what each standing state leaves on screen", () => {
 
   describe("a required field emptied in the form", () => {
     const emptied: FieldIssue = { field: "D_target", kind: "empty", message: "valeur requise" };
+    // The flèche has to be the driver for its field to be the one emptied.
+    const sagDriven = (draft: ScenarioDraft) => {
+      draft.tightness = { mode: "sag", D_target: 6 };
+    };
 
     test("under the caret it freezes the picture — « Saisie en cours », nothing suppressed", () => {
-      const { solved, surfaces } = surfacesOf(() => {}, {
+      const { solved, surfaces } = surfacesOf(sagDriven, {
         focused: "D_target",
         issues: [emptied],
       });
@@ -92,7 +96,7 @@ describe("what each standing state leaves on screen", () => {
     });
 
     test("left blank it blocks, as the same blank arriving in a link would", () => {
-      const { surfaces } = surfacesOf(() => {}, { issues: [emptied] });
+      const { surfaces } = surfacesOf(sagDriven, { issues: [emptied] });
       expect(surfaces).toMatchObject({ saisie: null, solved: null, results: null });
       expect(surfaces.cause).toMatch(/^Aucun résultat — /);
     });

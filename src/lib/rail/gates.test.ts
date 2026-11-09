@@ -528,15 +528,20 @@ describe("tier one arrives from the form for the text the Scenario cannot hold",
 });
 
 describe("« Saisie en cours » — a required field empty **and holding focus**", () => {
+  // The flèche has to be the driver for its field to be the one emptied.
+  const sagDriven = (draft: ScenarioDraft) => {
+    draft.tightness = { mode: "sag", D_target: 6 };
+  };
   const report = evaluateGates({
     scenario: scenario((draft) => {
       draft.regime = "en15567";
+      sagDriven(draft);
     }),
     issues: [{ field: "D_target", kind: "empty", message: "valeur requise" }],
   });
 
   test("it names the field and its last committed value", () => {
-    const state = scenario();
+    const state = scenario(sagDriven);
     expect(
       saisieEnCours(
         report,

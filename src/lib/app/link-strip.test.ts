@@ -117,7 +117,7 @@ describe("§ 8's second sentence — the completion names the values", () => {
     // § 7 serialises every force in daN; the strip prints what the recipient's own field shows.
     expect(strip("?te=900&L=150")?.completed).not.toContain("tension horizontale");
     expect(strip("?tp=900&L=150")?.completed).not.toContain("prétension");
-    expect(strip("?L=150&h=-18")?.completed).toContain("flèche à vide 6,00 m");
+    expect(strip("?L=150&h=-18")?.completed).toContain("prétension 263,4 daN");
   });
 
   test("what absence *means* is never completed, so the strip never names it", () => {
