@@ -130,25 +130,14 @@ export function PageLink({
   children: ReactNode;
 }) {
   const search = useLocation({ select: (location) => location.search });
-  const pending = use(PendingWrites);
-  const navigate = useNavigate();
-
-  function onClick(event: MouseEvent<HTMLAnchorElement>) {
-    const flushed = pending?.flush() ?? null;
-    if (flushed === null || !isPlainClick(event)) return;
-    event.preventDefault();
-    // The browser history coalesces the navigations of one tick into a single entry, which would
-    // swallow the flush's replace. Queued after it, the push leaves the Page's own entry holding
-    // the edit, so Back returns to the Scenario that was left.
-    queueMicrotask(() => void navigate({ search: flushed, to }));
-  }
+  const open = useOpenPage(to);
 
   return (
     <Link
       activeOptions={{ exact, includeSearch: false }}
       className={className}
       id={id}
-      onClick={onClick}
+      onClick={open}
       search={search}
       title={title}
       to={to}
@@ -156,6 +145,32 @@ export function PageLink({
       {children}
     </Link>
   );
+}
+
+/**
+ * The press behind {@link PageLink}, for a control that is not a link — a banner action that opens
+ * another Page. Same flush, same navigation, so the two cannot disagree on which search is carried.
+ *
+ * @param to an entry of the bar, as `PageLink`'s is.
+ * @returns a handler: given the click's event it leaves a modified click, and a click that flushed
+ *   nothing, to the link; with none it always navigates.
+ */
+export function useOpenPage(to: NavigationPath): (event?: MouseEvent<HTMLAnchorElement>) => void {
+  const search = useLocation({ select: (location) => location.search });
+  const pending = use(PendingWrites);
+  const navigate = useNavigate();
+
+  return (event) => {
+    const flushed = pending?.flush() ?? null;
+    if (event !== undefined) {
+      if (flushed === null || !isPlainClick(event)) return;
+      event.preventDefault();
+    }
+    // The browser history coalesces the navigations of one tick into a single entry, which would
+    // swallow the flush's replace. Queued after it, the push leaves the Page's own entry holding
+    // the edit, so Back returns to the Scenario that was left.
+    queueMicrotask(() => void navigate({ search: flushed ?? search, to }));
+  };
 }
 
 /** A click the router would handle itself: the main button, no modifier opening another tab. */

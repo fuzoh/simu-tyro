@@ -32,6 +32,16 @@ import type { Terrain } from "@/lib/sim";
  */
 export type TraceEnds = { readonly A: Position; readonly B: Position };
 
+/** Do two Positions name the same coordinates? Exact: a Position is typed, never computed. */
+export function samePosition(a: Position, b: Position): boolean {
+  return a.lat === b.lat && a.lon === b.lon;
+}
+
+/** Do two pairs of ends stand on the same two Positions? */
+export function sameEnds(a: TraceEnds, b: TraceEnds): boolean {
+  return samePosition(a.A, b.A) && samePosition(a.B, b.B);
+}
+
 /**
  * Where a Trace came from — the three ways a profil enters (#103). Only a CSV has a name to show:
  * a profil geo.admin is fetched between the two Positions and is attributed to swisstopo, and a
@@ -79,8 +89,7 @@ export function profilRunsBetween(positions: Positions, trace: Trace | null): bo
   const { A, B } = positions;
   if (A === null || B === null) return true;
   const ends = trace?.ends;
-  const same = (one: Position, other: Position) => one.lat === other.lat && one.lon === other.lon;
-  return ends !== undefined && same(A, ends.A) && same(B, ends.B);
+  return ends !== undefined && sameEnds({ A, B }, ends);
 }
 
 /** § 4's derived read-outs: `L` and `h`, measured anchor top to anchor top. */

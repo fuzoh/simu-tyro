@@ -146,7 +146,7 @@ describe.each(CANONICAL_LINKS.map((fixture) => [fixture.name, fixture.scenario] 
         estimation: arrival.notes.includes("estimation"),
       }).toEqual({
         scope: "avec le vent saisi",
-        value: windy === null ? null : (windy.arrival?.kmh ?? "n'arrive pas"),
+        value: windy === null ? null : (windy.arrival?.kmh ?? "pas d'arrivée"),
         estimation: windy !== null,
       });
     });
@@ -237,18 +237,18 @@ describe("the vitesse d'arrivée", () => {
     });
   });
 
-  test("a head wind that stops the passager: « n'arrive pas », and the Point d'arrêt", () => {
+  test("a head wind that stops the passager: « pas d'arrivée », and the Point d'arrêt", () => {
     const { reading } = ridesUnder(50, 0);
     if (reading.windy.end.kind !== "stop") throw new Error("a 50 km/h head wind stops the ride");
     const { terrain } = pagesOn({ ...SHIPPED, wind: { speedKmh: 50, directionDeg: 0 } });
     expect(tile(terrain, "arrival")).toMatchObject({
       kind: "word",
-      value: "n'arrive pas",
+      value: "pas d'arrivée",
       notes: [`point d'arrêt ${formatAtX(reading.windy.end.x)}`, "estimation"],
     });
   });
 
-  test("a ride that never settles: « n'arrive pas », and that it keeps swinging", () => {
+  test("a ride that never settles: « pas d'arrivée », and that it keeps swinging", () => {
     const { reading } = ridesUnder(0, 0);
     const swinging: Ride = { ...reading.calm, end: { kind: "unsettled", t: 120 } };
     const view = terrainView({
@@ -261,7 +261,7 @@ describe("the vitesse d'arrivée", () => {
     });
     expect(tile(view, "arrival")).toMatchObject({
       kind: "word",
-      value: "n'arrive pas",
+      value: "pas d'arrivée",
       notes: ["oscille sans s'arrêter", "estimation"],
     });
   });

@@ -14,8 +14,7 @@ import type { FieldId } from "@/lib/rail/fields.ts";
 
 import { AvanceNotice } from "@/components/app/avance-notice.tsx";
 import { Group, NumericRow, RailRow, useFieldRows } from "@/components/rail/inputs.tsx";
-import { ASSUMED_NOTE } from "@/lib/app/avance-copy.ts";
-import { pageReport } from "@/lib/app/banner.ts";
+import { ASSUMED_NOTE, breachedElsewhere } from "@/lib/app/avance-copy.ts";
 import { DYNAMIQUE_FIELDS, DYNAMIQUE_GATES, DYNAMIQUE_GROUPS } from "@/lib/dynamique/copy.ts";
 
 const SHOWN: ReadonlySet<FieldId> = new Set(DYNAMIQUE_FIELDS);
@@ -29,14 +28,12 @@ export function DynamiqueFields({ rail }: { rail: RailFormState }) {
   const row = useFieldRows({ rail, register: "terrain" });
   // A value this Page does not show can stop the computation or the rides too — a link, or an edit
   // on Avancé: a ride constant is set there alone. A Verdict or a garde breach removes nothing here.
-  const elsewhere = pageReport(rail.report, DYNAMIQUE_GATES).errors.some(
-    (error) => !shownOnDynamique(error.field),
-  );
+  const elsewhere = breachedElsewhere(rail.report, DYNAMIQUE_GATES, shownOnDynamique);
 
   return (
     <RailRow.Provider value={row}>
       <div className="flex flex-col gap-3 px-3 py-3">
-        {elsewhere && <AvanceNotice />}
+        {elsewhere !== null && <AvanceNotice gate={elsewhere} />}
 
         <Group title={DYNAMIQUE_GROUPS.passenger}>
           <NumericRow hint="kg" id="mp" />

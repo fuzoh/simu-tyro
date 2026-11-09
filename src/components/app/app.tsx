@@ -15,8 +15,6 @@
  * the *screen*, so the screen needs one place that decides them.
  */
 
-import { useMemo } from "react";
-
 import type { ViewportFit } from "@/lib/layout/collapse.ts";
 
 import { ChartBlock } from "@/components/chart/chart-block.tsx";
@@ -25,7 +23,6 @@ import { TopMap } from "@/components/map/top-map.tsx";
 import { RailHeaderControls, RailInputs } from "@/components/rail/inputs.tsx";
 import { RailOutputs } from "@/components/rail/outputs.tsx";
 import { TopViewFrame } from "@/components/statique/top-view.tsx";
-import { gatedRides } from "@/lib/app/surfaces.ts";
 import { compactRequired, fitsWholeBlock } from "@/lib/layout/collapse.ts";
 import { NAV_BAR, threeColumns } from "@/lib/layout/contract.ts";
 
@@ -77,7 +74,7 @@ function Live({ page }: { page: string }) {
    * also what dismissing it restores.
    */
   const chrome = useBandHeight();
-  const { state, deduced, strip, traverse, rail, surfaces, copyDiagnostic } = usePage({
+  const { deduced, strip, rail, rides, surfaces, copyDiagnostic } = usePage({
     page,
     register: "exact",
   });
@@ -105,28 +102,11 @@ function Live({ page }: { page: string }) {
   const collapse = useCollapse({ fits: fitsWholeBlock(fit), compact: compactRequired(fit) });
   const { cause, clearance, frame, occupant, results, rideCause, saisie, solved, windCause } =
     surfaces;
-  /**
-   * The passager's two rides, as Dynamique reads them: off the same solved traverse the charts draw,
-   * never a second sweep, and none while the gates withhold them. Avancé prints none of their
-   * outputs — only §12.1's check, beside the constants they ran on. The Scenario is the
-   * Traverse-scope one: a scrub moves `x_D`, which no ride reads, and must not run two rides per
-   * frame.
-   */
-  const reading = useMemo(
-    () => gatedRides({ solved, rideCause }, traverse, state.trace),
-    [solved, rideCause, traverse, state.trace],
-  );
 
   return (
     // `RailInputs` owns the Rail's field rows and hands back the two sections they live in, so the
     // shell can stand them in different columns without the rows losing their one context.
-    <RailInputs
-      cause={cause}
-      deduced={deduced}
-      dynamics={reading}
-      rail={rail}
-      rideCause={rideCause}
-    >
+    <RailInputs cause={cause} deduced={deduced} dynamics={rides} rail={rail} rideCause={rideCause}>
       {(sections) => (
         <Shell
           chartRef={ref}

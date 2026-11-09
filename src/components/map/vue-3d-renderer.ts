@@ -61,7 +61,7 @@ import {
 import type { MapDisplay } from "@/lib/map/display.ts";
 import type { Anchor, MapEvent } from "@/lib/map/gesture.ts";
 import type { WmtsLayer } from "@/lib/map/style.ts";
-import type { EarthPoint, Ends, Vue3dFollowing, Vue3dScene } from "@/lib/map/vue-3d.ts";
+import type { EarthPoint, Vue3dFollowing, Vue3dScene } from "@/lib/map/vue-3d.ts";
 
 import {
   LINE_CASING,
@@ -73,6 +73,7 @@ import {
   wmtsTiles,
 } from "@/lib/map/style.ts";
 import { CAMERA_REACH, DRAPED, TERRAIN_URL, vue3dFollowing } from "@/lib/map/vue-3d.ts";
+import { sameEnds } from "@/lib/terrain/trace.ts";
 
 // Cesium's workers and assets are copied beside the app (`vite.config.ts`); this says where.
 (globalThis as { CESIUM_BASE_URL?: string }).CESIUM_BASE_URL = `${import.meta.env.BASE_URL}cesium/`;
@@ -452,10 +453,6 @@ function member(
       return Cartesian3.subtract(point, shift, shift);
     });
   }, false);
-}
-
-function sameEnds(a: Ends, b: Ends): boolean {
-  return a.A.lat === b.A.lat && a.A.lon === b.A.lon && a.B.lat === b.B.lat && a.B.lon === b.B.lon;
 }
 
 /** The view the Vue 3D opens on: both anchors and their feet, from the side the coupe shows. */

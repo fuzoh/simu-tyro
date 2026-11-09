@@ -10,6 +10,8 @@ import {
   maxSpacing,
   meanAltitude,
   profilRunsBetween,
+  sameEnds,
+  samePosition,
   traceExtent,
 } from "./trace.ts";
 
@@ -127,6 +129,23 @@ describe("deriveTerrain", () => {
     deriveTerrain(RAMP, 1);
     expect(Array.from(RAMP.d)).toEqual(before.d);
     expect(Array.from(RAMP.z)).toEqual(before.z);
+  });
+});
+
+describe("samePosition and sameEnds", () => {
+  const A = { lat: 46.5, lon: 6.6 };
+  const B = { lat: 46.51, lon: 6.62 };
+
+  test("two Positions are the same only where both coordinates are", () => {
+    expect(samePosition(A, { ...A })).toBe(true);
+    expect(samePosition(A, { ...A, lon: A.lon + 1e-6 })).toBe(false);
+    expect(samePosition(A, { ...A, lat: A.lat + 1e-6 })).toBe(false);
+  });
+
+  test("two pairs of ends are the same only where both ends are", () => {
+    expect(sameEnds({ A, B }, { A: { ...A }, B: { ...B } })).toBe(true);
+    expect(sameEnds({ A, B }, { A, B: { ...B, lat: B.lat + 1e-6 } })).toBe(false);
+    expect(sameEnds({ A, B }, { A: B, B: A })).toBe(false);
   });
 });
 

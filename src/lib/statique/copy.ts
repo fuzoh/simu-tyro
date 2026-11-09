@@ -7,9 +7,10 @@
 
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 
-import { ASSUMED_NOTE, AVANCE_NOTICE } from "@/lib/app/avance-copy.ts";
+import { ASSUMED_NOTE, AVANCE_NOTICE, avanceNoticeText } from "@/lib/app/avance-copy.ts";
 import { CHOOSE_REGIME_BY_REGISTER, JUMP_LABEL } from "@/lib/app/banner.ts";
 import { DISMISS_LABEL } from "@/lib/app/link-strip.ts";
+import { refusalLabelTable } from "@/lib/app/refusal-copy.ts";
 import { DIAGNOSTIC_ACTION } from "@/lib/app/refusals.ts";
 import { COUPE_HOVER, LAYER_LABEL, NO_SPAN_LINE, PEEK_LABEL } from "@/lib/chart/copy.ts";
 import { peekBadgeLabel, veBadgeLabel } from "@/lib/layout/contract.ts";
@@ -173,12 +174,14 @@ export function statiqueLabelTable(): readonly string[] {
     ...Object.values(TOP_VIEW),
     ...Object.values(UNORIENTED),
     ...mapLabelTable(),
-    ...Object.values(AVANCE_NOTICE),
+    AVANCE_NOTICE.action,
+    ...STATIQUE_GATES.map(avanceNoticeText),
     ASSUMED_NOTE,
     NO_REGIME_BANNER_BY_REGISTER.terrain,
     CHOOSE_REGIME_BY_REGISTER.terrain,
     JUMP_LABEL,
     DIAGNOSTIC_ACTION,
     PASS_TO_PULLEY,
+    ...refusalLabelTable("terrain"),
   ];
 }

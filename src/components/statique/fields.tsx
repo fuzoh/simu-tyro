@@ -41,8 +41,7 @@ import {
   useLastGoodSolve,
 } from "@/components/rail/inputs.tsx";
 import { TerrainDisclosure } from "@/components/rail/outputs.tsx";
-import { ASSUMED_NOTE } from "@/lib/app/avance-copy.ts";
-import { pageReport } from "@/lib/app/banner.ts";
+import { ASSUMED_NOTE, breachedElsewhere } from "@/lib/app/avance-copy.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { fieldLabel } from "@/lib/rail/fields.ts";
 import { presetProvenance } from "@/lib/rail/presets.ts";
@@ -83,14 +82,12 @@ export function StatiqueFields({
   const shows = (id: FieldId) => shownOnStatique(id, scenario);
   // A value this Page does not show can stop the computation too — a link, or an edit on Avancé. A
   // ride constant stops only a ride, which this Page does not print.
-  const elsewhere = pageReport(rail.report, STATIQUE_GATES).errors.some(
-    (error) => !shows(error.field),
-  );
+  const elsewhere = breachedElsewhere(rail.report, STATIQUE_GATES, shows);
 
   return (
     <RailRow.Provider value={row}>
       <div className="flex flex-col gap-3 px-3 py-3">
-        {elsewhere && <AvanceNotice />}
+        {elsewhere !== null && <AvanceNotice gate={elsewhere} />}
 
         <Group title={STATIQUE_GROUPS.profile}>
           {shows("L") ? (

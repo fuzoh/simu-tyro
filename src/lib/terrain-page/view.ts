@@ -22,12 +22,12 @@ import type {
 } from "@/lib/statique/outputs.ts";
 
 import { VERDICT_TONE } from "@/lib/app/tone.ts";
-import { ESTIMATE, INCOMPLETE } from "@/lib/dynamique/copy.ts";
+import { ESTIMATE, INCOMPLETE, NO_ARRIVAL } from "@/lib/dynamique/copy.ts";
 import { dynamiqueOutputs } from "@/lib/dynamique/outputs.ts";
 import { scopeOf, statiqueOutputs } from "@/lib/statique/outputs.ts";
 import { label } from "@/lib/vocabulary/labels.ts";
 
-import { ARRIVAL_SCOPE, NO_ARRIVAL, TILE_LABEL } from "./copy.ts";
+import { ARRIVAL_SCOPE, TILE_LABEL } from "./copy.ts";
 
 /** The five tiles, in the order the Page prints them — and its Skeleton reserves them. */
 export const TERRAIN_TILE_IDS = ["pretension", "sag", "clearance", "arrival", "verdict"] as const;

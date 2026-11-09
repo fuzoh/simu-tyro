@@ -11,7 +11,8 @@ import type { GateId } from "@/lib/rail/fields.ts";
 import type { DynamicsWarningId } from "@/lib/scenario/dynamics.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 
-import { ASSUMED_NOTE, AVANCE_NOTICE } from "@/lib/app/avance-copy.ts";
+import { ASSUMED_NOTE, AVANCE_NOTICE, avanceNoticeText } from "@/lib/app/avance-copy.ts";
+import { refusalLabelTable } from "@/lib/app/refusal-copy.ts";
 import { COUPE_HOVER, NO_SPAN_LINE } from "@/lib/chart/copy.ts";
 import { fieldLabel } from "@/lib/rail/fields.ts";
 import { GATE_CONSEQUENCE } from "@/lib/rail/gates.ts";
@@ -156,7 +157,9 @@ export function dynamiqueLabelTable(): readonly string[] {
     ...Object.values(WARNING_COPY).filter((text) => text !== null),
     NO_SPAN_LINE,
     ...DYNAMIQUE_GATES.map((gate) => GATE_CONSEQUENCE[gate]),
-    ...Object.values(AVANCE_NOTICE),
+    AVANCE_NOTICE.action,
+    ...DYNAMIQUE_GATES.map(avanceNoticeText),
     ASSUMED_NOTE,
+    ...refusalLabelTable("terrain"),
   ];
 }

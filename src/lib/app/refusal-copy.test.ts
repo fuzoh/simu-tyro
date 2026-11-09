@@ -8,8 +8,14 @@ import { describe, expect, it } from "vitest";
 import type { LinkRefusal } from "@/lib/url/schema.ts";
 
 import { REFUSAL_KINDS, salvageSearch } from "@/lib/url/schema.ts";
+import { exactTermsIn, proscribedIn } from "@/lib/vocabulary/labels.ts";
 
-import { REFUSAL_ACTION, REFUSAL_TITLE, refusalReasonLine } from "./refusal-copy.ts";
+import {
+  REFUSAL_ACTION,
+  REFUSAL_TITLE,
+  refusalLabelTable,
+  refusalReasonLine,
+} from "./refusal-copy.ts";
 
 const marker = (kind: LinkRefusal["kind"], received: unknown): LinkRefusal => ({
   kind,
@@ -67,5 +73,30 @@ describe("§ 8 — the refusal page's copy", () => {
       expect(refusal).toBeDefined();
       expect(refusalReasonLine(refusal as LinkRefusal)).toMatch(/\.$/);
     }
+  });
+});
+
+describe("#102 — the refusal in the Page's register", () => {
+  const twoDrivers = marker("deux-directeurs", ["fl", "lo"]);
+
+  it("keeps Avancé's exact terms by default", () => {
+    expect(refusalReasonLine(twoDrivers, "exact")).toBe(refusalReasonLine(twoDrivers));
+  });
+
+  it("names the five tension values on a simplified Page without an Avancé-only term", () => {
+    expect(refusalReasonLine(twoDrivers, "terrain")).toBe(
+      "Flèche, tension de pose, longueur à vide et réglage de la Page Avancé : deux valeurs de tension dans le même lien.",
+    );
+  });
+
+  it("prints nothing a simplified Page proscribes or leaves to Avancé", () => {
+    for (const copy of refusalLabelTable("terrain")) {
+      expect(proscribedIn(copy)).toEqual([]);
+      expect(exactTermsIn(copy)).toEqual([]);
+    }
+  });
+
+  it("lists the title, the action and one line per cause", () => {
+    expect(refusalLabelTable("terrain")).toHaveLength(2 + REFUSAL_KINDS.length);
   });
 });

@@ -28,8 +28,8 @@
  */
 
 import type { Polyline, SceneBase, SceneFrame, SceneRider } from "@/lib/chart/scene.ts";
-import type { Position, Positions } from "@/lib/scenario/types.ts";
-import type { Trace } from "@/lib/terrain/trace.ts";
+import type { Positions } from "@/lib/scenario/types.ts";
+import type { Trace, TraceEnds } from "@/lib/terrain/trace.ts";
 
 import { profilRunsBetween } from "@/lib/terrain/trace.ts";
 
@@ -86,12 +86,9 @@ export const CAMERA_REACH = 20_000;
 /** Why the switch to the Vue 3D is off: no two Positions, or no profil to stand the line on. */
 export type Vue3dBlock = "positions" | "profil";
 
-/** The two Positions, both known. */
-export type Ends = { readonly A: Position; readonly B: Position };
-
 /** What stands the engine's line on the earth: both Positions, and the profil under the span. */
 export type Vue3dPlacement = {
-  readonly ends: Ends;
+  readonly ends: TraceEnds;
   /** The coupe's input half: portée, dénivelé, Anchor Heights. */
   readonly frame: SceneFrame;
   /** The profil's altitude under each anchor. */
@@ -137,7 +134,7 @@ export type FilAPlomb = {
 
 /** Everything the Vue 3D draws over the relief. */
 export type Vue3dScene = {
-  readonly ends: Ends;
+  readonly ends: TraceEnds;
   readonly fils: { readonly A: FilAPlomb; readonly B: FilAPlomb };
   /** The Ligne à vide — `null` under « Aucun résultat », when the line did not solve. */
   readonly unloaded: readonly EarthPoint[] | null;
@@ -233,7 +230,7 @@ export function earthFrame({
   topA,
   across = 0,
 }: {
-  ends: Ends;
+  ends: TraceEnds;
   /** Portée, m: `x` runs from 0 at A to `L` at B. */
   L: number;
   /** Anchor A's altitude, m. */

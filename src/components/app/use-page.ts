@@ -19,6 +19,7 @@ import type { AppState } from "@/lib/app/state.ts";
 import type { ErrorSurfaces } from "@/lib/app/surfaces.ts";
 import type { Deduced } from "@/lib/rail/deduced.ts";
 import type { GateReport } from "@/lib/rail/gates.ts";
+import type { DynamicsReading } from "@/lib/scenario/dynamics.ts";
 import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 import type { Unloaded } from "@/lib/scenario/unloaded.ts";
 import type { Register } from "@/lib/vocabulary/labels.ts";
@@ -26,6 +27,7 @@ import type { Register } from "@/lib/vocabulary/labels.ts";
 import { buildDiagnostic } from "@/lib/app/diagnostic.ts";
 import { linkStrip } from "@/lib/app/link-strip.ts";
 import { siteOrigin } from "@/lib/app/site.ts";
+import { gatedRides } from "@/lib/app/surfaces.ts";
 import { evaluateGates } from "@/lib/rail/gates.ts";
 
 import type { RailFormState } from "./use-rail-form.ts";
@@ -51,6 +53,12 @@ export type PageModel = {
   /** The fields' text, focus and gate report — one form whichever Page renders the fields. */
   readonly rail: RailFormState;
   readonly surfaces: ErrorSurfaces;
+  /**
+   * The passager's two rides as the gates leave them, off the **Traverse-scope** Scenario — the one
+   * without `x_D`, which no ride reads, so a scrub re-runs none. `null` under a cause or on an
+   * incomplete traverse. Computed here so no Page keys its own memo on a different rider.
+   */
+  readonly rides: DynamicsReading | null;
   /** « Calcul impossible »'s one action: the evidence, to the clipboard. */
   readonly copyDiagnostic: () => void;
 };
@@ -115,7 +123,7 @@ function usePublished({
   readonly base: PageBase;
   readonly focused: RailFormState["focused"];
   readonly report: GateReport;
-}): Pick<PageModel, "surfaces" | "copyDiagnostic"> {
+}): Pick<PageModel, "surfaces" | "rides" | "copyDiagnostic"> {
   /**
    * **The gates are applied here and nowhere else.** The scene is derived from the store, which
    * holds numbers, while a committed-invalid « −5 » lives in the form, which holds text — so the
@@ -130,6 +138,12 @@ function usePublished({
     solved: scene.solved,
     traverse,
   });
+
+  const { solved, rideCause } = surfaces;
+  const rides = useMemo(
+    () => gatedRides({ solved, rideCause }, traverse, state.trace),
+    [solved, rideCause, traverse, state.trace],
+  );
 
   // § 7's write side. **Both writes suspend together under « Saisie en cours »**, so the address bar
   // keeps the last complete Scenario rather than publishing a half-typed one.
@@ -152,5 +166,5 @@ function usePublished({
     if (payload !== null) void navigator.clipboard.writeText(payload).catch(() => undefined);
   }
 
-  return { surfaces, copyDiagnostic };
+  return { surfaces, rides, copyDiagnostic };
 }

@@ -8,12 +8,14 @@
 
 import { CHOOSE_REGIME_BY_REGISTER, JUMP_LABEL } from "@/lib/app/banner.ts";
 import { DISMISS_LABEL } from "@/lib/app/link-strip.ts";
+import { refusalLabelTable } from "@/lib/app/refusal-copy.ts";
 import { DIAGNOSTIC_ACTION } from "@/lib/app/refusals.ts";
 import { COUPE_HOVER, LAYER_LABEL, NO_SPAN_LINE, PEEK_LABEL } from "@/lib/chart/copy.ts";
 import {
   ESTIMATE,
   INCOMPLETE,
   NEVER_SETTLES,
+  NO_ARRIVAL,
   OUTPUT_LABEL as RIDE_OUTPUT_LABEL,
   RIDE_LABEL,
 } from "@/lib/dynamique/copy.ts";
@@ -39,9 +41,6 @@ export const TILE_LABEL = {
 
 /** What the vitesse d'arrivée is read with: the Vent entered, in Dynamique's words. */
 export const ARRIVAL_SCOPE = lowerFirst(RIDE_LABEL.windy);
-
-/** The ride with the Vent stops before B, or never settles: there is no arrival to print. */
-export const NO_ARRIVAL = "n'arrive pas";
 
 /** The Page's two regions. */
 export const SECTION = {
@@ -86,5 +85,6 @@ export function terrainLabelTable(): readonly string[] {
     JUMP_LABEL,
     CHOOSE_REGIME_BY_REGISTER.terrain,
     DIAGNOSTIC_ACTION,
+    ...refusalLabelTable("terrain"),
   ];
 }

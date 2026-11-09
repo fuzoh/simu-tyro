@@ -25,7 +25,6 @@ import { useViewport } from "@/components/app/use-viewport.ts";
 import { DynamiqueCharts } from "@/components/chart/dynamique.tsx";
 import { useChartWidth } from "@/components/chart/use-chart-width.ts";
 import { banner, pageReport } from "@/lib/app/banner.ts";
-import { gatedRides } from "@/lib/app/surfaces.ts";
 import { DYNAMIQUE_GATES, INCOMPLETE } from "@/lib/dynamique/copy.ts";
 import { dynamiqueOutputs } from "@/lib/dynamique/outputs.ts";
 
@@ -46,7 +45,14 @@ function Live({ page }: { page: string }) {
   const { ref, width } = useChartWidth();
   // Read for its side effect alone: it writes `--kb`, the iOS keyboard inset the frame pads by.
   useViewport();
-  const { state, strip, traverse, rail, surfaces, copyDiagnostic } = usePage({
+  const {
+    state,
+    strip,
+    rail,
+    rides: reading,
+    surfaces,
+    copyDiagnostic,
+  } = usePage({
     page,
     register: "terrain",
   });
@@ -67,10 +73,6 @@ function Live({ page }: { page: string }) {
   const { material } = state.scenario;
 
   // What the gates leave: no ride under « Aucun résultat » or while a ride value is refused.
-  const reading = useMemo(
-    () => gatedRides({ solved, rideCause }, traverse, state.trace),
-    [solved, rideCause, traverse, state.trace],
-  );
   const model = useMemo(
     () => (reading === null ? null : dynamiqueOutputs(reading, material.family)),
     [reading, material.family],

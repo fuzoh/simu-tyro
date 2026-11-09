@@ -4,12 +4,12 @@
  * Shared by every Page that shows a subset of Avancé's fields.
  */
 
-import type { FieldId } from "@/lib/rail/fields.ts";
+import type { FieldId, GateId } from "@/lib/rail/fields.ts";
 
 import { jumpToField } from "@/components/app/banner.tsx";
 import { PageLink } from "@/components/app/navigation-bar.tsx";
 import { buttonVariants } from "@/components/ui/button.tsx";
-import { AVANCE_NOTICE } from "@/lib/app/avance-copy.ts";
+import { AVANCE_NOTICE, avanceNoticeText } from "@/lib/app/avance-copy.ts";
 import { CENTRE_IN_RAIL } from "@/lib/layout/collapse.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -33,11 +33,15 @@ export function jumpOrAvance(field: FieldId, shown: boolean): void {
   link?.focus();
 }
 
-/** The way out to the value this Page does not show. A link that looks like a button. */
-export function AvanceNotice() {
+/**
+ * The way out to the value this Page does not show. A link that looks like a button.
+ *
+ * @param gate the worst gate that value breaches — it decides what the sentence says is gone.
+ */
+export function AvanceNotice({ gate }: { gate: GateId }) {
   return (
     <div className="flex flex-col gap-1" role="status">
-      <p className="text-destructive text-xs">⛔ {AVANCE_NOTICE.text}</p>
+      <p className="text-destructive text-xs">⛔ {avanceNoticeText(gate)}</p>
       <PageLink
         className={cn(buttonVariants({ variant: "outline", size: "sm" }), "touch-44 self-start")}
         id={AVANCE_LINK_ID}

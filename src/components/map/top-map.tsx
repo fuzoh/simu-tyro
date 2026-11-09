@@ -781,7 +781,9 @@ function MapCanvas({
       onFailed();
       return;
     }
+    // `dragRotate: false` leaves two other ways to turn the map: a pinch, and Shift + ← / →.
     created.touchZoomRotate.disableRotation();
+    created.keyboard.disableRotation();
     // MapLibre's buttons are 29 px; on the Page Terrain, read on a phone, a pinch does their work.
     if (!locked) created.addControl(new NavigationControl({ showCompass: false }), "top-right");
     created.on("move", placeRose);

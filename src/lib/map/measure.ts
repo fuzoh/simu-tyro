@@ -24,6 +24,7 @@ import type { Fetch, GeoadminFailure } from "@/lib/terrain/geoadmin.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
+import { samePosition } from "@/lib/terrain/trace.ts";
 
 /** The points of a Mesure: none yet, the first, or both. */
 export type MeasurePoints = readonly Position[];
@@ -152,10 +153,6 @@ export function profileFor(
   const same =
     loaded.points.length === 2 && points.every((p, i) => samePosition(p, loaded.points[i]));
   return same ? loaded.profile : null;
-}
-
-function samePosition(a: Position, b: Position): boolean {
-  return a.lat === b.lat && a.lon === b.lon;
 }
 
 /** The numbers a Mesure reports, by how far its profil has come. */

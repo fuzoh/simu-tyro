@@ -25,6 +25,6 @@ export const Route = createFileRoute("/_app/dynamique")({
 function DynamiqueRoute() {
   // The one thing app code reads off the router, as on every Page: the synthesised refusal marker.
   const refused = Route.useSearch({ select: (search) => search.refused });
-  if (refused !== undefined) return <LinkRefusalSurface refusal={refused} />;
+  if (refused !== undefined) return <LinkRefusalSurface refusal={refused} register="terrain" />;
   return <Dynamique page={Route.fullPath} />;
 }

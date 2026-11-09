@@ -10,21 +10,18 @@
  * set on Statique, one press away in the navigation bar.
  */
 
-import { useLocation, useNavigate } from "@tanstack/react-router";
-import { use, useMemo } from "react";
+import { useMemo } from "react";
 
-import type { NavigationPath } from "@/lib/app/pages.ts";
 import type { FieldId } from "@/lib/rail/fields.ts";
 
 import { Banner } from "@/components/app/banner.tsx";
 import { LinkStripNotice } from "@/components/app/link-strip.tsx";
+import { useOpenPage } from "@/components/app/navigation-bar.tsx";
 import { AppStoreProvider } from "@/components/app/store.tsx";
 import { useReadingPage } from "@/components/app/use-page.ts";
-import { PendingWrites } from "@/components/app/use-persist.ts";
 import { ChartBlock } from "@/components/chart/chart-block.tsx";
 import { useChartWidth } from "@/components/chart/use-chart-width.ts";
 import { TopMap } from "@/components/map/top-map.tsx";
-import { gatedRides } from "@/lib/app/surfaces.ts";
 import { gateOf } from "@/lib/rail/fields.ts";
 import { STATIQUE_GATES } from "@/lib/statique/fields.ts";
 import { terrainView } from "@/lib/terrain-page/view.ts";
@@ -46,18 +43,20 @@ function ignore() {}
 
 function Live({ page }: { page: string }) {
   const { ref, width } = useChartWidth();
-  const { state, deduced, strip, traverse, surfaces, copyDiagnostic } = useReadingPage({
+  const {
+    state,
+    deduced,
+    strip,
+    rides: reading,
+    surfaces,
+    copyDiagnostic,
+  } = useReadingPage({
     page,
     register: "terrain",
   });
   const { cause, clearance, frame, occupant, results, rideCause, solved, windCause } = surfaces;
-  const { scenario, trace } = state;
+  const { scenario } = state;
 
-  // The ride Dynamique reads, off the same gated traverse: none under a cause.
-  const reading = useMemo(
-    () => gatedRides({ solved, rideCause }, traverse, trace),
-    [solved, rideCause, traverse, trace],
-  );
   const view = useMemo(
     () => terrainView({ scenario, deduced, results, cause, rideCause, reading }),
     [scenario, deduced, results, cause, rideCause, reading],
@@ -105,22 +104,4 @@ function Live({ page }: { page: string }) {
       }
     />
   );
-}
-
-/**
- * A press that opens `to` on the same Scenario — Statique, where the banner's « voir la première »
- * and « Choisir une marge exigée » take the reader since this Page shows no field, or Avancé for a
- * ride constant. The Page's pending Session write goes first, as a navigation bar link sends it.
- *
- * @param to an entry of the bar, as `PageLink`'s is: the raw search is written verbatim, and only
- *   the validated bag carries the refusal marker the app Pages' schema types as required.
- */
-function useOpenPage(to: NavigationPath): () => void {
-  const navigate = useNavigate();
-  const search = useLocation({ select: (location) => location.search });
-  const pending = use(PendingWrites);
-  return () => {
-    pending?.flush();
-    void navigate({ search, to });
-  };
 }

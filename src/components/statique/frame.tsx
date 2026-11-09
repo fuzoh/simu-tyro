@@ -84,7 +84,8 @@ export function ColumnsFrame({
 }: {
   busy?: boolean;
   strip?: ReactNode;
-  fields: ReactNode;
+  /** Absent, the right column takes the whole width: the refusal surface has no field to offer. */
+  fields?: ReactNode;
   /** The right column's {@link Region}s. */
   children: ReactNode;
 }) {
@@ -98,12 +99,14 @@ export function ColumnsFrame({
       {/* `pb-[var(--kb,0px)]`: the iOS keyboard inset, so the last field scrolls clear of it — the
           same self-neutralising padding the Rail carries, on whichever box scrolls at this width. */}
       <div className="border-border mx-auto flex min-h-0 w-full max-w-[1728px] flex-1 scroll-pb-[var(--kb,0px)] flex-col overflow-y-auto pb-[var(--kb,0px)] min-[1730px]:border-x md:flex-row md:overflow-hidden md:pb-0">
-        <aside
-          aria-label={SECTION.fields}
-          className="border-border order-last w-full min-w-0 shrink-0 border-t md:order-first md:w-80 md:scroll-pb-[var(--kb,0px)] md:overflow-y-auto md:border-t-0 md:border-r md:pb-[var(--kb,0px)]"
-        >
-          {fields}
-        </aside>
+        {fields !== undefined && (
+          <aside
+            aria-label={SECTION.fields}
+            className="border-border order-last w-full min-w-0 shrink-0 border-t md:order-first md:w-80 md:scroll-pb-[var(--kb,0px)] md:overflow-y-auto md:border-t-0 md:border-r md:pb-[var(--kb,0px)]"
+          >
+            {fields}
+          </aside>
+        )}
         <div className="@container flex min-w-0 shrink-0 flex-col md:min-h-0 md:flex-1 md:shrink md:overflow-y-auto">
           {children}
         </div>
