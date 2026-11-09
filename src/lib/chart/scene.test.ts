@@ -903,6 +903,20 @@ describe("the Zones d'ancrage — grey on the coupe, never red (#106)", () => {
     expect(scene(lowAtA(10, 145)).rider.inAnchorZone).toBe(true);
   });
 
+  it("« Garde min. ligne » leaves the zones out for a passager at mid-span", () => {
+    // The cell's `worst` is the line's minimum outside the zones, not the platform under A: with
+    // the zones dropped the same rider at x_D 75 reads A's anchor, at x ≈ 0, where the ground is
+    // 0,4 m under the envelope. Structural, in the shipped 150 m span's [0, 10] and [140, 150].
+    const L = 150;
+    const zoned = scene(lowAtA(10, 75)).rider.worst;
+    expect(zoned.atX).toBeGreaterThan(10);
+    expect(zoned.atX).toBeLessThan(L - 10);
+    expect(zoned.hClear).toBeGreaterThan(0);
+    // The control: without zones the cell does read the platform, so this case tells them apart.
+    const bare = scene(lowAtA(0, 75)).rider.worst;
+    expect(bare.atX).toBeLessThan(10);
+  });
+
   describe("a rider on the platform over a line that fails just past the zone", () => {
     /**
      * A synthetic profil, flat but for an 8 m ridge one metre wide at x 11,5 — 1,5 m past A's 10 m
