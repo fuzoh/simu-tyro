@@ -479,8 +479,9 @@ _Avoid_: preset, bookmark, saved view
 
 **Vue du départ**:
 The Vue prédéfinie on the platform at A: the eye 4,5 m to the left of A when one looks
-toward B, 1,7 m above the ground at A's foot, looking along A → B and aimed at anchor B — to
-see the line run away from the start and the Banane bow it. Key 1.
+toward B, 1,7 m above the ground at A's foot — or above the ground under the eye, where a cross
+slope lifts it higher — looking along A → B and aimed at anchor B — to see the line run away
+from the start and the Banane bow it. Key 1.
 _Avoid_: vue passager, vue subjective
 
 **Vue latérale**:

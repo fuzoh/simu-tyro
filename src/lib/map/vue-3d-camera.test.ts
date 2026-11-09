@@ -88,6 +88,23 @@ describe("the Vue du départ", () => {
     expect(vueDuDepart(line(NORTH, 1400, 1450)).destination.altitude).toBeCloseTo(1401.7, 9);
   });
 
+  test("on a cross slope, the eye stands 1,7 m above the ground under it, never inside it", () => {
+    // The ground 4,5 m to the left of A stands 3 m above A's foot (a 34° cross slope): 1 403 + 1,7.
+    const steep = vueDuDepart(line(NORTH, 1400, 1450), () => 1403);
+    expect(steep.destination.altitude).toBeCloseTo(1404.7, 9);
+    // B's anchor is then 1 450 − 1 404,7 = 45,3 m above the eye.
+    expect(steep.pitchDeg).toBeCloseTo(deg(Math.atan(45.3 / horizontalDistance(A, NORTH))), 3);
+    // Ground falling away from the line, or none sampled yet: A's foot, as without it.
+    expect(vueDuDepart(line(NORTH, 1400, 1450), () => 1398).destination.altitude).toBeCloseTo(
+      1401.7,
+      9,
+    );
+    expect(vueDuDepart(line(NORTH, 1400, 1450), () => undefined).destination.altitude).toBeCloseTo(
+      1401.7,
+      9,
+    );
+  });
+
   test("pitches to aim at anchor B: up the rise over the portée", () => {
     const { pitchDeg } = vueDuDepart(line(NORTH, 1400, 1450));
     // B's anchor is 1 450 − 1 401,7 = 48,3 m above the eye, the portée ahead of it.

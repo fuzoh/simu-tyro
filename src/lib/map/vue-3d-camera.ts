@@ -8,10 +8,10 @@
  *
  * - **The Vues prédéfinies are geometry on the anchors, never a fit the engine picks.** The Vue du
  *   départ stands {@link VUE_DU_DEPART}'s 4,5 m to the left of A, looking along A → B, at eye
- *   height above A's foot, and aims at anchor B. The Vue latérale looks square across the line,
- *   from the side that puts A on the left of the screen as on the coupe, a little from above, and
- *   stands back just far enough for the whole line, anchors and feet included, to fit with a
- *   margin.
+ *   height above A's foot — or above the relief under the eye where it stands higher — and aims
+ *   at anchor B. The Vue latérale looks square across the line, from the side that puts A on the
+ *   left of the screen as on the coupe, a little from above, and stands back just far enough for
+ *   the whole line, anchors and feet included, to fit with a margin.
  * - **One local plane per line.** East and north in metres around anchor A, on the ellipsoid's
  *   radii of curvature at the line's mid-latitude (the Mesure's, `./measure.ts`): over the few
  *   kilometres a zip line spans, exact to well under a millimetre per kilometre.
@@ -63,8 +63,17 @@ type Placed = Pick<Vue3dScene, "ends" | "fils">;
 /**
  * The Vue du départ: {@link VUE_DU_DEPART}'s offset to the left of A when one looks from A to B, at
  * eye height above A's foot, heading A → B and pitched to aim at anchor B.
+ *
+ * @param groundAt the relief's altitude under a Position, as the view draws it, or `undefined`
+ *   where it has none yet. Where the ground under the eye stands higher than A's foot — a cross
+ *   slope steeper than eye height over the offset, about 21° — the eye stands at eye height above
+ *   it instead, never inside the relief.
  */
-export function vueDuDepart({ ends, fils }: Placed, view = VUE_DU_DEPART): CameraPose {
+export function vueDuDepart(
+  { ends, fils }: Placed,
+  groundAt: (at: Position) => number | undefined = () => undefined,
+  view = VUE_DU_DEPART,
+): CameraPose {
   const plane = localPlane(ends.A, ends.B);
   const b = plane.metres(ends.B);
   const along = Math.hypot(b.east, b.north);
@@ -72,12 +81,15 @@ export function vueDuDepart({ ends, fils }: Placed, view = VUE_DU_DEPART): Camer
   const forward =
     along === 0 ? { east: 0, north: 1 } : { east: b.east / along, north: b.north / along };
   const left = { east: -forward.north, north: forward.east };
-  const eye = fils.A.foot.altitude + view.eyeM;
+  const at = plane.position(left.east * view.offsetM, left.north * view.offsetM);
+  const under = groundAt(at);
+  const ground =
+    under === undefined || !Number.isFinite(under)
+      ? fils.A.foot.altitude
+      : Math.max(fils.A.foot.altitude, under);
+  const eye = ground + view.eyeM;
   return {
-    destination: {
-      ...plane.position(left.east * view.offsetM, left.north * view.offsetM),
-      altitude: eye,
-    },
+    destination: { ...at, altitude: eye },
     headingDeg: headingOf(forward.east, forward.north),
     // B lies `along` metres ahead of the eye — the offset is square to the line.
     pitchDeg: degrees(Math.atan2(fils.B.anchor.altitude - eye, along)),

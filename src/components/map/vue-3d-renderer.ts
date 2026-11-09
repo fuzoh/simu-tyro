@@ -730,7 +730,11 @@ function moveCamera(
     case "view":
       camera.flyTo({
         ...cesiumPose(
-          command.view === "depart" ? vueDuDepart(scene) : lateralPose(cesium, scene, layers),
+          command.view === "depart"
+            ? vueDuDepart(scene, ({ lon, lat }) =>
+                cesium.globe.getHeight(Cartographic.fromDegrees(lon, lat)),
+              )
+            : lateralPose(cesium, scene, layers),
         ),
         duration: CAMERA_STEP.flightS,
       });
