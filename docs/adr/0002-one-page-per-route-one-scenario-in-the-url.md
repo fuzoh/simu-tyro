@@ -64,3 +64,13 @@ layout like Avancé, reading the same schema, and a link shared before the Pages
 its Scenario on Statique. The layout's `pendingComponent` — the SPA shell's — is Statique's
 Skeleton, the same one `/` declares, so `index.html` and `404.html` paint Statique's frame; the
 prerender list in `vite.config.ts` skips `/`, which the shell already is.
+
+## Update — 2026-11-09, #115
+
+The charts' gutter is 12 px, the other containers' `px-3`, so `W_inner` is the column less 24 px
+and every band grows with it. Budget C's block is 870,24 px at its 1152 px column, so the 864 px a
+900 px viewport leaves under the 36 px bar no longer hold it: the « 7,68 px to spare » above is
+gone. No Page stands that pair today. Avancé at 1440 × 900 is three columns — an 864 px middle
+column, a 755,2 px block — and keeps it whole; it reaches the 1152 px column only from 1728 px of
+viewport, where it needs 907 px of height (915 under a 44 px bar). The plateau is 889,76 px. The
+36 px bar stands: it is still the Rail row's height, and 8 px cheaper than the Rail Header's.

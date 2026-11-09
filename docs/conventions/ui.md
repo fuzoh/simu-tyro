@@ -106,16 +106,25 @@ fixes that and nothing else needs to move.
 
 - **inline:** controls `px-2.5` (the registry's own, so an added component is already correct);
   containers and full-bleed bars `px-3`.
+- **the charts' gutter is the containers' margin:** `GUTTER = 12` in `src/lib/layout/contract.ts`,
+  the `px-3` of every other container (#115). The coupe's frame, the strip's and Dynamique's curve
+  therefore stand on the same verticals as the region titles, the tiles and the vue de dessus — left
+  edges and right edges, on Statique, Avancé, Dynamique and Terrain. A chart label that needs room
+  takes it **inside the plot** (`axisLabel()`), never in the gutter, and the vue de dessus spans
+  its region and caps its height rather than its width.
 - **gap:** `gap-1` inside a row (label → control → hint) · `gap-2` between rows in a section ·
   `gap-3` between sections.
-- **vertical:** a Rail row is `h-7` inside a `py-1` wrapper.
+- **vertical:** a Rail row is `h-7` inside a `py-1` wrapper; a Page region — a titled section, the
+  fields' column, Terrain's band of tiles — is `py-3`.
 
 Nothing else. A `gap-1.5` in a diff is the defect, not the taste.
 
 ### Touch: `.touch-44`
 
 ≥44 px on coarse pointers is a budget § 5 spends to the pixel — `view-strip.tsx`'s
-`59 + 48 + 44 + 128 + 24 = 303 px`, and a `size="sm"` control is **28 px visually**. One utility in
+`4 × 28 + 12 + 44 + 153 + 16 = 337 px` of the `390 − 2 × 12 = 366` a phone's row has (it was
+`59 + 48 + 44 + 128 + 24 = 303` of 342 before the four layers and the 12 px gutter), and a
+`size="sm"` control is **28 px visually**. One utility in
 `src/styles.css` carries the `::after` overlay that closes the gap, applied at call sites and
 **never baked into a `ui/` component**: components stay re-`add`-able, and the touch policy stays
 one grep.
@@ -207,14 +216,14 @@ it. The numbers are `THREE_COLUMN_PX`, `RAIL_WIDTH` (left), `RIGHT_COLUMN_WIDTH`
   in clear at every width, and read the same Scenario the map and the rose write.
 - **Why 1024.** A stacked block is sized from the *whole* viewport width and owes `MIN_RAIL` under
   it, so stacking costs the chart its profile on any screen that is not tall: at 1024 × 768 it is a
-  782 px block against 612 px left, and Avancé opens on « Garde min. ligne » alone (measured at the
+  796 px block against 612 px left (782 when measured, at the 24 px gutter), and Avancé opens on « Garde min. ligne » alone (measured at the
   built `/avance`, with 1180 × 820 and 1194 × 834 the same). In three columns the same screens keep
-  everything: 1024 × 768 is a 448 px middle column, a 616 px block and 732 px of height. **What it
+  everything: 1024 × 768 is a 448 px middle column, a 626 px block and 732 px of height. **What it
   costs**: at the switch the middle column is under B1 (`CELL_WRAP_PX`, 624) and under 768, so the
   banner takes three lines and the View Strip its short labels (« à vide », « A–B »); the column
   clears B1 from 1200.
 - **Stacked below 1024 and short**: the whole block plus `MIN_RAIL` and the navigation bar need
-  `block + 156` px of height — 842 px at 768 wide, 938 px at 1023. Portrait tablets (768 × 1024,
+  `block + 156` px of height — 856 px at 768 wide, 952 px at 1023. Portrait tablets (768 × 1024,
   810 × 1080, 820 × 1180, 834 × 1194) clear it; a narrow desktop window such as 1000 × 900 does not
   and opens on the Pinned Safety Header alone until the window is taller. That is the collapse the
   ticket keeps (« le Pinned Safety Header reste »), accepted rather than capped around.
@@ -236,9 +245,10 @@ axis. No charting library, and no `d3-scale`** — the only transform is linear 
 the two scales are *deliberately mismatched*, which is the whole point (« v1 build spec » § 5).
 
 - The x scale is **one `SharedX` object per (chart-column inline size, `L`, terrain source)**,
-  built by `@/lib/layout/contract.ts` and consumed by **both** charts. `GUTTER = 24` on both sides
-  of both charts, and **the pointer inverse is a method on it** — never a formula retyped per call
-  site.
+  built by `@/lib/layout/contract.ts` and consumed by **both** charts. `GUTTER = 12` — the
+  containers' `px-3`, voir *Rhythm* — on both sides of both charts, and **the pointer inverse is a
+  method on it** — never a formula retyped per call site. The y-axis labels stand inside the plot
+  at `axisLabel()`, on a halo of the background, because a 12 px gutter holds none.
 - **No chart dimension may read the window height.** Every band height is a function of the chart
   column's inner width; the constants and the vertical-exaggeration policy (the aspect identity,
   the band, the ×1 floor) live in `contract.ts` and are unit-tested there.
