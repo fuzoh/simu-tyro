@@ -104,7 +104,10 @@ every Page shares rather than by having one Page.
 - **The bar is `NAV_BAR` = 36 px, paid out of every Page's height.** `PageFrame` is `h-dvh`, and
   the shell under it is `h-full`. The collapse rule reads it as `ViewportFit.navigationHeight` on
   both arms: unlike § 8's strip it is never dismissed, so `MIN_RAIL` is owed under it below B2.
-  At 44 px it would pin budget C, whose letterbox is 43,68 px.
+  Under a 44 px bar Avancé's 1152 px column (from 1728 px of viewport) needs 915 px of height
+  against 907 under 36 px; at the 24 px gutter a 44 px bar pinned budget C, whose letterbox was then
+  43,68 px. Since the 12 px gutter (#115) budget C's block is 870,24 px, and it pins at 900 px under
+  either bar.
 - **`/` is the Page Statique (#91)** — `ssr: false`, its own Skeleton, the shared schema. It
   replaced the client redirect to `/avance` that held the path until then, so a link shared before
   the Pages (`/?…`) opens its Scenario on Statique, and the navigation bar's links carry the search
