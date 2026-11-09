@@ -191,22 +191,43 @@ export type Terrain =
 /**
  * §11's reduction over the sweep. It is a **reducer, not a sweep field**: the §15 fixtures need
  * no terrain stub, and terrain enters the engine at exactly one point.
+ *
+ * **What is judged leaves the two Zones d'ancrage out** (#106): a rider position `x_P` and a point
+ * `x` of the line or of the ground count only outside `[0, z] ∪ [L − z, L]`. With `z = 0` there is
+ * no zone and every field reads exactly as it did before the zones. {@link ClearanceResult.whole}
+ * is the same reduction with nothing left out, which judges nothing.
  */
 export type ClearanceResult = {
-  /** Least ground clearance over the whole traverse, m; negative means contact. */
+  /**
+   * Least ground clearance over the traverse outside the Zones d'ancrage, m; negative means
+   * contact. `+∞` when no rider position falls outside them.
+   */
   hMin: number;
   /** Horizontal position of that minimum, m. */
   atX: number;
-  /** Index into the sweep's `steps` at which it occurs. */
+  /** Index into the sweep's `steps` at which it occurs; −1 when no position is judged. */
   atStepIndex: number;
-  /** Which envelope is violated, if any — two contact kinds, two separate verdicts. */
+  /**
+   * Which envelope is violated outside the Zones d'ancrage, if any — two contact kinds, two
+   * separate verdicts. A contact inside a zone is no contact.
+   */
   contact: "none" | "rider" | "cable";
-  /** Per-step clearance minimum, m; one entry per sweep step. */
+  /**
+   * Per-step clearance minimum over the points of the line outside the Zones d'ancrage, m; one
+   * entry per sweep step, judged or not — a step inside a zone still has a line to draw.
+   */
   perStep: Float64Array;
   /** Horizontal position of each per-step minimum, m. */
   perStepX: Float64Array;
-  /** Per step, `1` when the minimum is the cable's rather than the rider's. */
+  /** Per step, `1` when the cable itself is under the ground at a point outside the zones. */
   perStepCable: Uint8Array;
+  /** Per step, `1` when the rider's own `x_P` is outside the Zones d'ancrage — a judged step. */
+  perStepJudged: Uint8Array;
+  /**
+   * §11 over **every** rider position and every point, the zones included — what the minimum was
+   * before the zones. Shown on Avancé beside the judged one, and judged by nothing.
+   */
+  whole: { hMin: number; atX: number; atStepIndex: number };
 };
 
 /**
