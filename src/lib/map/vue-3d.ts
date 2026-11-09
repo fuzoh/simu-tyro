@@ -175,7 +175,10 @@ export type Vue3dScene = {
   readonly fils: { readonly A: FilAPlomb; readonly B: FilAPlomb };
   /** The Ligne A–B, straight from anchor to anchor: it needs no solve. */
   readonly ligneAB: readonly [EarthPoint, EarthPoint];
-  /** The Ligne à vide — `null` under « Aucun résultat », when the line did not solve. */
+  /**
+   * The Ligne à vide — `null` under « Aucun résultat », when the line did not solve, or where the
+   * passager could not be placed: the coupe draws its solved half only with the passager.
+   */
   readonly unloaded: readonly EarthPoint[] | null;
   /**
    * The loaded line at the Scenario's passager, through the passager's own node — `null` under
@@ -184,8 +187,9 @@ export type Vue3dScene = {
   readonly loaded: readonly EarthPoint[] | null;
   /**
    * The Trajectoire — the passager's node over the whole traverse, one polyline per run as the
-   * coupe splits it (`SceneBase.trajectory`) — or `null` under « Aucun résultat ». Straight like the
-   * loaded line it hangs from: the Banane is the Ligne à vide's.
+   * coupe splits it (`SceneBase.trajectory`) — or `null` under « Aucun résultat » or with no
+   * passager placed, as the Ligne à vide. Straight like the loaded line it hangs from: the Banane is
+   * the Ligne à vide's.
    */
   readonly trajectory: readonly (readonly EarthPoint[])[] | null;
   /**
@@ -199,7 +203,7 @@ export type Vue3dScene = {
  * The scene, from what the coupe already computed.
  *
  * @param solved the solved half, or `null` under « Aucun résultat ».
- * @param rider the passager placed at the Scenario's `x_D`, or `null`.
+ * @param rider the passager placed at the Scenario's `x_D`, or `null` — then no engine line stands.
  * @param across the wind's cross component, m/s: the Ligne à vide's bow, nil without it.
  */
 export function vue3dScene({
@@ -224,12 +228,15 @@ export function vue3dScene({
     ends,
     fils,
     ligneAB: [fils.A.anchor, fils.B.anchor],
-    unloaded: solved === null ? null : alongLine(onBanane, solved.unloadedCable),
-    loaded:
-      solved === null || rider === null
-        ? null
-        : alongLine(onEarth, throughNode(rider.cable, rider.step.xD, rider.step.zD)),
-    trajectory: solved === null ? null : solved.trajectory.map((run) => alongLine(onEarth, run)),
+    // As on the coupe, the solved half stands only with the passager placed: no Ligne à vide nor
+    // Trajectoire under a loaded line the exact solve at x_D refused.
+    ...(solved === null || rider === null
+      ? { unloaded: null, loaded: null, trajectory: null }
+      : {
+          unloaded: alongLine(onBanane, solved.unloadedCable),
+          loaded: alongLine(onEarth, throughNode(rider.cable, rider.step.xD, rider.step.zD)),
+          trajectory: solved.trajectory.map((run) => alongLine(onEarth, run)),
+        }),
     membersPx: solved?.members.map((member) => member.offsetPx) ?? [0],
   };
 }

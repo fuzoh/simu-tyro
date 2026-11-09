@@ -383,6 +383,19 @@ describe("the coupe's layers in the Vue 3D (#111)", () => {
     expect(none.trajectory).toBeNull();
   });
 
+  test("with no passager placed, no line of the solve stands, as on the coupe", () => {
+    // The coupe draws the Ligne à vide and the Trajectoire only with its passager: where the exact
+    // solve at x_D refused, the Vue 3D keeps only what needs no solve.
+    const unplaced = vue3dScene({
+      placement: placed(scene),
+      solved: scene,
+      rider: null,
+      across: 0,
+    });
+    expect([unplaced.unloaded, unplaced.loaded, unplaced.trajectory]).toEqual([null, null, null]);
+    expect(unplaced.ligneAB[0].altitude).toBeCloseTo(1455.2, 9);
+  });
+
   test("the loaded line touches the Trajectoire at the passager's node, wherever the passager is", () => {
     const [run] = drawn().trajectory ?? [];
     const engine = scene.trajectory[0];
