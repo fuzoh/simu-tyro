@@ -856,8 +856,14 @@ function MapCanvas({
     );
     // The aperçu follows a pointer that hovers — a mouse, a pen — and leaves with it. Pointer events
     // come before the mouse events they cause, so a tap is known for one before MapLibre hears it.
+    // The pixel is read here too, from the DOM and against the canvas as MapLibre reads a click's:
+    // its own `mousemove` is held back while a drag pans the map, and the cross would stay where
+    // the pan began, away from where the next click lands.
     const sense = (event: PointerEvent) => {
       hovers.current = event.pointerType !== "touch";
+      if (!hovers.current || event.type !== "pointermove") return;
+      const box = created.getCanvas().getBoundingClientRect();
+      aim.current = [event.clientX - box.left, event.clientY - box.top];
     };
     node.addEventListener("pointerdown", sense, true);
     node.addEventListener("pointermove", sense, true);
@@ -869,7 +875,7 @@ function MapCanvas({
       aim.current = null;
       if (measures.current) redrawMeasure();
     });
-    // A pan or a zoom under a still pointer: the cross stays under it.
+    // A pan or a zoom, under a still pointer or one that drags: the cross stays under it.
     created.on("move", () => {
       if (measures.current && aim.current !== null) redrawMeasure();
     });
