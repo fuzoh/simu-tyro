@@ -321,7 +321,10 @@ export function TopMap({
                   send={send}
                   target={target}
                 />
-                <div className="pointer-events-none absolute top-2 left-2 flex gap-1">
+                {/* `right-12` keeps the row clear of MapLibre's zoom stack (29 px, 10 px in from
+                    the top-right corner) and `flex-wrap` folds it under itself instead: Statique's
+                    first row leaves the map 287 px at 1024 px of viewport (#109). */}
+                <div className="pointer-events-none absolute top-2 right-12 left-2 flex flex-wrap gap-1">
                   {!locked &&
                     (["A", "B"] as const).map((anchor) => (
                       <Toggle
