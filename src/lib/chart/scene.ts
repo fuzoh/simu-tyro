@@ -23,8 +23,8 @@
  *   and {@link placeRider} runs the rider's exact solve and its one-step clearance. That split
  *   **is** § 7's « memo on the solve inputs behind the `useSweep` seam »: dragging the rider
  *   dispatches a new Scenario on every `pointermove`, and only the second half may re-run for it.
- *   `unloadedInputs`, `mp`, `hRider` and the member count are what a memo keys on, and `x_D` is
- *   absent from them.
+ *   `unloadedInputs`, `mp`, `hRider`, the Zones d'ancrage and the member count are what a memo
+ *   keys on, and `x_D` is absent from them.
  * - **No polyline is ever stored in a result object.** The cable is regenerated per render from
  *   `sampleCable(state, n)`; what is stored here is this render's samples, not a field on a
  *   `SpanState` — voir § 2 — le contrat du moteur.
@@ -71,6 +71,7 @@ import { clampX, type PlacedSpan } from "@/lib/scenario/geometry.ts";
 import { sweepRider, sweepRiderOf } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import {
+  CLEARANCE,
   evaluateClearance,
   sampleCable,
   solveAtHorizontalPosition,
@@ -80,8 +81,8 @@ import {
 
 /**
  * Vertices minus one on a drawn cable. Nothing downstream is measured against it — it is a drawing
- * resolution, not a physical grid — and 240 puts a vertex every ~4,6 px on the 1104 px desktop plot
- * and every ~1,4 px at 390. The clearance reducer keeps its own `CLEARANCE.samplesPerStep`.
+ * resolution, not a physical grid — and 240 puts a vertex every ~4,7 px on the 1128 px desktop plot
+ * and every ~1,5 px at 390. The clearance reducer keeps its own `CLEARANCE.samplesPerStep`.
  */
 export const CABLE_SAMPLES = 240;
 
@@ -180,7 +181,15 @@ export type SceneRider = {
    * number is not under the passenger » together or not at all (ticket 41).
    */
   readonly relabel: boolean;
-  /** Signal 4 — « suis-je dans la zone en ce moment ? ». Cable-red is reserved for this. */
+  /**
+   * Is the rider inside a Zone d'ancrage (#106)? Then nothing is judged at this position: no
+   * signal 4, no breach on the cell, and the hover says so. The garde is still read and drawn.
+   */
+  readonly inAnchorZone: boolean;
+  /**
+   * Signal 4 — « suis-je dans la zone en ce moment ? ». Cable-red is reserved for this. Never set
+   * inside a Zone d'ancrage, where the passager is on the platform and nothing is judged.
+   */
   readonly inViolation: boolean;
   /**
    * §6.3's passenger envelope, m — drawn **metrically**, never at a minimum pixel size. At 1500 m
@@ -266,11 +275,25 @@ export type SceneBase = SceneFrame & {
    * would draw a position nobody computed. Usually one run.
    */
   readonly trajectory: readonly Polyline[];
-  /** §11 over the traverse: the aggregate `h_min`, its `x`, and the per-step arrays. */
+  /**
+   * §11 over the traverse, outside the Zones d'ancrage: the aggregate `h_min`, its `x`, the
+   * per-step arrays, and the minimum with the zones included.
+   */
   readonly clearance: ClearanceResult;
   /** §6.3's passenger envelope, m — §11's third term, so it is the scenario's, not the view's. */
   readonly hRider: number;
-  /** Signal 3 — the rider positions that violate, merged into runs. Empty when nothing fails. */
+  /** The length of each Zone d'ancrage, m — the scenario's, like the envelope. `0` is no zone. */
+  readonly anchorZone: number;
+  /**
+   * The two Zones d'ancrage, `[0, z]` and `[L − z, L]`, as the bands the coupe and the strip grey
+   * (#106) — the same shape as {@link violating}, in a neutral tint. Empty when `z` is 0, and
+   * never wider than the span: zones that meet are the Clearance Gate's, which removes them.
+   */
+  readonly anchorZones: readonly Band[];
+  /**
+   * Signal 3 — the rider positions that violate, merged into runs. Empty when nothing fails. A
+   * position inside a Zone d'ancrage never violates: it is not judged.
+   */
   readonly violating: readonly Band[];
 };
 
@@ -346,6 +369,8 @@ export function buildSceneBase(
     trajectory: trajectoryRuns(traverse),
     clearance,
     hRider: rider.hRider,
+    anchorZone: rider.anchorZone,
+    anchorZones: anchorZoneBands(frame.L, rider.anchorZone),
     violating: violatingBands(traverse, clearance),
     zExtent: solvedZExtent(frame.zExtent, { traverse, unloadedCable }),
   };
@@ -436,7 +461,7 @@ function drawnGround({ L, terrain, bases }: PlacedSpan): {
  *   returns, and A11's to name.
  */
 export function placeRider(base: SceneBase, requestedXD: number): SceneRider | null {
-  const { span, P, terrain, hRider, L, h, unloadedCable } = base;
+  const { span, P, terrain, hRider, anchorZone, L, h, unloadedCable } = base;
   const xD = clampX(requestedXD, L);
   // §6.1 case 2 — outer bisection on `s_P`, inner 2×2 Newton, measured ≈40 µs. Snapping 99,7 to
   // 101,2 and rewriting the field would discard user input silently for the sake of one code path.
@@ -451,9 +476,25 @@ export function placeRider(base: SceneBase, requestedXD: number): SceneRider | n
   if (!resolved.ok) return null;
   const { step, state } = resolved;
 
-  // §11's **inner** minimum at this one rider position: the reducer, over a one-step traverse.
-  const at = evaluateClearance(span, P, [step], terrain, hRider);
-  const worst = { hClear: at.perStep[0], atX: at.perStepX[0] };
+  // §11's **inner** minimum at this one rider position: the reducer, over a one-step traverse —
+  // over the line outside the Zones d'ancrage, as the traverse's own. Zones that leave no point of
+  // the line between them are the Clearance Gate's to refuse; until then the cell reads the whole
+  // line rather than the identity of an empty minimum.
+  const at = evaluateClearance(
+    span,
+    P,
+    [step],
+    terrain,
+    hRider,
+    CLEARANCE.samplesPerStep,
+    anchorZone,
+  );
+  const worst = Number.isFinite(at.perStep[0])
+    ? { hClear: at.perStep[0], atX: at.perStepX[0] }
+    : { hClear: at.whole.hMin, atX: at.whole.atX };
+  // Read on the requested `x_D`, not on the solve's: the re-solved step lands within a few µm of
+  // it, and `x_D = z` typed in the field must be in the zone the field's help says it is.
+  const inAnchorZone = isInAnchorZone(xD, L, anchorZone);
 
   return {
     step,
@@ -469,7 +510,8 @@ export function placeRider(base: SceneBase, requestedXD: number): SceneRider | n
     // rider's own node, 0,000 m away, against 0,9 m before — so the cell reads plainly on first
     // paint. The traverse's own minimum still sits elsewhere, 0,57 m off at x 74,43.
     relabel: Math.abs(worst.atX - step.xD) > Math.max(1, 0.01 * L),
-    inViolation: worst.hClear < 0,
+    inAnchorZone,
+    inViolation: !inAnchorZone && worst.hClear < 0,
     envelope: hRider,
     sagAtRider: (h * step.xD) / L - step.zD,
   };
@@ -527,16 +569,38 @@ export function trajectoryRuns(traverse: SweepResult): Polyline[] {
 }
 
 /**
+ * Is `x` inside a Zone d'ancrage — `x ≤ z` or `x ≥ L − z`? The zones are closed, as the reducer
+ * leaves them out, and `z ≤ 0` is no zone. The passager's cell and the coupe's hover both ask it.
+ */
+export function isInAnchorZone(x: number, L: number, anchorZone: number): boolean {
+  return anchorZone > 0 && (x <= anchorZone || x >= L - anchorZone);
+}
+
+/**
+ * The two Zones d'ancrage as bands, A's first. Exported for its test: the bands are arithmetic on
+ * `L` and `z` alone, and a test that read them off a whole scene would also be testing the sweep.
+ */
+export function anchorZoneBands(L: number, anchorZone: number): Band[] {
+  if (!(anchorZone > 0) || !(L > 0)) return [];
+  const z = Math.min(anchorZone, L);
+  return [
+    { from: 0, to: z },
+    { from: L - z, to: L },
+  ];
+}
+
+/**
  * Signal 3 — the rider positions that violate, as runs of consecutive sweep steps.
  *
  * **Not the x of the worst point.** The band answers « où le passager ne doit-il pas aller ? »,
- * which is a different set of x values; the prototype had this backwards at first.
+ * which is a different set of x values; the prototype had this backwards at first. A step inside a
+ * Zone d'ancrage is not judged, so it ends a run rather than extending one.
  */
 function violatingBands(traverse: SweepResult, clearance: ClearanceResult): Band[] {
   const bands: Band[] = [];
   let start: number | null = null;
   for (let i = 0; i < traverse.steps.length; i++) {
-    const violates = clearance.perStep[i] < 0;
+    const violates = clearance.perStepJudged[i] === 1 && clearance.perStep[i] < 0;
     if (violates && start === null) start = traverse.steps[i].xD;
     if (!violates && start !== null) {
       bands.push({ from: start, to: traverse.steps[i - 1].xD });

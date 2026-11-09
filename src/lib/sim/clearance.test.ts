@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 
+import type { CableShape } from "./catenary.ts";
 import type { SpanInput, SweepStep, Terrain } from "./types.ts";
 
 import {
@@ -658,5 +659,207 @@ describe("the reducer's own contract", () => {
     const before = JSON.stringify({ span, steps: traverse.steps });
     evaluateClearance(span, 1177, traverse.steps, flat, 2.1);
     expect(JSON.stringify({ span, steps: traverse.steps })).toBe(before);
+  });
+});
+
+describe("the Zones d'ancrage — nothing is judged within z of either anchor (#106)", () => {
+  // A level 150 m span over a V valley: each anchor stands 12 m above its own base and the ground
+  // falls to 40 m under the chord at mid-span. In the anchor-A-top frame the cable starts and ends
+  // at `z = 0` over ground at −12, so **every** step scans those two vertices at a garde of
+  // exactly `12 − h_rider` — the V valley's minimum sits beside an anchor by construction, which
+  // is the situation the zones exist for.
+  const { in: given } = FIRST_RUN_CLEARANCE;
+  const L = 150;
+  const span: SpanInput = { L, h: 0, L0: 150.6, w: given.w, EA: given.EA, loads: [] };
+  const traverse = sweep(span, given.P, given.sweepSteps);
+  const hRider = 2.1;
+  const atAnchor = 12 - hRider;
+  /** The valley's own slope from A down to mid-span, anchor-A-top frame. */
+  const slope = (x: number) => -12 - (28 * x) / 75;
+  /** The V valley, with an optional one-vertex spike whose feet sit a metre away on the slope. */
+  const valley = (bump?: { x: number; z: number }): Terrain => {
+    const points: [number, number][] = [
+      [0, -12],
+      [75, -40],
+      [L, -12],
+    ];
+    if (bump !== undefined) {
+      points.push(
+        [bump.x - 1, slope(bump.x - 1)],
+        [bump.x, bump.z],
+        [bump.x + 1, slope(bump.x + 1)],
+      );
+    }
+    points.sort((a, b) => a[0] - b[0]);
+    return {
+      kind: "profile",
+      xs: Float64Array.from(points.map(([x]) => x)),
+      zs: Float64Array.from(points.map(([, z]) => z)),
+    };
+  };
+  const reduce = (terrain: Terrain, z: number) =>
+    evaluateClearance(span, given.P, traverse.steps, terrain, hRider, CLEARANCE.samplesPerStep, z);
+
+  test("the traverse solves whole, so every assertion below reads all 260 steps", () => {
+    expect(traverse.coverage).toBe(1);
+  });
+
+  test("with z = 0 there is no zone: the opening screen still reads 2,42 m at x 74,4", () => {
+    const { in: line, out: measured } = FIRST_RUN_CLEARANCE;
+    const firstRun = spanOf(line, line.L0);
+    const ground = groundUnderAnchors(line.L, line.h, line.anchorHeight, line.anchorHeight);
+    const steps = sweep(firstRun, line.P, line.sweepSteps).steps;
+    const none = evaluateClearance(firstRun, line.P, steps, ground, line.hRider, 60, 0);
+    expect(measuredOffBy(none.hMin, measured.hMin, 2)).toBeLessThanOrEqual(1);
+    expect(measuredOffBy(none.atX, measured.atX, 1)).toBeLessThanOrEqual(1);
+    // Its minimum is mid-span, so the shipped 10 m zones leave it where it is.
+    const zoned = evaluateClearance(firstRun, line.P, steps, ground, line.hRider, 60, 10);
+    expect(zoned.hMin).toBe(none.hMin);
+    expect(zoned.atX).toBe(none.atX);
+  });
+
+  test("with z = 0 the valley's minimum is the anchor's own garde, as it was before #106", () => {
+    const none = reduce(valley(), 0);
+    expect(none.hMin).toBeLessThanOrEqual(atAnchor);
+    // Beside an anchor, where the 10 m zones below will cover it: a few metres out, the trolley's
+    // kink has dropped the line faster than the valley falls.
+    expect(none.atX < 10 || none.atX > L - 10).toBe(true);
+    expect(none.perStepJudged.every((flag) => flag === 1)).toBe(true);
+    // The argument's default is that same no-zone reduction, field for field.
+    expect(evaluateClearance(span, given.P, traverse.steps, valley(), hRider)).toEqual(none);
+    expect(none.whole).toEqual({ hMin: none.hMin, atX: none.atX, atStepIndex: none.atStepIndex });
+  });
+
+  test("with z = 10 m the minimum leaves the zones' insides, point and rider alike", () => {
+    const zoned = reduce(valley(), 10);
+    // The judged span is the open interval `(10, 140)`; its minimum is read up to its edges.
+    expect(zoned.atX).toBeGreaterThanOrEqual(10);
+    expect(zoned.atX).toBeLessThanOrEqual(L - 10);
+    const rider = traverse.steps[zoned.atStepIndex].xD;
+    expect(rider).toBeGreaterThan(10);
+    expect(rider).toBeLessThan(L - 10);
+    expect(zoned.hMin).toBeGreaterThan(reduce(valley(), 0).hMin);
+  });
+
+  test("where the garde rises away from a zone, the minimum is read on its edge, not a step past it", () => {
+    // The valley falls from A faster than the line does, so the judged garde is least at the edge
+    // of A's zone: a boundary minimum, with a slope there. The uniform grid never lands on `x = 10`;
+    // reading the first sample past it was optimistic by up to one spacing times that slope.
+    const zoned = reduce(valley(), 10);
+    expect(zoned.atX).toBe(10);
+    // The value is the line's own at `x = 10` on the governing step, read off `x(s)` and `z(s)`
+    // by a bisection of this test's own rather than by the reducer.
+    const step = traverse.steps[zoned.atStepIndex];
+    const shape: CableShape = {
+      H: step.H,
+      V0: step.V0,
+      w: span.w,
+      EA: span.EA,
+      loads: [{ P: given.P, s: step.sD }],
+    };
+    let lo = 0;
+    let hi = span.L0;
+    for (let it = 0; it < 200; it++) {
+      const mid = (lo + hi) / 2;
+      if (xAt(shape, mid) < 10) lo = mid;
+      else hi = mid;
+    }
+    const atEdge = zAt(shape, lo) - zGroundAt(valley(), 10) - hRider;
+    expect(zoned.hMin).toBeCloseTo(atEdge, 6);
+    // And the scan's resolution no longer moves it: ten times the samples, the same garde.
+    const fine = evaluateClearance(span, given.P, traverse.steps, valley(), hRider, 600, 10);
+    expect(fine.hMin).toBeCloseTo(zoned.hMin, 6);
+    expect(fine.atX).toBe(10);
+  });
+
+  test("`whole` is the no-zone reduction whatever z is, so Avancé still has what the zones hide", () => {
+    const none = reduce(valley(), 0);
+    for (const z of [5, 10, 40]) {
+      expect(reduce(valley(), z).whole).toEqual(none.whole);
+    }
+  });
+
+  test("a longer zone never lowers the judged minimum", () => {
+    let previous = Number.NEGATIVE_INFINITY;
+    for (const z of [0, 2, 5, 10, 20, 40, 70]) {
+      const { hMin } = reduce(valley(), z);
+      expect(hMin).toBeGreaterThanOrEqual(previous);
+      previous = hMin;
+    }
+  });
+
+  test("the judged steps are the rider positions strictly between the two zones", () => {
+    const zoned = reduce(valley(), 10);
+    const { steps } = traverse;
+    // The sweep runs anchor to anchor: its first and last positions are on the platforms.
+    expect(zoned.perStepJudged[0]).toBe(0);
+    expect(zoned.perStepJudged[steps.length - 1]).toBe(0);
+    expect(zoned.perStepJudged[steps.findIndex((step) => step.xD > L / 2)]).toBe(1);
+    // A step on the platform is still drawn: its line minimum outside the zones is a number.
+    expect(Number.isFinite(zoned.perStep[0])).toBe(true);
+  });
+
+  test("a cable in the ground only inside a zone is no contact; just outside, it still is", () => {
+    // Ground at +5 m, above both anchor tops: a sagging level cable is under it, whoever rides.
+    const inside = valley({ x: 5, z: 5 });
+    expect(reduce(inside, 0).contact).toBe("cable");
+    const zoned = reduce(inside, 10);
+    expect(zoned.contact).toBe("none");
+    expect(zoned.hMin).toBeGreaterThan(0);
+    expect(zoned.perStepCable.every((flag) => flag === 0)).toBe(true);
+
+    const outside = reduce(valley({ x: 15, z: 5 }), 10);
+    expect(outside.contact).toBe("cable");
+    // The spike is a terrain vertex, scanned exactly: the governing point is its own x.
+    expect(outside.atX).toBe(15);
+    expect(outside.hMin).toBeLessThan(-5 - hRider);
+  });
+
+  test("a cable in the ground past the zone, read while the rider is on the platform, is no contact", () => {
+    // The spike at x 15 is outside A's 10 m zone, and the cable is under it whoever rides. Reduced
+    // over the platform's steps alone, the line still records its cable contact step by step — it
+    // is drawn — but no judged rider position sees it, so the verdict holds none.
+    const onPlatform = traverse.steps.filter((step) => step.xD <= 10);
+    expect(onPlatform.length).toBeGreaterThan(0);
+    const zoned = evaluateClearance(
+      span,
+      given.P,
+      onPlatform,
+      valley({ x: 15, z: 5 }),
+      hRider,
+      CLEARANCE.samplesPerStep,
+      10,
+    );
+    expect(zoned.perStepJudged.every((flag) => flag === 0)).toBe(true);
+    expect(zoned.perStepCable.every((flag) => flag === 1)).toBe(true);
+    expect(zoned.contact).toBe("none");
+    expect(zoned.atStepIndex).toBe(-1);
+  });
+
+  test("a rider contact only at an anchor is no contact once the zone covers it", () => {
+    // Anchor A stands 1 m over its base and the ground drops 11 m in the next metre: at `x = 0`
+    // the garde is exactly `1 − h_rider` on every step, and nowhere else is the envelope crossed.
+    const shortA: Terrain = {
+      kind: "profile",
+      xs: Float64Array.from([0, 1, 75, L]),
+      zs: Float64Array.from([-1, -12, -40, -12]),
+    };
+    const none = reduce(shortA, 0);
+    expect(none.contact).toBe("rider");
+    expect(none.hMin).toBeCloseTo(1 - hRider, 12);
+    expect(none.atX).toBe(0);
+
+    const zoned = reduce(shortA, 10);
+    expect(zoned.contact).toBe("none");
+    expect(zoned.hMin).toBeGreaterThan(0);
+    expect(zoned.whole.hMin).toBeCloseTo(1 - hRider, 12);
+  });
+
+  test("zones that leave no rider position between them judge nothing, and `whole` still reads", () => {
+    const all = reduce(valley(), L / 2);
+    expect(all.atStepIndex).toBe(-1);
+    expect(all.hMin).toBe(Number.POSITIVE_INFINITY);
+    expect(all.contact).toBe("none");
+    expect(all.whole.atStepIndex).toBeGreaterThanOrEqual(0);
   });
 });

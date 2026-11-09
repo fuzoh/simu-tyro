@@ -74,7 +74,12 @@ type PageInput = { readonly page: string; readonly register: Register };
  */
 export function usePage({ page, register }: PageInput): PageModel {
   const base = usePageBase(register);
-  const rail = useRailForm(base.deduced, base.traverse, register);
+  const rail = useRailForm(
+    base.deduced,
+    base.traverse,
+    base.scene.solved?.clearance ?? null,
+    register,
+  );
   const published = usePublished({
     page,
     register,
@@ -85,13 +90,18 @@ export function usePage({ page, register }: PageInput): PageModel {
   return { ...base, rail, ...published };
 }
 
-/** The Page Terrain's (#101): no field holds text, so the gates judge the Scenario alone. */
+/**
+ * The Page Terrain's (#101): no field holds text, so the gates judge the Scenario and its solved
+ * garde alone.
+ */
 export function useReadingPage({ page, register }: PageInput): ReadingPageModel {
   const base = usePageBase(register);
-  const { traverse } = base;
+  const { traverse, state, scene } = base;
+  const { trace } = state;
+  const clearance = scene.solved?.clearance ?? null;
   const report = useMemo(
-    () => evaluateGates({ scenario: traverse, register }),
-    [traverse, register],
+    () => evaluateGates({ scenario: traverse, trace, clearance, register }),
+    [traverse, trace, clearance, register],
   );
   return { ...base, ...usePublished({ page, register, base, focused: null, report }) };
 }

@@ -51,8 +51,10 @@ export function plainDrawing(
   return {
     unoriented: unoriented === null ? null : UNORIENTED[unoriented],
     ends: { A, B },
+    // The drawing stands in a 3 : 2 box of its own, centred in the frame: the frame is 3 : 2 only
+    // up to its height cap, and the letters, placed by percentage, must share the drawing's box.
     figure: (
-      <>
+      <div className="absolute inset-y-0 left-1/2 aspect-[3/2] h-full -translate-x-1/2">
         <svg
           className="text-foreground absolute inset-0 h-full w-full"
           role="img"
@@ -115,7 +117,7 @@ export function plainDrawing(
             </span>
           )}
         </div>
-      </>
+      </div>
     ),
   };
 }
@@ -132,6 +134,18 @@ function at({ x, y }: TopViewPoint): CSSProperties {
  * The figure's box, shared with the Skeleton: one control row, the map at 3 : 2 — capped so a
  * desktop column does not spend its whole height on it — then five caption lines, reserved so the
  * live lines land in the Skeleton's space. The Skeleton passes no occupant, only the heights.
+ *
+ * **The cap is on the height, not the width** (#115): the box spans its region, so its edges are
+ * the tiles', the region titles' and the coupe's on every Page, and it stops growing taller at the
+ * 448 px it had when it was capped at `max-w-2xl`. Past 672 px of width the map is wider than
+ * 3 : 2; the plain drawing keeps its own 3 : 2, centred.
+ *
+ * **Both numbers are custom properties with these defaults** — `--top-view-max-h` (28 rem, the
+ * 448 px cap) and `--top-view-caption` (5 rem, five `text-xs` lines) — so a Page's layout can
+ * change them on the region around the frame without a prop through `TopMap`, whose mount the
+ * layout contract pins. Statique's first row (#109) is the one that does: it lifts the cap, so the
+ * map keeps its 3 : 2 beside the tiles, and reserves seven lines, since the caption sets that row's
+ * height and so the coupe's place under it.
  */
 export function TopViewFrame({
   controls,
@@ -143,12 +157,14 @@ export function TopViewFrame({
   caption?: ReactNode;
 }) {
   return (
-    <div className="flex max-w-2xl flex-col gap-2">
+    <div className="flex w-full flex-col gap-2">
       <div className="flex h-7 items-center gap-2">{controls}</div>
-      <div className="border-border relative aspect-[3/2] w-full overflow-hidden border">
+      <div className="border-border relative aspect-[3/2] max-h-[var(--top-view-max-h,28rem)] w-full overflow-hidden border">
         {figure}
       </div>
-      <div className="text-muted-foreground flex min-h-20 flex-col text-xs">{caption}</div>
+      <div className="text-muted-foreground flex min-h-[var(--top-view-caption,5rem)] flex-col text-xs">
+        {caption}
+      </div>
     </div>
   );
 }

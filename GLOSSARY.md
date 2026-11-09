@@ -190,7 +190,8 @@ _Avoid_: descente, envelope vs instant, global vs local, min vs current, worst c
 
 **Verdict**:
 The app's answer to "is this line safe?" — the worst tension over the whole traverse and
-the minimum clearance over the whole traverse, judged against a chosen safety regime.
+the minimum clearance over the traverse outside the Zones d'ancrage, judged against a chosen
+safety regime.
 Never judged from the rider's current position.
 _Avoid_: check, validation, safety result
 
@@ -311,10 +312,17 @@ full when clearance is measured. French, on every Page: **gabarit du passager**.
 _Avoid_: empreinte, hauteur du passager, enveloppe, maître-couple, rider height, lanyard length, offset
 
 **Garde au sol**:
-The distance from the passager to the ground. The minimum is where, over the traverse, the
-passager comes closest to the ground. At the passager's position it is the same quantity,
-not a second name. The maximum is the inverse and is not a shown value.
+The distance from the passager to the ground. The minimum is where, over the traverse outside
+the two Zones d'ancrage, the passager comes closest to the ground. At the passager's position it
+is the same quantity, not a second name. The maximum is the inverse and is not a shown value.
 _Avoid_: garde sous le passager, garde passager
+
+**Zone d'ancrage**:
+The stretch at each end of the span, measured horizontally from the anchor, where the passager is
+still or already on the platform and comes close to the ground by construction. Clearance there
+— garde, Garde min. ligne, Rider Contact, Cable Contact — is not judged; the coupe greys it. Its
+length is set on Avancé, 10 m by default, a convention without a normative source.
+_Avoid_: zone de départ, zone d'arrivée, plateforme, zone exclue, zone morte
 
 **Garde exigée**:
 The garde au sol the user refuses to go under. Not the computed garde.
@@ -358,8 +366,10 @@ in two columns either side of the Chart Block — `Paramètres` on the left, the
 report on the right; below it they stack into one scroll, Chart Block first, the Rail's
 sections after it in their own order. A right-hand column was once rejected because it steals
 the width a 1500 m span needs; 1024 px is the narrowest landscape tablet, where stacking would
-cost the chart its whole profile; the middle column is then 448 px, and the shell's cap keeps
-it at 1152 px beyond.
+cost the chart its whole profile; the middle column is then 448 px, and it takes every pixel of
+the window past the two side columns beyond — Avancé has no width cap. Both are 288 px; from
+1920 px the left one is 576 px and `Paramètres` stands its field groups on two columns, read
+down the left one first, no group cut between them, the Rail Header across both.
 _Avoid_: results panel, output half as a place, sidebar, form
 
 **Rail Header**:
@@ -374,10 +384,13 @@ _Avoid_: app bar, toolbar, navbar, page header, chrome
 
 **Chart Block**:
 The banner slot, profile chart, clearance strip, View Strip and five read-out cells as
-one co-visible unit sharing a single x scale and a single gutter constant. On Avancé it heads
-the middle column between the Rail's two, with Statique's vue de dessus under it — never a view
-of Avancé's own. It reflows and collapses as a whole; no member is ever hidden or occluded on
-its own.
+one co-visible unit sharing a single x scale and a single gutter constant. On Avancé it stands
+in the middle column between the Rail's two, under Statique's vue de dessus, which heads that
+column from the three-column width — never a view of Avancé's own — and it widens with the
+window up to 1984 px — the column at 2848 px of window since the left column doubles from
+1920 — past which it letterboxes, centred in the column, so the whole block stays short enough
+for a 1440 px window. It reflows and collapses as a whole; no
+member is ever hidden or occluded on its own.
 _Avoid_: chart area, main pane, canvas
 
 **View Strip**:
@@ -400,9 +413,10 @@ _Avoid_: handle row, anchor bar, gutter, axis area
 **Pinned Safety Header**:
 What the Chart Block collapses to when the Rail scrolls, a field takes focus, or the
 block cannot fit: the banner slot plus one live « Garde min » cell, down to a single row
-while the soft keyboard is open. The banner slot carries whichever occupant precedence
-gives it, never only a Verdict. Derived from scroll, focus and available height — never
-persisted, and never a toggle.
+while the soft keyboard is open. Only where the Rail stands under the block — below the
+three-column width; in Avancé's three columns the Chart Block never collapses to it. The banner
+slot carries whichever occupant precedence gives it, never only a Verdict. Derived from scroll,
+focus and available height — never persisted, and never a toggle.
 _Avoid_: sticky header, mini banner, collapsed chart, HUD
 
 **Plot Aspect Band**:
@@ -430,7 +444,8 @@ _Avoid_: loader, loading state, placeholder, spinner, shell (the shell is the do
 
 **Fond de carte**:
 The swisstopo rendering under the vue de dessus: carte claire (default), orthophoto
-swissimage or carte nationale. A display choice, never part of the Scenario; without
+swissimage or carte nationale. A display choice, never part of the Scenario, kept beside the
+Couche pentes, the Vue 3D and the Repères; without
 network or outside swisstopo coverage the vue de dessus keeps its drawing on a plain
 background.
 _Avoid_: basemap, map layer, tiles, carte (for the rendering itself)
@@ -442,10 +457,39 @@ _Avoid_: slope layer, hillshade, relief
 
 **Vue 3D**:
 The relief view of the line: swisstopo terrain and imagery, both anchors on their Fils à
-plomb, Ligne à vide and loaded line from the engine, and the Banane. Context, not
-measurement: it states nothing the coupe does not. Anchors drag there as on the carte: the
-line follows the pointer, the recalculation waits for the release. Loaded only when chosen.
+plomb, the loaded line from the engine and, as the View Strip's layers say, the Ligne à vide
+with its Banane, the Ligne A–B and the Trajectoire — the coupe's curves, with no picker of its
+own. Context, not measurement: it states nothing the coupe does not. Anchors drag there as on
+the carte: the line follows the pointer, the recalculation waits for the release. The camera
+moves by the Gimbal, by the keys once the view has the focus, and to the two Vues
+prédéfinies. Loaded only when chosen.
 _Avoid_: 3D map, globe, scene, viewer
+
+**Gimbal**:
+The camera's controls over the corner of the Vue 3D: a north needle that turns with the
+camera and puts north up when pressed, a turn left or right around the line's centre, the
+inclinaison up or down, the zoom, and the two Vues prédéfinies. Each button has its key, and
+its hover names it. It moves the camera and nothing else: no anchor, no Scenario.
+_Avoid_: boussole (avoided for the Rose des vents too), navigation control, widget
+
+**Vue prédéfinie**:
+One of the Vue 3D's two set camera poses, each a Gimbal button and a key: the Vue du départ
+(key 1) and the Vue latérale (key 2). Geometry on the anchors, never a fit the engine picks.
+_Avoid_: preset, bookmark, saved view
+
+**Vue du départ**:
+The Vue prédéfinie on the platform at A: the eye 4,5 m to the left of A when one looks
+toward B, 1,7 m above the ground at A's foot — or above the ground under the eye, where a cross
+slope lifts it higher — looking along A → B and aimed at anchor B — to see the line run away
+from the start and the Banane bow it. Key 1.
+_Avoid_: vue passager, vue subjective
+
+**Vue latérale**:
+The Vue prédéfinie square across the line, A on the left of the screen as on the coupe, looking
+10° down, just far enough back for the whole line, both anchors and both feet included, to fit
+with a margin. The camera stands on the right of A → B, the side that puts A on the left of the
+screen. The view the Vue 3D opens on. Key 2.
+_Avoid_: vue de profil, vue de côté
 
 **Rose des vents**:
 The compass rose drawn on the vue de dessus, with a handle that sets the Vent's direction and force by dragging. It edits the azimuth directly: on the north-up map the handle stands where the wind comes from. Its reading gives that azimuth and, from the line's bearing, where the wind comes from relative to the line A → B (« Vent d'ouest (264°), 30 km/h : par la gauche à l'avant, 312° par rapport à la ligne A → B »). Without A and B on the map it has no handle and says why. On Terrain it is read-only. It sets the wind that draws the Banane.
@@ -460,8 +504,23 @@ _Avoid_: pole, mast, drop line
 **Mesure**:
 The one-line ruler on the vue de dessus: two clicked points, a third click starts over.
 Reports the horizontal distance, the straight distance between the two points and the
-distance along the ground. Never saved.
+distance along the ground. Never saved. With a pointer that hovers — a mouse, a pen — the
+**aperçu** shows before each click: the dotted cross of the next point follows the pointer,
+and the click sets the point exactly where it stood. A finger has no aperçu. Points are not
+dragged once set.
 _Avoid_: measure tool, ruler, polyline, outil de distance
+
+**Repères**:
+The dotted crosses of the vue de dessus, one line north–south and one east–west across the
+whole frame: through each point of the Mesure, through its aperçu, and through A and through
+B as soon as each is placed. Those two are the **repères d'ancrage**: drawn in every mode,
+not only in the Mesure, they follow an anchor while it is dragged, so a point of the Mesure
+can be set in line with an anchor. The « Repères » button above the map hides or shows them
+all at once; shown by default. A display choice like the Fond de carte, never part of the
+Scenario nor of the link, and hiding them hides no point, no line and no reading of the
+Mesure. The Vue 3D has no Repères and no Mesure, and its « Repères » button is off. The Page
+Terrain has no Repères: there the Mesure keeps the crosses of its points, as #98 drew them.
+_Avoid_: grille, guides, réticule, viseur, crosshair
 
 ### When something is wrong
 

@@ -49,6 +49,21 @@
  *   contact kinds stay separate because they are different classes of claim: « Câble au sol » is
  *   bare geometry, « Enveloppe passager traversée » is true only **given `h_rider`** and carries
  *   that convention's « non confirmé » chip.
+ * - **The Zones d'ancrage are left out of what is judged, and only of that** (#106). Near an anchor
+ *   the passager is still, or already, on the platform, and the garde there is the anchor height
+ *   less the envelope by construction — in a V valley the traverse minimum always lands there and
+ *   says nothing about the crossing. So a rider position `x_P` and a point `x` of the line or the
+ *   ground count toward `hMin`, `atX`, `contact` and `perStep` only outside `[0, z] ∪ [L − z, L]`.
+ *   The zone length `z` is a `[CONVENTION]` with no normative source (`simulation-theory.md` §11),
+ *   so it is the caller's argument and this module ships no value for it; `z = 0` is no zone at
+ *   all and reproduces every figure from before the zones, bit for bit. The scan itself is
+ *   unchanged — same vertices, same order — and `whole` keeps the reduction over everything, so
+ *   Avancé can still print what the zones hide. The judged fields add the line **at** `x = z` and
+ *   `x = L − z`, one root-find of `x(s)` per edge and step: the judged interval is open, and where
+ *   the garde rises away from a zone its minimum is the limit at the edge, which a sample a grid
+ *   spacing past it read optimistic by centimetres (§11). `2z ≥ L` leaves nothing to judge, and so does a
+ *   gap between the zones narrower than one sweep step (`atStepIndex` −1 while `whole` has one);
+ *   refusing either is the Rail's gate, not this reducer's.
  * - **The engine is dependency-free, synchronous and SI** — `m`, `N`, `N/m`; `z` positive up,
  *   `x` measured from anchor A.
  */
@@ -100,9 +115,9 @@ export const CLEARANCE = {
  * millimetres, for the half of the frame budget that scales.
  *
  * **`atX` and `perStepX` carry that same resolution, and ticket 09 recorded only the magnitude
- * trade.** They are always a *scanned* vertex — a cable vertex, the rider's node, or a terrain point
- * — never an interpolated argmin, so the **position** is quantised where the value is not. Measured
- * on ticket 39 item 5 against a 600-sample scan of the same traverse: on § 4's straight two-point
+ * trade.** They are always a *scanned* vertex — a cable vertex, the rider's node, a terrain point
+ * or, with Zones d'ancrage, an edge `z` or `L − z` of the judged span — never an interpolated
+ * argmin, so the **position** is quantised where the value is not. Measured on ticket 39 item 5 against a 600-sample scan of the same traverse: on § 4's straight two-point
  * ground `perStepX` is the rider's own node on 142 of 260 steps (209 of 260 on a textile line) and a
  * cable vertex `L₀ / 60` ≈ 2,53 m apart elsewhere, landing within **1,26 m** of the fine scan's
  * answer while the value it indexes moves at most **1,5 mm**; on all three imported profiles the
@@ -127,10 +142,17 @@ export const CLEARANCE = {
  * @param hRider §6.3's passenger envelope, m — `[CONVENTION]` 2,1 m, and the reason the rider
  *   contact kind is a separate verdict that names its own value.
  * @param samplesPerStep vertices minus one per step; the default is the measured 60.
+ * @param anchorZone the length `z` of each Zone d'ancrage, m, measured horizontally from its
+ *   anchor — `[CONVENTION]`, the Scenario's. `0`, the default, is no zone: every rider position and
+ *   every point is judged, as before #106. A rider position or a point at `x ≤ z` or `x ≥ L − z`
+ *   is left out of the judged fields and kept in `whole`; the judged fields also read the line **at**
+ *   `x = z` and `x = L − z`, the open interval's limits (§11). Last, after the scan's resolution, so
+ *   no call written before the zones can read its sample count as a zone.
  * @returns `hMin` positive is clearance, negative is contact. An **empty** `steps` — a sweep that
  *   lost every step — has no minimum: `hMin` is the reducer's identity `+∞`, `atX` is `NaN` and
  *   `atStepIndex` is **−1**, which is the flag a caller checks rather than reading a garde off a
- *   traverse that never happened.
+ *   traverse that never happened. Zones that leave no rider position outside them read the same
+ *   way in the judged fields, while `whole` still has the traverse.
  * @throws RangeError when `input.loads` is not empty, or when `samplesPerStep` is not a positive
  *   integer — both are caller bugs of `sampleCable`'s class, not physics failures.
  */
@@ -141,6 +163,7 @@ export function evaluateClearance(
   terrain: Terrain,
   hRider: number,
   samplesPerStep: number = CLEARANCE.samplesPerStep,
+  anchorZone: number = 0,
 ): ClearanceResult {
   if (input.loads.length !== 0) {
     throw new RangeError(
@@ -158,6 +181,22 @@ export function evaluateClearance(
   const perStep = new Float64Array(count);
   const perStepX = new Float64Array(count);
   const perStepCable = new Uint8Array(count);
+  const perStepJudged = new Uint8Array(count);
+
+  // The two Zones d'ancrage, as the open interval between them: `x` is judged when `zoneEnd < x <
+  // zoneStart`. With no zone the bounds are the infinities, so every `x` passes — the cable's own
+  // end vertices included, which may sit an ulp outside `[0, L]`.
+  const zoned = anchorZone > 0;
+  const zoneEnd = zoned ? anchorZone : Number.NEGATIVE_INFINITY;
+  const zoneStart = zoned ? input.L - anchorZone : Number.POSITIVE_INFINITY;
+  // The judged interval is open, so its infimum is the limit at its two edges — a **boundary**
+  // minimum wherever the garde rises away from the zone, as in a valley falling from the anchor,
+  // with a non-zero slope there. No sample lands on an edge, and the first one past it reads up to
+  // a grid spacing late, optimistic by the garde's slope times that distance. So each step also
+  // reads the line **at** `x = z` and `x = L − z` (`edgeClearance`), in the judged fields only:
+  // `whole` keeps the no-zone reduction vertex for vertex. Zones that meet have no interval and no
+  // edge.
+  const edges = zoned && zoneEnd < zoneStart;
 
   // One cable, re-posed per step: only `H`, `V₀` and the trolley's material coordinate move.
   const rider: PointLoad = { P: riderP, s: 0 };
@@ -171,6 +210,9 @@ export function evaluateClearance(
   let hMin = Number.POSITIVE_INFINITY;
   let atX = Number.NaN;
   let atStepIndex = -1;
+  let wholeMin = Number.POSITIVE_INFINITY;
+  let wholeAtX = Number.NaN;
+  let wholeAtStepIndex = -1;
 
   // « Câble au sol » is the outer verdict: the cable under the terrain always puts the envelope
   // under it too, so the two kinds nest and the bare-geometry one wins.
@@ -184,6 +226,8 @@ export function evaluateClearance(
 
     let stepMin = Number.POSITIVE_INFINITY;
     let stepMinX = Number.NaN;
+    let stepWhole = Number.POSITIVE_INFINITY;
+    let stepWholeX = Number.NaN;
 
     // § 11 fixes the worst point per load position **at `x = x_P`**, and `s_D` is never on the
     // uniform grid — it is the arc the trolley has travelled, the grid is equal divisions of
@@ -207,6 +251,7 @@ export function evaluateClearance(
     let g = 0;
     let xPrev = 0;
     let zPrev = 0;
+    let sPrev = 0;
 
     for (let k = 0; k <= samplesPerStep + 1; k++) {
       // The uniform sample this position carries, or `-1` for the kink itself. The last uniform
@@ -217,14 +262,17 @@ export function evaluateClearance(
       const x = xAt(shape, s);
       const z = zAt(shape, s);
       const above = z - zGroundAt(terrain, x);
-      if (above < 0) {
-        cableInGround = true;
-        perStepCable[i] = 1;
-      }
       const clear = above - hRider;
-      if (clear < stepMin) {
-        stepMin = clear;
-        stepMinX = x;
+      if (clear < stepWhole) {
+        stepWhole = clear;
+        stepWholeX = x;
+      }
+      if (x > zoneEnd && x < zoneStart) {
+        if (above < 0) perStepCable[i] = 1;
+        if (clear < stepMin) {
+          stepMin = clear;
+          stepMinX = x;
+        }
       }
 
       // The other half of § 4's scan: the terrain's own sample points **strictly inside** this
@@ -242,25 +290,55 @@ export function evaluateClearance(
           const xg = xs[g];
           const zChord = dx > 0 ? zPrev + ((xg - xPrev) / dx) * (z - zPrev) : z;
           const aboveG = zChord - zs[g];
-          if (aboveG < 0) {
-            cableInGround = true;
-            perStepCable[i] = 1;
-          }
           const clearG = aboveG - hRider;
-          if (clearG < stepMin) {
-            stepMin = clearG;
-            stepMinX = xg;
+          if (clearG < stepWhole) {
+            stepWhole = clearG;
+            stepWholeX = xg;
+          }
+          if (xg > zoneEnd && xg < zoneStart) {
+            if (aboveG < 0) perStepCable[i] = 1;
+            if (clearG < stepMin) {
+              stepMin = clearG;
+              stepMinX = xg;
+            }
+          }
+        }
+      }
+
+      // The judged interval's two edges, each where the scan first steps past it: `x(s)` is
+      // strictly increasing, so a step's line crosses each edge once, between two samples.
+      if (edges && k > 0) {
+        for (let e = 0; e < 2; e++) {
+          const edge = e === 0 ? zoneEnd : zoneStart;
+          if (!(xPrev <= edge && x > edge)) continue;
+          const aboveE =
+            zAt(shape, sAtX(shape, edge, sPrev, xPrev, s, x)) - zGroundAt(terrain, edge);
+          const clearE = aboveE - hRider;
+          if (aboveE < 0) perStepCable[i] = 1;
+          if (clearE < stepMin) {
+            stepMin = clearE;
+            stepMinX = edge;
           }
         }
       }
 
       xPrev = x;
       zPrev = z;
+      sPrev = s;
     }
 
     perStep[i] = stepMin;
     perStepX[i] = stepMinX;
     // Strictly less, so the traverse minimum is reported at the **first** step that reaches it.
+    if (stepWhole < wholeMin) {
+      wholeMin = stepWhole;
+      wholeAtX = stepWholeX;
+      wholeAtStepIndex = i;
+    }
+    // A rider position inside a zone is on the platform: its line is drawn, and judges nothing.
+    if (!(step.xD > zoneEnd && step.xD < zoneStart)) continue;
+    perStepJudged[i] = 1;
+    if (perStepCable[i] === 1) cableInGround = true;
     if (stepMin < hMin) {
       hMin = stepMin;
       atX = stepMinX;
@@ -276,5 +354,48 @@ export function evaluateClearance(
     perStep,
     perStepX,
     perStepCable,
+    perStepJudged,
+    whole: { hMin: wholeMin, atX: wholeAtX, atStepIndex: wholeAtStepIndex },
   };
+}
+
+/**
+ * The material coordinate where a step's line stands at abscissa `target`, between two scanned
+ * samples that bracket it — `x(sLo) = xLo ≤ target ≤ xHi = x(sHi)`. `x(s)` is strictly increasing
+ * and smooth but for the trolley's kink, so the Illinois variant of regula falsi converges in a few
+ * evaluations from the chord's own guess, and stops within a nanometre.
+ */
+function sAtX(
+  shape: CableShape,
+  target: number,
+  sLo: number,
+  xLo: number,
+  sHi: number,
+  xHi: number,
+): number {
+  let lo = sLo;
+  let hi = sHi;
+  let fLo = xLo - target;
+  let fHi = xHi - target;
+  if (fLo === 0) return lo;
+  if (fHi === 0) return hi;
+  let side = 0;
+  let s = lo;
+  for (let it = 0; it < 60; it++) {
+    s = (lo * fHi - hi * fLo) / (fHi - fLo);
+    const f = xAt(shape, s) - target;
+    if (Math.abs(f) < 1e-9) return s;
+    if (f > 0) {
+      hi = s;
+      fHi = f;
+      if (side === 1) fLo /= 2;
+      side = 1;
+    } else {
+      lo = s;
+      fLo = f;
+      if (side === -1) fHi /= 2;
+      side = -1;
+    }
+  }
+  return s;
 }

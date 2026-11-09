@@ -64,8 +64,13 @@ export type StopMarker = {
   readonly row: 0 | 1;
 };
 
-/** One tick of a y axis. */
-export type Tick = { readonly y: number; readonly text: string };
+/**
+ * One tick of a y axis: `y` is the value's pixel, `baseline` where its glyphs stand — centred on
+ * `y` at the axis' 9 px, except the speed axis' « 0 », which stands just **above** the zero line as
+ * the clearance strip's does. Centred on it, the line would run out from under the label's halo
+ * and read as a minus sign (« -0 »), since a label stands inside the plot (#115).
+ */
+export type Tick = { readonly y: number; readonly baseline: number; readonly text: string };
 
 export type CoupeScene = {
   /** The whole band: badge + plot + handle lane + x labels. */
@@ -83,6 +88,11 @@ export type CoupeScene = {
    * `null` where `members` is.
    */
   readonly rest: ChartScene["rider"] | null;
+  /**
+   * The length of each Zone d'ancrage, m — the Scenario's, as on every coupe (#106), so the hover
+   * says the garde is not judged inside one. `0` without a solved line or without a zone.
+   */
+  readonly anchorZone: number;
   /** The loaded trajectory of the passager, one path per run of solved steps. */
   readonly trajectory: readonly PxPath[];
   /** Each anchor's tower, clipped to the plot. */
@@ -151,6 +161,12 @@ const LABEL_ROW = { calm: 0, windy: 1 } as const satisfies Record<RideId, 0 | 1>
 /** A tick closer than this to the zero line is dropped rather than drawn over it. */
 const TICK_CLEARANCE = 9;
 
+/** A 9 px label's baseline below the pixel it reads, so the glyphs are centred on it. */
+const TICK_CENTRED = 3;
+
+/** The zero label's baseline above the zero line, so the line passes under the glyph. */
+const ZERO_ABOVE = 2;
+
 /**
  * @param width the chart column's inline size — the single `ResizeObserver`'s.
  * @param frame the input half, always drawn.
@@ -209,6 +225,7 @@ export function dynamiqueScene({
           ? null
           : solved.base.members.map(({ offsetPx }) => ({ offsetPx, path: inPx(rest.cable) })),
       rest,
+      anchorZone: solved?.base.anchorZone ?? 0,
       trajectory: solved === null ? [] : solved.base.trajectory.map(inPx),
       anchors: [
         tower(0, 0, -frame.anchors.zA),
@@ -289,15 +306,21 @@ function curveScene(
     y: (value: number) => number,
   ) => samples.map((sample): PxPoint => [x.x(sample.x), y(read(sample))]);
 
-  // The gutter holds four characters at the axis' 9 px: from 10 on the decimal is dropped, so
-  // « -12,3 » reads « -12 » rather than running past the SVG's edge.
+  // A tick label stands inside the plot (`axisLabel`, #115) and covers the curves' first or last
+  // metres, so it stays at four characters at the axis' 9 px: from 10 on the decimal is dropped, and
+  // « -12,3 » reads « -12 ».
   const tick = (
     value: number,
     y: (value: number) => number,
     quantity: "speed" | "acceleration",
   ) => {
     const text = formatValue(quantity, value);
-    return { y: y(value), text: Math.abs(value) >= 10 ? text.replace(/,\d+$/, "") : text };
+    const at = y(value);
+    return {
+      y: at,
+      baseline: at + TICK_CENTRED,
+      text: Math.abs(value) >= 10 ? text.replace(/,\d+$/, "") : text,
+    };
   };
   const apart = (ticks: readonly Tick[]) =>
     ticks.filter((one) => Math.abs(one.y - zero) > TICK_CLEARANCE);
@@ -312,7 +335,7 @@ function curveScene(
     acceleration: path(passes.windy, (sample) => sample.a, yAcceleration),
     zero,
     speedTicks: [
-      { y: zero, text: "0" },
+      { y: zero, baseline: zero - ZERO_ABOVE, text: "0" },
       ...apart([tick(speed.pos, ySpeed, "speed"), tick(-speed.neg, ySpeed, "speed")]),
     ],
     accelerationTicks: apart([

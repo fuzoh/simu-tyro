@@ -15,6 +15,9 @@
  * - **The vector Fond's `style.json` is fetched with the injected `fetch`, not given to MapLibre
  *   as a URL.** A style URL that fails leaves MapLibre with no style at all, so no line either;
  *   fetched here, its failure is one more case of plain background, and a `node` test replays it.
+ * - **Every dotted cross is the Mesure's source's, and the Repères hide them all** (#107): the
+ *   crosses through the points of the Mesure, the aperçu under the pointer and the Repères
+ *   d'ancrage through A and B share one style, so a hidden Repère never hides a point or a ligne.
  */
 
 import type { Map as MapLibreMap } from "maplibre-gl";
@@ -53,7 +56,10 @@ export const LINE_SOURCE = "ligne-ab";
 /** The source the Banane (#96) is drawn from: the Ligne à vide bowed by the wind. */
 export const BANANE_SOURCE = "banane";
 
-/** The source the Mesure (#98) is drawn from: its line, its two crosses and its points. */
+/**
+ * The source the Mesure (#98) is drawn from: its line, its points and every dotted cross — its
+ * points', the aperçu's and the Repères d'ancrage (#107).
+ */
 export const MEASURE_SOURCE = "mesure";
 
 /** The Couche pentes' source: an overlay, so its tiles never decide whether the Fond arrived. */
@@ -161,10 +167,18 @@ export function bananeData(positions: Positions, across: number): LineData {
   };
 }
 
-/** One feature of the Mesure's source, told apart by its `kind`. */
+/**
+ * What a dotted cross goes through: a `point` of the Mesure, the pointer before its click
+ * (`aperçu`), or an anchor — a Repère d'ancrage (#107).
+ */
+export type CrossThrough = "point" | "aperçu" | "A" | "B";
+
+/** One feature of the Mesure's source, told apart by its `kind`; a `croix` says what it crosses. */
 export type MeasureFeature = {
   readonly type: "Feature";
-  readonly properties: { readonly kind: "point" | "croix" | "ligne" };
+  readonly properties:
+    | { readonly kind: "point" | "ligne" }
+    | { readonly kind: "croix"; readonly through: CrossThrough };
   readonly geometry:
     | { readonly type: "Point"; readonly coordinates: number[] }
     | { readonly type: "LineString"; readonly coordinates: number[][] };
@@ -176,29 +190,88 @@ export type MeasureCollection = {
 };
 
 /**
- * The Mesure as its source holds it: a `point` per click, the `ligne` between two of them, and for
- * each point its `croix` — the two lines, north-south and east-west, that cross the map.
+ * Everything the Mesure's source draws (#98, #107). Its transient part, the aperçu, is held beside
+ * the style and never in it, so a new style — a Fond changed — is built with it still under the
+ * pointer.
  */
-export function measureData(points: MeasurePoints): MeasureCollection {
+export type MeasureDrawing = {
+  /** The Mesure's points. */
+  readonly points: MeasurePoints;
+  /** Where the pointer stands before the click, which is where the point lands — or `null`. */
+  readonly preview: Position | null;
+  /** The anchors a Repère crosses: those placed, the one being dragged where it is drawn. */
+  readonly anchors: Positions;
+  /** The Repères: every dotted cross, or none — never a point or the ligne of the Mesure. */
+  readonly reperes: boolean;
+};
+
+/**
+ * What the Mesure's source draws on one vue de dessus, from what the map knows of its pointer and
+ * its anchors. The aperçu is drawn only while the Mesure is on, and only where a pointer hovers —
+ * `pointer` is `null` for a finger, and once the pointer has left the map.
+ *
+ * @param readOnly the Page Terrain (#101), which keeps the Mesure as #98 drew it: no aperçu, no
+ *   Repère d'ancrage, and the crosses of its points whatever the Repères say elsewhere.
+ */
+export function measureDrawing({
+  points,
+  pointer,
+  anchors,
+  reperes,
+  measuring,
+  readOnly,
+}: {
+  points: MeasurePoints;
+  pointer: Position | null;
+  anchors: Positions;
+  reperes: boolean;
+  measuring: boolean;
+  readOnly: boolean;
+}): MeasureDrawing {
+  return {
+    points,
+    preview: measuring && !readOnly ? pointer : null,
+    anchors: readOnly ? { A: null, B: null } : anchors,
+    reperes: readOnly || reperes,
+  };
+}
+
+/** The two dotted lines through `at`, north-south then east-west. */
+function crossFeatures(at: Position, through: CrossThrough): MeasureFeature[] {
+  return crossLines(at).map((coordinates) => ({
+    type: "Feature",
+    properties: { kind: "croix", through },
+    geometry: { type: "LineString", coordinates: coordinates.map((c) => [...c]) },
+  }));
+}
+
+/**
+ * The Mesure as its source holds it: a `point` per click and the `ligne` between two of them; and,
+ * while the Repères are shown, a `croix` — the two lines, north-south and east-west, that cross the
+ * map — through each anchor placed, through each point and through the aperçu.
+ */
+export function measureData({
+  points,
+  preview,
+  anchors,
+  reperes,
+}: MeasureDrawing): MeasureCollection {
   const features: MeasureFeature[] = [];
-  for (const point of points) {
-    const [northSouth, eastWest] = crossLines(point);
-    features.push(
-      {
-        type: "Feature",
-        properties: { kind: "point" },
-        geometry: { type: "Point", coordinates: [point.lon, point.lat] },
-      },
-      ...[northSouth, eastWest].map(
-        (coordinates) =>
-          ({
-            type: "Feature",
-            properties: { kind: "croix" },
-            geometry: { type: "LineString", coordinates: coordinates.map((c) => [...c]) },
-          }) satisfies MeasureFeature,
-      ),
-    );
+  if (reperes) {
+    for (const anchor of ["A", "B"] as const) {
+      const at = anchors[anchor];
+      if (at !== null) features.push(...crossFeatures(at, anchor));
+    }
   }
+  for (const point of points) {
+    features.push({
+      type: "Feature",
+      properties: { kind: "point" },
+      geometry: { type: "Point", coordinates: [point.lon, point.lat] },
+    });
+    if (reperes) features.push(...crossFeatures(point, "point"));
+  }
+  if (reperes && preview !== null) features.push(...crossFeatures(preview, "aperçu"));
   if (points.length === 2) {
     features.push({
       type: "Feature",
@@ -217,7 +290,7 @@ export function measureData(points: MeasurePoints): MeasureCollection {
  *   or unavailable. The carte claire then draws as the plain background alone.
  * @param positions where the line is drawn now.
  * @param across the wind's cross component, m/s, the Banane's only input.
- * @param measure the Mesure's points, drawn above everything else.
+ * @param measure the Mesure, the aperçu and the Repères d'ancrage, drawn above everything else.
  */
 export function mapStyle({
   display,
@@ -230,7 +303,7 @@ export function mapStyle({
   vector: MapStyle | null;
   positions: Positions;
   across: number;
-  measure: MeasurePoints;
+  measure: MeasureDrawing;
 }): MapStyle {
   const fond = fondStyle(display.fond, vector);
   const pentes: Record<string, StyleSource> = display.pentes

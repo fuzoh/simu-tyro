@@ -138,7 +138,9 @@ function Swatch({ layer }: { layer: keyof LayerToggles }) {
  * 44 and `.touch-44` still lands inside it exactly.
  *
  * **The width budget, re-derived for four layers** (2026-09-23). § 5 abbreviates below B1 and
- * sums the abbreviated row against the 342 px of inner width a 390 px viewport leaves:
+ * sums the abbreviated row against the inner width a 390 px viewport leaves — the row is
+ * `px-[var(--gutter)]`, so that is `390 − 2 × GUTTER`: 342 px at the 24 px gutter these rows were
+ * written against, **366 px since the 12 px gutter of #115**:
  *
  * ```
  * 59 + 48 + 44 + 128 + 24       = 303   2 labelled toggles, 32 px box, 11 px label   (shipped)
@@ -146,13 +148,15 @@ function Swatch({ layer }: { layer: keyof LayerToggles }) {
  * 4 × 28 + 12 + 44 + 153 + 16   = 337   4 swatch-only toggles, 28 × 28              (below B1)
  * ```
  *
+ * The third row is the one in force: 337 against 366, 29 px to spare where there were 5.
+ *
  * Four labelled toggles cannot fit there — « à vide · corde · trajet · dist. » alone is ≈ 300 px —
  * so **below B1 a layer toggle is its swatch**, a 28 px square (`px-0 w-7`), named by its
  * `aria-label` and `title`. From B1 the short labels come back beside the swatch — ≈ 300 + 44 + 153
- * + 16 ≈ 513 against 576 — and from **768 px of column** the full ones, ≈ 400 + 110 + 153 + 16 ≈ 680
- * against 720. That 768 is this row's own threshold and nothing else's. **Measured** (Chromium,
- * 2026-09-23), the space left between the toggle group and « ×1 » beyond the row's `gap-2`: 9 px
- * at a 390 px column, 65 at 624, 26 at 768.
+ * + 16 ≈ 513 against 600 — and from **768 px of column** the full ones, ≈ 400 + 110 + 153 + 16 ≈ 680
+ * against 744. That 768 is this row's own threshold and nothing else's. **Measured** (Chromium, on
+ * Statique, 2026-11-09, 12 px gutter), the space left between the toggle group and « ×1 » beyond the
+ * row's `gap-2`: 42 px at a 390 px column, 108 at 624, 76 at 768.
  *
  * - **the `x` field, 153.** Its input is **locked at 16 px** (§ 7.1 / amendment G decision 5: iOS
  *   Safari auto-zooms below it), and « 1500,0 » at 16 px against amendment L's 0,62 em advance is

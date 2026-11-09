@@ -211,11 +211,13 @@ describe("FIRST_RUN_SCENARIO — § 9's shipped inputs", () => {
     expect(FIRST_RUN_SCENARIO.terminations.B).toEqual(FIRST_RUN_SCENARIO.terminations.A);
   });
 
-  test("the passenger: 120 kg, 2,1 m, garde admise 1,0 m, DAF 1,2, at x = L/2 = 75,0 m", () => {
+  test("the passenger: 120 kg, 2,1 m, garde admise 1,0 m, zones d'ancrage 10 m, DAF 1,2, at x = L/2 = 75,0 m", () => {
     expect(FIRST_RUN_SCENARIO.rider).toEqual({
       mp: 120,
       hRider: 2.1,
       hClearMin: 1,
+      // #106's `[CONVENTION]`: 10 m at each end.
+      anchorZone: 10,
       DAF: 1.2,
       xD: 75,
     });

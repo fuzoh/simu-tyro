@@ -28,7 +28,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { Deduced } from "@/lib/rail/deduced.ts";
 import type { FieldId, FieldIssue } from "@/lib/rail/fields.ts";
-import type { GateReport } from "@/lib/rail/gates.ts";
+import type { GateInput, GateReport } from "@/lib/rail/gates.ts";
 import type { RailValues } from "@/lib/rail/values.ts";
 import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 import type { Register } from "@/lib/vocabulary/labels.ts";
@@ -70,14 +70,17 @@ export type RailFormState = {
 /**
  * @param traverse `useTraverse`'s Scenario without `x_D`: the gates read nothing else, so a scrub
  *   leaves the report identical.
+ * @param clearance §11 over the solved traverse, or `null` — the scene's, which a scrub leaves
+ *   untouched: zones that leave no swept position between them are a breach only it can show.
  * @param register the Page's vocabulary, which names the fields in every message the report holds.
  */
 export function useRailForm(
   deduced: Deduced,
   traverse: TraverseScenario,
+  clearance: GateInput["clearance"],
   register: Register = "exact",
 ): RailFormState {
-  const { scenario } = useAppState();
+  const { scenario, trace } = useAppState();
 
   const [focused, setFocused] = useState<FieldId | null>(null);
   const values = useMemo(() => railValues(scenario, deduced), [scenario, deduced]);
@@ -117,8 +120,8 @@ export function useRailForm(
   // the banner all hang off it, and a fresh object per render would re-run `evaluateVerdict` over
   // 260 steps on every keystroke and every scrub frame — the one measured cost in the app.
   const report = useMemo(
-    () => evaluateGates({ scenario: traverse, issues, register }),
-    [traverse, issues, register],
+    () => evaluateGates({ scenario: traverse, trace, clearance, issues, register }),
+    [traverse, trace, clearance, issues, register],
   );
 
   return { form, text, focused, setFocused, issues, report };

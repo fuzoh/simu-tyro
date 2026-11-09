@@ -24,6 +24,7 @@ import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { CLEARANCE, evaluateClearance } from "@/lib/sim";
 
 import {
+  anchorZoneBands,
   buildScene,
   buildSceneBase,
   buildSceneFrame,
@@ -837,6 +838,148 @@ describe("the two pointer helpers", () => {
     expect(snapToStep(first.traverse, 1e6)).toBe(
       first.traverse.steps[first.traverse.steps.length - 1].xD,
     );
+  });
+});
+
+describe("the Zones d'ancrage — grey on the coupe, never red (#106)", () => {
+  /**
+   * A low anchor A — its top 2,5 m over its foot, under 2,1 m of envelope plus the line's sag a few
+   * metres out — and a high B, so the line clears the ground everywhere but near A. The passager
+   * then touches the ground only while still on the platform: the case the zones exist for.
+   */
+  function lowAtA(anchorZone: number, xD = 4): ScenarioDraft {
+    const shipped = firstRunDefaults();
+    return {
+      ...shipped,
+      anchors: { zA: 2.5, zB: 50 },
+      rider: { ...shipped.rider, anchorZone, xD },
+    };
+  }
+
+  it("the bands are `[0, z]` and `[L − z, L]`, A's first, and none without a zone", () => {
+    expect(anchorZoneBands(150, 10)).toEqual([
+      { from: 0, to: 10 },
+      { from: 140, to: 150 },
+    ]);
+    expect(anchorZoneBands(150, 0)).toEqual([]);
+    expect(anchorZoneBands(150, -3)).toEqual([]);
+    // Never wider than the span, whatever arrived: the gate refuses it, the drawing stays inside.
+    expect(anchorZoneBands(20, 30)).toEqual([
+      { from: 0, to: 20 },
+      { from: 0, to: 20 },
+    ]);
+  });
+
+  it("the shipped scene carries its two 10 m zones", () => {
+    expect(first.anchorZone).toBe(10);
+    expect(first.anchorZones).toEqual([
+      { from: 0, to: 10 },
+      { from: 140, to: 150 },
+    ]);
+  });
+
+  it("a contact on the platform alone draws no red band, and no contact", () => {
+    // Without zones the same line is « Enveloppe passager traversée » a few metres from A.
+    const bare = scene(lowAtA(0));
+    expect(bare.clearance.contact).toBe("rider");
+    expect(bare.violating.length).toBeGreaterThan(0);
+    for (const band of bare.violating) expect(band.to).toBeLessThan(10);
+
+    const zoned = scene(lowAtA(10));
+    expect(zoned.violating).toEqual([]);
+    expect(zoned.clearance.contact).toBe("none");
+    // On the judged span — at its edge at most, the limit the open interval's minimum reaches.
+    expect(zoned.clearance.atX).toBeGreaterThanOrEqual(10);
+    // The contact is still read — as the whole traverse's minimum, which judges nothing.
+    expect(zoned.clearance.whole.hMin).toBeLessThan(0);
+    expect(zoned.clearance.whole.hMin).toBe(bare.clearance.hMin);
+  });
+
+  it("signal 4 is silent while the passager is in a zone, and fires again outside", () => {
+    expect(scene(lowAtA(0, 4)).rider).toMatchObject({ inAnchorZone: false, inViolation: true });
+    expect(scene(lowAtA(10, 4)).rider).toMatchObject({ inAnchorZone: true, inViolation: false });
+    // x = z is in the zone: the zones are closed.
+    expect(scene(lowAtA(10, 10)).rider.inAnchorZone).toBe(true);
+    expect(scene(lowAtA(10, 75)).rider.inAnchorZone).toBe(false);
+    expect(scene(lowAtA(10, 145)).rider.inAnchorZone).toBe(true);
+  });
+
+  it("« Garde min. ligne » leaves the zones out for a passager at mid-span", () => {
+    // The cell's `worst` is the line's minimum outside the zones, not the platform under A: with
+    // the zones dropped the same rider at x_D 75 reads A's anchor, at x ≈ 0, where the ground is
+    // 0,4 m under the envelope. Structural, in the shipped 150 m span's [0, 10] and [140, 150]: the
+    // judged span is the open interval between them, read up to its edges (`evaluateClearance`).
+    const L = 150;
+    const zoned = scene(lowAtA(10, 75)).rider.worst;
+    expect(zoned.atX).toBeGreaterThanOrEqual(10);
+    expect(zoned.atX).toBeLessThanOrEqual(L - 10);
+    expect(zoned.hClear).toBeGreaterThan(0);
+    // The control: without zones the cell does read the platform, so this case tells them apart.
+    const bare = scene(lowAtA(0, 75)).rider.worst;
+    expect(bare.atX).toBeLessThan(10);
+  });
+
+  describe("a rider on the platform over a line that fails just past the zone", () => {
+    /**
+     * A synthetic profil, flat but for an 8 m ridge one metre wide at x 11,5 — 1,5 m past A's 10 m
+     * zone — and B 18 m lower. The line over the ridge is under the envelope wherever the passager
+     * is, so a position on A's platform has a negative garde **outside** the zone: the one case
+     * where the zone guards themselves decide what is drawn. Structural — no number is measured.
+     */
+    const ridge: Trace = {
+      d: Float64Array.from([0, 11, 11.5, 12, 150]),
+      z: Float64Array.from([100, 100, 108, 100, 82]),
+      dev: null,
+      origin: { kind: "csv", fileName: "crete.csv" },
+    };
+    const onRidge = (xD: number): ScenarioDraft => {
+      const shipped = firstRunDefaults();
+      return {
+        ...shipped,
+        geometry: { source: "trace", trace: "p1.stub" },
+        rider: { ...shipped.rider, anchorZone: 10, xD },
+      };
+    };
+
+    it("a step on the platform reads the failing line, and is not judged", () => {
+      const built = scene(onRidge(8), ridge);
+      const onPlatform = built.traverse.steps.findIndex((step) => step.xD > 7 && step.xD < 9);
+      expect(onPlatform).toBeGreaterThanOrEqual(0);
+      expect(built.clearance.perStepJudged[onPlatform]).toBe(0);
+      expect(built.clearance.perStep[onPlatform]).toBeLessThan(0);
+    });
+
+    it("signal 3 starts past the zone: no red band reaches onto the platform", () => {
+      const built = scene(onRidge(8), ridge);
+      expect(built.violating.length).toBeGreaterThan(0);
+      for (const band of built.violating) {
+        expect(band.from).toBeGreaterThan(10);
+        expect(band.to).toBeLessThan(140);
+      }
+    });
+
+    it("signal 4 is silent on the platform although the line fails, and fires past the zone", () => {
+      const platform = scene(onRidge(8), ridge).rider;
+      expect(platform.worst.hClear).toBeLessThan(0);
+      expect(platform).toMatchObject({ inAnchorZone: true, inViolation: false });
+      expect(scene(onRidge(75), ridge).rider).toMatchObject({
+        inAnchorZone: false,
+        inViolation: true,
+      });
+    });
+  });
+
+  it("a breach just outside a zone still draws its band", () => {
+    // B lowered to 40 m: the passager now touches the ground beyond A's 10 m as well.
+    const shipped = firstRunDefaults();
+    const zoned = scene({
+      ...shipped,
+      anchors: { zA: 2.5, zB: 40 },
+      rider: { ...shipped.rider, anchorZone: 10 },
+    });
+    expect(zoned.clearance.contact).toBe("rider");
+    expect(zoned.violating.length).toBeGreaterThan(0);
+    for (const band of zoned.violating) expect(band.from).toBeGreaterThan(10);
   });
 });
 

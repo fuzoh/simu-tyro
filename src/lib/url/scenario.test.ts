@@ -168,6 +168,18 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
     }
   });
 
+  test("`zan` is exempt — its absence is the shipped 10 m Zones d'ancrage (#106)", () => {
+    const { search, completed } = complete("?L=250");
+    expect("zan" in search).toBe(false);
+    expect(completed).not.toContain("zan");
+    // Absent reads 10 m; present reads as given — 0, which is no zone, and a negative length too,
+    // which the Clearance Gate refuses rather than the link (ADR-0001).
+    expect(searchToScenario(search).rider.anchorZone).toBe(10);
+    expect(decode("?L=250&zan=25").rider.anchorZone).toBe(25);
+    expect(decode("?L=250&zan=0").rider.anchorZone).toBe(0);
+    expect(decode("?L=250&zan=-3").rider.anchorZone).toBe(-3);
+  });
+
   test("a present key is never overwritten by its default", () => {
     const { search, completed } = complete("?za=4&zb=2.5&mp=95");
     expect(search.za).toBe(4);

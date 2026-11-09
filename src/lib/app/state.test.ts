@@ -60,7 +60,7 @@ function storedSession(): Session {
     trace: null,
     retainedCsv: null,
     layers: { unloadedLine: true, chordAB: false, riderTip: false, trajectory: true },
-    map: { fond: "orthophoto", pentes: true, view: "3d" },
+    map: { fond: "orthophoto", pentes: true, view: "3d", reperes: false },
   };
 }
 
@@ -835,9 +835,9 @@ describe("#103's profil geo.admin — loaded between the two Positions, a third 
   });
 });
 
-describe("#93's Fond de carte and Couche pentes, #95's Vue 3D — the Session's, never the link's", () => {
+describe("#93's Fond de carte and Couche pentes, #95's Vue 3D, #107's Repères — the Session's, never the link's", () => {
   const ORIGIN = "https://scoutech.example";
-  const CHOSEN = { fond: "orthophoto", pentes: true, view: "3d" } as const;
+  const CHOSEN = { fond: "orthophoto", pentes: true, view: "3d", reperes: false } as const;
 
   /** A page load with `query` on whatever the last one stored. */
   function reload(storage: Map<string, string>, state: AppState, query = ""): AppState {
@@ -855,8 +855,8 @@ describe("#93's Fond de carte and Couche pentes, #95's Vue 3D — the Session's,
   const opened = initialAppState({ query: "", session: null });
   const switched = appReducer(opened, { type: "carte/affichée", map: CHOSEN });
 
-  it("opens on the carte claire with no Couche pentes, in 2D, and a switch moves no part of the Scenario", () => {
-    expect(opened.map).toEqual({ fond: "carte-claire", pentes: false, view: "2d" });
+  it("opens on the carte claire with no Couche pentes, in 2D, its Repères shown, and a switch moves no part of the Scenario", () => {
+    expect(opened.map).toEqual({ fond: "carte-claire", pentes: false, view: "2d", reperes: true });
     expect(switched.map).toEqual(CHOSEN);
     expect(switched.scenario).toBe(opened.scenario);
   });
@@ -871,10 +871,30 @@ describe("#93's Fond de carte and Couche pentes, #95's Vue 3D — the Session's,
     const shared = link(switched);
     if (!shared.ok) throw new Error(shared.message);
     expect(shared).toEqual(link(opened));
-    expect(shared.href).not.toMatch(/orthophoto|pentes|carte|3d/);
+    expect(shared.href).not.toMatch(/orthophoto|pentes|carte|3d|rep/);
 
     const arrived = reload(new Map(), switched, shared.href.slice(shared.href.indexOf("?")));
     expect(arrived.map).toEqual(CHOSEN);
+  });
+
+  it("hides the Repères without touching the Scenario, so the copied link cannot change", () => {
+    // #107's « Le lien copié est identique avec les repères affichés ou masqués »: `copyLink` reads
+    // the Scenario and the Trace alone, so the link is the same exactly when hiding the Repères
+    // leaves both the very same objects. That identity is what can go red here; the codec's side —
+    // no `rep` key in a link — is the test above's.
+    const placed = appReducer(opened, {
+      type: "scénario/modifié",
+      patch: {
+        positions: { A: { lat: 46.843556, lon: 6.525035 }, B: { lat: 46.846166, lon: 6.520783 } },
+      },
+    });
+    const hidden = appReducer(placed, {
+      type: "carte/affichée",
+      map: { ...placed.map, reperes: false },
+    });
+    expect(hidden.map.reperes).toBe(false);
+    expect(hidden.scenario).toBe(placed.scenario);
+    expect(hidden.trace).toBe(placed.trace);
   });
 
   it("« Réinitialiser le scénario » leaves it as chosen", () => {

@@ -28,12 +28,25 @@
  * - **The Mesure is the map's own state** (#98): `./use-measure.ts` holds its points, which never
  *   reach the store, the Session or the link. While it is on, a click on the map is a point of the
  *   ruler and places no anchor; the Vue 3D has no Mesure.
+ * - **The aperçu and the Repères are drawn, never held by the store** (#107): the pixel a hovering
+ *   pointer stands on is a ref of the map's, read as a click there would be read and drawn in the
+ *   Mesure's source of every style — so a changed Fond keeps it, and the click sets the point where
+ *   the cross showed. A finger draws none. The Repères d'ancrage cross A and B where they are
+ *   drawn, a dragged one under the pointer. « Repères » is a display choice, beside the Fond.
+ * - **The Vue 3D's camera is the reader's, and its keys are its own** (#111): the Gimbal
+ *   (`./vue-3d-gimbal.tsx`) sits over its corner, and a key reaches it only from inside the view —
+ *   its canvas or a Gimbal button — where an arrow no longer scrolls the page. The View Strip's
+ *   layers are read from the store, so the Vue 3D shows the curves the coupe shows; they reach the
+ *   renderer beside the scene, never in it, so a toggle redraws nothing. On the Page Terrain, whose
+ *   coupe hides while the 3D is shown, no strip stands beside it, and the view keeps its own lines
+ *   (`vue3dLayers` with `viewStrip: false`).
  * - **One gesture machine for both views** (#97): an anchor dragged in the Vue 3D is sent to the
  *   same `send` as a marker, so its release is the same new line, recomputed by the same rule.
  * - **On the Page Terrain the map writes nothing** (#101): no click places an anchor, no anchor is
  *   taken in either view, the rose has no handle and no Fond or Couche pentes is offered — the Fond
- *   is the one the Session holds. The Mesure stays, being the map's own; the coupe stands under the
- *   map, and the switch flips the two together between « 2D » and « 3D ».
+ *   is the one the Session holds. The Mesure stays, being the map's own, as #98 drew it — no aperçu,
+ *   no Repère d'ancrage, no « Repères » (#107); the coupe stands under the map, and the switch flips
+ *   the two together between « 2D » and « 3D ».
  */
 
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -50,8 +63,8 @@ import type { SceneBase, SceneFrame } from "@/lib/chart/scene.ts";
 import type { Fond, MapDisplay } from "@/lib/map/display.ts";
 import type { Anchor, MapEvent, MapGesture } from "@/lib/map/gesture.ts";
 import type { MeasurePoints, MeasureReading } from "@/lib/map/measure.ts";
-import type { FondHealth, MapStyle } from "@/lib/map/style.ts";
-import type { Vue3dBlock, Vue3dScene } from "@/lib/map/vue-3d.ts";
+import type { FondHealth, MapStyle, MeasureDrawing } from "@/lib/map/style.ts";
+import type { Vue3dBlock, Vue3dLayers, Vue3dScene } from "@/lib/map/vue-3d.ts";
 import type { Position, Positions } from "@/lib/scenario/types.ts";
 import type { Fetch } from "@/lib/terrain/geoadmin.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
@@ -88,6 +101,7 @@ import {
 import { FONDS } from "@/lib/map/display.ts";
 import { clickTarget, drawnPositions, IDLE, stepGesture } from "@/lib/map/gesture.ts";
 import { type LineEnds, type LinePick, pointerOnLine } from "@/lib/map/hover.ts";
+import { measureAim } from "@/lib/map/measure.ts";
 import {
   BANANE_SOURCE,
   bananeData,
@@ -101,9 +115,11 @@ import {
   mapStyle,
   MEASURE_SOURCE,
   measureData,
+  measureDrawing,
   SWISSTOPO_COVERAGE,
 } from "@/lib/map/style.ts";
-import { drapedAttribution, vue3dPlacement, vue3dScene } from "@/lib/map/vue-3d.ts";
+import { vue3dKeyCommand } from "@/lib/map/vue-3d-camera.ts";
+import { drapedAttribution, vue3dLayers, vue3dPlacement, vue3dScene } from "@/lib/map/vue-3d.ts";
 import { roseReference } from "@/lib/map/wind-rose.ts";
 import { windBearing } from "@/lib/rail/gates.ts";
 import { geoadminNotice, loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
@@ -114,6 +130,7 @@ import type { Vue3d } from "./vue-3d-renderer.ts";
 
 import { loadVue3d } from "./load-vue-3d.ts";
 import { useMeasure } from "./use-measure.ts";
+import { Gimbal } from "./vue-3d-gimbal.tsx";
 import { WindRose } from "./wind-rose.tsx";
 
 // MapLibre cannot find its worker inside a bundle; Vite hands over the file's URL.
@@ -143,7 +160,7 @@ export function TopMap({
   windCause: string | null;
   readOnly?: { readonly coupe: ReactNode };
 }) {
-  const { scenario, map: display, trace } = useAppState();
+  const { scenario, map: display, trace, layers } = useAppState();
   const dispatch = useAppDispatch();
   const { positions } = scenario;
   // `trace` stays cached behind manual geometry, where it is no ground of the line's.
@@ -169,6 +186,9 @@ export function TopMap({
   const bearing = windBearing({ positions: drawn });
   const across = bananeAcross(wind, bearing);
   const scene3d = useVue3dScene(shows3d, frame, profil, solved, across);
+  // The View Strip's layers where the strip stands beside the Vue 3D; on the Page Terrain it hides
+  // with the coupe while the 3D is shown, and toggles out of reach decide nothing.
+  const layers3d = useMemo(() => vue3dLayers(layers, { viewStrip: !locked }), [locked, layers]);
 
   const plain = failed ? plainDrawing(drawn, across) : null;
   const measure = useMeasure(browserFetch, profil);
@@ -225,11 +245,12 @@ export function TopMap({
       : null;
   const unavailable = failed || fondUnavailable(health, drawn);
   // The Banane is on screen when there is a cross wind and a line for it to bow: the map's, or the
-  // Ligne à vide the Vue 3D drew — which it does not while an anchor follows the pointer.
+  // Ligne à vide the Vue 3D drew — which it does not while an anchor follows the pointer, nor while
+  // the View Strip's « ligne à vide » is off.
   const bananeShown =
     across !== 0 &&
     (shows3d
-      ? scene3d?.unloaded != null && gesture.kind === "idle"
+      ? scene3d?.unloaded != null && layers3d.unloaded && gesture.kind === "idle"
       : drawn.A !== null && drawn.B !== null);
   // A release loads its profil the same way in both views, and says so under either.
   const gestureLine = measuring
@@ -290,6 +311,7 @@ export function TopMap({
                 display={display}
                 // A view that never idles takes no anchor: the Page Terrain only looks at the line.
                 idle={!locked && gesture.kind === "idle"}
+                layers={layers3d}
                 onGesture={send}
                 onUnavailable={lose3d}
                 renderer={renderer}
@@ -313,6 +335,7 @@ export function TopMap({
                   across={across}
                   measure={measure.points}
                   measuring={measuring}
+                  reperes={display.reperes}
                   // A function is a state updater to `setState`, so the projection goes in wrapped.
                   onProject={(next) => setProject(() => next)}
                   // The line moved under a still pointer: what was read is stale.
@@ -321,7 +344,10 @@ export function TopMap({
                   send={send}
                   target={target}
                 />
-                <div className="pointer-events-none absolute top-2 left-2 flex gap-1">
+                {/* `right-12` keeps the row clear of MapLibre's zoom stack (29 px, 10 px in from
+                    the top-right corner) and `flex-wrap` folds it under itself instead: Statique's
+                    first row leaves the map 287 px at 1024 px of viewport (#109). */}
+                <div className="pointer-events-none absolute top-2 right-12 left-2 flex flex-wrap gap-1">
                   {!locked &&
                     (["A", "B"] as const).map((anchor) => (
                       <Toggle
@@ -479,12 +505,14 @@ function Vue3dLoading() {
  * closed when the vue de dessus comes back.
  *
  * @param idle the gesture machine waits for a gesture, so an anchor may be taken.
+ * @param layers which of the scene's lines are shown: a change shows or hides, and draws nothing.
  */
 function Vue3dHost({
   renderer,
   scene,
   display,
   idle,
+  layers,
   onGesture,
   onUnavailable,
 }: {
@@ -492,11 +520,13 @@ function Vue3dHost({
   scene: Vue3dScene;
   display: MapDisplay;
   idle: boolean;
+  layers: Vue3dLayers;
   onGesture: (event: MapEvent) => void;
   onUnavailable: () => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<Vue3d | null>(null);
+  const [heading, setHeading] = useState(0);
   const fallen = useRef(onUnavailable);
   const gestured = useRef(onGesture);
   useLayoutEffect(() => {
@@ -517,6 +547,8 @@ function Vue3dHost({
     const options = {
       onGesture: (event: MapEvent) => gestured.current(event),
       onUnavailable: fail,
+      onHeading: setHeading,
+      label: MAP_COPY.vue3dTitle,
     };
     renderer.openVue3d(node, options).then((open) => {
       if (live) {
@@ -532,18 +564,37 @@ function Vue3dHost({
   }, [renderer]);
 
   useEffect(() => {
-    view?.show(scene, display, idle);
-  }, [view, scene, display, idle]);
+    view?.show(scene, display, idle, layers);
+  }, [view, scene, display, idle, layers]);
+
+  // The keys reach the view only from inside it: the canvas — a focusable `application` once pressed
+  // or tabbed to — or a Gimbal button. Handled, a key's default, the page scrolling under an arrow,
+  // is cancelled. Heard on the region rather than on either, so a key works after a Gimbal press.
+  const region = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const node = region.current;
+    if (node === null || view === null) return;
+    const keyed = (event: KeyboardEvent) => {
+      const command = vue3dKeyCommand(event);
+      if (command === null) return;
+      event.preventDefault();
+      view.command(command);
+    };
+    node.addEventListener("keydown", keyed);
+    return () => node.removeEventListener("keydown", keyed);
+  }, [view]);
 
   return (
-    <div className="absolute inset-0">
+    <div aria-label={MAP_COPY.vue3dTitle} className="absolute inset-0" ref={region} role="region">
       <div
-        aria-label={MAP_COPY.vue3dTitle}
-        className="h-full w-full"
+        className="[&_canvas:focus-visible]:outline-ring h-full w-full [&_canvas]:outline-none [&_canvas:focus-visible]:outline-2 [&_canvas:focus-visible]:-outline-offset-2"
         ref={container}
-        role="region"
       />
-      {view === null && <Vue3dLoading />}
+      {view === null ? (
+        <Vue3dLoading />
+      ) : (
+        <Gimbal headingDeg={heading} onCommand={(command) => view.command(command)} />
+      )}
     </div>
   );
 }
@@ -616,8 +667,10 @@ function MapControls({
     <>
       <NativeSelect
         aria-label={MAP_COPY.fond}
-        // The one control that gives way at 390 px: a Fond name cut short still reads.
-        className="max-w-48 min-w-0"
+        // The control that gives way first (390 px): a Fond name cut short still reads. Never below
+        // « Carte c… » — on the 287 px map of Statique's first row (#109), beside « Repères » (#107),
+        // the pentes label is cut short after it, its whole name in its title.
+        className="max-w-48 min-w-18 shrink-[1000]"
         onChange={(event) => onDisplay({ ...display, fond: event.target.value as Fond })}
         size="sm"
         title={MAP_COPY.fond}
@@ -629,13 +682,26 @@ function MapControls({
           </NativeSelectOption>
         ))}
       </NativeSelect>
-      <Label className="shrink-0 gap-1 whitespace-nowrap">
+      <Label className="min-w-0 gap-1" title={MAP_COPY.pentes}>
         <Checkbox
           checked={display.pentes}
           onCheckedChange={(pentes) => onDisplay({ ...display, pentes })}
         />
-        {MAP_COPY.pentes}
+        <span className="truncate">{MAP_COPY.pentes}</span>
       </Label>
+      {/* A display choice like the Fond: it hides the crosses, never a point or a reading. The Vue
+          3D draws none, so it is off there — and a disabled button takes no hover, hence the wrapper. */}
+      <span className="shrink-0" title={shows3d ? MAP_COPY.reperes3d : MAP_COPY.reperesHelp}>
+        <Toggle
+          disabled={shows3d}
+          onPressedChange={(reperes) => onDisplay({ ...display, reperes })}
+          pressed={display.reperes}
+          size="sm"
+          variant="outline"
+        >
+          {MAP_COPY.reperes}
+        </Toggle>
+      </span>
       {/* A disabled button takes no hover, so the reason's title is on its wrapper. */}
       <span className="shrink-0" title={blocked === null ? undefined : VUE_3D_BLOCKED[blocked]}>
         <Toggle
@@ -699,6 +765,7 @@ function MapCanvas({
   across,
   measure,
   measuring,
+  reperes,
   onProject,
   onMove,
   rose,
@@ -710,12 +777,18 @@ function MapCanvas({
   display: MapDisplay;
   drawn: Positions;
   gesture: MapGesture;
-  /** The Page Terrain: no anchor is taken, and no zoom button under the 44 px floor is drawn. */
+  /**
+   * The Page Terrain: no anchor is taken, and no zoom button under the 44 px floor is drawn — and
+   * the Mesure draws no aperçu, no Repère d'ancrage, and the crosses of its points always (#107).
+   */
   locked: boolean;
   target: Anchor | null;
   /** The Mesure's points, drawn above the line. */
   measure: MeasurePoints;
+  /** The Mesure is on: a click sets one of its points, and a hovering pointer draws its aperçu. */
   measuring: boolean;
+  /** The Repères are shown: every dotted cross, through A and B, the points and the aperçu. */
+  reperes: boolean;
   /** What a click on the map does: place an anchor, or set a point of the Mesure. */
   onClick: (at: Position) => void;
   /** The wind's cross component, m/s: the Banane's only input. */
@@ -741,12 +814,39 @@ function MapCanvas({
   const line = useRef(drawn);
   const bow = useRef(across);
   const ruler = useRef(measure);
+  const shownReperes = useRef(reperes);
+  // The aperçu (#107): the pixel the pointer hovers in the map's box — re-read on every move of the
+  // view, so a pan under a still pointer keeps the cross under it — and whether it is drawn at all:
+  // only while the Mesure is on.
+  const aim = useRef<readonly [number, number] | null>(null);
+  const measures = useRef(measuring);
+  // A finger never hovers: the compatibility mouse events a tap fires after it draw no aperçu.
+  const hovers = useRef(true);
   const clicked = useRef(onClick);
   const moved = useRef(onMove);
   useLayoutEffect(() => {
     clicked.current = onClick;
     moved.current = onMove;
   }, [onClick, onMove]);
+
+  // What the Mesure's source draws now, the aperçu at the pixel the pointer hovers — read as a click
+  // there reads it, so the point lands where the cross shows.
+  const drawing = useCallback((): MeasureDrawing => {
+    const live = map.current;
+    const at = aim.current;
+    const pointer = live === null || at === null ? null : live.unproject([at[0], at[1]]);
+    return measureDrawing({
+      points: ruler.current,
+      pointer: pointer === null ? null : { lat: pointer.lat, lon: pointer.lng },
+      anchors: line.current,
+      reperes: shownReperes.current,
+      measuring: measures.current,
+      readOnly: locked,
+    });
+  }, [locked]);
+  const redrawMeasure = useCallback(() => {
+    void map.current?.getSource<GeoJSONSource>(MEASURE_SOURCE)?.setData(measureData(drawing()));
+  }, [drawing]);
 
   // The rose follows the line's midpoint through every pan and zoom: it runs on every frame, so it
   // moves the host's style rather than render.
@@ -768,7 +868,7 @@ function MapCanvas({
           vector: vector.current,
           positions: line.current,
           across: bow.current,
-          measure: ruler.current,
+          measure: drawing(),
         }),
         attributionControl: false,
         // A vue de dessus: north stays up, so the drawing reads like the plan it is.
@@ -796,6 +896,39 @@ function MapCanvas({
     created.on("click", (event) =>
       clicked.current({ lat: event.lngLat.lat, lon: event.lngLat.lng }),
     );
+    // The aperçu follows a pointer that hovers — a mouse, a pen — and leaves with it. Pointer events
+    // come before the mouse events they cause, so a tap is known for one before MapLibre hears it.
+    // The pixel is read here too, from the DOM and against the canvas as MapLibre reads a click's:
+    // its own `mousemove` is held back while a drag pans the map, and the cross would stay where
+    // the pan began, away from where the next click lands.
+    // The box also holds the zoom buttons, off the canvas MapLibre listens on: a pointer there, or
+    // a finger anywhere — a pan sends no mouse event to clear a cross a mouse left — has none.
+    const sense = (event: PointerEvent) => {
+      hovers.current = event.pointerType !== "touch";
+      const box = created.getCanvas().getBoundingClientRect();
+      const was = aim.current;
+      aim.current = measureAim({
+        kind: event.pointerType,
+        onCanvas:
+          event.target instanceof Node && created.getCanvasContainer().contains(event.target),
+        at: [event.clientX - box.left, event.clientY - box.top],
+      });
+      if (was !== null && aim.current === null && measures.current) redrawMeasure();
+    };
+    node.addEventListener("pointerdown", sense, true);
+    node.addEventListener("pointermove", sense, true);
+    created.on("mousemove", (event) => {
+      aim.current = hovers.current ? [event.point.x, event.point.y] : null;
+      if (measures.current) redrawMeasure();
+    });
+    created.on("mouseout", () => {
+      aim.current = null;
+      if (measures.current) redrawMeasure();
+    });
+    // A pan or a zoom, under a still pointer or one that drags: the cross stays under it.
+    created.on("move", () => {
+      if (measures.current && aim.current !== null) redrawMeasure();
+    });
     created.on("error", (event) => {
       const source: unknown = (event as { sourceId?: unknown }).sourceId;
       if (typeof source === "string" && isFondSource(source)) {
@@ -812,8 +945,11 @@ function MapCanvas({
     placeRose();
     applied.current = styleKey(display, vector.current);
     return () => {
+      node.removeEventListener("pointerdown", sense, true);
+      node.removeEventListener("pointermove", sense, true);
       created.remove();
       map.current = null;
+      aim.current = null;
       onProject(null);
       markers.current = { A: null, B: null };
     };
@@ -836,7 +972,8 @@ function MapCanvas({
           vector: vector.current,
           positions: line.current,
           across: bow.current,
-          measure: ruler.current,
+          // The aperçu included: a Fond changed under the pointer leaves the cross where it was.
+          measure: drawing(),
         }),
         { diff: true },
       );
@@ -914,11 +1051,15 @@ function MapCanvas({
     void map.current?.getSource<GeoJSONSource>(BANANE_SOURCE)?.setData(bananeData(drawn, across));
   }, [drawn, across]);
 
-  // The Mesure follows its clicks: a source of its own, in every style.
+  // The Mesure follows its clicks, the Repères d'ancrage the anchors as drawn — a dragged one under
+  // the pointer — and the Repères' button hides or shows every cross: a source of its own, in every
+  // style. After the effect above, which keeps `line` on the drawing.
   useEffect(() => {
     ruler.current = measure;
-    void map.current?.getSource<GeoJSONSource>(MEASURE_SOURCE)?.setData(measureData(measure));
-  }, [measure]);
+    shownReperes.current = reperes;
+    measures.current = measuring;
+    redrawMeasure();
+  }, [measure, drawn, reperes, measuring, redrawMeasure]);
 
   // A crosshair while a click would place an anchor or a point; MapLibre's own hand otherwise.
   useEffect(() => {

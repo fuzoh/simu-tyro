@@ -52,22 +52,68 @@ export function clickMeasure(points: MeasurePoints, at: Position): MeasurePoints
   return points.length === 1 ? [points[0], at] : [at];
 }
 
+/** A pointer over the map's box, as the aperçu of the Mesure (#107) reads it. */
+export type MeasurePointer = {
+  /** The event's `pointerType`: `"mouse"`, `"pen"`, `"touch"`, or what a browser adds. */
+  readonly kind: string;
+  /**
+   * Whether it is over the map's canvas — where a click places a point — and not over a control
+   * the map holds above it, such as the zoom buttons, where a click places nothing.
+   */
+  readonly onCanvas: boolean;
+  /** Where, in the canvas's own pixels. */
+  readonly at: readonly [number, number];
+};
+
 /**
- * The offset of `to` from `from` in metres, east and north — the ellipsoid's local radii of
- * curvature at the mid-latitude. For the few kilometres a zip line spans this is exact to well
- * under a millimetre per kilometre; it is not a geodesic for a continent.
+ * The pixel the aperçu is drawn at, or `null` for none: a finger never hovers, and a pointer off
+ * the canvas is where no click would land.
  */
-function offsetMetres(from: Position, to: Position): { east: number; north: number } {
+export function measureAim({
+  kind,
+  onCanvas,
+  at,
+}: MeasurePointer): readonly [number, number] | null {
+  return kind !== "touch" && onCanvas ? at : null;
+}
+
+/** A local plane of the ellipsoid: metres east and north of its origin, and back. */
+export type LocalPlane = {
+  /** A Position's offset from the origin, m east and north. */
+  readonly metres: (at: Position) => { east: number; north: number };
+  /** The Position `east` and `north` metres from the origin. */
+  readonly position: (east: number, north: number) => Position;
+};
+
+/**
+ * The local plane around `origin` — the ellipsoid's radii of curvature at the mid-latitude of
+ * `origin` and `other`, the meridian's north and the prime vertical's east. For the few kilometres a
+ * zip line spans this is exact to well under a millimetre per kilometre; it is not a geodesic for a
+ * continent. The Mesure's distances and the Vue 3D's Vues prédéfinies both stand on it: the one
+ * geodesy of `src/lib/map/`.
+ */
+export function localPlane(origin: Position, other: Position): LocalPlane {
   const rad = Math.PI / 180;
   const e2 = WGS84_F * (2 - WGS84_F);
-  const phi = ((from.lat + to.lat) / 2) * rad;
+  const phi = ((origin.lat + other.lat) / 2) * rad;
   const w = Math.sqrt(1 - e2 * Math.sin(phi) ** 2);
-  const meridian = (WGS84_A * (1 - e2)) / w ** 3;
-  const primeVertical = WGS84_A / w;
+  const perLat = ((WGS84_A * (1 - e2)) / w ** 3) * rad;
+  const perLon = (WGS84_A / w) * Math.cos(phi) * rad;
   return {
-    east: (to.lon - from.lon) * rad * primeVertical * Math.cos(phi),
-    north: (to.lat - from.lat) * rad * meridian,
+    metres: ({ lat, lon }) => ({
+      east: (lon - origin.lon) * perLon,
+      north: (lat - origin.lat) * perLat,
+    }),
+    position: (east, north) => ({
+      lon: origin.lon + east / perLon,
+      lat: origin.lat + north / perLat,
+    }),
   };
+}
+
+/** The offset of `to` from `from` in metres, east and north, on {@link localPlane}. */
+function offsetMetres(from: Position, to: Position): { east: number; north: number } {
+  return localPlane(from, to).metres(to);
 }
 
 /** The horizontal distance between two Positions, m, on the WGS84 ellipsoid. */

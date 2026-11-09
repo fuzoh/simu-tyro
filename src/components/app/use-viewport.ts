@@ -3,9 +3,7 @@
  * collapses to a Pinned Safety Header*, *Keyboard, four pieces*) and § 7 (*`__root.tsx` carries the
  * document and nothing visible*), ticket A12.2.
  *
- * `useViewport` does two things, and they are the same measurement read twice
- * ({@link useBandHeight}, below, is the third height § 5's two constraints spend — the shell's own
- * band above the two columns, which is a box and not a viewport):
+ * `useViewport` does two things, and they are the same measurement read twice:
  *
  * 1. It writes § 5's `--kb` — `layoutHeight − visual viewport height − offsetTop`, **taken only at
  *    scale 1**, voir {@link keyboardInsetOf} — onto `documentElement`, which is the iOS fallback that
@@ -43,7 +41,7 @@
  * tracks the resized content, `offsetTop` stays 0, and the inset stays 0.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 /** The property the layout reads as `var(--kb, 0px)`. */
 const KEYBOARD_INSET = "--kb";
@@ -204,58 +202,4 @@ export function useViewport(): Viewport {
   }, []);
 
   return viewport;
-}
-
-/**
- * **The height of one shell band above the two columns** — § 5's `ViewportFit.chromeHeight`, and
- * today that is § 8's « clés ignorées » strip alone.
- *
- * It lives beside {@link useViewport} because the two are the *same* input to the *same* two
- * predicates: `fitsWholeBlock` compares the block against what is left of the screen, and a band the
- * shell paints above the columns is as much a subtraction from that as the soft keyboard is. Ticket
- * 31's **D3** is what a missing term costs — `data-fit="roomy"` over a column 42 px too short, and
- * « Garde min » clipped by the shell's `overflow-hidden`.
- *
- * Three things about the shape of it:
- *
- * - **It measures, because the strip's height is its own text's.** Every *band* height in this app is
- *   a function of the chart column's width (§ 5's invariant) and none of them is measured; the strip
- *   is not a band of the block at all — § 5's spine lists it as a conditional row *outside* the five,
- *   « 0 | 60 » — and its 1–3 wrapped lines have no width-derived row to look up. **The invariant is
- *   untouched**: nothing is *sized* from this number, it is one side of a comparison whose output is
- *   a state.
- * - **`0` when the band is not there**, which is the same value as « no band », so a link with every
- *   key present and a strip the user dismissed give the identical answer — and § 5's own reason for
- *   tolerating the strip's cost (« rejetable ») then actually pays off: dismissing it restores the
- *   whole block on the next frame.
- * - **A `ResizeObserver` and not a one-off `getBoundingClientRect`**, because the height changes
- *   without a React render underneath it: the sentences re-wrap on every window resize, and the shell
- *   is one `overflow-hidden` box that would keep reserving a stale figure.
- */
-export function useBandHeight(): {
-  ref: (node: HTMLElement | null) => void;
-  height: number;
-} {
-  const [height, setHeight] = useState(0);
-
-  // A cleanup-returning ref callback (React 19), so the band leaving the tree — dismissed, or a
-  // second render with nothing to report — puts the term back to 0 rather than freezing it.
-  const ref = useCallback((node: HTMLElement | null) => {
-    if (node === null) return;
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      const block =
-        entry.borderBoxSize[0]?.blockSize ?? entry.target.getBoundingClientRect().height;
-      setHeight((previous) => (previous === block ? previous : block));
-    });
-    // The **border** box: the strip carries a `border-b`, and a term short by its width is a term
-    // that under-states the band by exactly the pixel a clipped row needs.
-    observer.observe(node, { box: "border-box" });
-    return () => {
-      observer.disconnect();
-      setHeight(0);
-    };
-  }, []);
-
-  return { ref, height };
 }

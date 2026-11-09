@@ -106,16 +106,29 @@ fixes that and nothing else needs to move.
 
 - **inline:** controls `px-2.5` (the registry's own, so an added component is already correct);
   containers and full-bleed bars `px-3`.
+- **the charts' gutter is the containers' margin:** `GUTTER = 12` in `src/lib/layout/contract.ts`,
+  the `px-3` of every other container (#115). The coupe's frame, the strip's and Dynamique's curve
+  therefore stand on the same verticals as the region titles, the tiles and the vue de dessus — left
+  edges and right edges, on Statique, Avancé, Dynamique and Terrain. A chart label that needs room
+  takes it **inside the plot** (`axisLabel()`), never in the gutter, and the vue de dessus spans
+  its region and caps its height rather than its width. Where the aligned boxes stand in two
+  sibling scrollers — Terrain's visualisation, which scrolls, and its tiles, which do not — both
+  reserve the same scrollbar gutter (`scrollbar-gutter: stable`, the tiles' section
+  `overflow-hidden` so that it applies), or a classic scrollbar would pull one set of right edges
+  its width in from the other.
 - **gap:** `gap-1` inside a row (label → control → hint) · `gap-2` between rows in a section ·
   `gap-3` between sections.
-- **vertical:** a Rail row is `h-7` inside a `py-1` wrapper.
+- **vertical:** a Rail row is `h-7` inside a `py-1` wrapper; a Page region — a titled section, the
+  fields' column, Terrain's band of tiles — is `py-3`.
 
 Nothing else. A `gap-1.5` in a diff is the defect, not the taste.
 
 ### Touch: `.touch-44`
 
 ≥44 px on coarse pointers is a budget § 5 spends to the pixel — `view-strip.tsx`'s
-`59 + 48 + 44 + 128 + 24 = 303 px`, and a `size="sm"` control is **28 px visually**. One utility in
+`4 × 28 + 12 + 44 + 153 + 16 = 337 px` of the `390 − 2 × 12 = 366` a phone's row has (it was
+`59 + 48 + 44 + 128 + 24 = 303` of 342 before the four layers and the 12 px gutter), and a
+`size="sm"` control is **28 px visually**. One utility in
 `src/styles.css` carries the `::after` overlay that closes the gap, applied at call sites and
 **never baked into a `ui/` component**: components stay re-`add`-able, and the touch policy stays
 one grep.
@@ -177,6 +190,27 @@ very literals from `style.ts` — the globe's background is `PLAIN`, the lines a
 `LINE_INK` cased in `LINE_CASING` — and holds none of its own. The attribution and the messages
 under it are HTML, on the tokens.
 
+The Vue 3D's lines follow the coupe's strokes in those literals: the Ligne à vide dashed in
+`LINE_INK`, the Ligne A–B dashed and the Trajectoire dotted in `LINE_INK` at 60 %, and the loaded
+line solid. The Trajectoire takes the coupe's `foreground/60`; the coupe draws its Ligne A–B in
+`muted-foreground/60`, a muted ink the Vue 3D has no literal for, so its chord takes the ink at
+60 % too and reads a shade darker than the coupe's. Which of them is shown is the View Strip's: the Vue 3D has no
+layer picker of its own (#111).
+
+**The Gimbal is HTML over the canvas, from `ui/`** (#111). CesiumJS has no navigation control and
+none is brought in: `vue-3d-gimbal.tsx` is `ui/button` at `size="icon-sm"` (the pad) and
+`size="sm"` (« Vue du départ », « Vue latérale »), `.touch-44` at each call site, over the view's
+top-left corner where « Placer A / B » sit on the vue de dessus. The buttons stand 4 px apart, so
+each 44 px hit box bleeds onto its neighbour's face; the Gimbal paints those hit boxes **under**
+every face (`after:-z-1` inside an `isolate` group), so a face is always its own button and a click
+on the edge of « Incliner vers le bas » never flies to « Vue du départ ». The pad's grid box lets
+presses through (`pointer-events-none`, its children `auto`), so its gaps keep the enlarged target.
+Each button's hover names its key (`gimbalHint`), and a keyboard glyph's hover lists them all
+(`vue3dKeysHelp`). The keys act only from inside the view — its canvas, focusable and outlined in
+`--ring` when tabbed to, or a Gimbal button — and a handled key's default is cancelled, so an arrow
+turns the camera and never scrolls the page. The north needle is `Navigation2` turned by the camera's heading: a shape, not a printed
+number.
+
 **The carte claire has no raster twin, so the Vue 3D drapes its nearest one.** The carte claire is
 swisstopo's vector `ch.swisstopo.lightbasemap.vt`, which CesiumJS cannot drape; the WMTS
 capabilities read on 2026-11-08 offer no raster light base map (only its relief shading), so the
@@ -187,19 +221,67 @@ nationale drape the very tiles the vue de dessus shows.
 ## Avancé's three columns
 
 The Page Avancé (`/avance`) stands on **three columns from 1024 px of viewport** and on one below
-it. The numbers are `THREE_COLUMN_PX`, `RAIL_WIDTH` (left), `RIGHT_COLUMN_WIDTH` and
-`SHELL_MAX_PX` in `src/lib/layout/contract.ts`; the classes spell them as `min-[1024px]:` and
-`w-72`, and `contract.test.ts` holds the two together.
+it, and spans **the whole width of the window** (#110). The numbers are `THREE_COLUMN_PX`,
+`RAIL_WIDTH` (left), `WIDE_RAIL_PX` and `WIDE_RAIL_WIDTH` (the left column from 1920, #112),
+`RIGHT_COLUMN_WIDTH`, `AVANCE_BLOCK_MAX_PX` and `AVANCE_PLOT_MAX` in
+`src/lib/layout/contract.ts`; the classes spell them as `three-columns:`, `w-72`, `wide-rail:w-144`
+and `max-w-[1984px]`, and `contract.test.ts` holds the two together. B2 and B3 are each **one**
+`@custom-variant` in `src/styles.css` — `three-columns` and `wide-rail` — never an arbitrary
+`min-[…px]:` retyped at a call site, so moving the constant moves every Page that switches on it.
 
-- **Left** — the Rail Header and `Paramètres`. **Middle** — the Chart Block, then Statique's vue
-  de dessus (`TopMap`, the same component and the same gestures — #104). **Right** — `Valeurs
-  déduites`, `Résultats`, `Provenance`, `Ce que cet outil ne calcule pas`. Both side columns are
-  288 px, and all three scroll on their own.
-- **The middle column scrolls, block first** — the way Statique's right column does. Holding the
-  block still over a residual scroller was rejected: at 1024 × 768 it leaves the map 116 px. The
-  column reserves its scrollbar gutter (`scrollbar-gutter: stable`), so a scrollbar that comes and
-  goes cannot move the width every band is a function of; on a platform with classic scrollbars the
-  measured column is that gutter narrower than `chartColumnWidth()`.
+- **Left** — the Rail Header and `Paramètres`. **Middle** — Statique's vue de dessus (`TopMap`, the
+  same component and the same gestures — the rose des vents, the draggable anchors, « Mesure »,
+  « 3D » — #104), then the Chart Block under it (#110). **Right** — `Valeurs déduites`,
+  `Résultats`, `Provenance`, `Ce que cet outil ne calcule pas`. Both side columns are 288 px — the
+  left one 576 from 1920 (below) — run the whole height, and all three columns scroll on their own.
+- **From 1920 the left column is 576 px and `Paramètres` stands on two columns (#112).** B3 —
+  `WIDE_RAIL_PX`, declared once in CSS as the `wide-rail` custom variant of `src/styles.css`, never
+  retyped as a `min-[1920px]:` (`contract.test.ts` holds the variant to the constant and greps
+  `src/` for the retyping). The column is `wide-rail:w-144`, `2 × 288`; the Rail Header and the
+  `Paramètres` heading stay across it, and the groups under them flow in **CSS columns**
+  (`wide-rail:columns-2`), each group `break-inside-avoid`, `space-y-3` between groups and the
+  wrapper's own `gap-3` between the two columns: each column is `(576 − 1 − 24 − 12) / 2 = 269,5`
+  px, against the `288 − 1 − 24 = 263` px a group has in the 288 px column (both measured, the
+  column's hairline counted). Columns rather than a grid because a column box flows the groups in the
+  DOM's order, down the left column and then down the right: the reading order, the order on screen
+  and the Tab order are one, with no `order` to keep in step and no split point to choose by hand.
+  The browser balances the two, so which group opens the right column depends on the groups'
+  heights — `Passager` on the shipped line (routing.md's measurements). Nothing else moves: the
+  right column stays 288 px, the column scrolls on its own, and its focus and keyboard handling are
+  the 288 px column's. **What it costs**: the middle column, and with it the vue de dessus and the
+  Chart Block, is 288 px narrower from 1920 — `viewport − 864` — so it drops from 1343 px at 1919
+  to 1056 at 1920 before it widens again pixel for pixel, and the coupe takes the step with it — at
+  1920 its plot is 120,5 px and its strip 34,9 px shorter than at 1919 (`0,42` and `0,16 × W_inner`,
+  `W_inner` 1319 → 1032); the column is back to its 1919 width at 2207. And the balance is
+  re-struck on every edit: a group that grows or shrinks near the split moves the groups after it
+  to the other column under the user's eyes. At 1920 × 1080 on the shipped line (review of #112,
+  agent-browser), « Installation temporaire » then « Corde » in `Ligne` take it from 398 to 702
+  px, and `Tension de la ligne` — the next group to fill — jumps from the foot of the left column
+  (x 12, y 980) to the head of the right one (x 294, y 117), the groups after it with it; the
+  focus stays on the radio and the DOM order, so the reading and Tab orders hold. The family, the
+  Pilote mode, a warning row or Position's LV95 read-outs can do the same. Accepted: a split fixed
+  by hand — two wrappers in DOM order on a two-column grid — would not move, but it is lopsided
+  whenever `Ligne` swings by its 300 px, and is a split point to re-choose every time a group
+  changes, where the columns rebalance on their own.
+- **The middle column scrolls, vue de dessus first** — the way Statique's right column does. The
+  map is first in the DOM too, so the focus order is the order on screen; its hairline is under it,
+  between it and the block. Holding the block still over a residual scroller was rejected (#104): at
+  1024 × 768 it leaves the map 116 px. The column reserves its scrollbar gutter
+  (`scrollbar-gutter: stable`), so a scrollbar that comes and goes cannot move the width every band
+  is a function of; on a platform with classic scrollbars the measured block is that gutter
+  narrower than `avanceBlockWidth()` up to 2848 px of viewport. **What it costs**: the Chart Block starts under the map — its
+  banner slot at 665 px from the top of the window at 1440 and at 2560 (the map's region,
+  36 + 629 px: its 448 px cap plus its controls and **seven** caption lines), 489,7 px at 1024
+  (36 + 453,7) — and the profile under the banner at 709 and 565,7 px (routing.md's measurements).
+  The seven lines are Statique's first row's reserve (`--top-view-caption: 7rem`, below), for the
+  same reason: the block sits right under the caption, so a Banane line from a cross wind, a
+  failing Fond or a blocked Vue 3D must land inside the reserve, not push the whole block — and the
+  coupe the Skeleton placed — 16 px down per line while the user edits.
+  So the banner is below the fold on a window shorter than about 665 px (490 at 1024), and
+  « Garde min » and the read-out cells, under the profile, clearance strip and View Strip, are a
+  scroll down on any window shorter than the map plus the whole block — 1440 × 900 among them.
+  Scrolled to, the block itself stands whole in any window 36 px taller than it — 1276 px at most,
+  its 1984 px letterbox (below).
 - **The vue de dessus is three columns only.** Below 1024 its box is `display: none`, and the map
   is not started there at all — `threeColumns()` in `contract.ts`, the same B2, decides what to
   *mount*, never a size: a MapLibre map started in a box with no size holds a WebGL context for
@@ -207,27 +289,134 @@ it. The numbers are `THREE_COLUMN_PX`, `RAIL_WIDTH` (left), `RIGHT_COLUMN_WIDTH`
   in clear at every width, and read the same Scenario the map and the rose write.
 - **Why 1024.** A stacked block is sized from the *whole* viewport width and owes `MIN_RAIL` under
   it, so stacking costs the chart its profile on any screen that is not tall: at 1024 × 768 it is a
-  782 px block against 612 px left, and Avancé opens on « Garde min. ligne » alone (measured at the
-  built `/avance`, with 1180 × 820 and 1194 × 834 the same). In three columns the same screens keep
-  everything: 1024 × 768 is a 448 px middle column, a 616 px block and 732 px of height. **What it
+  796 px block against 612 px left (782 when measured, at the 24 px gutter), and Avancé opens on « Garde min. ligne » alone (measured at the
+  built `/avance`, with 1180 × 820 and 1194 × 834 the same). In three columns nothing is collapsed
+  and the Rail stands beside the block rather than under it: 1024 × 768 is a 448 px middle column
+  and 732 px of height, the map's region to y ≈ 458 and the whole 626 px block under it, to
+  y ≈ 1084 — so « Garde min » is a scroll of the middle column away there, never folded away, and
+  the profile is never spent to pay for the Rail. Until #110 the block headed the column and the
+  same screen held it whole above the fold; putting the map above it spent that. **What it
   costs**: at the switch the middle column is under B1 (`CELL_WRAP_PX`, 624) and under 768, so the
   banner takes three lines and the View Strip its short labels (« à vide », « A–B »); the column
   clears B1 from 1200.
 - **Stacked below 1024 and short**: the whole block plus `MIN_RAIL` and the navigation bar need
-  `block + 156` px of height — 842 px at 768 wide, 938 px at 1023. Portrait tablets (768 × 1024,
+  `block + 156` px of height — 856 px at 768 wide, 952 px at 1023. Portrait tablets (768 × 1024,
   810 × 1080, 820 × 1180, 834 × 1194) clear it; a narrow desktop window such as 1000 × 900 does not
   and opens on the Pinned Safety Header alone until the window is taller. That is the collapse the
   ticket keeps (« le Pinned Safety Header reste »), accepted rather than capped around.
-- **Why the cap.** The shell stops at 1728 px, and `1728 − 576 = 1152` is `REFERENCE_COLUMN_PX`:
-  the middle column never outgrows the plot's ceiling, so the Plot Aspect Band holds at every
-  width (`contract.test.ts` walks it).
+- **No shell cap (#110).** The shell spans the window, and every pixel past the two side columns
+  goes to the middle one: `chartColumnWidth()` is `viewport − 576` from 1024 and `viewport − 864`
+  from 1920 (#112) — 1056 px at 1920, 1696 at 2560 and 2576 at 3440 — with no empty margin either
+  side. Statique, Dynamique and Terrain keep
+  `SHELL_MAX_PX` (1728). The shell used to stop there too, because `1728 − 576 = 1152` is
+  `REFERENCE_COLUMN_PX` and kept the middle column under amendment F's plot ceiling (473,76 px).
+- **The Chart Block stops at 1984 px and letterboxes past it (#110).** The vue de dessus takes the
+  whole middle column; the block widens with it up to `AVANCE_BLOCK_MAX_PX` — the column at 2560
+  under #110, `2560 − 576`, and at 2848 since the left column doubles (`AVANCE_BLOCK_VIEWPORT_PX`,
+  `1984 + 864`, #112) — and past it stays 1984 px wide, centred (`mx-auto max-w-[1984px]` on the
+  block's own box, which is the query container and the observer's target), the column's surplus
+  empty either side: 296 px a side at 3440 (288,5 with a classic scrollbar). Its plot ceiling is raised to match (`AVANCE_PLOT_MAX`,
+  `0,42 × 1960 = 823,2` px), so the plot is `0,42 × W_inner` at every width it is drawn at and the
+  Plot Aspect Band holds by construction — 0,42 at 1024, 1440, 1920, 2560 and 3440
+  (`contract.test.ts` walks it). **Why the cap** — the old « Why the cap », moved from the shell to
+  the block: with no ceiling the block was `416 + 0,42 × 2840 = 1608,8` px at 3440, taller than the
+  1404 px a 1440 px window leaves, so no scroll position showed the banner slot and « Garde min »
+  together and the block stopped being one co-visible unit. Capped, it plateaus at 1239,2 px: whole
+  in 1920 × 1080 (814,56 against 1044 since #112), 2560 × 1440 (1118,24) and 3440 × 1440 once the
+  column is scrolled to it. **Why 1984**: #110 set it at the column of the brief's own 2560, so the
+  coupe filled the column there, and it is a block that fits the 1440 px-tall windows the brief
+  names; a 1920 cap would fit 1080 px windows at every width but stop the coupe 640 px short at
+  2560. #112's wider left column changes no term of the height it bounds, so the cap stays 1984
+  rather than following the column at 2560 down to 1696 — which would shrink the coupe at 3440 for
+  nothing — and is now reached at 2848. **Why the whole block and not the
+  plot alone**: the profile and the clearance strip share one x scale, so a plot narrowed inside its
+  band would draw the anchors off the strip's. The cap is a width, so nothing reads the window's
+  height: measured at 2560 the coupe is the same at 1440, 900 and 500 px of window height. The Chart
+  Block is told the same ceiling (`plotMax`) that the shell's `--profile-plot` spells, so the drawn
+  plot and its band agree. Below 1024 nothing moves: the widest stacked column is 1023 px, a
+  419,58 px plot, which neither ceiling reaches. **What it costs**: a window under 1276 px tall at
+  2848 or wider does not hold the whole block (2560 × 1080 already does not: 1118,24 against 1044);
+  past 2848 the block does not widen with the window, and its letterbox margins stand empty.
+- **The vue de dessus keeps its frame**: 3 : 2 up to the frame's 448 px height cap
+  (`--top-view-max-h`, #115), then wider than 3 : 2 — 409 × 273 at 1024 (its region 422 px tall
+  with its controls and caption) and 1657 × 448 at 2560 (1945 before #112), with a classic
+  scrollbar. A height read off
+  the width, capped, never off the window.
+- **The window's height binds the block below 1024 only** (#110, `heightBindsBlock` in
+  `src/lib/layout/collapse.ts`): from three columns neither (c) nor the `compact` row fires,
+  whatever the height or the keyboard, because the block stands under the map in a column that
+  scrolls — so the coupe's height never changes when only the window's does. Before #110 three
+  columns at 1440 × 500 pinned the block to the Pinned Safety Header; now they keep it whole and
+  scroll to it. The § 8 strip is no longer a term of (c): below 1024 the Rail pays it, which § 5
+  tolerates, and above it nothing is fitted to the window.
 - **Stacked, the order is the Chart Block, then the Rail's sections in their own order** — the
-  Pinned Safety Header and its collapse are unchanged, and now apply below 1024 instead of below 768
-  (the `width < 1024px` arm in `src/styles.css`). The one scroller is a wrapper that is
-  `display: contents` from 1024 up: both columns become the chart's flex siblings, and a focus
-  inside either still bubbles to the wrapper's handlers.
+  Pinned Safety Header and its collapse are unchanged, and apply below 1024 only (the
+  `width < 1024px` arm in `src/styles.css` for scroll and focus, `heightBindsBlock` for the
+  height). The one scroller is a wrapper that is `display: contents` from 1024 up: both columns
+  become the chart's flex siblings, and a focus inside either still bubbles to the wrapper's
+  handlers.
 - **`Valeurs déduites` holds editable rows**, so it shares `Paramètres`' field-row context: `RailInputs`
   owns the context and hands the two sections back through a render prop.
+
+## Statique's first row
+
+From **1024 px of viewport** — `THREE_COLUMN_PX`, Avancé's own switch — the right column of the
+Page Statique (`/`) is two rows (#109). The one number of it in `src/lib/layout/contract.ts` is
+`STATIQUE_TILE_MAX_PX`, which reaches the CSS as the block's own `--tile-max` (the
+`minmax(0, var(--tile-max))` of its two tracks), so no class spells it a second time. The switch is
+written `three-columns:`, Avancé's own variant. The rest — what the row leaves the map — is
+arithmetic over the shell, measured by `agent-browser` (`docs/conventions/routing.md`, 2026-11-09), not modelled.
+
+- **Row 1: the vue de dessus, then `Résultats`.** The map takes the rest of the column; the tiles
+  stand on its right as a **block of 2 × 3** — the four value tiles in a 2 × 2, the Verdict across
+  both columns of the third row — each capped at 180 px, so the block is `2 × 180 + 8 = 368` px with
+  its `gap-2`. The tiles stand at the top of the row. A hairline between the two regions, as one
+  under each stacked region; both keep their `px-3`, so the map's left edge and the tiles' right
+  edge are the coupe's (#115).
+- **Row 2: the coupe**, across the column — the same width, and so the same bands, as before.
+- **Below 1024 nothing moves.** The regions' wrapper is `display: contents` there, so `Résultats`,
+  the coupe and the vue de dessus stack in the column as they always have — the brief keeps that
+  order below 1024, and the DOM keeps it at every width, because any one DOM order mismatches the
+  drawing at one of the two shapes. **What it costs from 1024**: a screen reader reads the tiles
+  before the map it sees first, and **keyboard focus goes from the coupe back up to the map** —
+  measured at 1440 on the trial line, Tab visits the coupe's controls (« Choisir une marge
+  exigée », « ligne à vide », « ×1 vraie échelle », « Afficher le profil ») before the vue de
+  dessus's (« Fond de carte », pentes, the map, its zoom, « Placer A », « Placer B », « Mesure »…),
+  so the focus order is row 2, then row 1 (WCAG 2.4.3). The tiles hold no control, so it is the only
+  jump. Accepted: reordering the DOM would move the phone's, which the brief keeps.
+- **The block is Statique's alone** (`<OutputGrid block>`, its Verdict `wide`): two columns at every
+  width. Terrain's grid keeps its row of five from a 56 rem column. Statique dropped that arm with
+  nothing lost below 1024 — its column, `md:w-80` short of the viewport, is 703 px at the most there.
+- **The vue de dessus keeps its format**: 3 : 2 at every width of the row, its height read off its
+  width and never off the window — the brief's « format conservé ». The row lifts the frame's
+  448 px height cap (#115) through the frame's own `--top-view-max-h` (`none` on the region from
+  1024), so the cap still holds for the stacked phone shape, Terrain and Avancé, and `TopMap`'s
+  mount takes no new prop. Its width is the column, `min(viewport, 1728) − 320`, less the block
+  (368), four `px-3` (48) and the hairline between the regions (1): **287 × 191** px at the switch,
+  narrower than the block, the wider from 1106 px of viewport, **703 × 469** at 1440 and
+  **989 × 659** from the shell's cap — `1408 − 417 = 991` less the shell's own two hairlines
+  (`min-[1730px]:border-x`). **What it costs**: the row is as tall as the map, so at 1440 × 900 the
+  coupe starts at 710 px and at 2560 × 900 it starts at the fold (900 px), one scroll down — the
+  price of a map that keeps its format beside the tiles.
+- **Seven caption lines in the row** (`--top-view-caption`, 7 rem, as Avancé's middle column, and
+  against five on Terrain and the stacked shape): the caption sets the row's height, and so the
+  coupe's place, where it was the last region and moved nothing. Seven is one per line the caption can hold in 2D (A, B, the Vent, the gesture, the fond
+  indisponible, the Banane, the Vue 3D); on the narrow map from 1024 to about 1200 px the Vent and
+  the Vue 3D lines wrap to two each, and the trial line's six lines on load, seven with « Mesure »
+  armed, stay inside it. **What it costs**: 32 to 48 px of empty caption at 1440 on a calm line;
+  and a caption of more than seven lines — a Vent, the Banane and « Mesure » armed on the 287 px
+  map make eight — still pushes the coupe down a line. The Skeleton cannot foresee a caption any
+  more than a tile's Avertissement; seven covers every line the caption can hold unwrapped.
+- **The map's own controls at 287 px**: « Placer A / Placer B / Mesure » wrap onto a second line
+  rather than run under MapLibre's zoom buttons (the overlay row is `right-12` and `flex-wrap`,
+  every Page), so « Quitter la mesure » sits under « Placer A » at 1024. The rose's handle, the
+  Mesure, « Placer B » and the Vue 3D work there (`docs/conventions/routing.md`), but the overlay
+  and the Mesure's readout cover much of a 191 px map, and at the switch, beside « Repères »
+  (#107), the « Fond de carte » select shrinks to its 72 px floor (« Carte ») and the pentes label
+  is then cut to « Pentes sup… », its whole name in its title — the select gives way first, so
+  390 px still reads « Pentes supérieures à 30° » whole. Accepted: the brief puts the switch at
+  1024, and the map is the wider of the two from 1106.
+- **The Skeleton is the same tree** (`StatiqueFrame`), so it lands in the same boxes at every width.
 
 ## Charts
 
@@ -236,9 +425,10 @@ axis. No charting library, and no `d3-scale`** — the only transform is linear 
 the two scales are *deliberately mismatched*, which is the whole point (« v1 build spec » § 5).
 
 - The x scale is **one `SharedX` object per (chart-column inline size, `L`, terrain source)**,
-  built by `@/lib/layout/contract.ts` and consumed by **both** charts. `GUTTER = 24` on both sides
-  of both charts, and **the pointer inverse is a method on it** — never a formula retyped per call
-  site.
+  built by `@/lib/layout/contract.ts` and consumed by **both** charts. `GUTTER = 12` — the
+  containers' `px-3`, voir *Rhythm* — on both sides of both charts, and **the pointer inverse is a
+  method on it** — never a formula retyped per call site. The y-axis labels stand inside the plot
+  at `axisLabel()`, on a halo of the background, because a 12 px gutter holds none.
 - **No chart dimension may read the window height.** Every band height is a function of the chart
   column's inner width; the constants and the vertical-exaggeration policy (the aspect identity,
   the band, the ×1 floor) live in `contract.ts` and are unit-tested there.
@@ -257,6 +447,12 @@ the two scales are *deliberately mismatched*, which is the whole point (« v1 bu
   at low anchors has every rider position violating at −0,36 m while the passenger flies a valley at
   +62,6 m — so one linear domain leaves the zero crossing **0,2 px** tall. Whatever the curve is,
   `clearanceDomain()` is fed **that** quantity and nothing else.
+- **The Zones d'ancrage are grey, never red** — #106. `SceneBase.anchorZones` holds the two bands
+  `[0, z]` and `[L − z, L]`, and `AnchorZoneBands` (`src/components/chart/anchor-zones.tsx`) draws
+  them full height on the profile and on the clearance strip, in `muted-foreground` at low opacity
+  with a dashed inner edge, under the red violating bands. Red — the violating bands, the strip's
+  below-zero stroke and its deficit fill — is drawn only where the garde is judged, outside the
+  zones; the garde itself stays drawn inside them. The coupe's hover says « garde non jugée » there.
 - What the charts draw comes from `@/lib/chart/scene.ts` — pure functions over the unloaded line
   `deriveUnloaded` returns (`@/lib/scenario/unloaded.ts`), so the questions worth testing are `node`
   tests and the components stay thin.

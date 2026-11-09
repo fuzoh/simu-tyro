@@ -69,6 +69,8 @@ export type TermId =
   | "requiredClearance"
   | "lineClearance"
   | "traverseClearance"
+  | "anchorZone"
+  | "anchorZones"
   | "riderEnvelope"
   | "anchor"
   | "anchors"
@@ -219,6 +221,9 @@ export const LABELS = {
   requiredClearance: same("garde exigée"),
   lineClearance: exactOnly("garde min. ligne"),
   traverseClearance: exactOnly("garde min (traversée)"),
+  // Where the garde is not judged (#106). Named on every Page; its length is set on Avancé alone.
+  anchorZone: same("zone d'ancrage"),
+  anchorZones: same("zones d'ancrage"),
   riderEnvelope: same("gabarit du passager"),
   anchor: same("ancrage"),
   // The pair, as a group heading names them: a plural is a wording of its own, not a suffix.

@@ -117,14 +117,14 @@ export const PROFILE_BAND_LABEL = "Profil";
 
 /**
  * **Is the reduction forced by the height rather than asked for by scroll or focus?** (c) and the
- * `compact` rule are the two constraints, and this is the one thing the *width* scoping cannot
- * cover: (a) and (b) are narrow-screen behaviour — above B2 the Rail sits beside the block and a
- * focused field must cost the chart nothing — while a block that does not fit does not fit at any
- * width. **A short desktop window is exactly that case and needs no rule of its own**: three
- * columns at 1440 × 500 are above B2, so only this makes the Pinned Safety Header appear there.
+ * `compact` rule are the two constraints. Since #110 both are scoped to B2 by their own predicates
+ * ({@link heightBindsBlock}) — from three columns the middle column scrolls under the vue de dessus,
+ * so three columns at 1440 × 500 open whole and scroll, where they used to pin — and this flag can
+ * only be set below B2, where the triggers' own arm already applies.
  *
  * The shell publishes it as `data-fit`, and `src/styles.css` gates the same bands on it that its
- * `width < 1024px` arm gates on B2 — voir the `pinned` variant.
+ * `width < 1024px` arm gates on B2 — voir the `pinned` variant. The width scoping lives in the
+ * predicates rather than in that CSS, so the stylesheet applies whatever state it is handed.
  */
 export function heightConstrained({ fits, compact }: Pick<CollapseInputs, "compact" | "fits">) {
   return !fits || compact;
@@ -150,7 +150,7 @@ export function collapseState({
   return compact ? "compact" : "pinned";
 }
 
-/** Everything the two height constraints read. **Four measurements, no branch on any of them.** */
+/** Everything the two height constraints read: four measurements, and B2 the one branch on them. */
 export type ViewportFit = {
   /** The window's inline size, px — B2's own input, and the only width in this module. */
   readonly viewportWidth: number;
@@ -158,27 +158,17 @@ export type ViewportFit = {
   readonly viewportHeight: number;
   /** `--kb`, px — the soft-keyboard inset the shell publishes, and **0 with no keyboard up**. */
   readonly keyboardInset: number;
-  /** The chart column's inline size, or `null` before the single `ResizeObserver`'s first report. */
+  /**
+   * The Chart Block's inline size — the chart column's below B2, at most `AVANCE_BLOCK_MAX_PX` on
+   * Avancé from it — or `null` before the single `ResizeObserver`'s first report.
+   */
   readonly columnWidth: number | null;
   /**
-   * The shell's own bands **above the two columns**, px — today that is § 8's « clés ignorées »
-   * strip and nothing else, `0` when it is absent or dismissed. § 5's spine lists it as
-   * « (conditionnel) bandeau « clés ignorées », pleine largeur, rejetable ·· 0 | 60 », i.e. a
-   * conditional row *outside* the block's five bands, so it is measured rather than budgeted:
-   * its height is its own text's, at the shell's width.
-   *
-   * Absent from this type, the term was simply unspent, and {@link fitsWholeBlock} then reported
-   * « roomy » for a column too short to hold the block — measured at 1440 × 900 on `/?L=250`
-   * (ticket 31, **D3**): strip 85 px, column 815 px against a block of 857, and the read-out cells
-   * row landed at `y 889` with `bottom 941`, so « Garde min 1,31 m » was cut by the shell's
-   * `overflow-hidden` with nothing to scroll to reach it.
-   */
-  readonly chromeHeight?: number;
-  /**
    * The navigation bar above the shell, px — `NAV_BAR` on every app Page (ADR-0002), `0` for a
-   * shell that stands alone. **Paid on both arms**, unlike {@link chromeHeight}: below B2 the strip
-   * is tolerated out of the Rail only because it is dismissable, and the navigation bar never is,
-   * so `MIN_RAIL` is owed under it like under anything else.
+   * shell that stands alone. It is never dismissed, so below B2 `MIN_RAIL` is owed under it like
+   * under anything else. § 8's « clés ignorées » strip is **not** a term: below B2 it is spent out
+   * of the Rail, which § 5's spine tolerates (« tolérable seulement parce que ce bandeau est
+   * rejetable »), and above B2 nothing is fitted to the window any more (#110).
    */
   readonly navigationHeight?: number;
 };
@@ -202,6 +192,23 @@ export function availableHeight({
 }
 
 /**
+ * **Does the window's height bind the Chart Block at this width?** Only where the Rail stands
+ * *under* it — below {@link THREE_COLUMN_PX}, the one column whose residual scroller is the Rail.
+ *
+ * From B2 up it does not, and that is #110's « la hauteur de la coupe ne change pas quand seule la
+ * hauteur de la fenêtre change »: the Rail is two full-height columns *beside* the block, the
+ * middle column scrolls (#104), and the vue de dessus stands **above** the block, so the block was
+ * never going to be whole in the window and pinning it would only take the profile away from a
+ * column that can scroll to it. Before #110 three columns at 1440 × 500 pinned, and the measured
+ * reason — a block clipped by an `overflow-hidden` column, ticket 31's D3 — went with #104's scroll.
+ * **What it costs**: a short desktop window, or a landscape tablet with its keyboard up, scrolls the
+ * middle column to reach « Garde min » rather than getting the Pinned Safety Header.
+ */
+export function heightBindsBlock(viewportWidth: number): boolean {
+  return viewportWidth < THREE_COLUMN_PX;
+}
+
+/**
  * **(c), the fit rule** — « the Chart Block pins whenever its width-derived height exceeds the
  * available height minus the minimum Rail height ».
  *
@@ -211,22 +218,13 @@ export function availableHeight({
  *   viewport. § 5's invariant is intact: the viewport is one side of a comparison whose output is a
  *   state, and no band is sized from it. A block sized to the height available is *literally* how
  *   the prototype's ×5,02 happened.
- * - **`MIN_RAIL` is only owed where the Rail is *under* the block.** Below B2 the two share one
- *   column and the Rail's floor comes straight out of the same height — budget A's « bloc 540 ·
- *   reste : rail en flux 124 » clears it by 4 px, which is why the app has no title bar. Above B2
- *   the Rail is a full-height column *beside* the block and owes it nothing, so the block's own
- *   height is the whole test. **That comparison is not a layout branch**: the tree, the bands and
- *   every band height are identical either way — it names which of § 5's two budget shapes is in
- *   force, on the same {@link THREE_COLUMN_PX} the shell's `min-[1024px]:` classes use.
- * - **{@link ViewportFit.chromeHeight} is owed on the *other* arm of that same branch, and for the
- *   mirror-image reason.** Above B2 the block lives in a height-bounded `overflow-hidden` column,
- *   so every pixel the « clés ignorées » strip takes above it is a pixel the block's last band is
- *   clipped by — ticket 31's **D3**, « Garde min » cut out of the viewport. Below B2 the strip is
- *   spent out of the **Rail**, which is the residual scroller there, and § 5's spine says so in as
- *   many words: « avec le bandeau des clés ignorées le rail descend à 64 px — tolérable seulement
- *   parce que ce bandeau est rejetable et que le bloc se replie au premier défilement ». Nothing is
- *   clipped in that shape, so subtracting it there would pin a viewport the spec explicitly
- *   tolerates — which is why the term sits on one arm and not in {@link availableHeight}.
+ * - **It is only asked where the Rail is *under* the block** ({@link heightBindsBlock}). Below B2
+ *   the two share one column and the Rail's floor comes straight out of the same height — budget
+ *   A's « bloc 540 · reste : rail en flux 124 » clears it by 4 px, which is why the app has no title
+ *   bar. Above B2 the block always fits, because nothing there is fitted to the window (#110).
+ *   **That comparison is not a layout branch**: the tree, the bands and every band height are
+ *   identical either way — it names which of § 5's two budget shapes is in force, on the same
+ *   {@link THREE_COLUMN_PX} the shell's `three-columns:` classes use.
  *
  * Unmeasured is « it fits »: before the observer reports there is no width to derive a height from,
  * and the Skeleton opens whole.
@@ -236,13 +234,11 @@ export function fitsWholeBlock({
   viewportHeight,
   keyboardInset,
   columnWidth,
-  chromeHeight = 0,
   navigationHeight = 0,
 }: ViewportFit): boolean {
-  if (columnWidth === null) return true;
-  const railBelow = viewportWidth < THREE_COLUMN_PX;
+  if (columnWidth === null || !heightBindsBlock(viewportWidth)) return true;
   const available = availableHeight({ viewportHeight, keyboardInset, navigationHeight });
-  return chartBlockHeight(columnWidth) <= available - (railBelow ? MIN_RAIL : chromeHeight);
+  return chartBlockHeight(columnWidth) <= available - MIN_RAIL;
 }
 
 /**
@@ -253,12 +249,20 @@ export function fitsWholeBlock({
  * assume is a platform-typical figure rather than a device measurement. The 420 px half is what
  * catches the posture the app says nothing about: landscape leaves ~330 px, and ~150 px with the
  * keyboard up.
+ *
+ * **Below B2 only**, like (c) — {@link heightBindsBlock}: from three columns the field being typed
+ * into is beside the block, never under it, so a keyboard there costs the chart nothing (#110).
  */
 export function compactRequired({
+  viewportWidth,
   viewportHeight,
   keyboardInset,
   navigationHeight = 0,
-}: Pick<ViewportFit, "keyboardInset" | "navigationHeight" | "viewportHeight">): boolean {
+}: Pick<
+  ViewportFit,
+  "keyboardInset" | "navigationHeight" | "viewportHeight" | "viewportWidth"
+>): boolean {
+  if (!heightBindsBlock(viewportWidth)) return false;
   return (
     keyboardInset > 0 ||
     availableHeight({ viewportHeight, keyboardInset, navigationHeight }) < COMPACT_HEIGHT_PX
@@ -306,7 +310,8 @@ export function railFocus(
  * chevron — **the request is still latched**, so it is granted the moment the constraint lifts.
  *
  * It says nothing about *whether* a viewport should reach that state: that is condition (c)'s own
- * arithmetic ({@link fitsWholeBlock}), and § 5's wide-and-short-desktop question is open.
+ * arithmetic ({@link fitsWholeBlock}). § 5's wide-and-short-desktop question is answered by #110:
+ * from three columns no viewport reaches it.
  */
 export function revealGrantable(inputs: Pick<CollapseInputs, "compact" | "fits">): boolean {
   return !heightConstrained(inputs);

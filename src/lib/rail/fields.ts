@@ -102,6 +102,7 @@ export type FieldId =
   | "mp"
   | "hRider"
   | "hClearMin"
+  | "anchorZone"
   | "DAF"
   | "xD"
   | "windSpeed"
@@ -531,6 +532,20 @@ export const FIELDS = {
     rule: { kind: "non-negative", sentence: "une garde négative n'existe pas" },
     warning: null,
     // It qualifies the clearance read-out and nothing else — never the solve, never the verdict.
+    gate: "clearance",
+  },
+  // The Zones d'ancrage (#106): where §11 judges nothing. Set on Avancé alone; every other Page
+  // reads the Scenario's.
+  anchorZone: {
+    id: "anchorZone",
+    label: `Longueur de la ${label("anchorZone", "exact")}`,
+    errorLabel: `Longueur de la ${label("anchorZone", "exact")}`,
+    quantity: "anchorZone",
+    // `0` is no zone at all, a legitimate value; only a negative length is nonsense. Two zones that
+    // meet or overlap are a scenario-level Clearance error in `./gates.ts`, since they read `L`.
+    rule: { kind: "non-negative", sentence: "une longueur négative n'existe pas" },
+    warning: null,
+    // It decides which garde is judged and nothing else — never the solve, never the verdict.
     gate: "clearance",
   },
   DAF: {

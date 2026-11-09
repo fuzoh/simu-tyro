@@ -83,6 +83,8 @@ export const PROVENANCE_COPY = {
   trolleyMu:
     "μ 0,015 — repli à μ constant, extrémité basse de la plage 0,015–0,02, sans source primaire ouverte [CONVENTION]. Aucune source ouverte ne sépare le câble de la corde.\n§12.2 · docs/simulation-theory.md",
   rho: "ρ — atmosphère type (ISA), ρ = p/(R_s·T) à l'altitude moyenne du profil importé, 1,225 kg/m³ sans profil ; [R1] et [R2] concordent. Une valeur saisie la remplace.\n§12.2 · docs/simulation-theory.md",
+  anchorZone:
+    "Zone d'ancrage 10 m à chaque bout — [CONVENTION], décision de #106 : aucune source normative ne fixe où le passager quitte la plateforme. EN 15567 reste [PAYWALLED].\n§11 · docs/simulation-theory.md",
 } as const;
 
 /** Which aggregate line this is. Membership is mechanically derivable from § 6's own table. */
@@ -291,6 +293,20 @@ function isUnconfirmedTermination(id: TerminationId): boolean {
  */
 function edited(quantity: "m_p" | "h_rider" | "eta", value: number, shipped: number): boolean {
   return !equalAtDisplayPrecision(quantity, value, shipped);
+}
+
+/**
+ * The chip on the Zone d'ancrage's length (#106): « non confirmé » at the shipped 10 m, a
+ * `[CONVENTION]`, and « valeur utilisateur » once typed over. Like the garde exigée it decides
+ * which garde is judged and computes nothing, so it carries its chip on the field and stays out of
+ * the aggregate, whose four entries are inputs of the physics.
+ */
+export function anchorZoneChip(
+  anchorZone: number,
+): Extract<ChipLabel, "non confirmé" | "valeur utilisateur"> {
+  return equalAtDisplayPrecision("anchorZone", anchorZone, FIRST_RUN_SCENARIO.rider.anchorZone)
+    ? "non confirmé"
+    : "valeur utilisateur";
 }
 
 /** § 6's three tiers: how loudly a thing is said, and each tier is defined by a property. */

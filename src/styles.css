@@ -21,6 +21,23 @@
 @custom-variant dark (&:is(.dark *));
 
 /**
+ * B2 — `THREE_COLUMN_PX` in `src/lib/layout/contract.ts`, declared here once rather than retyped as
+ * a `min-[1024px]:` at every call site, as B3 is below. From it Avancé stands on three columns and
+ * Statique's first row puts the vue de dessus beside the tiles (#109). `contract.test.ts` holds the
+ * number to the constant. Declared **before** `wide-rail`, so B3's classes come later in the sheet
+ * and win where both match (`three-columns:w-72 wide-rail:w-144`).
+ */
+@custom-variant three-columns (@media (width >= 1024px));
+
+/**
+ * B3 — `WIDE_RAIL_PX` in `src/lib/layout/contract.ts`, declared here once rather than retyped as a
+ * `min-[1920px]:` at every call site (#112). From it Avancé's left column is 576 px (`w-144`, the
+ * contract's `WIDE_RAIL_WIDTH`) and `Paramètres` stands its groups on two columns, the left one
+ * read first. `contract.test.ts` holds the number to the constant.
+ */
+@custom-variant wide-rail (@media (width >= 1920px));
+
+/**
  * § 5's Pinned Safety Header, applied. The **state is derived in TypeScript** — scroll, focus, fit
  * and the keyboard, `src/lib/layout/collapse.ts` — and lands on the shell as `data-collapse` plus
  * `data-fit`; **which bands that costs is decided here**, so the reflow stays « CSS over a finished
@@ -28,16 +45,17 @@
  *
  * **Each variant has two arms, and the split is the whole of § 5's width-versus-height argument:**
  *
- * - **Below B2** — the same 1024 px the shell's `min-[1024px]:` classes use (`THREE_COLUMN_PX`) —
+ * - **Below B2** — the same 1024 px the `three-columns` variant spells (`THREE_COLUMN_PX`) —
  *   triggers (a) and (b) reduce the block. Above B2 they must not: the Rail's two columns sit
  *   *beside* the block, all three are co-visible, and a Rail field taking focus has to cost the
  *   chart nothing. The derived state still changes there, it simply has no consumer.
- * - **`[data-fit="tight"]` at any width** — condition (c) and the `compact` row. A block that does
- *   not fit does not fit at any width, and **a short desktop window is exactly that case**: three
- *   columns at 1440 × 500 are above B2, so without this arm the profile would stand at full height
- *   inside an `overflow-hidden` shell 500 px tall and clip the View Strip and « Garde min » out of
- *   the viewport. That is also why § 5 needs no rotate prompt: the posture reaches the header
- *   through the fit rule alone.
+ * - **`[data-fit="tight"]`, unscoped** — condition (c) and the `compact` row, applied wherever the
+ *   policy raises them. **Since #110 it raises them below B2 only** (`heightBindsBlock` in
+ *   `collapse.ts`): from three columns the middle column scrolls under the vue de dessus, so a
+ *   short desktop window such as 1440 × 500 keeps the whole block and scrolls to it. The width
+ *   scoping lives in the policy, so this arm stays the one place « the height forced it » is drawn.
+ *   That is also why § 5 needs no rotate prompt: a landscape phone reaches the header through the
+ *   fit rule alone.
  *
  * `tight` is only ever set when the policy has already reduced the block, so the second arm needs no
  * `data-collapse` term of its own except where the three states differ.
@@ -237,8 +255,9 @@
    * Action that focuses rather than sets.
    *
    * **The two arms are the two arms of the variants above**, for the same reason: below B2 the
-   * header exists whenever the state is reduced, and above B2 it exists only when the height forced
-   * it. Reserving 120 px on a roomy desktop would shift a `block: 'center'` jump for nothing.
+   * header exists whenever the state is reduced, and the height-forced arm follows the policy, which
+   * since #110 never forces it above B2. Reserving 120 px on a roomy desktop would shift a
+   * `block: 'center'` jump for nothing.
    * `--pinned-clearance` is the shell's, from `pinnedHeaderHeight()`, and it is `0px` whenever the
    * block is whole and 44 px in the `compact` row.
    */
@@ -247,8 +266,8 @@
       scroll-margin-top: var(--pinned-clearance, 0px);
     }
   }
-  /* Landscape, and a desktop window shorter than its own block: the header is on screen above B2
-     too, so the reserve follows it there on exactly the condition the bands do. */
+  /* Wherever the height forced the header, the reserve follows it on exactly the condition the
+     bands do. */
   [data-fit="tight"] [id^="rail-"] {
     scroll-margin-top: var(--pinned-clearance, 0px);
   }
@@ -410,8 +429,8 @@
 
 /**
  * § 5's touch budget as **one** utility — « ≥ 44 px on a coarse pointer », a budget § 5 spends to the
- * pixel (`59 + 48 + 44 + 128 + 24 = 303` in the View Strip) against an app whose one control height
- * is **28 px visually**. It is the generalisation of the two places that already close that gap by
+ * pixel (`4 × 28 + 12 + 44 + 153 + 16 = 337` of 366 px in the View Strip) against an app whose one
+ * control height is **28 px visually**. It is the generalisation of the two places that already close that gap by
  * hand: `view-strip.tsx`'s `after:-inset-y-1.5` on a 32 px button, and `.chart-grab`'s transparent
  * stroke on the rider.
  *

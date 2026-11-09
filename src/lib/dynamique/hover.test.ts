@@ -1,10 +1,12 @@
 import { describe, expect, test } from "vitest";
 
-import { groundAt } from "@/lib/chart/hover.ts";
+import { COUPE_HOVER } from "@/lib/chart/copy.ts";
+import { coupeLines, groundAt } from "@/lib/chart/hover.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 
-import { ON_PROFIL, PROFIL, ridesUnder } from "./__fixtures__/rides.ts";
-import { curveHover, sampleNear } from "./hover.ts";
+import { ON_PROFIL, PROFIL, ridesUnder, SHIPPED } from "./__fixtures__/rides.ts";
+import { coupeAt, curveHover, sampleNear } from "./hover.ts";
+import { dynamiqueScene } from "./scene.ts";
 
 const HEAD = ridesUnder(50, 0);
 const CALM = ridesUnder(0, 0);
@@ -96,5 +98,46 @@ describe("the curve's hover — the speed and the acceleration at the point", ()
       if (near === null) throw new Error("the ride crosses the whole line");
       expect(Math.abs(near.x - metres)).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+describe("the coupe's hover over a passager at rest in a Zone d'ancrage (#106)", () => {
+  /**
+   * The shipped line's passager rests about 20 m short of B — inside a 25 m zone, outside the shipped
+   * 10 m one. Both zones leave the span's middle open, so the Clearance Gate stands for both.
+   */
+  const restingIn = (anchorZone: number) => {
+    const under = ridesUnder(0, 0, { ...SHIPPED, rider: { ...SHIPPED.rider, anchorZone } });
+    const { coupe } = dynamiqueScene({ width: 640, frame: under.frame, solved: under.solved });
+    const rest = coupe.rest;
+    if (rest === null) throw new Error("the shipped line has a loaded line at rest");
+    const reading = coupeAt({
+      frame: under.frame,
+      coupe,
+      metres: rest.step.xD,
+      reach: 1,
+      clearance: true,
+    });
+    if (reading === null) throw new Error("the passager rests on the span");
+    return { rest, reading, L: under.frame.L };
+  };
+
+  test("the garde is read and said to be not judged, as on Statique", () => {
+    const { rest, reading, L } = restingIn(25);
+    expect(rest.step.xD).toBeGreaterThan(L - 25);
+    expect(reading.garde).toBe(rest.underRider);
+    expect(reading.inAnchorZone).toBe(true);
+    expect(coupeLines(reading, "terrain").map((line) => line.label)).toContain(
+      COUPE_HOVER.anchorZone,
+    );
+  });
+
+  test("a passager resting past the zone is judged, and the hover says nothing of a zone", () => {
+    const { rest, reading, L } = restingIn(10);
+    expect(rest.step.xD).toBeLessThan(L - 10);
+    expect(reading.inAnchorZone).toBe(false);
+    expect(coupeLines(reading, "terrain").map((line) => line.label)).not.toContain(
+      COUPE_HOVER.anchorZone,
+    );
   });
 });

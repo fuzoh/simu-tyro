@@ -64,3 +64,32 @@ layout like Avancé, reading the same schema, and a link shared before the Pages
 its Scenario on Statique. The layout's `pendingComponent` — the SPA shell's — is Statique's
 Skeleton, the same one `/` declares, so `index.html` and `404.html` paint Statique's frame; the
 prerender list in `vite.config.ts` skips `/`, which the shell already is.
+
+## Update — 2026-11-09, #115
+
+The charts' gutter is 12 px, the other containers' `px-3`, so `W_inner` is the column less 24 px
+and every band grows with it. Budget C's block is 870,24 px at its 1152 px column, so the 864 px a
+900 px viewport leaves under the 36 px bar no longer hold it: the « 7,68 px to spare » above is
+gone. No Page stands that pair today. Avancé at 1440 × 900 is three columns — an 864 px middle
+column, a 755,2 px block — and keeps it whole; it reaches the 1152 px column only from 1728 px of
+viewport, where it needs 907 px of height (915 under a 44 px bar). The plateau is 889,76 px. The
+36 px bar stands: it is still the Rail row's height, and 8 px cheaper than the Rail Header's.
+
+## Update — 2026-11-09, #110
+
+Avancé spans the whole window: no shell cap, the middle column is `viewport − 576` from 1024 px. Its
+Chart Block widens with the column up to 1984 px, the column at 2560, and letterboxes past it, so
+its plot is `0,42 × W_inner` at every width under a raised 823,2 px ceiling and the whole block
+plateaus at 1239,2 px — whole in a 1440 px window under the bar. The window's height binds the
+Chart Block below 1024 only, where the Rail stands under it; from three columns the block stands
+under the vue de dessus in a column that scrolls and never pins. So the « 907 px of height » above
+no longer applies to Avancé, and the 36 px bar is owed to the fit below 1024 alone, where `MIN_RAIL`
+is paid under it. The bar's height stands.
+
+## Update — 2026-11-09, #112
+
+From 1920 px the left column is 576 px (`WIDE_RAIL_WIDTH`), so the middle column is
+`viewport − 864` there, and `viewport − 576` from 1024 to 1919 only. The #110 paragraph's « up to
+1984 px, the column at 2560 » therefore no longer holds: at 2560 the middle column is 1696 px, and
+the Chart Block reaches its 1984 px letterbox at 2848 px of viewport (`AVANCE_BLOCK_VIEWPORT_PX`).
+The plateau, the raised plot ceiling and the « never pins from three columns » stand.

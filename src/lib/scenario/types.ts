@@ -108,6 +108,14 @@ export type Rider = {
    * traverse minimum falls under this value. `0` disables the check.
    */
   hClearMin: number;
+  /**
+   * The length of each **Zone d'ancrage**, m (#106) — measured horizontally from its anchor, the
+   * same at A and at B. The garde au sol is not judged there: §11's reducer leaves out every rider
+   * position and every point within it. A `[CONVENTION]` with no normative source, 10 m shipped;
+   * `0` is no zone. `zan` in a link, **absent there at 10 m**, so a link older than the key reads
+   * the shipped zones.
+   */
+  anchorZone: number;
   /** §8.2's dynamic amplification factor. */
   DAF: number;
   /** Rider position, m in the span frame `[0, L]`. */

@@ -40,6 +40,7 @@ import {
   REVEAL_LABEL,
 } from "@/lib/layout/collapse.ts";
 import {
+  AVANCE_PLOT_MAX,
   BANNER,
   CELL_BASIS_PX,
   CELL_ROW,
@@ -110,9 +111,21 @@ export const READ_OUT_CELLS: Record<CellId, { readonly basis: string; readonly p
 export const NOSCRIPT_LINE = "Ce simulateur nécessite JavaScript pour fonctionner.";
 
 /**
- * The layout contract as CSS custom properties. `100cqi` is the **chart column's** inline size —
- * the column is the query container, so `--w-inner` is exactly § 5's `W_inner = col − 48`, and
- * every band below is a function of it and of nothing else. Exported for the other Pages that
+ * § 5's aspect rule as CSS, under a Page's plot ceiling: `min(0,42 × W_inner, ceiling)` —
+ * amendment F's {@link PROFILE_PLOT_MAX}, or Avancé's raised {@link AVANCE_PLOT_MAX} (#110). One
+ * function, so the band the CSS reserves and the `profilePlotHeight()` the SVG is drawn at cannot
+ * spell two ceilings. The ceiling is printed to 0,1 µm, so `0,42 × 1960`'s float noise
+ * (823,1999…) is not spelled into the stylesheet.
+ */
+function profilePlotRule(ceiling: number): string {
+  return `min(calc(${PROFILE_ASPECT} * var(--w-inner)), ${Number(ceiling.toFixed(4))}px)`;
+}
+
+/**
+ * The layout contract as CSS custom properties. `100cqi` is the **Chart Block's** inline size —
+ * its box is the query container (on Avancé the middle column's, under its 1984 px letterbox), so
+ * `--w-inner` is exactly § 5's `W_inner = col − 24`, and every band below is a function of it and
+ * of nothing else. Exported for the other Pages that
  * stand the Chart Block in a column of their own — Statique — so its bands read the same contract.
  */
 export const LAYOUT_VARS = {
@@ -122,12 +135,12 @@ export const LAYOUT_VARS = {
   "--handle-lane": `${PROFILE_CHROME.handleLane}px`,
   "--x-labels": `${PROFILE_CHROME.xLabels}px`,
   // § 5's aspect rule under **amendment F**'s ceiling, as one `min()` rather than a JS branch: the
-  // plot is `0,42 × W_inner` up to § 5's reference chart column (1152 px, `W_inner` 1104) and frozen
-  // at the 463,68 px it reaches there past it. Both terms come from `contract.ts`, so the rendered
+  // plot is `0,42 × W_inner` up to § 5's reference chart column (1152 px, `W_inner` 1128) and frozen
+  // at the 473,76 px it reaches there past it. Both terms come from `contract.ts`, so the rendered
   // band and `chartBlockHeight()`'s own term are the same arithmetic — and the whole rule stays a
   // function of the container's inline size, so the Skeleton is still correct before any measurement.
   // Without it the plot grew linearly for ever and five ordinary 16:9 desktops opened with no chart.
-  "--profile-plot": `min(calc(${PROFILE_ASPECT} * var(--w-inner)), ${PROFILE_PLOT_MAX}px)`,
+  "--profile-plot": profilePlotRule(PROFILE_PLOT_MAX),
   // The whole profile band, because § 5's profile is **one SVG** spanning all four of its rows —
   // the Handle Lane is inside it, which is what keeps the handles on the shared x scale. The
   // Skeleton draws the four rows separately; both add up to this, from these same three constants.
@@ -148,6 +161,19 @@ export const LAYOUT_VARS = {
   "--banner-three-lines": `${BANNER.threeLines}px`,
   "--rail-header": `${RAIL_HEADER}px`,
 } as CSSProperties;
+
+/**
+ * Avancé's own: the same contract under its **raised plot ceiling** (#110). Its shell spans the whole
+ * width, so its middle column widens with the window and the Chart Block with it up to
+ * `AVANCE_BLOCK_MAX_PX`, where the plot reaches this ceiling; past it the block letterboxes, so the
+ * plot stays at 0,42 and the Plot Aspect Band holds at every width. The Chart Block is told the same
+ * ceiling (`plotMax`), so the drawn plot and this band agree. Exported for `shell.test.ts`, which
+ * reads the rule it spells.
+ */
+export const AVANCE_LAYOUT_VARS = {
+  ...LAYOUT_VARS,
+  "--profile-plot": profilePlotRule(AVANCE_PLOT_MAX),
+} as CSSProperties;
 // `--kb`, the iOS soft-keyboard inset, is deliberately **not** here: the `visualViewport` fallback
 // writes it on `documentElement`, and an inline `--kb: 0px` on this element would shadow it for the
 // whole subtree. Consumers read `var(--kb, 0px)`, so the fallback needs no threshold constant —
@@ -160,7 +186,7 @@ export const LAYOUT_VARS = {
  * `window.scrollY` *and* survive iOS's document-scroll-under-keyboard behaviour, where a fixed
  * shell plus `interactive-widget=resizes-content` gives the same result with one known scroller.
  *
- * B2 is `THREE_COLUMN_PX`, spelled `min-[1024px]:` below — from it the row is **three columns**: the
+ * B2 is `THREE_COLUMN_PX`, spelled `three-columns:` below — from it the row is **three columns**: the
  * Rail's `Paramètres` on the left, the Chart Block in the middle, the Rail's reports on the right.
  * Under it the row becomes a column and both Rail halves go `order-last` inside one scroller, in
  * flow, pushing rather than covering. No bottom sheet: Base UI 1.6.0 ships a
@@ -175,14 +201,16 @@ export const LAYOUT_VARS = {
  * branch appears. The two attributes carry the two halves of § 5's argument: **`data-collapse` is
  * *which* state, and the variants apply it below B2 for triggers (a) and (b), because above B2 the
  * Rail is beside the block and a focused field must cost the chart nothing; `data-fit` is *whether
- * the height forced it*, and that arm applies at every width, because a block that does not fit does
- * not fit at any width.** Both sit on the **shell** rather than on the chart column because
+ * the height forced it*, and since #110 the policy sets it below B2 only — from three columns the
+ * middle column scrolls under the vue de dessus, and the window's height costs the block nothing.**
+ * Both sit on the **shell** rather than on the chart column because
  * `--pinned-clearance` has to reach the Rail's controls: § 7's jump primitive reserves the header's
  * height there, and the Rail is the chart column's sibling.
  *
  * **Which of the two absorbs the residual flips at B2, and that is § 5's budget A, not styling.**
- * In a row the two Rail columns are the fixed 288 px each (`min-[1024px]:w-72`) and the chart
- * column takes the rest of the *width* (`min-[1024px]:flex-1`). **The scroller wrapper is
+ * In a row the two Rail columns are the fixed 288 px each (`three-columns:w-72`) — the left one
+ * 576 px from B3 (`wide-rail:w-144`, `WIDE_RAIL_PX`, #112), where `Paramètres` stands its groups on
+ * two columns — and the chart column takes the rest of the *width* (`three-columns:flex-1`). **The scroller wrapper is
  * `display: contents` there**, so the two columns are the chart's own flex siblings and each scrolls
  * itself, while below B2 the same wrapper is the one Rail scroller the collapse reads. A focus or
  * blur inside either column still bubbles to it. In a column the Chart Block keeps its **budgeted height**
@@ -230,10 +258,8 @@ export function Shell({
   /**
    * **Is the reduction forced by the height rather than asked for?** § 5's (c) and its `compact`
    * row, as one flag, published as `data-fit` — `src/styles.css` gates the same bands on it that
-   * its `width < 1024px` arm gates on B2, because a block that does not fit does not fit at any
-   * width. **This is the whole of the short-desktop case**: three columns at 1440 × 500 are *above*
-   * B2, so without it the profile would stand at full height inside an `overflow-hidden` shell
-   * 500 px tall and clip the View Strip and « Garde min » out of the viewport. The Skeleton passes
+   * its `width < 1024px` arm gates on B2. The policy raises it below B2 only (#110): three columns
+   * at 1440 × 500 keep the whole block and scroll the middle column to it. The Skeleton passes
    * nothing.
    */
   tight?: boolean;
@@ -243,9 +269,10 @@ export function Shell({
   right?: ReactNode;
   chart: ReactNode;
   /**
-   * The middle column's views under the Chart Block, three columns only (#104): Statique's vue de
-   * dessus, never one of Avancé's own. Below B2 there is no middle column — the block stands over
-   * the Rail — and the box is `display: none`. The Skeleton passes the empty frame.
+   * The middle column's views **above** the Chart Block, three columns only (#104, #110):
+   * Statique's vue de dessus, never one of Avancé's own. Below B2 there is no middle column — the
+   * block stands over the Rail — and the box is `display: none`. The Skeleton passes the empty
+   * frame.
    */
   views?: ReactNode;
   /**
@@ -273,19 +300,20 @@ export function Shell({
       // scoped to B2 — above it there is no pinned header to clear.
       style={
         {
-          ...LAYOUT_VARS,
+          ...AVANCE_LAYOUT_VARS,
           "--pinned-clearance": `${pinnedHeaderHeight(collapse)}px`,
         } as CSSProperties
       }
     >
       {strip}
-      {/* Capped and centred past 1728 px (`SHELL_MAX_PX`) — the two 288 px columns plus a 1152 px
-          chart column, which is `REFERENCE_COLUMN_PX`: the widest the plot's own ceiling still
-          grows with. Uncapped, a 2560 px desktop stretched the x scale edge-to-edge and scattered
-          the read-out cells apart, with the banner's sentence a screen away from its own action.
-          The hairline borders paint only once the cap engages, so no viewport below it gains an
-          edge it never had. */}
-      <div className="border-border mx-auto flex min-h-0 w-full max-w-[1728px] flex-1 flex-col min-[1024px]:flex-row min-[1730px]:border-x">
+      {/* **No shell cap** (#110): the shell spans the window, and every pixel past the two side
+          columns (288 px each, the left one 576 from B3, #112) goes to the middle one, so the vue
+          de dessus widens with it, and the Chart Block up to `AVANCE_BLOCK_MAX_PX` (1984 px, the
+          column at 2848), where it letterboxes. It was
+          capped at 1728 px (`SHELL_MAX_PX`, the other Pages' cap) while the plot's ceiling was
+          amendment F's; Avancé's is raised now (`AVANCE_PLOT_MAX`), and the block's own cap is what
+          keeps it whole in a 1440 px window. */}
+      <div className="three-columns:flex-row flex min-h-0 w-full flex-1 flex-col">
         {/* The Rail is not becoming interactive: `focusin`, `focusout` and `scroll` are **observed**
             here, on the one element that is both the collapse's scroller (below B2) and the ancestor
             of every field it watches. None of the three adds an affordance, a role or a keyboard
@@ -312,7 +340,7 @@ export function Shell({
           // piece 3's `{ block: 'center' }` / `behavior: auto` exactly as § 5 writes them, and § 7's
           // jump primitive — the same {@link CENTRE_IN_RAIL} object — inherits the correction. The
           // two columns spend the same pair on their own scroller from B2 up.
-          className="order-last flex min-h-0 w-full min-w-0 flex-1 scroll-pb-[var(--kb,0px)] flex-col overflow-y-auto pb-[var(--kb,0px)] min-[1024px]:contents"
+          className="three-columns:contents order-last flex min-h-0 w-full min-w-0 flex-1 scroll-pb-[var(--kb,0px)] flex-col overflow-y-auto pb-[var(--kb,0px)]"
           // React's `onBlur` is `focusout`, so it bubbles and `relatedTarget` is where focus is
           // *going*. Reporting `null` only when that lands outside the Rail is what makes a move
           // from one field to the next a single continuous focus rather than a gap.
@@ -352,7 +380,7 @@ export function Shell({
         >
           <aside
             aria-label="Paramètres"
-            className="border-border flex w-full shrink-0 flex-col min-[1024px]:order-first min-[1024px]:min-h-0 min-[1024px]:w-72 min-[1024px]:scroll-pb-[var(--kb,0px)] min-[1024px]:overflow-y-auto min-[1024px]:border-r min-[1024px]:pb-[var(--kb,0px)]"
+            className="border-border wide-rail:w-144 three-columns:order-first three-columns:min-h-0 three-columns:w-72 three-columns:scroll-pb-[var(--kb,0px)] three-columns:overflow-y-auto three-columns:border-r three-columns:pb-[var(--kb,0px)] flex w-full shrink-0 flex-col"
           >
             {left}
           </aside>
@@ -362,7 +390,7 @@ export function Shell({
           {right !== undefined && (
             <aside
               aria-label="Valeurs déduites et résultats"
-              className="border-border flex w-full shrink-0 flex-col min-[1024px]:order-last min-[1024px]:min-h-0 min-[1024px]:w-72 min-[1024px]:scroll-pb-[var(--kb,0px)] min-[1024px]:overflow-y-auto min-[1024px]:border-l min-[1024px]:pb-[var(--kb,0px)] min-[1024px]:[&>section:first-child]:border-t-0"
+              className="border-border three-columns:order-last three-columns:min-h-0 three-columns:w-72 three-columns:scroll-pb-[var(--kb,0px)] three-columns:overflow-y-auto three-columns:border-l three-columns:pb-[var(--kb,0px)] three-columns:[&>section:first-child]:border-t-0 flex w-full shrink-0 flex-col"
             >
               {right}
             </aside>
@@ -370,35 +398,55 @@ export function Shell({
         </div>
         {/* No horizontal padding here: `GUTTER` lives **inside** the two SVGs, as the x scale's own
             range `[gutter, width − gutter]`, so that one object aligns both charts. Padding the
-            column instead would inset the SVGs *and* the scale, spending 48 px a side — and it
+            column instead would inset the SVGs *and* the scale, spending 24 px a side — and it
             would inset the read-out cells, which § 5 spans across the **full column width**
             because aligning them to the plot would imply a correspondence that does not exist.
 
-            **From B2 up the column scrolls**, the block first and the views under it (#104), the
+            **From B2 up the column scrolls**, the views first and the block under them (#110), the
             way Statique's right column does: a block held still over a residual scroller would
-            leave the map 116 px at 1024 × 768. The gutter is reserved so a scrollbar that comes
-            and goes cannot move the width every band is a function of. It spends the `--kb` pair
-            like the two side columns. */}
-        <div
-          className="@container min-w-0 flex-none overflow-hidden min-[1024px]:min-h-0 min-[1024px]:flex-1 min-[1024px]:scroll-pb-[var(--kb,0px)] min-[1024px]:[scrollbar-gutter:stable] min-[1024px]:overflow-y-auto min-[1024px]:pb-[var(--kb,0px)]"
-          ref={chartRef}
-        >
-          {/* § 5's `compact` row, and the **one** place the band stack stops being a stack: under a
-              soft keyboard, or below 420 px of available height, the banner slot and the live
-              « Garde min » share a single 44 px line — `664 − 336 − 44 = 284 px` of usable form.
-              Every other band is already gone by then, dropped by the same `pinned` variant, so this
-              turns two survivors into one row rather than hiding anything. */}
-          <div className="compact:h-[var(--pinned-cell)] compact:flex-row compact:items-center flex flex-col">
-            {chart}
-          </div>
+            leave the map 116 px at 1024 × 768 (#104). The gutter is reserved so a scrollbar that
+            comes and goes cannot move the width every band is a function of. It spends the `--kb`
+            pair like the two side columns. */}
+        <div className="three-columns:min-h-0 three-columns:flex-1 three-columns:scroll-pb-[var(--kb,0px)] three-columns:[scrollbar-gutter:stable] three-columns:overflow-y-auto three-columns:pb-[var(--kb,0px)] min-w-0 flex-none overflow-hidden">
+          {/* The vue de dessus heads the column from B2 (#110), above the Chart Block, in the DOM
+              too, so the focus order is the order on screen. Below B2 there is no middle column and
+              the box is `display: none`, so the stacked shape — the block over the Rail — is the
+              one it always was. Its hairline is under it, between it and the block.
+
+              The Chart Block sits right under the caption, so the caption reserves its **seven**
+              lines (`--top-view-caption`, as Statique's first row): one per line it can hold in 2D
+              — A, B, the Vent, the gesture, the fond indisponible, the Banane, the Vue 3D. A cross
+              wind or a failing Fond then adds a line inside the reserve rather than pushing the
+              whole block down while the user edits, and the Skeleton, which shares this section,
+              reserves the same box: ui.md's « the caption sets the row's height ». */}
           {views !== undefined && (
             <section
               aria-label={SECTION.topView}
-              className="border-border hidden border-t px-3 py-3 min-[1024px]:block"
+              className="border-border three-columns:block three-columns:[--top-view-caption:7rem] hidden border-b px-3 py-3"
             >
               {views}
             </section>
           )}
+          {/* § 5's `compact` row, and the **one** place the band stack stops being a stack: under a
+              soft keyboard, or below 420 px of available height, the banner slot and the live
+              « Garde min » share a single 44 px line — `664 − 336 − 44 = 284 px` of usable form.
+              Every other band is already gone by then, dropped by the same `pinned` variant, so this
+              turns two survivors into one row rather than hiding anything.
+
+              **This box is the Chart Block's**: the query container every band's `100cqi` reads and
+              the app's single `ResizeObserver`'s target, so the block's width, not the column's, is
+              what its bands are a function of. `max-w-[1984px]` is `AVANCE_BLOCK_MAX_PX` (#110):
+              past it the block **letterboxes**, centred (`mx-auto`) in the column with the surplus
+              empty either side, so the plot keeps its 0,42 inside the Plot Aspect Band and the whole
+              block stays 1239,2 px tall at most — whole in a 1440 px window. Below 2848 px of
+              viewport (`AVANCE_BLOCK_VIEWPORT_PX`) the cap does not bind and the block is the
+              column, as below B2. */}
+          <div
+            className="compact:h-[var(--pinned-cell)] compact:flex-row compact:items-center @container mx-auto flex w-full max-w-[1984px] flex-col"
+            ref={chartRef}
+          >
+            {chart}
+          </div>
         </div>
       </div>
     </div>

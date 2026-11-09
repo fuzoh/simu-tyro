@@ -10,7 +10,7 @@
 import type { ClearanceResult, SweepResult } from "@/lib/sim";
 
 import { G } from "@/lib/format/quantity.ts";
-import { evaluateClearance, sweep } from "@/lib/sim";
+import { CLEARANCE, evaluateClearance, sweep } from "@/lib/sim";
 
 import type { CarryingLines, Rider, ScenarioDraft } from "./types.ts";
 import type { UnloadedLine } from "./unloaded.ts";
@@ -54,7 +54,7 @@ export function traverseInputs(scenario: ScenarioDraft): TraverseInputs {
     dynamics,
     positions,
   } = scenario;
-  const { mp, hRider, hClearMin, DAF } = scenario.rider;
+  const { mp, hRider, hClearMin, anchorZone, DAF } = scenario.rider;
   return {
     unit,
     usage,
@@ -72,6 +72,7 @@ export function traverseInputs(scenario: ScenarioDraft): TraverseInputs {
     mp,
     hRider,
     hClearMin,
+    anchorZone,
     DAF,
   };
 }
@@ -81,18 +82,23 @@ export function traverseScenario({
   mp,
   hRider,
   hClearMin,
+  anchorZone,
   DAF,
   ...rest
 }: TraverseInputs): TraverseScenario {
-  return { ...rest, rider: { mp, hRider, hClearMin, DAF } };
+  return { ...rest, rider: { mp, hRider, hClearMin, anchorZone, DAF } };
 }
 
-/** What the Sweep reads beside the unloaded line — the rider's load and §11's envelope. */
-export type SweepRider = Pick<Rider, "mp" | "hRider"> & Pick<ScenarioDraft, "carryingLines">;
+/**
+ * What the Sweep reads beside the unloaded line — the rider's load, §11's envelope and the Zones
+ * d'ancrage §11 leaves out of what it judges.
+ */
+export type SweepRider = Pick<Rider, "mp" | "hRider" | "anchorZone"> &
+  Pick<ScenarioDraft, "carryingLines">;
 
 /** A Scenario's {@link SweepRider}. */
 export function sweepRiderOf({ rider, carryingLines }: ScenarioDraft): SweepRider {
-  return { mp: rider.mp, hRider: rider.hRider, carryingLines };
+  return { mp: rider.mp, hRider: rider.hRider, anchorZone: rider.anchorZone, carryingLines };
 }
 
 /** A Sweep that solved at least one step, with §11 reduced over it. */
@@ -101,7 +107,10 @@ export type RiderSweep = {
   readonly P: number;
   /** One member's traverse under `P`. Both are the same line. `coverage < 1` is `Indéterminé`. */
   readonly traverse: SweepResult;
-  /** §11 over the traverse: the aggregate `h_min`, its `x`, and the per-step arrays. */
+  /**
+   * §11 over the traverse, outside the Zones d'ancrage: the aggregate `h_min`, its `x`, the
+   * per-step arrays, and the same minimum with the zones included (`whole`).
+   */
   readonly clearance: ClearanceResult;
   /**
    * « Cas défavorable : une seule ligne porte tout » — one member under the whole `m_p·g`, for
@@ -126,13 +135,21 @@ export function memberLoad(mp: number, carryingLines: CarryingLines): number {
  */
 export function sweepRider(
   unloaded: UnloadedLine,
-  { mp, hRider, carryingLines }: SweepRider,
+  { mp, hRider, anchorZone, carryingLines }: SweepRider,
 ): RiderSweep | null {
   const { input, span } = unloaded;
   const P = memberLoad(mp, carryingLines);
   const traverse = sweep(input, P);
   if (traverse.steps.length === 0) return null;
-  const clearance = evaluateClearance(input, P, traverse.steps, span.terrain, hRider);
+  const clearance = evaluateClearance(
+    input,
+    P,
+    traverse.steps,
+    span.terrain,
+    hRider,
+    CLEARANCE.samplesPerStep,
+    anchorZone,
+  );
   const soleCarrier = carryingLines === 1 ? null : sweep(input, memberLoad(mp, 1));
   return { P, traverse, clearance, soleCarrier };
 }

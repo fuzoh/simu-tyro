@@ -78,6 +78,8 @@ const ROWS: ReadonlyArray<{ id: QuantityId; value: number; expected: string }> =
   { id: "m_p", value: 120, expected: "120 kg" },
   { id: "h_rider", value: 2.1, expected: "2,1 m" },
   { id: "h_clear_min", value: 1, expected: "1,0 m" },
+  // The Zones d'ancrage (#106): the shipped 10 m, padded like every length typed to a decimal.
+  { id: "anchorZone", value: 10, expected: "10,0 m" },
   { id: "DAF", value: 1.2, expected: "1,2" },
   { id: "x_D", value: 75, expected: "75,0 m" },
   // The Vent (#87): whole km/h and whole degrees, in state exactly as typed.

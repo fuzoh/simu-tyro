@@ -63,11 +63,18 @@
 
 import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
-import type { RegimeId, RegimeMismatch, TerminationId, TextileSpec } from "@/lib/sim";
+import type {
+  ClearanceResult,
+  RegimeId,
+  RegimeMismatch,
+  TerminationId,
+  TextileSpec,
+} from "@/lib/sim";
+import type { Trace } from "@/lib/terrain/trace.ts";
 import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
-import { lineBearing } from "@/lib/scenario/geometry.ts";
+import { lineBearing, spanOfGeometry } from "@/lib/scenario/geometry.ts";
 import { isFamilyAllowed, REGIMES, regimeMismatch, TERMINATIONS } from "@/lib/sim";
 import { heading, label } from "@/lib/vocabulary/labels.ts";
 
@@ -78,6 +85,7 @@ import {
   checkField,
   displayField,
   emptyMessage,
+  fieldErrorLabel,
   FIELD_ORDER,
   FIELDS,
   fieldLabel,
@@ -255,6 +263,20 @@ export function windNotice(
 /** What the gates read. Everything else in the app is downstream of them. */
 export type GateInput = {
   readonly scenario: TraverseScenario;
+  /**
+   * The decoded profil beside an imported geometry, for the one check that reads the span: two
+   * Zones d'ancrage that meet. Omitted or `null`, an imported span is unknown and that check is
+   * not made — the profil's own absence is « l'exception géométrique », not this gate's.
+   */
+  readonly trace?: Pick<Trace, "d"> | null;
+  /**
+   * §11's reduction over the solved traverse, for the one check only a sweep can answer: do the
+   * Zones d'ancrage leave a rider position between them? `2z < L` is not enough — the reducer
+   * judges the sweep's own `x_P`, about `L/241` apart, so a sliver narrower than that holds none,
+   * and the garde would vanish with no field named. Omitted or `null` (no solve, or a `node` test
+   * of the Scenario alone), only `2z ≥ L` is checked.
+   */
+  readonly clearance?: Pick<ClearanceResult, "atStepIndex" | "whole"> | null;
   /**
    * Tier one's standing failures, from the form. Text the Scenario cannot hold: an emptied field,
    * or « 12,3,4 ». Omitted, the gates judge the Scenario alone — which is what a link arrival, a
@@ -485,6 +507,8 @@ export function isFieldActive(id: FieldId, scenario: TraverseScenario): boolean 
  */
 export function evaluateGates({
   scenario,
+  trace = null,
+  clearance = null,
   issues = [],
   register = "exact",
 }: GateInput): GateReport {
@@ -620,6 +644,31 @@ export function evaluateGates({
     push({ gate, kind: issue.kind, field, alsoOutlined: [], message: issue.message, fixes: [] });
   }
 
+  // ── Two Zones d'ancrage that meet, or leave no rider position between them ──────────────────
+  // `2z ≥ L` leaves no rider position and no point of the line to judge, so a garde read there
+  // would be the identity of an empty minimum. ADR-0001: the length is kept as given and the
+  // Clearance Gate refuses it, whichever path brought it — a typed value, a link, a Session, or a
+  // shorter span under unchanged zones. Just under `L/2` the zones may still leave no *sweep step*
+  // between them, which is the same empty minimum: the solved reduction says so, and the same
+  // field answers for it. A sweep with no step at all is not the zones' doing.
+  const zone = scenario.rider.anchorZone;
+  const span = spanOfGeometry(scenario.geometry, trace);
+  const meet = span > 0 && 2 * zone >= span;
+  const noRiderBetween =
+    clearance !== null && clearance.atStepIndex < 0 && clearance.whole.atStepIndex >= 0;
+  if (zone > 0 && (meet || noRiderBetween)) {
+    push({
+      gate: "clearance",
+      kind: "invalid",
+      field: "anchorZone",
+      alsoOutlined: [],
+      message: meet
+        ? zonesMeetMessage(zone, span, register)
+        : noRiderBetweenMessage(zone, span, register),
+      fixes: [],
+    });
+  }
+
   errors.sort(
     (a, b) =>
       GATE_RANK(a.gate) - GATE_RANK(b.gate) ||
@@ -633,6 +682,32 @@ export function evaluateGates({
   const worst = errors.length === 0 ? null : errors[0].gate;
 
   return { errors, passed, worst, noRegime, windNeedsPositions: windBearing(scenario) === null };
+}
+
+/**
+ * The breach of two Zones d'ancrage that meet, in § 7's fixed template — the rule stated as a
+ * property of the world, the value echoed in the field's own unit, and the span it is measured
+ * against, because on an arrived link the user has seen neither.
+ */
+export function zonesMeetMessage(zone: number, span: number, register: Register = "exact"): string {
+  return `⛔ ${fieldErrorLabel("anchorZone", register)} — les deux ${label("anchorZones", register)} couvrent toute la ${label("span", register)} de ${formatQuantity("L", span)}, il n'y reste aucune garde à juger. Valeur : ${formatQuantity("anchorZone", zone)}.`;
+}
+
+/**
+ * The breach of two Zones d'ancrage that do not meet but leave no position of the swept passager
+ * between them — a sliver narrower than one sweep step — in the same template as
+ * {@link zonesMeetMessage}.
+ *
+ * @param span the span the zones are measured against, m; `NaN` when unknown, and then not quoted.
+ */
+export function noRiderBetweenMessage(
+  zone: number,
+  span: number,
+  register: Register = "exact",
+): string {
+  // An imported span read without its profil is unknown here; the sentence holds without it.
+  const of = span > 0 ? ` de ${formatQuantity("L", span)}` : "";
+  return `⛔ ${fieldErrorLabel("anchorZone", register)} — entre les deux ${label("anchorZones", register)}, la ${label("span", register)}${of} ne laisse aucune position du passager où juger la garde. Valeur : ${formatQuantity("anchorZone", zone)}.`;
 }
 
 /**

@@ -12,15 +12,27 @@ import { describe, expect, test } from "vitest";
 
 import type { ChartScene } from "@/lib/chart/scene.ts";
 import type { Scenario } from "@/lib/scenario/types.ts";
+import type { LayerToggles } from "@/lib/session/session.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
-import { buildScene, buildSceneFrame, MEMBER_GAP_PX } from "@/lib/chart/scene.ts";
+import { buildScene, buildSceneFrame, MEMBER_GAP_PX, placeRider } from "@/lib/chart/scene.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { placeSpan } from "@/lib/scenario/geometry.ts";
+import { DEFAULT_LAYERS } from "@/lib/session/session.ts";
 import { TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
 
 import { mapStyle, wmtsTiles } from "./style.ts";
-import { CAMERA_REACH, DRAPED, vue3dFollowing, vue3dPlacement, vue3dScene } from "./vue-3d.ts";
+import {
+  CAMERA_REACH,
+  DRAPED,
+  vue3dFollowing,
+  vue3dLayers,
+  vue3dPlacement,
+  vue3dScene,
+} from "./vue-3d.ts";
+
+/** No Mesure and no anchor to cross: the vue de dessus's style with nothing of #98 or #107. */
+const NO_MEASURE = { points: [], preview: null, anchors: { A: null, B: null }, reperes: true };
 
 const PROFIL: Trace = {
   d: Float64Array.from([0, 243, 435.2]),
@@ -99,11 +111,11 @@ describe("what each Fond de carte drapes", () => {
   test("a raster Fond drapes the very tiles the vue de dessus shows", () => {
     for (const fond of ["orthophoto", "carte-nationale"] as const) {
       const style = mapStyle({
-        display: { fond, pentes: false, view: "3d" },
+        display: { fond, pentes: false, view: "3d", reperes: true },
         vector: null,
         positions: TRIAL_ENDS,
         across: 0,
-        measure: [],
+        measure: NO_MEASURE,
       });
       const source = style.sources.fond;
       expect(source?.type === "raster" ? source.tiles : null).toEqual([wmtsTiles(DRAPED[fond])]);
@@ -303,5 +315,132 @@ describe("an anchor dragged in the Vue 3D (#97)", () => {
     // A where the scene stands it, 1 453,7 + 1,5 m; B on the pointer's ground.
     expect(ligneAB).toEqual([shown.fils.A.anchor, fils.B.anchor]);
     expect(ligneAB[0].altitude).toBeCloseTo(1455.2, 9);
+  });
+});
+
+describe("the coupe's layers in the Vue 3D (#111)", () => {
+  const scene = solved(trial());
+  const drawn = (across = 0) =>
+    vue3dScene({ placement: placed(scene), solved: scene, rider: scene.rider, across });
+  const ALL: LayerToggles = { unloadedLine: true, chordAB: true, riderTip: true, trajectory: true };
+
+  test("follow the View Strip's defaults: Ligne à vide off, Ligne A–B on, Trajectoire off", () => {
+    expect(vue3dLayers(DEFAULT_LAYERS)).toEqual({
+      unloaded: false,
+      ligneAB: true,
+      trajectory: false,
+    });
+  });
+
+  test.each([
+    ["unloadedLine", "unloaded"],
+    ["chordAB", "ligneAB"],
+    ["trajectory", "trajectory"],
+  ] as const)(
+    "the View Strip's %s shows or hides the Vue 3D's %s, and only it",
+    (toggle, layer) => {
+      const off = vue3dLayers({ ...ALL, [toggle]: false });
+      expect(off[layer]).toBe(false);
+      expect(Object.values(off).filter((shown) => !shown)).toHaveLength(1);
+      expect(vue3dLayers(ALL)[layer]).toBe(true);
+    },
+  );
+
+  test("« distances » has no counterpart in the Vue 3D", () => {
+    expect(vue3dLayers({ ...ALL, riderTip: false })).toEqual(vue3dLayers(ALL));
+  });
+
+  test("with no View Strip beside it — the Page Terrain — the toggles decide nothing", () => {
+    const none = { viewStrip: false } as const;
+    const NONE: LayerToggles = {
+      unloadedLine: false,
+      chordAB: false,
+      riderTip: false,
+      trajectory: false,
+    };
+    // #95 and #96: the Ligne à vide with its Banane, even where the strip's defaults hide it; the
+    // Ligne A–B only under a drag, which Terrain never starts; no Trajectoire.
+    for (const toggles of [DEFAULT_LAYERS, ALL, NONE]) {
+      const shown = vue3dLayers(toggles, none);
+      expect(shown.unloaded).toBe(true);
+      expect(shown.ligneAB).toBe(false);
+      expect(shown.trajectory).toBe(false);
+    }
+    // With the strip beside it, the same defaults hide the Ligne à vide.
+    expect(vue3dLayers(DEFAULT_LAYERS, { viewStrip: true }).unloaded).toBe(false);
+  });
+
+  test("the Ligne A–B stands from anchor to anchor without a solve", () => {
+    const { ligneAB } = vue3dScene({
+      placement: placed(scene),
+      solved: null,
+      rider: null,
+      across: 0,
+    });
+    // A: 1 453,7 + 1,5 = 1 455,2 m. B: 1 438,7 + 1 = 1 439,7 m.
+    expect(ligneAB[0].lon).toBe(TRIAL_ENDS.A.lon);
+    expect(ligneAB[0].lat).toBe(TRIAL_ENDS.A.lat);
+    expect(ligneAB[0].altitude).toBeCloseTo(1455.2, 9);
+    expect(ligneAB[1].lon).toBeCloseTo(TRIAL_ENDS.B.lon, 9);
+    expect(ligneAB[1].lat).toBeCloseTo(TRIAL_ENDS.B.lat, 9);
+    expect(ligneAB[1].altitude).toBeCloseTo(1439.7, 9);
+  });
+
+  test("with no solve there is no Trajectoire", () => {
+    const none = vue3dScene({
+      placement: placed(scene),
+      solved: null,
+      rider: null,
+      across: 0,
+    });
+    expect(none.trajectory).toBeNull();
+  });
+
+  test("with no passager placed, no line of the solve stands, as on the coupe", () => {
+    // The coupe draws the Ligne à vide and the Trajectoire only with its passager: where the exact
+    // solve at x_D refused, the Vue 3D keeps only what needs no solve.
+    const unplaced = vue3dScene({
+      placement: placed(scene),
+      solved: scene,
+      rider: null,
+      across: 0,
+    });
+    expect([unplaced.unloaded, unplaced.loaded, unplaced.trajectory]).toEqual([null, null, null]);
+    expect(unplaced.ligneAB[0].altitude).toBeCloseTo(1455.2, 9);
+  });
+
+  test("the loaded line touches the Trajectoire at the passager's node, wherever the passager is", () => {
+    const [run] = drawn().trajectory ?? [];
+    const engine = scene.trajectory[0];
+    if (run === undefined || engine === undefined)
+      throw new Error("the trial line has a Trajectoire");
+    // The coupe's own run, one vertex per solved step.
+    expect(run).toHaveLength(engine.xs.length);
+    for (const index of [10, Math.floor(run.length / 2), run.length - 10]) {
+      const at = run[index];
+      const xD = engine.xs[index];
+      if (at === undefined || xD === undefined) throw new Error("a vertex of the run");
+      // The passager stood at that step: the loaded line, solved again exactly, passes through it.
+      const there = vue3dScene({
+        placement: placed(scene),
+        solved: scene,
+        rider: placeRider(scene, xD),
+        across: 0,
+      }).loaded;
+      const node = there?.reduce((near, point) =>
+        Math.hypot(point.lon - at.lon, point.lat - at.lat) <
+        Math.hypot(near.lon - at.lon, near.lat - at.lat)
+          ? point
+          : near,
+      );
+      // §5.3's 1e-6 m: the sweep's step against the exact solve at its abscissa — 1e-9° is 0,1 mm.
+      expect(node?.lon).toBeCloseTo(at.lon, 9);
+      expect(node?.lat).toBeCloseTo(at.lat, 9);
+      expect(node?.altitude).toBeCloseTo(at.altitude, 5);
+    }
+  });
+
+  test("the Banane bows the Ligne à vide, never the Trajectoire", () => {
+    expect(drawn(10).trajectory).toEqual(drawn(0).trajectory);
   });
 });

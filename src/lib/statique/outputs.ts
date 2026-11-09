@@ -18,7 +18,12 @@ import type { VerdictState } from "@/lib/sim";
 
 import { formatAtX, formatQuantity } from "@/lib/format/quantity.ts";
 import { GATE_CONSEQUENCE } from "@/lib/rail/gates.ts";
-import { NO_REGIME_BANNER_BY_REGISTER, refusalReason, TRAVERSE_SCOPE } from "@/lib/rail/results.ts";
+import {
+  CLEARANCE_SCOPE,
+  NO_REGIME_BANNER_BY_REGISTER,
+  refusalReason,
+  TRAVERSE_SCOPE,
+} from "@/lib/rail/results.ts";
 import {
   demandedPretension,
   overLimitWarning,
@@ -77,9 +82,12 @@ const TRAVERSE_OUTPUTS: readonly StatiqueOutputId[] = ["loadedSag", "clearance"]
 
 /**
  * A tile's scope — the `Résultats`' own on the two traverse aggregates, « sur toute la traversée »
- * before there are any (the Skeleton's), and none on the unloaded line's two tiles.
+ * before there are any (the Skeleton's), and none on the unloaded line's two tiles. The garde's is
+ * its own, which names the Zones d'ancrage it leaves out — the shipped ones before any result.
  */
 export function scopeOf(id: StatiqueOutputId, results: Results | null = null): string | null {
+  // The garde leaves the Zones d'ancrage out, and its tile says so (#106).
+  if (id === "clearance") return results?.clearanceScope ?? CLEARANCE_SCOPE;
   return TRAVERSE_OUTPUTS.includes(id) ? (results?.scope ?? TRAVERSE_SCOPE) : null;
 }
 

@@ -118,7 +118,7 @@ import {
   matchingPreset,
   presetProvenance,
 } from "@/lib/rail/presets.ts";
-import { PROVENANCE_COPY, warningLadder } from "@/lib/rail/provenance.ts";
+import { anchorZoneChip, PROVENANCE_COPY, warningLadder } from "@/lib/rail/provenance.ts";
 import { RETENSION } from "@/lib/rail/retension.ts";
 import { limitReading, MAESTRO_ROPE_ONLY, PASS_TO_PULLEY } from "@/lib/rail/tensioning.ts";
 import {
@@ -417,10 +417,17 @@ export function RailInputs({
   );
   const quasiStatic = quasiStaticRow(dynamics, rideCause);
   const muChip = trolleyMuChip(scenario.dynamics.mu);
+  const zoneChip = anchorZoneChip(scenario.rider.anchorZone);
 
   const parameters = (
     <RailSection title="Paramètres">
-      <div className="mt-2 flex flex-col gap-3">
+      {/* From B3 (`WIDE_RAIL_PX`, the `wide-rail` variant, #112) the left column is 576 px and the
+          groups stand on **two columns** — CSS columns, not a grid, because a column box flows the
+          groups in the DOM's order, down the left column then down the right: the order on screen
+          is the reading order and the Tab order, with no `order` to keep in step. `gap-3` is then
+          the gap between the two columns, `space-y-3` the one between groups, and no group is ever
+          cut across them (`break-inside-avoid` on each). The heading above stays across both. */}
+      <div className="wide-rail:block wide-rail:columns-2 wide-rail:space-y-3 wide-rail:*:break-inside-avoid mt-2 flex flex-col gap-3">
         <Group title="Installation et régime">
           <UsageRow />
           <RegimeRow />
@@ -608,6 +615,19 @@ export function RailInputs({
           {/* The threshold the clearance read-outs are judged against (2026-09-23). Beside the
                 envelope because both are clearance inputs; a Clearance Gate field like it. */}
           <NumericRow hint="m" id="hClearMin" />
+          {/* The Zones d'ancrage (#106), beside the threshold they exempt: Avancé alone sets their
+                length, and every other Page reads the Scenario's. A Clearance Gate field too. */}
+          <NumericRow
+            chip={
+              <Chip
+                detail={PROVENANCE.anchorZone}
+                label={zoneChip}
+                tone={zoneChip === "non confirmé" ? "warning" : "neutral"}
+              />
+            }
+            hint="m"
+            id="anchorZone"
+          />
           <NumericRow
             chip={<Chip detail={PROVENANCE.DAF} label="§8.2" tone="neutral" />}
             id="DAF"

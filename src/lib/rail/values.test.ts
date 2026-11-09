@@ -306,6 +306,7 @@ describe("FIELD_ACCESS — one lens per numeric field", () => {
       "mp",
       "hRider",
       "hClearMin",
+      "anchorZone",
       "DAF",
       "xD",
       "windSpeed",

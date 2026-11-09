@@ -32,6 +32,8 @@ const KEYS: readonly (keyof TraverseInputs)[] = [
   "mp",
   "hRider",
   "hClearMin",
+  // #106: the Zones d'ancrage decide which garde is judged, so the report and the results move.
+  "anchorZone",
   "DAF",
 ];
 
@@ -39,7 +41,7 @@ describe("`traverseInputs` — the fields a memo keys on", () => {
   const before = firstRunDefaults() as ScenarioDraft;
   const inputs = traverseInputs(before);
 
-  test("the Scenario's seventeen Traverse-scope fields, and no `x_D`", () => {
+  test("the Scenario's eighteen Traverse-scope fields, and no `x_D`", () => {
     expect(Object.keys(inputs).sort()).toEqual([...KEYS].sort());
   });
 
@@ -72,16 +74,25 @@ describe("`traverseInputs` — the fields a memo keys on", () => {
       expect(stricter[key]).toBe(inputs[key]);
     }
   });
+
+  test("a Zone d'ancrage edit changes `anchorZone`, and nothing else", () => {
+    const wider = traverseInputs({ ...before, rider: { ...before.rider, anchorZone: 25 } });
+    expect(wider.anchorZone).toBe(25);
+    for (const key of KEYS.filter((key) => key !== "anchorZone")) {
+      expect(wider[key]).toBe(inputs[key]);
+    }
+  });
 });
 
 describe("`traverseScenario` — the Scenario the gates and the results read", () => {
-  test("the passenger keeps its four Traverse-scope fields and loses `x_D`", () => {
+  test("the passenger keeps its five Traverse-scope fields and loses `x_D`", () => {
     const shipped = firstRunDefaults() as ScenarioDraft;
     const { rider } = traverseScenario(traverseInputs(shipped));
     expect(rider).toEqual({
       mp: shipped.rider.mp,
       hRider: shipped.rider.hRider,
       hClearMin: shipped.rider.hClearMin,
+      anchorZone: shipped.rider.anchorZone,
       DAF: shipped.rider.DAF,
     });
   });
@@ -101,8 +112,8 @@ describe("`sweepRider` — two Brins porteurs, each solved under P/2", () => {
 
   const unloaded = deriveUnloaded(unloadedInputs(firstRunDefaults(), null));
   if (!unloaded.ok) throw new Error("the shipped line solves");
-  const one = sweepRider(unloaded, { mp: 120, hRider: 2.1, carryingLines: 1 });
-  const two = sweepRider(unloaded, { mp: 120, hRider: 2.1, carryingLines: 2 });
+  const one = sweepRider(unloaded, { mp: 120, hRider: 2.1, anchorZone: 10, carryingLines: 1 });
+  const two = sweepRider(unloaded, { mp: 120, hRider: 2.1, anchorZone: 10, carryingLines: 2 });
   if (one === null || two === null) throw new Error("the shipped traverse solves");
 
   test("each member is loaded with half the passager", () => {

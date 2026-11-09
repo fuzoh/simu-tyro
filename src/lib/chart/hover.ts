@@ -12,7 +12,7 @@
 import type { Polyline, SceneFrame, SceneRider } from "@/lib/chart/scene.ts";
 import type { Register } from "@/lib/vocabulary/labels.ts";
 
-import { polylineAt } from "@/lib/chart/scene.ts";
+import { isInAnchorZone, polylineAt } from "@/lib/chart/scene.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { zGroundAt } from "@/lib/sim";
 import { label } from "@/lib/vocabulary/labels.ts";
@@ -58,6 +58,11 @@ export type CoupeReading = {
   readonly lineGap: number | null;
   /** The passager's garde au sol, `null` unless the passager stands at this abscissa. */
   readonly garde: number | null;
+  /**
+   * Is the abscissa inside a Zone d'ancrage (#106)? There the garde is read and judged by
+   * nothing, and the hover says so. `false` while the garde is withheld, where nothing is judged.
+   */
+  readonly inAnchorZone: boolean;
 };
 
 /**
@@ -69,6 +74,8 @@ export type CoupeReading = {
  * @param reach how far from the passager's abscissa the pointer still counts as on it, m.
  * @param clearance `false` under a Clearance Gate breach: every gap computed from the anchor height
  *   the gate refused is withheld, the altitudes stay.
+ * @param anchorZone the length of each Zone d'ancrage, m — `0`, the default, where the reader
+ *   judges no garde at all (the vue de dessus) or the Scenario has no zone.
  */
 export function coupeReading({
   frame,
@@ -77,6 +84,7 @@ export function coupeReading({
   metres,
   reach,
   clearance,
+  anchorZone = 0,
 }: {
   frame: SceneFrame;
   cable: Polyline | null;
@@ -84,6 +92,7 @@ export function coupeReading({
   metres: number;
   reach: number;
   clearance: boolean;
+  anchorZone?: number;
 }): CoupeReading | null {
   if (!(metres >= 0 && metres <= frame.L)) return null;
   const { altitude, absolute, fromTop } = groundAt(frame, metres);
@@ -98,6 +107,7 @@ export function coupeReading({
       rider !== null && clearance && Math.abs(rider.step.xD - metres) <= reach
         ? rider.underRider
         : null,
+    inAnchorZone: clearance && isInAnchorZone(metres, frame.L, anchorZone),
   };
 }
 
@@ -122,6 +132,7 @@ export function coupeLines(reading: CoupeReading, register: Register): readonly 
   if (reading.garde !== null) {
     lines.push({ label: label("groundClearance", register), value: gap(reading.garde) });
   }
+  if (reading.inAnchorZone) lines.push({ label: COUPE_HOVER.anchorZone, value: "" });
   if (!reading.absolute) lines.push({ label: COUPE_HOVER.fromFoot, value: "" });
   return lines;
 }
