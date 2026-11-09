@@ -305,8 +305,13 @@ export function Choice<T extends string>({
     // It also renders a `<div role="radiogroup">`, which retires the `<fieldset>` this control used
     // to be — and with it the UA `min-inline-size: min-content` that {@link Row.stacked} exists to
     // work around. `stacked` stays because label-above is still the right shape at 288 px.
+    //
+    // `relative`: Base UI renders each option's visually-hidden `<input>` as a `position: absolute`
+    // sibling of the item. With no positioned ancestor its containing block is `<body>`, so inside a
+    // scrolled Rail it is laid out at its in-flow y (≈ 1300) and stretches the *document* past
+    // `100dvh` — a wheel over the nav bar then scrolls the window. The group is its own containing block.
     <RadioGroup
-      className="gap-1"
+      className="relative gap-1"
       name={name}
       onValueChange={(next: unknown) => onChange(next as T)}
       value={value}
