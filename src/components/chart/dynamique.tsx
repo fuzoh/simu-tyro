@@ -30,9 +30,9 @@ import { HoverRule, HoverTip } from "@/components/chart/hover.tsx";
 import { xTicks } from "@/components/chart/profile.tsx";
 import { type HoverHandlers, metresOn, useHover } from "@/components/chart/use-hover.ts";
 import { NO_SPAN_LINE } from "@/lib/chart/copy.ts";
-import { type CoupeReading, coupeLines, coupeReading, RIDER_REACH_PX } from "@/lib/chart/hover.ts";
+import { type CoupeReading, coupeLines, RIDER_REACH_PX } from "@/lib/chart/hover.ts";
 import { CHART_TITLE, CURVE_CAPTION } from "@/lib/dynamique/copy.ts";
-import { curveHover } from "@/lib/dynamique/hover.ts";
+import { coupeAt, curveHover } from "@/lib/dynamique/hover.ts";
 import { dynamiqueScene } from "@/lib/dynamique/scene.ts";
 import { axisLabel, CELL_WRAP_PX } from "@/lib/layout/contract.ts";
 import { cn } from "@/lib/utils.ts";
@@ -105,10 +105,9 @@ export function DynamiqueCharts({
   const reading =
     hover === null
       ? null
-      : coupeReading({
+      : coupeAt({
           frame,
-          cable: scene.coupe.rest?.cable ?? null,
-          rider: scene.coupe.rest,
+          coupe: scene.coupe,
           metres: hover,
           reach: RIDER_REACH_PX / scene.x.pxPerM,
           clearance,

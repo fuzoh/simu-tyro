@@ -88,6 +88,11 @@ export type CoupeScene = {
    * `null` where `members` is.
    */
   readonly rest: ChartScene["rider"] | null;
+  /**
+   * The length of each Zone d'ancrage, m — the Scenario's, as on every coupe (#106), so the hover
+   * says the garde is not judged inside one. `0` without a solved line or without a zone.
+   */
+  readonly anchorZone: number;
   /** The loaded trajectory of the passager, one path per run of solved steps. */
   readonly trajectory: readonly PxPath[];
   /** Each anchor's tower, clipped to the plot. */
@@ -220,6 +225,7 @@ export function dynamiqueScene({
           ? null
           : solved.base.members.map(({ offsetPx }) => ({ offsetPx, path: inPx(rest.cable) })),
       rest,
+      anchorZone: solved?.base.anchorZone ?? 0,
       trajectory: solved === null ? [] : solved.base.trajectory.map(inPx),
       anchors: [
         tower(0, 0, -frame.anchors.zA),
