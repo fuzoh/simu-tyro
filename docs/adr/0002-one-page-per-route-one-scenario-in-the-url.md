@@ -77,8 +77,10 @@ viewport, where it needs 907 px of height (915 under a 44 px bar). The plateau i
 
 ## Update — 2026-11-09, #110
 
-Avancé spans the whole window: no shell cap, the middle column is `viewport − 576` from 1024 px, and
-its plot has no ceiling, so it is `0,42 × W_inner` at every width. The window's height binds the
+Avancé spans the whole window: no shell cap, the middle column is `viewport − 576` from 1024 px. Its
+Chart Block widens with the column up to 1984 px, the column at 2560, and letterboxes past it, so
+its plot is `0,42 × W_inner` at every width under a raised 823,2 px ceiling and the whole block
+plateaus at 1239,2 px — whole in a 1440 px window under the bar. The window's height binds the
 Chart Block below 1024 only, where the Rail stands under it; from three columns the block stands
 under the vue de dessus in a column that scrolls and never pins. So the « 907 px of height » above
 no longer applies to Avancé, and the 36 px bar is owed to the fit below 1024 alone, where `MIN_RAIL`

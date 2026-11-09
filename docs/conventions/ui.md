@@ -201,8 +201,9 @@ nationale drape the very tiles the vue de dessus shows.
 
 The Page Avancé (`/avance`) stands on **three columns from 1024 px of viewport** and on one below
 it, and spans **the whole width of the window** (#110). The numbers are `THREE_COLUMN_PX`,
-`RAIL_WIDTH` (left), `RIGHT_COLUMN_WIDTH` and `AVANCE_PLOT_MAX` in `src/lib/layout/contract.ts`; the
-classes spell them as `min-[1024px]:` and `w-72`, and `contract.test.ts` holds the two together.
+`RAIL_WIDTH` (left), `RIGHT_COLUMN_WIDTH`, `AVANCE_BLOCK_MAX_PX` and `AVANCE_PLOT_MAX` in
+`src/lib/layout/contract.ts`; the classes spell them as `min-[1024px]:`, `w-72` and
+`max-w-[1984px]`, and `contract.test.ts` holds the two together.
 
 - **Left** — the Rail Header and `Paramètres`. **Middle** — Statique's vue de dessus (`TopMap`, the
   same component and the same gestures — the rose des vents, the draggable anchors, « Mesure »,
@@ -214,14 +215,16 @@ classes spell them as `min-[1024px]:` and `w-72`, and `contract.test.ts` holds t
   between it and the block. Holding the block still over a residual scroller was rejected (#104): at
   1024 × 768 it leaves the map 116 px. The column reserves its scrollbar gutter
   (`scrollbar-gutter: stable`), so a scrollbar that comes and goes cannot move the width every band
-  is a function of; on a platform with classic scrollbars the measured column is that gutter
-  narrower than `chartColumnWidth()`. **What it costs**: the Chart Block starts under the map — its
+  is a function of; on a platform with classic scrollbars the measured block is that gutter
+  narrower than `avanceBlockWidth()` up to 2560 px of viewport. **What it costs**: the Chart Block starts under the map — its
   banner slot at about 633 px from the top of the window at 1440 and at 2560 (the map's region,
   36 + 597 px: its 448 px cap plus its controls and five caption lines), about 458 px at 1024
   (36 + 421,7) — and the profile under the banner at 677 and 533,7 px (routing.md's measurements).
   So the banner is below the fold on a window shorter than about 633 px (458 at 1024), and
   « Garde min » and the read-out cells, under the profile, clearance strip and View Strip, are a
   scroll down on any window shorter than the map plus the whole block — 1440 × 900 among them.
+  Scrolled to, the block itself stands whole in any window 36 px taller than it — 1276 px at most,
+  its 1984 px letterbox (below).
 - **The vue de dessus is three columns only.** Below 1024 its box is `display: none`, and the map
   is not started there at all — `threeColumns()` in `contract.ts`, the same B2, decides what to
   *mount*, never a size: a MapLibre map started in a box with no size holds a WebGL context for
@@ -244,19 +247,34 @@ classes spell them as `min-[1024px]:` and `w-72`, and `contract.test.ts` holds t
   810 × 1080, 820 × 1180, 834 × 1194) clear it; a narrow desktop window such as 1000 × 900 does not
   and opens on the Pinned Safety Header alone until the window is taller. That is the collapse the
   ticket keeps (« le Pinned Safety Header reste »), accepted rather than capped around.
-- **No cap (#110).** The shell spans the window, and every pixel past the two side columns goes to
-  the middle one: `chartColumnWidth()` is `viewport − 576` from 1024, 1984 px at 2560 and 2864 at
-  3440, with no empty margin either side. Statique, Dynamique and Terrain keep `SHELL_MAX_PX`
-  (1728). The shell used to stop there too, because `1728 − 576 = 1152` is `REFERENCE_COLUMN_PX`
-  and kept the middle column under amendment F's plot ceiling (473,76 px). **Avancé's plot has no
-  ceiling now** (`AVANCE_PLOT_MAX`): it is `0,42 × W_inner` at every width, so the Plot Aspect Band
-  holds by construction — 0,42 at 1024, 1440, 1920, 2560 and 3440 (`contract.test.ts` walks it) —
-  and no letterbox is needed. Its height is read off the column's width alone: measured at 2560 the
-  coupe is the same 892,9 px at 1440, 900 and 500 px of window height. The Chart Block is told the
-  same ceiling (`plotMax`) that the shell's `--profile-plot` spells, so the drawn plot and its band
-  agree. Below 1024 nothing moves: the widest stacked column is 1023 px, a 419,58 px plot, which the
-  old ceiling never reached either. **What it costs**: at 3440 the plot is 1192,8 px tall and the
-  whole block about 1610, read by scrolling the column; the read-out cells spread across 2864 px.
+- **No shell cap (#110).** The shell spans the window, and every pixel past the two side columns
+  goes to the middle one: `chartColumnWidth()` is `viewport − 576` from 1024, 1984 px at 2560 and
+  2864 at 3440, with no empty margin either side. Statique, Dynamique and Terrain keep
+  `SHELL_MAX_PX` (1728). The shell used to stop there too, because `1728 − 576 = 1152` is
+  `REFERENCE_COLUMN_PX` and kept the middle column under amendment F's plot ceiling (473,76 px).
+- **The Chart Block stops at 1984 px and letterboxes past it (#110).** The vue de dessus takes the
+  whole middle column; the block widens with it up to `AVANCE_BLOCK_MAX_PX` — the column at 2560,
+  `2560 − 576` — and past it stays 1984 px wide, centred (`mx-auto max-w-[1984px]` on the block's
+  own box, which is the query container and the observer's target), the column's surplus empty
+  either side: 440 px a side at 3440. Its plot ceiling is raised to match (`AVANCE_PLOT_MAX`,
+  `0,42 × 1960 = 823,2` px), so the plot is `0,42 × W_inner` at every width it is drawn at and the
+  Plot Aspect Band holds by construction — 0,42 at 1024, 1440, 1920, 2560 and 3440
+  (`contract.test.ts` walks it). **Why the cap** — the old « Why the cap », moved from the shell to
+  the block: with no ceiling the block was `416 + 0,42 × 2840 = 1608,8` px at 3440, taller than the
+  1404 px a 1440 px window leaves, so no scroll position showed the banner slot and « Garde min »
+  together and the block stopped being one co-visible unit. Capped, it plateaus at 1239,2 px: whole
+  in 1920 × 1080 (970,4 against 1044), 2560 × 1440 and 3440 × 1440 once the column is scrolled to
+  it. **Why 2560**: it is the brief's own width, so the coupe still fills the column there, and the
+  widest block that fits the 1440 px-tall windows the brief names; a 1920 cap would fit 1080 px
+  windows at every width but stop the coupe 640 px short at 2560. **Why the whole block and not the
+  plot alone**: the profile and the clearance strip share one x scale, so a plot narrowed inside its
+  band would draw the anchors off the strip's. The cap is a width, so nothing reads the window's
+  height: measured at 2560 the coupe is the same at 1440, 900 and 500 px of window height. The Chart
+  Block is told the same ceiling (`plotMax`) that the shell's `--profile-plot` spells, so the drawn
+  plot and its band agree. Below 1024 nothing moves: the widest stacked column is 1023 px, a
+  419,58 px plot, which neither ceiling reaches. **What it costs**: a window under 1276 px tall at
+  2560 or wider (2560 × 1080) does not hold the whole block; past 2560 the block does not widen with
+  the window, and its letterbox margins stand empty.
 - **The vue de dessus keeps its frame**: 3 : 2 up to the frame's 448 px height cap
   (`--top-view-max-h`, #115), then wider than 3 : 2 — 409 × 273 at 1024 (its region 422 px tall
   with its controls and caption) and 1945 × 448 at 2560, with a classic scrollbar. A height read off
