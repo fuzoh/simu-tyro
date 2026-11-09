@@ -24,7 +24,7 @@ import { RailHeaderControls, RailInputs } from "@/components/rail/inputs.tsx";
 import { RailOutputs } from "@/components/rail/outputs.tsx";
 import { TopViewFrame } from "@/components/statique/top-view.tsx";
 import { compactRequired, fitsWholeBlock } from "@/lib/layout/collapse.ts";
-import { NAV_BAR, threeColumns } from "@/lib/layout/contract.ts";
+import { AVANCE_PLOT_MAX, NAV_BAR, threeColumns } from "@/lib/layout/contract.ts";
 
 import { Banner } from "./banner.tsx";
 import { LinkStripNotice } from "./link-strip.tsx";
@@ -145,6 +145,9 @@ function Live({ page }: { page: string }) {
               // Sweep on screen is stale by definition, so scrubbing would let the user *generate* new
               // stale numbers rather than read the ones already there.
               inert={saisie !== null}
+              // Avancé's plot has no ceiling (#110): its middle column widens with the window, and
+              // the plot with it at 0,42, the shell's `--profile-plot` spelling the same rule.
+              plotMax={AVANCE_PLOT_MAX}
               onPositionFocus={collapse.onPositionFocus}
               onReveal={collapse.reveal}
               // Under either height constraint the reveal cannot be granted, so the chevron publishes

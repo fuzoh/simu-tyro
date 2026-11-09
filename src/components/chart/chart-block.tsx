@@ -58,6 +58,7 @@ import {
   peekBadgeLabel,
   plotAspect,
   PROFILE_CHROME,
+  PROFILE_PLOT_MAX,
   profileOuterHeight,
   profilePlotHeight,
   stripOuterHeight,
@@ -87,6 +88,7 @@ export function ChartBlock({
   inert = false,
   onPositionFocus,
   onReveal,
+  plotMax = PROFILE_PLOT_MAX,
   readOnly = false,
   register = "exact",
   revealGrantable = true,
@@ -130,6 +132,12 @@ export function ChartBlock({
   onPositionFocus: (focused: boolean) => void;
   /** « Afficher le profil » — the pinned header's one control. */
   onReveal: () => void;
+  /**
+   * The Page's plot ceiling, px — amendment F's {@link PROFILE_PLOT_MAX} unless the Page says
+   * otherwise. Avancé passes `AVANCE_PLOT_MAX`, none (#110). It must be the ceiling the Page's own
+   * `--profile-plot` spells, or the drawn plot and its CSS band would disagree.
+   */
+  plotMax?: number;
   /**
    * The Page Terrain (#101): the passager stays where the link put it — no scrub on either plot,
    * and its position is read in the View Strip rather than typed.
@@ -204,7 +212,7 @@ export function ChartBlock({
   }
 
   const wInner = innerWidth(width);
-  const plotHeight = profilePlotHeight(wInner);
+  const plotHeight = profilePlotHeight(wInner, plotMax);
   const x = createSharedX({ width, L: frame.L, extent: frame.extent });
   // Without a solved half there is no cable to fit, so the auto-fit sees the frame's own extent —
   // the drawn ground and the two towers. Same policy, one term shorter.
@@ -215,7 +223,7 @@ export function ChartBlock({
     // capped box would build a z scale taller than the box it draws in, so the cable would leave the
     // frame while the badge went on claiming an auto-fit. `plotAspect` is the same `min` the band's
     // own height is, so the drawing and the badge cannot disagree.
-    plotAspect: plotAspect(wInner),
+    plotAspect: plotAspect(wInner, plotMax),
     xSpan: x.domain[1] - x.domain[0],
     zDataSpan: zExtent.max - zExtent.min,
   });
@@ -318,7 +326,7 @@ export function ChartBlock({
             label: held ? peekBadgeLabel(ve) : veBadgeLabel(ve),
             emphasised: held || ve.state !== "auto",
           }}
-          bandHeight={profileOuterHeight(wInner)}
+          bandHeight={profileOuterHeight(wInner, plotMax)}
           clearance={clearance}
           frame={frame}
           layers={state.layers}

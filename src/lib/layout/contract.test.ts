@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 import { formatValue } from "@/lib/format/quantity.ts";
 
 import {
+  AVANCE_PLOT_MAX,
   AXIS_LABEL_INSET,
   axisLabel,
   BANNER,
@@ -557,8 +558,9 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     expect(threeColumns(THREE_COLUMN_PX)).toBe(true);
     const root = fileURLToPath(new URL("../../..", import.meta.url));
     const shell = readFileSync(join(root, "src/components/app/shell.tsx"), "utf8");
-    // The views' box: `display: none` until B2, and the same B2 the predicate reads.
-    expect(shell).toContain(`hidden border-t px-3 py-3 min-[${THREE_COLUMN_PX}px]:block`);
+    // The views' box: `display: none` until B2, and the same B2 the predicate reads. Its hairline
+    // is under it since #110, between the vue de dessus and the Chart Block it now stands above.
+    expect(shell).toContain(`hidden border-b px-3 py-3 min-[${THREE_COLUMN_PX}px]:block`);
   });
 
   it("the middle column's views are Statique's own component, so no view is Avancé's alone", () => {
@@ -587,17 +589,59 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     expect(chartColumnWidth(768)).toBe(768);
   });
 
-  it("the shell's cap leaves exactly the reference column, so the plot never outgrows its ceiling", () => {
-    expect(SHELL_MAX_PX - RAIL_WIDTH - RIGHT_COLUMN_WIDTH).toBe(REFERENCE_COLUMN_PX);
-    for (const viewport of [1728, 1920, 2560, 3440]) {
-      expect(chartColumnWidth(viewport)).toBe(REFERENCE_COLUMN_PX);
+  /**
+   * #110 — Avancé spends the whole width. ADR-0001's « correctness over byte-compatibility » re-pins
+   * what this suite held until then: the middle column frozen at the 1152 px reference from 1728 px
+   * of viewport, and `max-w-[1728px]` on the shell. The column is the viewport less the two 288 px
+   * columns at every width from B2, by hand below.
+   */
+  it("Avancé has no cap: the middle column is the viewport less the two side columns (#110)", () => {
+    const measured = [
+      { viewport: 1728, column: 1152 },
+      { viewport: 1920, column: 1344 },
+      // The brief's « 2560 − 576 px »: no empty margin either side.
+      { viewport: 2560, column: 1984 },
+      { viewport: 3440, column: 2864 },
+    ];
+    for (const row of measured) expect(chartColumnWidth(row.viewport)).toBe(row.column);
+    // Strictly growing past the old cap, pixel for pixel: the width gained goes to the middle column.
+    for (let viewport = SHELL_MAX_PX; viewport < 3440; viewport += 97) {
+      expect(chartColumnWidth(viewport + 1) - chartColumnWidth(viewport)).toBe(1);
     }
   });
 
-  it("the Plot Aspect Band holds in the chart column at every viewport width, stacked or in three columns", () => {
-    // From 768, so the stacked widths — where the column is the whole viewport — are walked too.
+  it("Avancé's plot widens with its column at 0,42, with no ceiling (#110)", () => {
+    // `0,42 × W_inner` by hand, `W_inner` = column − 24: the plot is never frozen at amendment F's
+    // 473,76 on Avancé, and its height is a function of the width alone.
+    const measured = [
+      { viewport: 1024, wInner: 424, plot: 178.08 },
+      { viewport: 1440, wInner: 840, plot: 352.8 },
+      { viewport: 1920, wInner: 1320, plot: 554.4 },
+      { viewport: 2560, wInner: 1960, plot: 823.2 },
+      { viewport: 3440, wInner: 2840, plot: 1192.8 },
+    ];
+    for (const row of measured) {
+      const wInner = innerWidth(chartColumnWidth(row.viewport));
+      expect(wInner).toBe(row.wInner);
+      expect(profilePlotHeight(wInner, AVANCE_PLOT_MAX)).toBeCloseTo(row.plot, 9);
+      expect(profileOuterHeight(wInner, AVANCE_PLOT_MAX)).toBeCloseTo(76 + row.plot, 9);
+    }
+    // The other Pages keep amendment F's ceiling: the default is unchanged.
+    expect(profilePlotHeight(1960)).toBeCloseTo(473.76, 9);
+  });
+
+  it("the Plot Aspect Band holds in Avancé's chart column at every viewport width, stacked or in three columns", () => {
+    // The brief's five widths, by name, then every 8 px from 768 to 3440 so the stacked widths —
+    // where the column is the whole viewport — are walked too.
+    for (const viewport of [1024, 1440, 1920, 2560, 3440]) {
+      const aspect = plotAspect(innerWidth(chartColumnWidth(viewport)), AVANCE_PLOT_MAX);
+      expect({ viewport, aspect: Number(aspect.toFixed(12)) }).toStrictEqual({
+        viewport,
+        aspect: 0.42,
+      });
+    }
     for (let viewport = 768; viewport <= 3440; viewport += 8) {
-      const aspect = plotAspect(innerWidth(chartColumnWidth(viewport)));
+      const aspect = plotAspect(innerWidth(chartColumnWidth(viewport)), AVANCE_PLOT_MAX);
       expect({
         viewport,
         ok: aspect >= PLOT_ASPECT_BAND.min && aspect <= PLOT_ASPECT_BAND.max,
@@ -605,9 +649,23 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     }
   });
 
+  it("below B2 Avancé's plot is the one it always was: the ceiling could not bind there", () => {
+    // The widest stacked column is 1023 px, `W_inner` 999, a 419,58 px plot under the 473,76 cap —
+    // so dropping the ceiling moves nothing under 1024 px, which the brief keeps identical.
+    expect(PROFILE_ASPECT * innerWidth(chartColumnWidth(THREE_COLUMN_PX - 1))).toBeCloseTo(
+      419.58,
+      9,
+    );
+    for (let viewport = 320; viewport < THREE_COLUMN_PX; viewport += 7) {
+      const wInner = innerWidth(chartColumnWidth(viewport));
+      expect(profilePlotHeight(wInner, AVANCE_PLOT_MAX)).toBe(profilePlotHeight(wInner));
+    }
+  });
+
   it("the shell spells the contract's numbers, and styles.css gates on the same B2", () => {
     const root = fileURLToPath(new URL("../../..", import.meta.url));
-    const shell = readFileSync(join(root, "src/components/app/shell.tsx"), "utf8");
+    const read = (path: string) => readFileSync(join(root, path), "utf8");
+    const shell = read("src/components/app/shell.tsx");
     const styles = readFileSync(join(root, "src/styles.css"), "utf8");
     const wide = `min-[${THREE_COLUMN_PX}px]:`;
     // `w-72` is 18 rem: the two columns' 288 px, written as a Tailwind step.
@@ -616,7 +674,11 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     for (const cls of ["flex-row", "contents", "w-72", "order-first", "order-last", "flex-1"]) {
       expect(shell).toContain(`${wide}${cls}`);
     }
-    expect(shell).toContain(`max-w-[${SHELL_MAX_PX}px]`);
+    // No cap on Avancé's shell (#110); the other Pages' frames keep `SHELL_MAX_PX`.
+    expect(shell).not.toMatch(/max-w-\[/);
+    for (const frame of ["statique/frame.tsx", "terrain-page/frame.tsx"]) {
+      expect(read(`src/components/${frame}`)).toContain(`max-w-[${SHELL_MAX_PX}px]`);
+    }
     expect(styles).toContain(`@media (width < ${THREE_COLUMN_PX}px)`);
   });
 });

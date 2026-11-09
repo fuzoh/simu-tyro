@@ -40,6 +40,7 @@ import {
   REVEAL_LABEL,
 } from "@/lib/layout/collapse.ts";
 import {
+  AVANCE_PLOT_MAX,
   BANNER,
   CELL_BASIS_PX,
   CELL_ROW,
@@ -110,6 +111,17 @@ export const READ_OUT_CELLS: Record<CellId, { readonly basis: string; readonly p
 export const NOSCRIPT_LINE = "Ce simulateur nécessite JavaScript pour fonctionner.";
 
 /**
+ * § 5's aspect rule as CSS, under a Page's plot ceiling: `min(0,42 × W_inner, ceiling)`, or the
+ * bare rule where the Page has none — Avancé's {@link AVANCE_PLOT_MAX} (#110). One function, so
+ * the band the CSS reserves and the `profilePlotHeight()` the SVG is drawn at cannot spell two
+ * ceilings.
+ */
+function profilePlotRule(ceiling: number): string {
+  const rule = `calc(${PROFILE_ASPECT} * var(--w-inner))`;
+  return Number.isFinite(ceiling) ? `min(${rule}, ${ceiling}px)` : rule;
+}
+
+/**
  * The layout contract as CSS custom properties. `100cqi` is the **chart column's** inline size —
  * the column is the query container, so `--w-inner` is exactly § 5's `W_inner = col − 24`, and
  * every band below is a function of it and of nothing else. Exported for the other Pages that
@@ -127,7 +139,7 @@ export const LAYOUT_VARS = {
   // band and `chartBlockHeight()`'s own term are the same arithmetic — and the whole rule stays a
   // function of the container's inline size, so the Skeleton is still correct before any measurement.
   // Without it the plot grew linearly for ever and five ordinary 16:9 desktops opened with no chart.
-  "--profile-plot": `min(calc(${PROFILE_ASPECT} * var(--w-inner)), ${PROFILE_PLOT_MAX}px)`,
+  "--profile-plot": profilePlotRule(PROFILE_PLOT_MAX),
   // The whole profile band, because § 5's profile is **one SVG** spanning all four of its rows —
   // the Handle Lane is inside it, which is what keeps the handles on the shared x scale. The
   // Skeleton draws the four rows separately; both add up to this, from these same three constants.
@@ -147,6 +159,17 @@ export const LAYOUT_VARS = {
   "--banner-two-lines": `${BANNER.twoLines}px`,
   "--banner-three-lines": `${BANNER.threeLines}px`,
   "--rail-header": `${RAIL_HEADER}px`,
+} as CSSProperties;
+
+/**
+ * Avancé's own: the same contract with **no plot ceiling** (#110). Its shell spans the whole width,
+ * so its middle column widens with the window and the plot with it, at 0,42 — the Plot Aspect Band
+ * holds at every width. The Chart Block is told the same ceiling (`plotMax`), so the drawn plot and
+ * this band agree.
+ */
+const AVANCE_LAYOUT_VARS = {
+  ...LAYOUT_VARS,
+  "--profile-plot": profilePlotRule(AVANCE_PLOT_MAX),
 } as CSSProperties;
 // `--kb`, the iOS soft-keyboard inset, is deliberately **not** here: the `visualViewport` fallback
 // writes it on `documentElement`, and an inline `--kb: 0px` on this element would shadow it for the
@@ -175,8 +198,9 @@ export const LAYOUT_VARS = {
  * branch appears. The two attributes carry the two halves of § 5's argument: **`data-collapse` is
  * *which* state, and the variants apply it below B2 for triggers (a) and (b), because above B2 the
  * Rail is beside the block and a focused field must cost the chart nothing; `data-fit` is *whether
- * the height forced it*, and that arm applies at every width, because a block that does not fit does
- * not fit at any width.** Both sit on the **shell** rather than on the chart column because
+ * the height forced it*, and since #110 the policy sets it below B2 only — from three columns the
+ * middle column scrolls under the vue de dessus, and the window's height costs the block nothing.**
+ * Both sit on the **shell** rather than on the chart column because
  * `--pinned-clearance` has to reach the Rail's controls: § 7's jump primitive reserves the header's
  * height there, and the Rail is the chart column's sibling.
  *
@@ -230,10 +254,8 @@ export function Shell({
   /**
    * **Is the reduction forced by the height rather than asked for?** § 5's (c) and its `compact`
    * row, as one flag, published as `data-fit` — `src/styles.css` gates the same bands on it that
-   * its `width < 1024px` arm gates on B2, because a block that does not fit does not fit at any
-   * width. **This is the whole of the short-desktop case**: three columns at 1440 × 500 are *above*
-   * B2, so without it the profile would stand at full height inside an `overflow-hidden` shell
-   * 500 px tall and clip the View Strip and « Garde min » out of the viewport. The Skeleton passes
+   * its `width < 1024px` arm gates on B2. The policy raises it below B2 only (#110): three columns
+   * at 1440 × 500 keep the whole block and scroll the middle column to it. The Skeleton passes
    * nothing.
    */
   tight?: boolean;
@@ -243,9 +265,10 @@ export function Shell({
   right?: ReactNode;
   chart: ReactNode;
   /**
-   * The middle column's views under the Chart Block, three columns only (#104): Statique's vue de
-   * dessus, never one of Avancé's own. Below B2 there is no middle column — the block stands over
-   * the Rail — and the box is `display: none`. The Skeleton passes the empty frame.
+   * The middle column's views **above** the Chart Block, three columns only (#104, #110):
+   * Statique's vue de dessus, never one of Avancé's own. Below B2 there is no middle column — the
+   * block stands over the Rail — and the box is `display: none`. The Skeleton passes the empty
+   * frame.
    */
   views?: ReactNode;
   /**
@@ -273,19 +296,19 @@ export function Shell({
       // scoped to B2 — above it there is no pinned header to clear.
       style={
         {
-          ...LAYOUT_VARS,
+          ...AVANCE_LAYOUT_VARS,
           "--pinned-clearance": `${pinnedHeaderHeight(collapse)}px`,
         } as CSSProperties
       }
     >
       {strip}
-      {/* Capped and centred past 1728 px (`SHELL_MAX_PX`) — the two 288 px columns plus a 1152 px
-          chart column, which is `REFERENCE_COLUMN_PX`: the widest the plot's own ceiling still
-          grows with. Uncapped, a 2560 px desktop stretched the x scale edge-to-edge and scattered
-          the read-out cells apart, with the banner's sentence a screen away from its own action.
-          The hairline borders paint only once the cap engages, so no viewport below it gains an
-          edge it never had. */}
-      <div className="border-border mx-auto flex min-h-0 w-full max-w-[1728px] flex-1 flex-col min-[1024px]:flex-row min-[1730px]:border-x">
+      {/* **No cap** (#110): the shell spans the window, and every pixel past the two 288 px
+          columns goes to the middle one, so the coupe and the vue de dessus widen with it. It was
+          capped at 1728 px (`SHELL_MAX_PX`, the other Pages' cap) while the plot had a ceiling to
+          stay under; Avancé's has none now (`AVANCE_PLOT_MAX`), so the aspect holds at every width.
+          What the cap also held — the read-out cells and the banner within reach of each other —
+          is spent: at 3440 px they spread across a 2864 px column. */}
+      <div className="flex min-h-0 w-full flex-1 flex-col min-[1024px]:flex-row">
         {/* The Rail is not becoming interactive: `focusin`, `focusout` and `scroll` are **observed**
             here, on the one element that is both the collapse's scroller (below B2) and the ancestor
             of every field it watches. None of the three adds an affordance, a role or a keyboard
@@ -374,15 +397,27 @@ export function Shell({
             would inset the read-out cells, which § 5 spans across the **full column width**
             because aligning them to the plot would imply a correspondence that does not exist.
 
-            **From B2 up the column scrolls**, the block first and the views under it (#104), the
+            **From B2 up the column scrolls**, the views first and the block under them (#110), the
             way Statique's right column does: a block held still over a residual scroller would
-            leave the map 116 px at 1024 × 768. The gutter is reserved so a scrollbar that comes
-            and goes cannot move the width every band is a function of. It spends the `--kb` pair
-            like the two side columns. */}
+            leave the map 116 px at 1024 × 768 (#104). The gutter is reserved so a scrollbar that
+            comes and goes cannot move the width every band is a function of. It spends the `--kb`
+            pair like the two side columns. */}
         <div
           className="@container min-w-0 flex-none overflow-hidden min-[1024px]:min-h-0 min-[1024px]:flex-1 min-[1024px]:scroll-pb-[var(--kb,0px)] min-[1024px]:[scrollbar-gutter:stable] min-[1024px]:overflow-y-auto min-[1024px]:pb-[var(--kb,0px)]"
           ref={chartRef}
         >
+          {/* The vue de dessus heads the column from B2 (#110), above the Chart Block, in the DOM
+              too, so the focus order is the order on screen. Below B2 there is no middle column and
+              the box is `display: none`, so the stacked shape — the block over the Rail — is the
+              one it always was. Its hairline is under it, between it and the block. */}
+          {views !== undefined && (
+            <section
+              aria-label={SECTION.topView}
+              className="border-border hidden border-b px-3 py-3 min-[1024px]:block"
+            >
+              {views}
+            </section>
+          )}
           {/* § 5's `compact` row, and the **one** place the band stack stops being a stack: under a
               soft keyboard, or below 420 px of available height, the banner slot and the live
               « Garde min » share a single 44 px line — `664 − 336 − 44 = 284 px` of usable form.
@@ -391,14 +426,6 @@ export function Shell({
           <div className="compact:h-[var(--pinned-cell)] compact:flex-row compact:items-center flex flex-col">
             {chart}
           </div>
-          {views !== undefined && (
-            <section
-              aria-label={SECTION.topView}
-              className="border-border hidden border-t px-3 py-3 min-[1024px]:block"
-            >
-              {views}
-            </section>
-          )}
         </div>
       </div>
     </div>
