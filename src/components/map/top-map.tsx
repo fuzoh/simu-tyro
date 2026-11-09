@@ -667,8 +667,10 @@ function MapControls({
     <>
       <NativeSelect
         aria-label={MAP_COPY.fond}
-        // The one control that gives way at 390 px: a Fond name cut short still reads.
-        className="max-w-48 min-w-0"
+        // The control that gives way first (390 px): a Fond name cut short still reads. Never below
+        // « Carte c… » — on the 287 px map of Statique's first row (#109), beside « Repères » (#107),
+        // the pentes label is cut short after it, its whole name in its title.
+        className="max-w-48 min-w-18 shrink-[1000]"
         onChange={(event) => onDisplay({ ...display, fond: event.target.value as Fond })}
         size="sm"
         title={MAP_COPY.fond}
@@ -680,12 +682,12 @@ function MapControls({
           </NativeSelectOption>
         ))}
       </NativeSelect>
-      <Label className="shrink-0 gap-1 whitespace-nowrap">
+      <Label className="min-w-0 gap-1" title={MAP_COPY.pentes}>
         <Checkbox
           checked={display.pentes}
           onCheckedChange={(pentes) => onDisplay({ ...display, pentes })}
         />
-        {MAP_COPY.pentes}
+        <span className="truncate">{MAP_COPY.pentes}</span>
       </Label>
       {/* A display choice like the Fond: it hides the crosses, never a point or a reading. The Vue
           3D draws none, so it is off there — and a disabled button takes no hover, hence the wrapper. */}

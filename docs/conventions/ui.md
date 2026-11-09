@@ -401,9 +401,11 @@ shell, measured by `agent-browser` (`docs/conventions/routing.md`, 2026-11-09), 
   rather than run under MapLibre's zoom buttons (the overlay row is `right-12` and `flex-wrap`,
   every Page), so « Quitter la mesure » sits under « Placer A » at 1024. The rose's handle, the
   Mesure, « Placer B » and the Vue 3D work there (`docs/conventions/routing.md`), but the overlay
-  and the Mesure's readout cover much of a 191 px map, and at the switch the « Fond de carte »
-  select shrinks to « Carte c… » beside « Pentes supérieures à 30° ». Accepted: the brief puts the
-  switch at 1024, and the map is the wider of the two from 1106.
+  and the Mesure's readout cover much of a 191 px map, and at the switch, beside « Repères »
+  (#107), the « Fond de carte » select shrinks to its 72 px floor (« Carte ») and the pentes label
+  is then cut to « Pentes sup… », its whole name in its title — the select gives way first, so
+  390 px still reads « Pentes supérieures à 30° » whole. Accepted: the brief puts the switch at
+  1024, and the map is the wider of the two from 1106.
 - **The Skeleton is the same tree** (`StatiqueFrame`), so it lands in the same boxes at every width.
 
 ## Charts
