@@ -190,7 +190,8 @@ _Avoid_: descente, envelope vs instant, global vs local, min vs current, worst c
 
 **Verdict**:
 The app's answer to "is this line safe?" — the worst tension over the whole traverse and
-the minimum clearance over the whole traverse, judged against a chosen safety regime.
+the minimum clearance over the traverse outside the Zones d'ancrage, judged against a chosen
+safety regime.
 Never judged from the rider's current position.
 _Avoid_: check, validation, safety result
 
@@ -311,10 +312,17 @@ full when clearance is measured. French, on every Page: **gabarit du passager**.
 _Avoid_: empreinte, hauteur du passager, enveloppe, maître-couple, rider height, lanyard length, offset
 
 **Garde au sol**:
-The distance from the passager to the ground. The minimum is where, over the traverse, the
-passager comes closest to the ground. At the passager's position it is the same quantity,
-not a second name. The maximum is the inverse and is not a shown value.
+The distance from the passager to the ground. The minimum is where, over the traverse outside
+the two Zones d'ancrage, the passager comes closest to the ground. At the passager's position it
+is the same quantity, not a second name. The maximum is the inverse and is not a shown value.
 _Avoid_: garde sous le passager, garde passager
+
+**Zone d'ancrage**:
+The stretch at each end of the span, measured horizontally from the anchor, where the passager is
+still or already on the platform and comes close to the ground by construction. Clearance there
+— garde, Garde min. ligne, Rider Contact, Cable Contact — is not judged; the coupe greys it. Its
+length is set on Avancé, 10 m by default, a convention without a normative source.
+_Avoid_: zone de départ, zone d'arrivée, plateforme, zone exclue, zone morte
 
 **Garde exigée**:
 The garde au sol the user refuses to go under. Not the computed garde.
