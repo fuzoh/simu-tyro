@@ -60,6 +60,8 @@ export const MAP_COPY = {
   /** What it hides, on hover: the crosses alone, never what they help to place. */
   reperesHelp:
     "Afficher ou masquer les croix pointillées : par A et B, par les points de la Mesure et sous le pointeur.",
+  /** Why it is off in the Vue 3D, on hover: the crosses are drawn on the vue de dessus alone. */
+  reperes3d: "Repères : la Vue 3D n'en trace pas — revenez en 2D.",
 } as const;
 
 /** The Mesure's words (#98). */

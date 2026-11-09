@@ -647,17 +647,19 @@ function MapControls({
         />
         {MAP_COPY.pentes}
       </Label>
-      {/* A display choice like the Fond: it hides the crosses, never a point or a reading. */}
-      <Toggle
-        className="shrink-0"
-        onPressedChange={(reperes) => onDisplay({ ...display, reperes })}
-        pressed={display.reperes}
-        size="sm"
-        title={MAP_COPY.reperesHelp}
-        variant="outline"
-      >
-        {MAP_COPY.reperes}
-      </Toggle>
+      {/* A display choice like the Fond: it hides the crosses, never a point or a reading. The Vue
+          3D draws none, so it is off there — and a disabled button takes no hover, hence the wrapper. */}
+      <span className="shrink-0" title={shows3d ? MAP_COPY.reperes3d : MAP_COPY.reperesHelp}>
+        <Toggle
+          disabled={shows3d}
+          onPressedChange={(reperes) => onDisplay({ ...display, reperes })}
+          pressed={display.reperes}
+          size="sm"
+          variant="outline"
+        >
+          {MAP_COPY.reperes}
+        </Toggle>
+      </span>
       {/* A disabled button takes no hover, so the reason's title is on its wrapper. */}
       <span className="shrink-0" title={blocked === null ? undefined : VUE_3D_BLOCKED[blocked]}>
         <Toggle
