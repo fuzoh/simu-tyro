@@ -209,38 +209,14 @@ export function threeColumns(viewportWidth: number): boolean {
 }
 
 /**
- * The simplified Pages' fields column from `md` — Statique's, Dynamique's: `md:w-80`, 320 px. Their
- * right column is the rest of the shell.
- */
-export const FIELDS_WIDTH = 320;
-
-/**
  * **Statique's first row (#109)** — from {@link THREE_COLUMN_PX} of viewport, the vue de dessus on
  * the left and the `Résultats` on its right as a block of 2 × 3 tiles, the Verdict across the
- * third row; the coupe under both, across the column. Each tile is capped at this, px — the
- * `minmax(0,180px)` of the block's two tracks.
+ * third row; the coupe under both, across the column. Each tile is capped at this, px: the block's
+ * `--tile-max`, the `minmax(0, var(--tile-max))` of its two tracks. With their `gap-2` the block is
+ * `2 × 180 + 8 = 368` px, « environ 370 px »; what that leaves the map is measured, not modelled
+ * (`docs/conventions/ui.md`, *Statique's first row*).
  */
 export const STATIQUE_TILE_MAX_PX = 180;
-
-/** The tiles' `gap-2`, px. */
-export const TILE_GAP_PX = 8;
-
-/** The block of tiles, its gap included: « environ 370 px ». */
-export const STATIQUE_TILE_BLOCK_PX: number = 2 * STATIQUE_TILE_MAX_PX + TILE_GAP_PX;
-
-/**
- * **The vue de dessus's width on Statique at a viewport width**, from {@link THREE_COLUMN_PX}: the
- * right column less the block of tiles, less four `px-3` — two each side of the hairline between
- * the two regions — and that hairline. The same number the browser lays out, for the budgets and
- * tests that have no DOM; like {@link chartColumnWidth}, it ignores the shell's two hairlines past
- * its cap and the column's scrollbar gutter, which is the platform's. Below the switch the vue de
- * dessus spans the column, as it always did: `null`.
- */
-export function statiqueTopViewWidth(viewportWidth: number): number | null {
-  if (!threeColumns(viewportWidth)) return null;
-  const column = Math.min(viewportWidth, SHELL_MAX_PX) - FIELDS_WIDTH;
-  return column - STATIQUE_TILE_BLOCK_PX - 4 * GUTTER - 1;
-}
 
 /**
  * **The chart column's inline size at a viewport width** — the middle column from

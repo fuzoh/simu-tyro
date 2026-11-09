@@ -32,7 +32,6 @@ import {
   createSharedX,
   createZScale,
   exaggeration,
-  FIELDS_WIDTH,
   GUTTER,
   innerWidth,
   MIN_RAIL,
@@ -51,9 +50,7 @@ import {
   REFERENCE_DESKTOP_PX,
   RIGHT_COLUMN_WIDTH,
   SHELL_MAX_PX,
-  STATIQUE_TILE_BLOCK_PX,
   STATIQUE_TILE_MAX_PX,
-  statiqueTopViewWidth,
   STRIP,
   STRIP_POLICY_BAND,
   THREE_COLUMN_PX,
@@ -1406,48 +1403,15 @@ describe("#115 — the coupe's gutter is the containers' margin", () => {
 
 /**
  * #109 — **Statique's first row**: from B2 the vue de dessus on the left, the `Résultats` on its
- * right as a 2 × 3 block of capped tiles, the coupe under both. Where the boxes land is
- * `agent-browser`'s to measure (`docs/conventions/routing.md`, 2026-11-09); what is arithmetic is
- * the block's width and what it leaves the map, and that the classes spell these numbers.
+ * right as a 2 × 3 block of capped tiles, the coupe under both. The cap is the one number of it in
+ * the contract, and it reaches the CSS as the block's `--tile-max` rather than as a second spelling
+ * in a class. Where the boxes land — the map's 287 / 703 / 989 px, the coupe under both — is
+ * `agent-browser`'s to measure (`docs/conventions/routing.md`, 2026-11-09), not a class to grep.
  */
 describe("#109 — Statique's first row: the vue de dessus, then the block of tiles", () => {
   it("each tile is capped at 180 px, so the block is about 370 px, its gap included", () => {
+    // By hand, the brief's « environ 180 px » and its « environ 370 px gouttière comprise »: two
+    // tiles and the `gap-2` between them, 0,5 rem — 2 × 180 + 8 = 368.
     expect(STATIQUE_TILE_MAX_PX).toBe(180);
-    // By hand: two tiles and the `gap-2` between them, 2 × 180 + 8.
-    expect(STATIQUE_TILE_BLOCK_PX).toBe(368);
-  });
-
-  it("the row starts at Avancé's three-column switch; below it the regions stack as before", () => {
-    for (const viewport of [390, 768, THREE_COLUMN_PX - 1]) {
-      expect(statiqueTopViewWidth(viewport)).toBeNull();
-    }
-    expect(statiqueTopViewWidth(THREE_COLUMN_PX)).not.toBeNull();
-  });
-
-  it("the vue de dessus takes the rest of the column, as agent-browser measured it", () => {
-    // By hand: the column is `min(viewport, 1728) − 320`; the map has it less the block (368),
-    // four `px-3` (48) and the hairline between the regions (1) — 417 in all.
-    expect(statiqueTopViewWidth(1024)).toBe(704 - 417); // measured 287
-    expect(statiqueTopViewWidth(1440)).toBe(1120 - 417); // measured 703
-    // Past the cap, measured 989: the shell's own two hairlines, which the contract ignores.
-    expect(statiqueTopViewWidth(2560)).toBe(1408 - 417);
-    expect(statiqueTopViewWidth(3440)).toBe(statiqueTopViewWidth(SHELL_MAX_PX));
-    // From the reference desktop the map is the wider of the two: the row leads with it. At the
-    // switch it is not — the cost of 1024, stated in `docs/conventions/ui.md`.
-    expect(statiqueTopViewWidth(REFERENCE_DESKTOP_PX)).toBeGreaterThan(STATIQUE_TILE_BLOCK_PX);
-    expect(statiqueTopViewWidth(THREE_COLUMN_PX)).toBeLessThan(STATIQUE_TILE_BLOCK_PX);
-  });
-
-  it("Statique's frame and grid spell the contract's numbers", () => {
-    const root = fileURLToPath(new URL("../../..", import.meta.url));
-    const read = (path: string) => readFileSync(join(root, path), "utf8");
-    const frame = read("src/components/statique/frame.tsx");
-    const outputs = read("src/components/statique/outputs.tsx");
-    const wide = `min-[${THREE_COLUMN_PX}px]:`;
-    // `md:w-80` is 20 rem: the fields column's 320 px, written as a Tailwind step.
-    expect(FIELDS_WIDTH).toBe(80 * 4);
-    expect(frame).toContain("md:w-80");
-    expect(frame).toContain(`${wide}grid ${wide}grid-cols-[minmax(0,1fr)_auto]`);
-    expect(outputs).toContain(`${wide}grid-cols-[repeat(2,minmax(0,${STATIQUE_TILE_MAX_PX}px))]`);
   });
 });

@@ -8,7 +8,7 @@
  * print says why in a sentence, never with « — », which is `Indéterminé`'s glyph.
  */
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import { createContext, use } from "react";
 
@@ -17,6 +17,7 @@ import type { StatiqueOutput, StatiqueOutputs, StatiqueVerdict } from "@/lib/sta
 import { TONE_CLASS } from "@/components/app/banner.tsx";
 import { HelpText } from "@/components/docs/help-text.tsx";
 import { VERDICT_TONE } from "@/lib/app/tone.ts";
+import { STATIQUE_TILE_MAX_PX } from "@/lib/layout/contract.ts";
 import { OUTPUT_LABEL } from "@/lib/statique/copy.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -47,8 +48,10 @@ const GridLayout = createContext<"row" | "block">("row");
  * - **a block** (`block`, Statique's, #109) — two columns at every width, the Verdict across both
  *   on the third row, and from `THREE_COLUMN_PX` of viewport each tile capped at
  *   `STATIQUE_TILE_MAX_PX` (`@/lib/layout/contract.ts`), so the block stands beside the vue de
- *   dessus. Below 1024 it is the row's own phone shape: Statique's column, `md:w-80` short of the
- *   viewport, is 703 px at the most there, and a row of five needs 896.
+ *   dessus. The cap reaches the CSS as the block's own `--tile-max`, so the contract's number is
+ *   the one the browser lays out, never a second spelling of it in a class. Below 1024 it is the
+ *   row's own phone shape: Statique's column, `md:w-80` short of the viewport, is 703 px at the
+ *   most there, and a row of five needs 896.
  */
 export function OutputGrid({
   block = false,
@@ -63,8 +66,11 @@ export function OutputGrid({
       <div
         className={cn(
           "grid grid-cols-2 gap-2",
-          block ? "min-[1024px]:grid-cols-[repeat(2,minmax(0,180px))]" : "@min-[56rem]:grid-cols-5",
+          block
+            ? "min-[1024px]:grid-cols-[repeat(2,minmax(0,var(--tile-max)))]"
+            : "@min-[56rem]:grid-cols-5",
         )}
+        style={block ? ({ "--tile-max": `${STATIQUE_TILE_MAX_PX}px` } as CSSProperties) : undefined}
       >
         {children}
       </div>
