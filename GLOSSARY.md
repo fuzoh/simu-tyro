@@ -385,10 +385,9 @@ The banner slot, profile chart, clearance strip, View Strip and five read-out ce
 one co-visible unit sharing a single x scale and a single gutter constant. On Avancé it stands
 in the middle column between the Rail's two, under Statique's vue de dessus, which heads that
 column from the three-column width — never a view of Avancé's own — and it widens with the
-window. It reflows and collapses as a whole; no member is ever hidden or occluded on
-its own. Co-visible means its members stand together, not that the block is in view: in
-Avancé's three columns it starts under the vue de dessus, so from the three-column width up
-whether it — and « Garde min » with it — is on screen depends on the middle column's scroll.
+window up to the column at 2560 px, past which it letterboxes, centred in the column, so the
+whole block stays short enough for a 1440 px window. It reflows and collapses as a whole; no
+member is ever hidden or occluded on its own.
 _Avoid_: chart area, main pane, canvas
 
 **View Strip**:
