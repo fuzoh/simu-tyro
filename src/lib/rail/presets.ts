@@ -89,6 +89,24 @@ export function applyMaterialPreset(scenario: ScenarioDraft, id: PresetId): Scen
   return { ...scenario, material: { family: "textile", ...preset.spec } };
 }
 
+/**
+ * Which preset the Scenario's material is on, derived and never stored: the textile spec holds
+ * every one of the preset's five values at display precision (the unit-free daN reading the chips
+ * use, so `u=kn` changes nothing). Strict, unlike the chips: one field edited away and the Scenario
+ * is on no preset, while the unedited fields keep their sheet chip.
+ */
+export function matchingPreset(material: ScenarioDraft["material"]): PresetId | null {
+  if (material.family !== "textile") return null;
+  for (const preset of MATERIAL_PRESETS) {
+    if (
+      material.ropeClass === preset.spec.ropeClass &&
+      PRESET_NUMERICS.every((field) => matches(material, preset.spec, field))
+    )
+      return preset.id;
+  }
+  return null;
+}
+
 /** A preset field moved off the preset's value. */
 export const VALUE_CHIP: PresetProvenance = {
   label: "valeur utilisateur",

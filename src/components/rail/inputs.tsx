@@ -115,6 +115,7 @@ import {
   MATERIAL_PRESETS,
   PRESET_LABEL,
   applyMaterialPreset,
+  matchingPreset,
   presetProvenance,
 } from "@/lib/rail/presets.ts";
 import { PROVENANCE_COPY, warningLadder } from "@/lib/rail/provenance.ts";
@@ -1289,8 +1290,9 @@ export function CarryingLinesRow() {
 }
 
 /**
- * A rope preset — an **action**, not a selection: the Scenario holds the values, never the
- * preset's name, so the select returns to « — choisir — » after filling.
+ * A rope preset — an **action**: the Scenario holds the values, never the preset's name. The select
+ * reads the preset back off them (`matchingPreset`), so it names the preset while the values are
+ * its own and returns to « — choisir — » once one is edited.
  */
 export function PresetRow() {
   const { scenario } = useAppState();
@@ -1302,7 +1304,7 @@ export function PresetRow() {
           id="rail-preset"
           onChange={(id) => patch(applyMaterialPreset(scenario, id))}
           options={MATERIAL_PRESETS.map(({ id, label }) => ({ value: id, label }))}
-          value=""
+          value={matchingPreset(scenario.material) ?? ""}
         />
       }
       help={helpFor(register, PRESET_HELP)}

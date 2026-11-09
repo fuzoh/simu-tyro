@@ -8,7 +8,7 @@ import { completeFromDefaults, scenarioToSearch, searchToScenario } from "@/lib/
 import { canonicalLink, parseLinkSearch, validateSearch } from "@/lib/url/schema.ts";
 
 import { COURANT_BANDIT_11 as SHEET } from "./__fixtures__/courant-bandit.ts";
-import { applyMaterialPreset, presetProvenance } from "./presets.ts";
+import { applyMaterialPreset, matchingPreset, presetProvenance } from "./presets.ts";
 import { provenanceAggregate } from "./provenance.ts";
 import { applyField, applyRopeClass } from "./values.ts";
 
@@ -144,5 +144,73 @@ describe("Courant Bandit 11 mm preset", () => {
     const { search: completed, completed: filledIn } = completeFromDefaults(search);
     expect(searchToScenario(completed).material).toEqual(scenario.material);
     expect(filledIn).toEqual([]);
+  });
+});
+
+describe("which preset the Scenario is on", () => {
+  test("the filled spec is on the Courant Bandit 11 mm", () => {
+    expect(matchingPreset(filled())).toBe("courant-bandit-11");
+  });
+
+  test("a spec read off the sheet's figures, typed in the field's units, is on it too", () => {
+    // 3100 daN is 31 000 N; 73 g/m is 0,073 kg/m; the sheet's own numbers, not the preset's.
+    expect(
+      matchingPreset({
+        family: "textile",
+        ropeClass: SHEET.ropeClass.value,
+        MBL: SHEET.mblDaN.value * 10,
+        mu: SHEET.linearMassGramsPerMetre.value / 1000,
+        d: SHEET.diameterMm.value,
+        k: 1.27,
+      }),
+    ).toBe("courant-bandit-11");
+  });
+
+  test.each([
+    ["MBL", { MBL: 30_000 }],
+    ["mu", { mu: 0.07 }],
+    ["d", { d: 12 }],
+    ["k", { k: 1.5 }],
+    ["ropeClass", { ropeClass: "hmpe" as const }],
+    ["a blank diameter", { d: undefined }],
+    ["a blank MBL", { MBL: null }],
+  ])("one field edited away (%s) is on no preset", (_name, edit) => {
+    expect(matchingPreset({ ...filled(), ...edit })).toBeNull();
+  });
+
+  test("a sub-display-precision difference still matches: 11,04 mm reads 11,0, 3100,4 daN reads 3100", () => {
+    expect(matchingPreset({ ...filled(), d: 11.04 })).toBe("courant-bandit-11");
+    expect(matchingPreset({ ...filled(), MBL: 31_004 })).toBe("courant-bandit-11");
+  });
+
+  test("the first-run rope, a rope typed by hand and a steel line are on none", () => {
+    expect(matchingPreset(FIRST_RUN_RETAINED_TEXTILE.spec)).toBeNull();
+    expect(
+      matchingPreset({ ...FIRST_RUN_RETAINED_TEXTILE.spec, MBL: 20_000, mu: 0.05 }),
+    ).toBeNull();
+    expect(matchingPreset(FIRST_RUN_SCENARIO.material)).toBeNull();
+  });
+
+  test("an edit reads as no preset and filling again restores it", () => {
+    const edited = applyField(
+      applyMaterialPreset(textileDraft, "courant-bandit-11"),
+      "MBL",
+      30_000,
+      null,
+    );
+    expect(matchingPreset(edited.material)).toBeNull();
+    expect(matchingPreset(applyMaterialPreset(edited, "courant-bandit-11").material)).toBe(
+      "courant-bandit-11",
+    );
+  });
+
+  test("a link carrying the preset's values decodes to a Scenario on the preset", () => {
+    const scenario = completeScenario(applyMaterialPreset(textileDraft, "courant-bandit-11"));
+    if (scenario === null) throw new Error("a filled preset is a complete scenario");
+    const link = canonicalLink(scenarioToSearch(scenario), "/");
+    const search = validateSearch(parseLinkSearch(link.slice(2)));
+    if (search.refused !== undefined) throw new Error("refused");
+    const decoded = searchToScenario(completeFromDefaults(search).search);
+    expect(matchingPreset(decoded.material)).toBe("courant-bandit-11");
   });
 });
