@@ -489,8 +489,8 @@ not only in the Mesure, they follow an anchor while it is dragged, so a point of
 can be set in line with an anchor. The « Repères » button above the map hides or shows them
 all at once; shown by default. A display choice like the Fond de carte, never part of the
 Scenario nor of the link, and hiding them hides no point, no line and no reading of the
-Mesure. The Page Terrain and the Vue 3D have none: there the Mesure keeps the crosses of its
-points.
+Mesure. The Vue 3D has no Repères and no Mesure, and its « Repères » button is off. The Page
+Terrain has no Repères: there the Mesure keeps the crosses of its points, as #98 drew them.
 _Avoid_: grille, guides, réticule, viseur, crosshair
 
 ### When something is wrong
