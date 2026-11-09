@@ -10,7 +10,14 @@
  * - **The north needle turns with the camera**: it points where north is on the screen, so the
  *   heading reads at a glance, and a press turns north up.
  * - **A sibling of the canvas, never inside it**, so a press on a button is no gesture of the
- *   view's; each target is 44 px on a coarse pointer (`.touch-44`).
+ *   view's; each target is 44 px (`.touch-44`).
+ * - **No button's face belongs to another.** The pad's 28 px buttons stand 4 px apart, so each
+ *   44 px hit box bleeds 4 px onto its neighbour's face; painted in DOM order, the later one's
+ *   would win there, and a click on the edge of « Incliner vers le bas » would fly to « Vue du
+ *   départ ». The hit boxes are therefore painted **under** every face (`after:-z-1`), inside the
+ *   group's own stacking context (`isolate`), so they still win over the canvas: a face is its own
+ *   button, and only the 4 px gaps and the margin around the group take the enlarged target. The
+ *   pad's grid box would sit over its gaps' hit boxes, so it lets presses through.
  */
 
 import type { ReactNode } from "react";
@@ -46,10 +53,12 @@ export function Gimbal({
   return (
     <div
       aria-label={GIMBAL_COPY.title}
-      className="absolute top-2 left-2 flex flex-col gap-1"
+      className="absolute top-2 left-2 isolate flex flex-col gap-1"
       role="group"
     >
-      <div className="grid grid-cols-3 gap-1">
+      {/* The pad's own box lets a press through to the hit boxes under it, so its 4 px gaps keep
+          the enlarged target the faces no longer cover; its children take presses again. */}
+      <div className="pointer-events-none grid grid-cols-3 gap-1 *:pointer-events-auto">
         <Pad
           command={{ kind: "orbit", step: -1 }}
           keys="←"
@@ -127,6 +136,9 @@ export function Gimbal({
   );
 }
 
+/** `.touch-44`, its hit box painted under every button's face: see the module's rules. */
+const UNDER_FACES = "touch-44 after:-z-1";
+
 type Control = {
   command: Vue3dCommand;
   /** The key that does the same, as the hover names it. */
@@ -140,7 +152,7 @@ function Pad({ command, keys, name, onCommand, children }: Control & { children:
   return (
     <Button
       aria-label={name}
-      className="touch-44"
+      className={UNDER_FACES}
       onClick={() => onCommand(command)}
       size="icon-sm"
       title={gimbalHint(name, keys)}
@@ -155,7 +167,7 @@ function Pad({ command, keys, name, onCommand, children }: Control & { children:
 function Preset({ command, keys, name, onCommand }: Control) {
   return (
     <Button
-      className="touch-44"
+      className={UNDER_FACES}
       onClick={() => onCommand(command)}
       size="sm"
       title={gimbalHint(name, keys)}

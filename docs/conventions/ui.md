@@ -200,11 +200,15 @@ layer picker of its own (#111).
 **The Gimbal is HTML over the canvas, from `ui/`** (#111). CesiumJS has no navigation control and
 none is brought in: `vue-3d-gimbal.tsx` is `ui/button` at `size="icon-sm"` (the pad) and
 `size="sm"` (« Vue du départ », « Vue latérale »), `.touch-44` at each call site, over the view's
-top-left corner where « Placer A / B » sit on the vue de dessus. Each button's hover names its key
-(`gimbalHint`), and a keyboard glyph's hover lists them all (`vue3dKeysHelp`). The keys act only
-from inside the view — its canvas, focusable and outlined in `--ring` when tabbed to, or a Gimbal
-button — and a handled key's default is cancelled, so an arrow turns the camera and never scrolls
-the page. The north needle is `Navigation2` turned by the camera's heading: a shape, not a printed
+top-left corner where « Placer A / B » sit on the vue de dessus. The buttons stand 4 px apart, so
+each 44 px hit box bleeds onto its neighbour's face; the Gimbal paints those hit boxes **under**
+every face (`after:-z-1` inside an `isolate` group), so a face is always its own button and a click
+on the edge of « Incliner vers le bas » never flies to « Vue du départ ». The pad's grid box lets
+presses through (`pointer-events-none`, its children `auto`), so its gaps keep the enlarged target.
+Each button's hover names its key (`gimbalHint`), and a keyboard glyph's hover lists them all
+(`vue3dKeysHelp`). The keys act only from inside the view — its canvas, focusable and outlined in
+`--ring` when tabbed to, or a Gimbal button — and a handled key's default is cancelled, so an arrow
+turns the camera and never scrolls the page. The north needle is `Navigation2` turned by the camera's heading: a shape, not a printed
 number.
 
 **The carte claire has no raster twin, so the Vue 3D drapes its nearest one.** The carte claire is
