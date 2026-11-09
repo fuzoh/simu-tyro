@@ -5,7 +5,9 @@
  *
  * Its own layout, not the Rail's. Below `md` it is **one scroller**: the outputs, the coupe and the
  * vue de dessus first — what a rigger on site came to read — then the fields. From `md` the fields
- * are a column on the left and the rest a column on the right, each its own scroller. The coupe is
+ * are a column on the left and the rest a column on the right, each its own scroller. From
+ * `THREE_COLUMN_PX` (#109) the right column's first row is the vue de dessus, as wide as the column
+ * leaves it, with the tiles' 2 × 3 block on its right; the coupe is under both. The coupe is
  * the Chart Block itself, in a column that is its query container and carries the layout contract's
  * custom properties, so every band is the same function of its width as on Avancé. There is no
  * collapse here: the block is never squeezed beside a keyboard, it scrolls with the Page.
@@ -28,6 +30,7 @@ import { GroupHeading } from "@/components/rail/controls.tsx";
 import { cellLabel, cellsOf } from "@/lib/rail/cells.ts";
 import { OUTPUT_LABEL, SECTION, STATIQUE_GROUPS } from "@/lib/statique/copy.ts";
 import { scopeOf, STATIQUE_OUTPUT_IDS } from "@/lib/statique/outputs.ts";
+import { cn } from "@/lib/utils.ts";
 
 import { OutputGrid, TileFrame } from "./outputs.tsx";
 import { TopViewFrame } from "./top-view.tsx";
@@ -55,18 +58,34 @@ export function StatiqueFrame({
 }) {
   return (
     <ColumnsFrame busy={busy} fields={fields} strip={strip}>
-      <Region title={SECTION.outputs}>
-        <div className="px-3">{outputs}</div>
-      </Region>
-      <Region title={SECTION.section}>
-        {/* No horizontal padding: the gutter lives inside the two SVGs, as on Avancé. */}
-        <div className="@container min-w-0" ref={sectionRef}>
-          {section}
-        </div>
-      </Region>
-      <Region title={SECTION.topView}>
-        <div className="px-3">{topView}</div>
-      </Region>
+      {/* Below B2 the wrapper is `contents`: the three regions stack in the column as they always
+          have. From B2 it is a grid — the vue de dessus, then the tiles as wide as their block, on
+          the first row; the coupe across the second. The DOM keeps the phone's reading order. */}
+      <div className="contents min-[1024px]:grid min-[1024px]:grid-cols-[minmax(0,1fr)_auto]">
+        <Region
+          className="min-[1024px]:col-start-2 min-[1024px]:row-start-1 min-[1024px]:border-l"
+          title={SECTION.outputs}
+        >
+          <div className="px-3">{outputs}</div>
+        </Region>
+        {/* `min-w-0`: the two regions whose occupant is sized off a measured width, so a grid item
+            that is never narrower than its drawing cannot hold the column open as it narrows. */}
+        <Region
+          className="min-[1024px]:col-span-full min-[1024px]:row-start-2 min-[1024px]:min-w-0 min-[1024px]:border-b-0"
+          title={SECTION.section}
+        >
+          {/* No horizontal padding: the gutter lives inside the two SVGs, as on Avancé. */}
+          <div className="@container min-w-0" ref={sectionRef}>
+            {section}
+          </div>
+        </Region>
+        <Region
+          className="min-[1024px]:col-start-1 min-[1024px]:row-start-1 min-[1024px]:min-w-0 min-[1024px]:last:border-b"
+          title={SECTION.topView}
+        >
+          <div className="px-3">{topView}</div>
+        </Region>
+      </div>
     </ColumnsFrame>
   );
 }
@@ -116,9 +135,20 @@ export function ColumnsFrame({
 }
 
 /** One of the right column's regions: a heading, then its occupant. */
-export function Region({ title, children }: { title: string; children: ReactNode }) {
+export function Region({
+  title,
+  className,
+  children,
+}: {
+  title: string;
+  /** Where a Page's own layout places the region — Statique's first row (#109). */
+  className?: string;
+  children: ReactNode;
+}) {
   return (
-    <section className="border-border flex flex-col gap-2 border-b py-3 last:border-b-0">
+    <section
+      className={cn("border-border flex flex-col gap-2 border-b py-3 last:border-b-0", className)}
+    >
       <h2 className="font-heading text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">
         {title}
       </h2>
@@ -147,7 +177,7 @@ export function StatiqueSkeleton() {
         </div>
       }
       outputs={
-        <OutputGrid>
+        <OutputGrid block>
           {STATIQUE_OUTPUT_IDS.map((id) => (
             <TileFrame key={id} label={OUTPUT_LABEL[id]} scope={scopeOf(id)} />
           ))}
