@@ -222,7 +222,7 @@ export const CAMERA_STEP = {
   orbitDeg: 5,
   /** Degrees of pitch. */
   tiltDeg: 5,
-  /** The share of the distance to what the view looks at that a zoom in closes. */
+  /** The share of the step's distance ({@link stepDistance}) that a zoom in closes. */
   zoom: 0.2,
   /** The share of that distance a step forward covers, never under {@link MIN_WALK_M}. */
   walk: 0.1,
@@ -245,18 +245,41 @@ export function tiltedPitch(pitchDeg: number, step: 1 | -1): number {
 }
 
 /**
- * How far one zoom step moves the camera along its view, m, positive closer. Out is the inverse of
- * in — a step in then a step out comes back — and stops at {@link CAMERA_REACH}.
+ * The distance a zoom or a walk step scales on, m: how far the camera stands from what the middle
+ * of the view looks at, never more than from the far side of the line. A view aimed over the line
+ * at a slope across the valley would otherwise step by kilometres, past the whole line.
  *
- * @param distance how far the camera stands from what it looks at, m.
+ * @param toLooked how far the camera stands from what the middle of the view hits on the relief,
+ *   m; `undefined` when it looks at the sky.
+ * @param toCentre how far the camera stands from the line's centre, m.
+ * @param radius the radius of the sphere around the line, m.
  */
-export function zoomAmount(distance: number, step: 1 | -1): number {
-  if (step === 1) return distance * CAMERA_STEP.zoom;
-  const back = (distance * CAMERA_STEP.zoom) / (1 - CAMERA_STEP.zoom);
-  return -Math.max(0, Math.min(back, CAMERA_REACH - distance));
+export function stepDistance(toLooked: number | undefined, toCentre: number, radius: number) {
+  return Math.min(toLooked ?? toCentre, toCentre + radius);
 }
 
-/** How far one walk step moves the camera, m, positive forward. */
+/**
+ * How far one zoom step moves the camera along its view, m, positive closer. Out is the inverse of
+ * in — a step in then a step out comes back — and stops when the camera stands
+ * {@link CAMERA_REACH} high, the height CesiumJS's own zoom stops at.
+ *
+ * @param distance the step's distance ({@link stepDistance}), m.
+ * @param height how high the camera stands, m.
+ */
+export function zoomAmount(distance: number, step: 1 | -1, height: number): number {
+  if (step === 1) return distance * CAMERA_STEP.zoom;
+  const back = Math.min(
+    (distance * CAMERA_STEP.zoom) / (1 - CAMERA_STEP.zoom),
+    CAMERA_REACH - height,
+  );
+  return back > 0 ? -back : 0;
+}
+
+/**
+ * How far one walk step moves the camera, m, positive forward.
+ *
+ * @param distance the step's distance ({@link stepDistance}), m.
+ */
 export function walkAmount(distance: number, step: 1 | -1): number {
   return step * Math.max(MIN_WALK_M, distance * CAMERA_STEP.walk);
 }

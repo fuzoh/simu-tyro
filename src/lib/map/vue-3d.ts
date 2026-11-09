@@ -87,7 +87,10 @@ export function drapedAttribution(fond: Fond): string {
  */
 export const FIL_RISE = 100_000;
 
-/** The farthest the camera may stand from what it looks at, m — the Fils à plomb outreach it. */
+/**
+ * The farthest the camera stands back, m: the height a zoom out stops at, and the farthest the Vue
+ * latérale stands from the line — the Fils à plomb outreach it.
+ */
 export const CAMERA_REACH = 20_000;
 
 /** Why the switch to the Vue 3D is off: no two Positions, or no profil to stand the line on. */

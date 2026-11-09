@@ -87,6 +87,7 @@ import {
 } from "@/lib/map/style.ts";
 import {
   CAMERA_STEP,
+  stepDistance,
   tiltedPitch,
   vueDuDepart,
   vueLaterale,
@@ -347,7 +348,7 @@ export async function openVue3d(
     },
     command(command) {
       if (shown === null || widget.isDestroyed()) return;
-      moveCamera(cesium, shown, line.center, command);
+      moveCamera(cesium, shown, line, command);
     },
     destroy() {
       pointer.destroy();
@@ -664,18 +665,24 @@ function levelAhead(cesium: Scene): Cartesian3 {
  * One step of the Gimbal or of a key.
  *
  * @param shown the scene on screen and the layers it shows, which the Vues prédéfinies frame.
- * @param centre the line's centre, which the orbit turns around.
+ * @param line the sphere around the line: its centre is what the orbit turns around, and its far
+ *   side the farthest a zoom or a walk step scales on.
  */
 function moveCamera(
   cesium: Scene,
   { scene, layers }: { scene: Vue3dScene; layers: Vue3dLayers },
-  centre: Cartesian3,
+  line: BoundingSphere,
   command: Vue3dCommand,
 ) {
   const { camera } = cesium;
+  const centre = line.center;
   camera.cancelFlight();
   const looked = middleOfView(cesium);
-  const distance = Cartesian3.distance(camera.positionWC, looked ?? centre);
+  const toCentre = Cartesian3.distance(camera.positionWC, centre);
+  const toLooked =
+    looked === undefined ? undefined : Cartesian3.distance(camera.positionWC, looked);
+  // Zoom and walk scale on the line, never on a far slope the middle of the view happens to hit.
+  const step = stepDistance(toLooked, toCentre, line.radius);
   switch (command.kind) {
     case "orbit":
       // Around the centre's own vertical: in its east-north-up frame that is the z axis. `rotate`
@@ -696,13 +703,13 @@ function moveCamera(
       });
       return;
     case "zoom": {
-      const amount = zoomAmount(distance, command.step);
+      const amount = zoomAmount(step, command.step, camera.positionCartographic.height);
       if (amount >= 0) camera.zoomIn(amount);
       else camera.zoomOut(-amount);
       return;
     }
     case "walk":
-      camera.move(levelAhead(cesium), walkAmount(distance, command.step));
+      camera.move(levelAhead(cesium), walkAmount(step, command.step));
       return;
     case "north":
       // Turned about what the middle of the view looks at, so the line stays where it was; in the
@@ -715,7 +722,7 @@ function moveCamera(
         });
       } else {
         camera.flyToBoundingSphere(new BoundingSphere(looked, 0), {
-          offset: new HeadingPitchRange(0, camera.pitch, distance),
+          offset: new HeadingPitchRange(0, camera.pitch, toLooked ?? toCentre),
           duration: NORTH_FLIGHT_S,
         });
       }

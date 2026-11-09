@@ -22,6 +22,7 @@ import {
   CAMERA_STEP,
   MIN_WALK_M,
   PITCH_RANGE,
+  stepDistance,
   tiltedPitch,
   vue3dKeyCommand,
   vueDuDepart,
@@ -231,14 +232,31 @@ describe("one step of the camera", () => {
   });
 
   test("a zoom in closes a fifth of the distance, and a zoom out undoes it", () => {
-    expect(zoomAmount(500, 1)).toBeCloseTo(100, 9);
+    expect(zoomAmount(500, 1, 2_000)).toBeCloseTo(100, 9);
     // 400 m from the target, out: 400 / 0,8 = 500 m again.
-    expect(400 - zoomAmount(400, -1)).toBeCloseTo(500, 9);
+    expect(400 - zoomAmount(400, -1, 2_000)).toBeCloseTo(500, 9);
   });
 
-  test("a zoom out stops at the camera's reach", () => {
-    expect(zoomAmount(CAMERA_REACH - 10, -1)).toBeCloseTo(-10, 9);
-    expect(zoomAmount(CAMERA_REACH, -1)).toBeCloseTo(0, 9);
+  test("a zoom out stops when the camera stands at its reach's height", () => {
+    // 100 m back would be the step; 10 m are left under the ceiling.
+    expect(zoomAmount(400, -1, CAMERA_REACH - 10)).toBeCloseTo(-10, 9);
+    expect(zoomAmount(400, -1, CAMERA_REACH)).toBe(0);
+    expect(zoomAmount(400, -1, CAMERA_REACH + 500)).toBe(0);
+  });
+
+  test("a zoom out still moves when what the view looks at lies past the camera's reach", () => {
+    // Low over the valley, the middle of the view on a slope 25 km off: the step is the full
+    // 25 000 × 0,2 / 0,8 = 6 250 m back, not nothing.
+    expect(zoomAmount(25_000, -1, 2_400)).toBeCloseTo(-6_250, 6);
+  });
+
+  test("a step scales on what the middle of the view looks at, never past the far side of the line", () => {
+    // Looking at the line itself, 300 m off: that distance.
+    expect(stepDistance(300, 500, 250)).toBe(300);
+    // Looking over the line at a slope 12 km across the valley: the far side of the line, 750 m.
+    expect(stepDistance(12_000, 500, 250)).toBe(750);
+    // Looking at the sky: the line's centre.
+    expect(stepDistance(undefined, 500, 250)).toBe(500);
   });
 
   test("a step forward is a tenth of the distance, never under a metre", () => {
