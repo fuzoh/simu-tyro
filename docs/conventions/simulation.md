@@ -9,6 +9,7 @@ Long French engineering reports in `docs/references/`:
 
 | File | Covers |
 | --- | --- |
+| `equilibre spatial vent.md` | Preparatory spatial-equilibrium note for issues #127, #120, #118 and #124; no engine coefficient |
 | `simulation tyrolienne.md` | Catenary/parabolic sag, statics of the unloaded line, non-linear material behaviour, rider dynamics, numerical algorithms, cross-section rendering |
 | `tyrolienne sur cable.md` | Steel-cable spans >50 m: NF EN 15567, MBR, safety coefficients, anchor sizing, rigging setups |
 | `tyrolienne sur corde.md` | Textile-rope spans >50 m: vector statics, rope material strength, work-at-height and technical-rescue regulation |

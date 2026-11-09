@@ -938,7 +938,8 @@ MBL` / `≈ 31 @ 30 % MBL`, but a zip line is strength-sized for shock and rescu
 12. HMPE/PA thermal α magnitudes and creep-rate constants (confirm Vlasblom numbers)
     [§9.1, §9.2].
 13. Lateral wind model (blow-out corridor) — out of v1 scope, needed for EN compliance
-    view [§8.4].
+    view [§8.4]. Preparatory evidence and limits, without new coefficients:
+    `docs/references/equilibre spatial vent.md` (2026-11-09; issues #127, #120, #118, #124).
 14. Eddy-brake force–velocity curves (manufacturer data or bench measurement) [§12.3].
 15. Petzl Technical Institute quantified highline test reports; US Army FM rope-bridge
     sag-tension tables [R2 §7].
