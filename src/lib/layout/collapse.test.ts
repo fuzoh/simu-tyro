@@ -28,6 +28,7 @@ import {
   revealSurvivesScroll,
 } from "./collapse.ts";
 import {
+  avanceBlockWidth,
   BANNER,
   chartBlockHeight,
   chartColumnWidth,
@@ -569,38 +570,40 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
       fits: true,
     },
     {
-      // A 1344 px column since #110 (no shell cap): at 0,42 the block is
-      // `44 + 76 + 0,42 × 1320 + 200 + 44 + 52 = 970,4`, which would have fitted 1044 px anyway.
+      // A 1344 px block since #110 (no shell cap). The block Avancé draws there,
+      // `chartBlockHeight(1344, undefined, AVANCE_PLOT_MAX)`, is `44 + 76 + 0,42 × 1320 + 200 + 44 +
+      // 52 = 970,4` px — `contract.test.ts` holds it under the 1044 px left — but this fit does not
+      // read it: from B2 it returns before any block height.
       name: "1920×1080 — entier, la colonne s'élargit",
       fit: {
         viewportWidth: 1920,
         viewportHeight: 1080,
         keyboardInset: 0,
-        columnWidth: chartColumnWidth(1920),
+        columnWidth: avanceBlockWidth(1920),
       },
       fits: true,
     },
     {
-      // A 1984 px column: `416 + 0,42 × 1960 = 1239,2` px of block, under 1404.
+      // A 1984 px block, the column at 2560: Avancé's is `416 + 0,42 × 1960 = 1239,2` px, under 1404.
       name: "2560×1440 — entier",
       fit: {
         viewportWidth: 2560,
         viewportHeight: 1440,
         keyboardInset: 0,
-        columnWidth: chartColumnWidth(2560),
+        columnWidth: avanceBlockWidth(2560),
       },
       fits: true,
     },
     {
-      // The ultrawide the unbounded rule lost outright beside one Rail. Since #110 Avancé's plot is
-      // unbounded again — `416 + 0,42 × 2840 = 1608,8` px of block against 1404 — and the window
-      // still opens whole, because the middle column scrolls: the case the cap existed for.
-      name: "3440×1440 ultra-large — entier, la colonne défile",
+      // The ultrawide the unbounded rule lost outright beside one Rail. Avancé's block letterboxes
+      // at 1984 px in the 2864 px column, so it is 2560's 1239,2 px again, under 1404 — and the fit
+      // answers « whole » without reading it, as at every width from B2.
+      name: "3440×1440 ultra-large — entier, le bloc en letterbox",
       fit: {
         viewportWidth: 3440,
         viewportHeight: 1440,
         keyboardInset: 0,
-        columnWidth: chartColumnWidth(3440),
+        columnWidth: avanceBlockWidth(3440),
       },
       fits: true,
     },
@@ -740,14 +743,16 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
 
 /**
  * ADR-0002's navigation bar stands above every app Page's shell, so the shell never has the whole
- * viewport. Unlike § 8's strip it is never dismissed, so it is owed on **both** arms.
+ * viewport. Unlike § 8's strip it is never dismissed, so it is owed wherever the window's height
+ * binds the block — **below B2 only** since #110 (`heightBindsBlock`), where `MIN_RAIL` is owed
+ * under it too.
  */
-describe("la barre de navigation se paie sur toute largeur", () => {
+describe("la barre de navigation se paie sous B2", () => {
   const desktop: ViewportFit = {
     viewportWidth: 1440,
     viewportHeight: 900,
     keyboardInset: 0,
-    columnWidth: 1152,
+    columnWidth: chartColumnWidth(1440),
   };
 
   test("elle retire sa hauteur de ce qui reste, clavier compris", () => {
