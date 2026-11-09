@@ -53,8 +53,13 @@ export type TerrainTile = {
 export type TerrainView = { readonly tiles: readonly TerrainTile[] };
 
 export type TerrainInput = StatiqueInput & {
-  /** The two rides off the gated traverse; `null` under a cause and on an incomplete traverse. */
+  /**
+   * The two rides off the gated traverse (`gatedRides`); `null` under a cause and on an incomplete
+   * traverse.
+   */
   readonly reading: DynamicsReading | null;
+  /** Why the gates withhold the rides from a line that stands (`rideCause`), or `null`. */
+  readonly rideCause: string | null;
 };
 
 /** A tile's scope before there is a result to read it over — what the Skeleton reserves. */
@@ -75,7 +80,7 @@ export function terrainView(input: TerrainInput): TerrainView {
       statique("pretension"),
       statique("sag"),
       statique("clearance"),
-      arrivalTile(input.reading, input.scenario.material.family, input.cause),
+      arrivalTile(input.reading, input.scenario.material.family, input.cause ?? input.rideCause),
       verdictTile(verdict),
     ],
   };
@@ -93,7 +98,8 @@ function fromStatique(id: TerrainTileId, output: StatiqueOutput): TerrainTile {
 
 /**
  * The ride with the Vent entered, as Dynamique prints it: its vitesse d'arrivée, or « n'arrive
- * pas » and where it stops instead — an estimation either way.
+ * pas » and where it stops instead — an estimation either way. This Page has no field, so a ride
+ * the gates withhold says why on the tile itself.
  */
 function arrivalTile(
   reading: DynamicsReading | null,

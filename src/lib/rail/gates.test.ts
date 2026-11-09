@@ -58,7 +58,13 @@ describe("the first screen — verdict-less, and it still computes", () => {
     // « Régime choisi » is **struck** from the Solve Gate: as ticket 04 wrote it, first run blocked
     // the engine and showed an empty chart, destroying manual-mode ground's own reason for
     // existing. Garde min is geometric fact and the tension envelope is physics.
-    expect(report.passed).toEqual({ solve: true, clearance: true, verdict: false });
+    expect(report.passed).toEqual({
+      solve: true,
+      clearance: true,
+      verdict: false,
+      wind: true,
+      ride: true,
+    });
   });
 
   test("**nothing fails on first contact** — « — choisir — » is not an empty required field", () => {
@@ -80,7 +86,13 @@ describe("the first screen — verdict-less, and it still computes", () => {
       }),
     });
     expect(chosen.noRegime).toBe(false);
-    expect(chosen.passed).toEqual({ solve: true, clearance: true, verdict: true });
+    expect(chosen.passed).toEqual({
+      solve: true,
+      clearance: true,
+      verdict: true,
+      wind: true,
+      ride: true,
+    });
   });
 
   test("no banner line at all on the shipped scenario", () => {
@@ -372,6 +384,9 @@ describe("the gate matrix, one input at a time", () => {
     ["DAF", "verdict", (d) => void (d.rider.DAF = 0)],
     ["terminaison A", "verdict", (d) => void (d.terminations.A = { ...d.terminations.A, eta: 0 })],
     ["terminaison B", "verdict", (d) => void (d.terminations.B = { ...d.terminations.B, eta: 0 })],
+    ["vitesse du vent", "wind", (d) => void (d.wind = { speedKmh: -60, directionDeg: 0 })],
+    ["C_dA", "ride", (d) => void (d.dynamics = { ...d.dynamics, CdA: -0.45 })],
+    ["ρ", "ride", (d) => void (d.dynamics = { ...d.dynamics, rho: -1.2 })],
   ];
 
   test.each(cases)("%s breaches the %s gate", (_label, gate, patch) => {
@@ -393,8 +408,46 @@ describe("the gate matrix, one input at a time", () => {
         draft.rider.hRider = 0;
       }),
     });
-    expect(report.passed).toEqual({ solve: true, clearance: false, verdict: true });
+    expect(report.passed).toEqual({
+      solve: true,
+      clearance: false,
+      verdict: true,
+      wind: true,
+      ride: true,
+    });
     expect(blockingSummary(report)).toBe("⛔ 1 erreur bloquante — garde au sol indisponible");
+  });
+
+  test("a negative wind speed is kept and gated: statics, garde and Verdict stand (ADR-0001)", () => {
+    const report = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.regime = "en15567";
+        draft.wind = { speedKmh: -60, directionDeg: 0 };
+      }),
+    });
+    expect(report.passed).toEqual({
+      solve: true,
+      clearance: true,
+      verdict: true,
+      wind: false,
+      ride: true,
+    });
+    expect(report.errors[0]).toMatchObject({
+      field: "windSpeed",
+      kind: "invalid",
+      message: "⛔ Vitesse du vent — une vitesse négative n'existe pas. Valeur : −60 km/h.",
+    });
+    expect(blockingSummary(report)).toBe("⛔ 1 erreur bloquante — vent indisponible");
+  });
+
+  test("the other family's trolley constant is not on screen, so it blocks nothing", () => {
+    const report = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.material = { family: "steel", d: 12, R0: 1770, construction: "iwrc" };
+        draft.dynamics = { ...draft.dynamics, F0: -1, kv: -1 };
+      }),
+    });
+    expect(report.errors).toEqual([]);
   });
 
   test("`x_D` sits in no gate: an out-of-span viewpoint blocks nothing", () => {
@@ -407,11 +460,13 @@ describe("the gate matrix, one input at a time", () => {
     expect(report.errors).toEqual([]);
   });
 
-  test("the three consequences are § 7's own third column", () => {
+  test("the consequences are § 7's own third column, then what the passager's ride loses", () => {
     expect(GATE_CONSEQUENCE).toEqual({
       solve: "aucun résultat",
       clearance: "garde au sol indisponible",
       verdict: "aucun verdict",
+      wind: "vent indisponible",
+      ride: "aucune estimation",
     });
   });
 });
@@ -617,7 +672,13 @@ describe("ADR-0001 — a knot on HMPE is kept as given and blocks the verdict", 
   });
 
   test("geometry and clearance still solve; only the verdict goes", () => {
-    expect(report.passed).toEqual({ solve: true, clearance: true, verdict: false });
+    expect(report.passed).toEqual({
+      solve: true,
+      clearance: true,
+      verdict: false,
+      wind: true,
+      ride: true,
+    });
     expect(blockingSummary(report)).toBe("⛔ 1 erreur bloquante — aucun verdict");
   });
 

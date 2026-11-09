@@ -9,7 +9,7 @@
  * field is.
  */
 
-import type { FieldId } from "@/lib/rail/fields.ts";
+import type { FieldId, GateId } from "@/lib/rail/fields.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 
 /** In screen order — each through the same row, the same commit and the same gates as on Avancé. */
@@ -35,6 +35,18 @@ export const STATIQUE_FIELDS = [
   "hClearMin",
   "hRider",
 ] as const satisfies readonly FieldId[];
+
+/**
+ * The gates whose outputs Statique prints — the statics, the garde, the Verdict, and the Vent its
+ * vue de dessus draws. It prints no ride, so a Ride Gate breach stands on nothing here: its banner,
+ * its notice and its jump leave it to the Pages that read one.
+ */
+export const STATIQUE_GATES = [
+  "solve",
+  "clearance",
+  "verdict",
+  "wind",
+] as const satisfies readonly GateId[];
 
 /**
  * Does Statique show this field for this Scenario? Of the alternatives, `L` and `h` show in manual

@@ -27,6 +27,11 @@
  *   régime × famille/usage clash is a different thing: that one **is** a blocking error with its
  *   `[ Choisir un autre régime ]`, and § 8's message table has a row for it.
  * - **`x_D` sits in no gate.** It clamps on every path, and a clamp produces no error state.
+ * - **The passager's ride has two gates of its own**, past the three: the Wind Gate (the Vent) and
+ *   the Ride Gate (§12.2's constants). Their fields reach no statics number, but ADR-0001 keeps
+ *   them as they arrive **and** gates them, so a negative wind speed withholds the Banane, the
+ *   rose's reading and the ride rather than blowing the other way, and a negative `C_dA` withholds
+ *   the ride rather than speeding it up. A Wind breach removes the ride too, since it reads the Vent.
  * - **§5.4's chord bound is not here.** `L₀ > chord/(1 + T_break/EA)` needs `EA` and `MBF`, so
  *   evaluating it would re-derive physics in the UI. It stays in the engine and surfaces as
  *   « Tension impossible », an engine refusal — never a field error and never a gate.
@@ -64,6 +69,7 @@ import {
   FIELD_ORDER,
   FIELDS,
   fieldLabel,
+  GATE_IDS,
   gateOf,
   isOptionalField,
 } from "./fields.ts";
@@ -90,10 +96,33 @@ export const GATE_CONSEQUENCE: Record<GateId, string> = {
   solve: "aucun résultat",
   clearance: "garde au sol indisponible",
   verdict: "aucun verdict",
+  wind: "vent indisponible",
+  // Every value the ride gives is an « estimation » (#6), and it is all the Ride Gate removes.
+  ride: "aucune estimation",
 };
 
-/** Worst first. A Solve breach subsumes the other two, which is why it names the summary. */
-const GATE_RANK: Record<GateId, number> = { solve: 0, clearance: 1, verdict: 2 };
+/**
+ * Worst first, as {@link GATE_IDS} lists them. A Solve breach subsumes the others, which is why it
+ * names the summary; a Wind breach subsumes the Ride Gate's.
+ */
+const GATE_RANK = (gate: GateId): number => GATE_IDS.indexOf(gate);
+
+/**
+ * Which gates pass, read off the blocking list: a gate with a breach on it fails, and an absent
+ * régime fails the Verdict Gate without being on the list ({@link GateReport.noRegime}).
+ */
+export function passedGates(
+  errors: readonly Pick<BlockingError, "gate">[],
+  noRegime: boolean,
+): Record<GateId, boolean> {
+  const passed = Object.fromEntries(GATE_IDS.map((gate) => [gate, true])) as Record<
+    GateId,
+    boolean
+  >;
+  for (const error of errors) passed[error.gate] = false;
+  if (noRegime) passed.verdict = false;
+  return passed;
+}
 
 /**
  * § 7's four Fix Actions, and the fifth ADR-0001 admits for an end the line cannot use. **Their
@@ -146,7 +175,7 @@ export type BlockingError = {
   readonly fixes: readonly FixAction[];
 };
 
-/** What the three gates decided, in one object. */
+/** What the gates decided, in one object. */
 export type GateReport = {
   /** Worst gate first, then rail order. The banner's jump link targets `errors[0]`. */
   readonly errors: readonly BlockingError[];
@@ -165,7 +194,7 @@ export type GateReport = {
   readonly noRegime: boolean;
 };
 
-/** What the gates read. Everything else in the app is downstream of these three. */
+/** What the gates read. Everything else in the app is downstream of them. */
 export type GateInput = {
   readonly scenario: TraverseScenario;
   /**
@@ -391,10 +420,10 @@ export function isFieldActive(id: FieldId, scenario: TraverseScenario): boolean 
 }
 
 /**
- * The three gates over one Scenario.
+ * The gates over one Scenario.
  *
- * @returns every standing breach, worst gate first then rail order, with the three pass flags §
- *   7's table hangs its three different suppressions off.
+ * @returns every standing breach, worst gate first then rail order, with the pass flag per gate
+ *   that `@/lib/app/suppression.ts` hangs each gate's own suppression off.
  */
 export function evaluateGates({
   scenario,
@@ -535,16 +564,14 @@ export function evaluateGates({
 
   errors.sort(
     (a, b) =>
-      GATE_RANK[a.gate] - GATE_RANK[b.gate] ||
+      GATE_RANK(a.gate) - GATE_RANK(b.gate) ||
       FIELD_ORDER.indexOf(a.field) - FIELD_ORDER.indexOf(b.field),
   );
 
-  const passed: Record<GateId, boolean> = { solve: true, clearance: true, verdict: true };
-  for (const error of errors) passed[error.gate] = false;
   // The one gate breach that is not an error: an absent régime suppresses the verdict and the grid
   // without entering the blocking list, so `worst` and `blockingSummary` stay derived from
   // `errors` alone and the first screen carries **no** « ⛔ 1 erreur bloquante ».
-  if (noRegime) passed.verdict = false;
+  const passed = passedGates(errors, noRegime);
   const worst = errors.length === 0 ? null : errors[0].gate;
 
   return { errors, passed, worst, noRegime };

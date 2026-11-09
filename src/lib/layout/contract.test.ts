@@ -539,13 +539,15 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     // #12: « la colonne du milieu reprend les vues et gestes de Statique … Aucune vue propre ».
     // The gestures themselves are pure view models (`@/lib/map/`), and the Rail reading what they
     // write is `@/lib/rail/values.test.ts`'s; what is source is that both Pages stand the very same
-    // component, with the same two inputs, and that Avancé's own files draw no map of their own.
+    // component, with the same three inputs, and that Avancé's own files draw no map of their own.
     const root = fileURLToPath(new URL("../../..", import.meta.url));
     const read = (path: string) => readFileSync(join(root, path), "utf8");
     const pages = ["src/components/app/app.tsx", "src/components/statique/statique.tsx"];
     for (const page of pages) {
       expect(read(page)).toContain('import { TopMap } from "@/components/map/top-map.tsx";');
-      expect(read(page)).toContain("<TopMap frame={frame} solved={solved} />");
+      expect(read(page)).toContain(
+        "<TopMap frame={frame} solved={solved} windCause={windCause} />",
+      );
     }
     const avance = readdirSync(join(root, "src/components/app")).map((name) =>
       read(`src/components/app/${name}`),

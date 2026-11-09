@@ -7,12 +7,14 @@
  * Unlike Statique, this Page **does** say « estimation »: every value it prints is one (§12.2).
  */
 
+import type { GateId } from "@/lib/rail/fields.ts";
 import type { DynamicsWarningId } from "@/lib/scenario/dynamics.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 
 import { ASSUMED_NOTE, AVANCE_NOTICE } from "@/lib/app/avance-copy.ts";
 import { COUPE_HOVER, NO_SPAN_LINE } from "@/lib/chart/copy.ts";
 import { fieldLabel } from "@/lib/rail/fields.ts";
+import { GATE_CONSEQUENCE } from "@/lib/rail/gates.ts";
 import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 /** The fields' groups, in the order the Page lists them. */
@@ -23,6 +25,12 @@ export const DYNAMIQUE_GROUPS = {
 
 /** The fields the Page edits, in screen order — each through the Rail's own row and gates. */
 export const DYNAMIQUE_FIELDS = ["mp", "windSpeed", "windDirection"] as const;
+
+/**
+ * The gates whose outputs the Page prints: the line its rides run on, and the rides — which read
+ * the Vent. No Verdict and no garde here, so their breaches stand on nothing this Page shows.
+ */
+export const DYNAMIQUE_GATES = ["solve", "wind", "ride"] as const satisfies readonly GateId[];
 
 /** The Page's regions. */
 export const SECTION = {
@@ -147,6 +155,7 @@ export function dynamiqueLabelTable(): readonly string[] {
     ...Object.values(CONSTANTS_NOTE),
     ...Object.values(WARNING_COPY).filter((text) => text !== null),
     NO_SPAN_LINE,
+    ...DYNAMIQUE_GATES.map((gate) => GATE_CONSEQUENCE[gate]),
     ...Object.values(AVANCE_NOTICE),
     ASSUMED_NOTE,
   ];

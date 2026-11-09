@@ -457,7 +457,7 @@ _Avoid_: measure tool, ruler, polyline, outil de distance
 A validation failure that suppresses output until it is repaired, always rendered twice:
 the Champ responsable carries the message and its Fix Action, while the banner slot
 carries only the count and a jump link. Each names the gate it breached — Solve,
-Clearance or Verdict — because the gates suppress different things, and Blocking Errors
+Clearance, Verdict, Wind or Ride — because the gates suppress different things, and Blocking Errors
 are a **list**, never a singleton: repairing one leaves the others standing rather than
 cascading a silent second fix.
 _Avoid_: validation error, fatal error, invalid state, form error

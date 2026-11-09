@@ -5,7 +5,8 @@
  * value typed here lands in the Scenario, the address bar and the Session exactly as on those Pages.
  *
  * The ride's constants — `C_dA`, the trolley's friction, `ρ` — are not asked for here: they are
- * Avancé's, and their provenance is one line under the results.
+ * Avancé's, and their provenance is one line under the results. One that blocks the rides raises
+ * the notice to Avancé, as any value this Page does not show.
  */
 
 import type { RailFormState } from "@/components/app/use-rail-form.ts";
@@ -14,8 +15,8 @@ import type { FieldId } from "@/lib/rail/fields.ts";
 import { AvanceNotice } from "@/components/app/avance-notice.tsx";
 import { Group, NumericRow, RailRow, useFieldRows } from "@/components/rail/inputs.tsx";
 import { ASSUMED_NOTE } from "@/lib/app/avance-copy.ts";
-import { solveGateReport } from "@/lib/app/banner.ts";
-import { DYNAMIQUE_FIELDS, DYNAMIQUE_GROUPS } from "@/lib/dynamique/copy.ts";
+import { pageReport } from "@/lib/app/banner.ts";
+import { DYNAMIQUE_FIELDS, DYNAMIQUE_GATES, DYNAMIQUE_GROUPS } from "@/lib/dynamique/copy.ts";
 
 const SHOWN: ReadonlySet<FieldId> = new Set(DYNAMIQUE_FIELDS);
 
@@ -26,9 +27,9 @@ export function shownOnDynamique(id: FieldId): boolean {
 
 export function DynamiqueFields({ rail }: { rail: RailFormState }) {
   const row = useFieldRows({ rail, register: "terrain" });
-  // A value this Page does not show can stop the computation too — a link, or an edit on Avancé.
-  // Only the Solve Gate's breaches do: the others remove a Verdict and a garde this Page has none of.
-  const elsewhere = solveGateReport(rail.report).errors.some(
+  // A value this Page does not show can stop the computation or the rides too — a link, or an edit
+  // on Avancé: a ride constant is set there alone. A Verdict or a garde breach removes nothing here.
+  const elsewhere = pageReport(rail.report, DYNAMIQUE_GATES).errors.some(
     (error) => !shownOnDynamique(error.field),
   );
 

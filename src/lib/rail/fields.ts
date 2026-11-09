@@ -58,10 +58,14 @@ import { DYNAMICS, REGIMES } from "@/lib/sim";
 import { heading, isHiddenTerm, label } from "@/lib/vocabulary/labels.ts";
 
 /**
- * § 7's three gates. Declared here rather than in `./gates.ts` because every field names the gate
- * it belongs to, and « gates go in with the fields, not as a later pass ».
+ * § 7's three gates, then the two the passager's ride adds (#87, #89): the Vent and the ride's
+ * constants are kept as they arrive and gated like any other field (ADR-0001), each withholding
+ * only what reads it. Worst first. Declared here rather than in `./gates.ts` because every field
+ * names the gate it belongs to, and « gates go in with the fields, not as a later pass ».
  */
-export type GateId = "solve" | "clearance" | "verdict";
+export const GATE_IDS = ["solve", "clearance", "verdict", "wind", "ride"] as const;
+
+export type GateId = (typeof GATE_IDS)[number];
 
 /** Every control of the Rail's input half that a check can be attributed to. */
 export type FieldId =
@@ -152,7 +156,7 @@ export type FieldSpec = {
   readonly optional?: true;
   /** § 3's warning column — non-blocking, and never a reason to withhold a number. */
   readonly warning: WarningRule | null;
-  /** Which of § 7's three gates this field's failure breaches. `null` for `x_D`, which is in none. */
+  /** Which gate this field's failure breaches. `null` for `x_D` and the Positions, in none. */
   readonly gate: GateId | null;
 };
 
@@ -550,8 +554,8 @@ export const FIELDS = {
     warning: null,
     gate: null,
   },
-  // The two Vent fields sit in no gate: only the ride (#89) and the Banane read them, so a bad one
-  // must not take the statics or the Verdict down. Tier one still refuses the text, as typed.
+  // The Wind Gate: only the ride (#89), the Banane and the rose read the Vent, so a bad one withholds
+  // them and never takes the statics or the Verdict down.
   windSpeed: {
     id: "windSpeed",
     label: heading("windSpeed", "exact"),
@@ -559,7 +563,7 @@ export const FIELDS = {
     quantity: "windSpeed",
     rule: { kind: "non-negative", sentence: "une vitesse négative n'existe pas" },
     warning: null,
-    gate: null,
+    gate: "wind",
   },
   windDirection: {
     id: "windDirection",
@@ -568,10 +572,10 @@ export const FIELDS = {
     quantity: "windDirection",
     rule: { kind: "finite" },
     warning: null,
-    gate: null,
+    gate: "wind",
   },
-  // The ride's constants (#89, #104): §12.2's, every one editable and labelled. They sit in no
-  // gate — only the passager's ride reads them, never the statics or the Verdict.
+  // The ride's constants (#89, #104): §12.2's, every one editable and labelled. The Ride Gate: only
+  // the passager's ride reads them, so a bad one withholds it and nothing else.
   CdA: {
     id: "CdA",
     label: heading("dragArea", "exact"),
@@ -584,7 +588,7 @@ export const FIELDS = {
       max: DYNAMICS.CdABand.max,
       copy: `surface hors de la plage du champ (${formatValue("CdA", DYNAMICS.CdABand.min)} – ${formatValue("CdA", DYNAMICS.CdABand.max)} m²) [CONVENTION]`,
     },
-    gate: null,
+    gate: "ride",
   },
   F0: {
     id: "F0",
@@ -593,7 +597,7 @@ export const FIELDS = {
     quantity: "F0",
     rule: { kind: "non-negative", sentence: NO_NEGATIVE_FRICTION },
     warning: null,
-    gate: null,
+    gate: "ride",
   },
   kv: {
     id: "kv",
@@ -602,7 +606,7 @@ export const FIELDS = {
     quantity: "kv",
     rule: { kind: "non-negative", sentence: NO_NEGATIVE_FRICTION },
     warning: null,
-    gate: null,
+    gate: "ride",
   },
   trolleyMu: {
     id: "trolleyMu",
@@ -611,7 +615,7 @@ export const FIELDS = {
     quantity: "trolleyMu",
     rule: { kind: "non-negative", sentence: NO_NEGATIVE_FRICTION },
     warning: null,
-    gate: null,
+    gate: "ride",
   },
   // Blank is §12.2's « lu » half: the ISA density at the profil's mean altitude, or 1,225.
   rho: {
@@ -622,7 +626,7 @@ export const FIELDS = {
     rule: { kind: "non-negative", sentence: "une masse volumique négative n'existe pas" },
     optional: true,
     warning: null,
-    gate: null,
+    gate: "ride",
   },
   // The two Positions (#90). Both sit in no gate — no computation reads a Position — and a blank
   // pair is « inconnue », not « vide et requis », so none is required.

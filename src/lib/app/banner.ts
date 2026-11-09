@@ -39,14 +39,14 @@
  */
 
 import type { EngineRefusal } from "@/lib/app/refusals.ts";
-import type { FieldId } from "@/lib/rail/fields.ts";
+import type { FieldId, GateId } from "@/lib/rail/fields.ts";
 import type { BlockingError, GateReport, SaisieEnCours } from "@/lib/rail/gates.ts";
 import type { VerdictBanner } from "@/lib/rail/results.ts";
 import type { VerdictState } from "@/lib/sim";
 import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { fieldErrorLabel, lowerFirst } from "@/lib/rail/fields.ts";
-import { blockingSummary } from "@/lib/rail/gates.ts";
+import { blockingSummary, GATE_CONSEQUENCE, passedGates } from "@/lib/rail/gates.ts";
 import { NO_REGIME_BANNER_BY_REGISTER } from "@/lib/rail/results.ts";
 import { label } from "@/lib/vocabulary/labels.ts";
 
@@ -228,8 +228,7 @@ export function standingReport(report: GateReport, saisie: SaisieEnCours | null)
     (error) => !(error.field === saisie.field && error.kind === "empty"),
   );
   if (errors.length === report.errors.length) return report;
-  const passed = { solve: true, clearance: true, verdict: !report.noRegime };
-  for (const error of errors) passed[error.gate] = false;
+  const passed = passedGates(errors, report.noRegime);
   return { ...report, errors, passed, worst: errors[0]?.gate ?? null };
 }
 
@@ -245,19 +244,82 @@ function fieldCause(error: BlockingError, register: Register): string {
 }
 
 /**
- * The report as a Page with **no Verdict and no garde** reads it: only the Solve Gate's breaches
- * stand, because only they remove what the Page shows. A bad `DAF` or an empty régime breaches a
- * gate whose output this Page does not print, and a banner saying « aucun verdict » beside a
- * computed ride is the Page contradicting itself. With no régime breach left, the reducer's rank 4b
- * cannot fire either.
+ * The report as a Page that prints **some gates' outputs only** reads it: the breaches of the
+ * others stand on no value of that Page, and a banner saying « aucun verdict » beside a computed
+ * ride, or « aucune estimation » beside a Verdict, is the Page contradicting itself. Without the
+ * Verdict Gate there is no régime to ask for, so the reducer's rank 4b cannot fire either.
+ *
+ * @param gates the gates whose outputs the Page prints — its banner, its notice and its jump read
+ *   this report, and nothing else.
  */
-export function solveGateReport(report: GateReport): GateReport {
-  const errors = report.errors.filter((error) => error.gate === "solve");
-  if (errors.length === report.errors.length && !report.noRegime) return report;
+export function pageReport(report: GateReport, gates: readonly GateId[]): GateReport {
+  const errors = report.errors.filter((error) => gates.includes(error.gate));
+  const noRegime = report.noRegime && gates.includes("verdict");
+  if (errors.length === report.errors.length && noRegime === report.noRegime) return report;
   return {
     errors,
-    passed: { solve: report.passed.solve, clearance: true, verdict: true },
+    passed: passedGates(errors, noRegime),
     worst: errors[0]?.gate ?? null,
-    noRegime: false,
+    noRegime,
   };
+}
+
+/**
+ * What withholds the passager's ride from a line that stands — « Aucune estimation — vitesse du
+ * vent invalide. » — written once, like {@link noResultCause}, and echoed wherever a ride would be
+ * read: Dynamique's tiles and curve, Terrain's vitesse d'arrivée, Avancé's `v/c` row. A Wind Gate
+ * breach withholds it as well, because the ride reads the Vent.
+ *
+ * @returns `null` while the ride may be read, and under « Aucun résultat » or a refusal, whose own
+ *   cause already says there is no line to ride.
+ */
+export function rideCause({
+  report,
+  refusal,
+  saisie = null,
+  register = "exact",
+}: {
+  readonly report: GateReport;
+  readonly refusal: EngineRefusal | null;
+  readonly saisie?: SaisieEnCours | null;
+  readonly register?: Register;
+}): string | null {
+  if (refusal !== null) return null;
+  const { errors } = standingReport(report, saisie);
+  if (errors.some((error) => error.gate === "solve")) return null;
+  return withheld(errors, ["wind", "ride"], GATE_CONSEQUENCE.ride, register);
+}
+
+/**
+ * What withholds the Vent — « Vent indisponible — vitesse du vent invalide. » — said where the rose
+ * would read it, on every Page that draws the vue de dessus. The Banane and the rose's wind are not
+ * drawn meanwhile: a negative speed would bow the line the wrong way.
+ *
+ * @returns `null` while the Vent may be read. The statics have no say: the Vent is drawn over the
+ *   ligne A–B, which stands without a solve.
+ */
+export function windCause({
+  report,
+  saisie = null,
+  register = "exact",
+}: {
+  readonly report: GateReport;
+  readonly saisie?: SaisieEnCours | null;
+  readonly register?: Register;
+}): string | null {
+  const { errors } = standingReport(report, saisie);
+  return withheld(errors, ["wind"], GATE_CONSEQUENCE.wind, register);
+}
+
+/** The cause sentence of what `gates` withhold, from their first breach, or `null` without one. */
+function withheld(
+  errors: readonly BlockingError[],
+  gates: readonly GateId[],
+  consequence: string,
+  register: Register,
+): string | null {
+  const first = errors.find((error) => gates.includes(error.gate));
+  if (first === undefined) return null;
+  const opening = consequence.charAt(0).toLocaleUpperCase("fr") + consequence.slice(1);
+  return `${opening} — ${fieldCause(first, register)}.`;
 }

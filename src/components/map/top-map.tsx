@@ -124,15 +124,19 @@ const FIT = { padding: 48, maxZoom: 16 } as const;
 /**
  * @param frame the coupe's input half and `solved` its solved half, as the Page's gates leave them:
  *   the Vue 3D draws the same line the coupe does, or none.
+ * @param windCause why the Wind Gate withholds the Vent, or `null`: while it stands no Banane bows
+ *   and the rose draws no wind, and the line under the map says it in place of the rose's reading.
  * @param readOnly the Page Terrain's visualisation (#101), whose `coupe` stands under the map in 2D.
  */
 export function TopMap({
   frame,
   solved,
+  windCause,
   readOnly,
 }: {
   frame: SceneFrame | null;
   solved: SceneBase | null;
+  windCause: string | null;
   readOnly?: { readonly coupe: ReactNode };
 }) {
   const { scenario, map: display, trace } = useAppState();
@@ -151,7 +155,10 @@ export function TopMap({
   const shows3d = display.view === "3d" && placement.ok && !lost3d;
   const lose3d = useCallback(() => setLost3d(true), [setLost3d]);
   const renderer = useVue3dRenderer(shows3d, lose3d);
-  const across = bananeAcross(scenario.wind);
+  // A withheld Vent is drawn as none, and the rose's handle waits at the centre, where a drag sets a
+  // Vent the gates accept.
+  const wind = windCause === null ? scenario.wind : { ...scenario.wind, speedKmh: 0 };
+  const across = bananeAcross(wind);
   const scene3d = useVue3dScene(shows3d, frame, solved, across);
 
   const plain = failed ? plainDrawing(drawn, across) : null;
@@ -237,7 +244,7 @@ export function TopMap({
               {anchorReading(anchor, drawn)}
             </span>
           ))}
-          {!shows3d && <span>{windReading(scenario.wind, reference, !locked)}</span>}
+          {!shows3d && <span>{windCause ?? windReading(wind, reference, !locked)}</span>}
           <span>{gestureLine}</span>
           {!shows3d && unavailable && (
             <span>{[MAP_COPY.unavailable, plain?.unoriented].filter(Boolean).join(" · ")}</span>
@@ -352,7 +359,7 @@ export function TopMap({
                   : (next) => dispatch({ type: "scénario/modifié", patch: { wind: next } })
               }
               reference={reference}
-              wind={scenario.wind}
+              wind={wind}
             />
             <Attribution text={fondAttribution(display.fond)} />
             {read !== null && read.reading !== null && (

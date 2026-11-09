@@ -41,7 +41,7 @@ import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 import type { Unoriented } from "./top-view.ts";
 
-import { STATIQUE_FIELDS } from "./fields.ts";
+import { STATIQUE_FIELDS, STATIQUE_GATES } from "./fields.ts";
 
 /** The fields' groups, in the order the Page lists them. */
 export const STATIQUE_GROUPS = {
@@ -142,7 +142,7 @@ export function statiqueLabelTable(): readonly string[] {
     ...Object.values(REGIMES).map((regime) => regime.label),
     ...Object.values(OUTPUT_LABEL),
     TRAVERSE_SCOPE,
-    ...Object.values(GATE_CONSEQUENCE),
+    ...STATIQUE_GATES.map((gate) => GATE_CONSEQUENCE[gate]),
     ...cellsOf("terrain").map((id) => cellLabel(id, "terrain")),
     READ_OUT_SCOPE,
     ...Object.values(LAYER_LABEL).flatMap(({ full, short }) => [full, short]),

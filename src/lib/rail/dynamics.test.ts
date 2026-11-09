@@ -54,8 +54,14 @@ describe("§12.1's check, read on its own row", () => {
       {
         value: "0,08 à x 120,3 m",
         warning: null,
+        cause: null,
       },
     );
+  });
+
+  test("rides the gates withhold: no figure, and why in its place", () => {
+    const cause = "Aucune estimation — surface de traînée C_dA invalide.";
+    expect(quasiStaticRow(null, cause)).toEqual({ value: null, warning: null, cause });
   });
 
   test("above it: the avertissement names the threshold and the section", () => {

@@ -42,13 +42,14 @@ import {
 } from "@/components/rail/inputs.tsx";
 import { TerrainDisclosure } from "@/components/rail/outputs.tsx";
 import { ASSUMED_NOTE } from "@/lib/app/avance-copy.ts";
+import { pageReport } from "@/lib/app/banner.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { fieldLabel } from "@/lib/rail/fields.ts";
 import { presetProvenance } from "@/lib/rail/presets.ts";
 import { warningLadder } from "@/lib/rail/provenance.ts";
 import { clearOverride, idleDriverText } from "@/lib/rail/values.ts";
 import { DEVICE_LABEL, pretensionWhere, STATIQUE_GROUPS } from "@/lib/statique/copy.ts";
-import { shownOnStatique } from "@/lib/statique/fields.ts";
+import { shownOnStatique, STATIQUE_GATES } from "@/lib/statique/fields.ts";
 import { pretensionField } from "@/lib/statique/outputs.ts";
 import { heading } from "@/lib/vocabulary/labels.ts";
 
@@ -80,8 +81,11 @@ export function StatiqueFields({
   const span = deduced.span;
   // Which alternatives show follows the Scenario; the notice and the banner's jump read the same.
   const shows = (id: FieldId) => shownOnStatique(id, scenario);
-  // A value this Page does not show can stop the computation too — a link, or an edit on Avancé.
-  const elsewhere = rail.report.errors.some((error) => !shows(error.field));
+  // A value this Page does not show can stop the computation too — a link, or an edit on Avancé. A
+  // ride constant stops only a ride, which this Page does not print.
+  const elsewhere = pageReport(rail.report, STATIQUE_GATES).errors.some(
+    (error) => !shows(error.field),
+  );
 
   return (
     <RailRow.Provider value={row}>

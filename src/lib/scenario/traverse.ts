@@ -16,16 +16,13 @@ import type { CarryingLines, Rider, ScenarioDraft } from "./types.ts";
 import type { UnloadedLine } from "./unloaded.ts";
 
 /**
- * The Scenario as every Traverse-scope number reads it: all of it but `x_D`, which selects a Sweep
- * Step and judges nothing, the Mise en tension device, which is descriptive (#86), the Vent and
- * the ride's constants, which only the passager's ride reads (#87, #89), and the Positions, which
- * only « Charger le profil geo.admin » reads (#90, #103) — so a change of any of them cannot re-run
- * the Sweep.
+ * The Scenario as every Traverse-scope reader takes it — the gates and the `Résultats`: all of it
+ * but `x_D`, which selects a Sweep Step and judges nothing, the Mise en tension device, which is
+ * descriptive (#86), and the Positions, which only « Charger le profil geo.admin » reads (#90,
+ * #103). The Vent and the ride's constants stay in: no statics number reads them, but the Wind and
+ * Ride Gates judge them, so the report must move when they do.
  */
-export type TraverseScenario = Omit<
-  ScenarioDraft,
-  "rider" | "tensioningDevice" | "wind" | "dynamics" | "positions"
-> & {
+export type TraverseScenario = Omit<ScenarioDraft, "rider" | "tensioningDevice" | "positions"> & {
   readonly rider: Omit<Rider, "xD">;
 };
 
@@ -34,8 +31,7 @@ export type TraverseScenario = Omit<
  * memo compares its keys one level deep, and `rider` is a fresh object on every scrub.
  */
 export type TraverseInputs = Readonly<
-  Omit<ScenarioDraft, "rider" | "tensioningDevice" | "wind" | "dynamics" | "positions"> &
-    Omit<Rider, "xD">
+  Omit<ScenarioDraft, "rider" | "tensioningDevice" | "positions"> & Omit<Rider, "xD">
 >;
 
 /**
@@ -54,6 +50,8 @@ export function traverseInputs(scenario: ScenarioDraft): TraverseInputs {
     tightness,
     material,
     terminations,
+    wind,
+    dynamics,
   } = scenario;
   const { mp, hRider, hClearMin, DAF } = scenario.rider;
   return {
@@ -67,6 +65,8 @@ export function traverseInputs(scenario: ScenarioDraft): TraverseInputs {
     tightness,
     material,
     terminations,
+    wind,
+    dynamics,
     mp,
     hRider,
     hClearMin,

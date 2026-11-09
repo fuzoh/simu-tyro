@@ -195,11 +195,11 @@ describe("§ 7's message table — committed invalid, ⛔ and blocking", () => {
   });
 });
 
-describe("the ride's constants (#104) — §12.2's, in no gate", () => {
-  test("they sit in no gate: only the passager's ride reads them", () => {
+describe("the ride's constants (#104) — §12.2's, in the Ride Gate", () => {
+  test("they breach the Ride Gate: only the passager's ride reads them, in either mode", () => {
     for (const id of ["CdA", "F0", "kv", "trolleyMu", "rho"] as const) {
-      expect(gateOf(id, "manual")).toBeNull();
-      expect(gateOf(id, "trace")).toBeNull();
+      expect(gateOf(id, "manual")).toBe("ride");
+      expect(gateOf(id, "trace")).toBe("ride");
     }
   });
 
@@ -328,9 +328,11 @@ describe("the gate each field belongs to — wired with the field, not as a late
     expect(gateOf("zB", "trace")).toBe("solve");
   });
 
-  test("the Vent fields sit in no gate — nothing reads them, so they can block nothing (#87)", () => {
-    expect(gateOf("windSpeed", "manual")).toBeNull();
-    expect(gateOf("windDirection", "manual")).toBeNull();
+  test("the Vent fields breach the Wind Gate, never the statics or the Verdict (#87)", () => {
+    for (const mode of ["manual", "trace"] as const) {
+      expect(gateOf("windSpeed", mode)).toBe("wind");
+      expect(gateOf("windDirection", mode)).toBe("wind");
+    }
   });
 
   test("no wind is a valid value, and any direction is — it is read modulo 360°", () => {

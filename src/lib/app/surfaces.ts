@@ -24,16 +24,19 @@ import type { Deduced } from "@/lib/rail/deduced.ts";
 import type { FieldId } from "@/lib/rail/fields.ts";
 import type { GateReport, SaisieEnCours } from "@/lib/rail/gates.ts";
 import type { Results } from "@/lib/rail/results.ts";
+import type { DynamicsReading } from "@/lib/scenario/dynamics.ts";
 import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
+import type { Trace } from "@/lib/terrain/trace.ts";
 import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { saisieEnCours } from "@/lib/rail/gates.ts";
 import { deriveResults } from "@/lib/rail/results.ts";
+import { readDynamics } from "@/lib/scenario/dynamics.ts";
 
 import type { BannerOccupant } from "./banner.ts";
 import type { EngineRefusal } from "./refusals.ts";
 
-import { banner, noResultCause, standingReport } from "./banner.ts";
+import { banner, noResultCause, rideCause, standingReport, windCause } from "./banner.ts";
 import { engineRefusal } from "./refusals.ts";
 import { suppression } from "./suppression.ts";
 
@@ -61,6 +64,16 @@ export type ErrorSurfaces = {
   readonly results: Results | null;
   /** May the garde au sol and its curve be shown? False on a Clearance Gate breach. */
   readonly clearance: boolean;
+  /**
+   * Why the passager's ride is withheld from a line that stands — « Aucune estimation — … » — or
+   * `null` when it may be read. {@link gatedRides} reads none while it stands.
+   */
+  readonly rideCause: string | null;
+  /**
+   * Why the Vent is withheld — « Vent indisponible — … » — or `null`. While it stands the vue de
+   * dessus draws no Banane and no wind on the rose, and says this where the rose's reading goes.
+   */
+  readonly windCause: string | null;
 };
 
 /**
@@ -122,5 +135,25 @@ export function errorSurfaces({
     solved: shownSolved,
     results,
     clearance: !removed.clearance,
+    rideCause: rideCause({ report, refusal, saisie, register }),
+    windCause: windCause({ report, saisie, register }),
   };
+}
+
+/**
+ * The passager's two rides **as the gates leave them** — the one way every Page that prints a ride
+ * reads it: off the gated solved half, and none while {@link ErrorSurfaces.rideCause} withholds
+ * them. Reading `readDynamics` beside it would integrate a ride the gates refuse.
+ *
+ * @param traverse the Scenario without `x_D`, which no ride reads: a scrub re-runs no ride.
+ * @param trace the cached Trace; it sets `ρ` only while it is the line's ground.
+ */
+export function gatedRides(
+  { solved, rideCause: withheld }: Pick<ErrorSurfaces, "solved" | "rideCause">,
+  traverse: Pick<TraverseScenario, "material" | "rider" | "wind" | "dynamics" | "geometry">,
+  trace: Trace | null,
+): DynamicsReading | null {
+  if (solved === null || withheld !== null) return null;
+  const profile = traverse.geometry.source === "trace" ? trace : null;
+  return readDynamics(traverse, solved, solved, profile);
 }

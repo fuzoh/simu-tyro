@@ -153,9 +153,10 @@ describe("the Vent fields (#87)", () => {
     expect(railValues(scenario())).toMatchObject({ windSpeed: "0", windDirection: "0" });
   });
 
-  test("a wind field is in no gate, so a scrub-free edit never reaches tier one", () => {
+  test("a wind field is in the Wind Gate, so its text reaches tier one (ADR-0001)", () => {
     const shown = railValues(scenario());
-    expect(sameGatedText(shown, { ...shown, windSpeed: "-5", windDirection: "x" })).toBe(true);
+    expect(sameGatedText(shown, { ...shown, windSpeed: "-5" })).toBe(false);
+    expect(sameGatedText(shown, { ...shown, windDirection: "x" })).toBe(false);
   });
 });
 
@@ -871,9 +872,16 @@ describe("the ride's constants (#104) — one trolley law per family, and ρ rea
     expect(commit(steel, "trolleyMu", "-0,1").next).toBeNull();
   });
 
-  test("the constants are in no gate: an edit never reaches the text the gates read", () => {
+  test("the constants are in the Ride Gate: an edit reaches the text the gates read", () => {
     const shown = railValues(rope);
-    expect(sameGatedText(shown, { ...shown, CdA: "-1", F0: "x", kv: "", rho: "abc" })).toBe(true);
+    for (const [id, text] of [
+      ["CdA", "-1"],
+      ["F0", "x"],
+      ["kv", ""],
+      ["rho", "abc"],
+    ] as const) {
+      expect(sameGatedText(shown, { ...shown, [id]: text })).toBe(false);
+    }
   });
 });
 

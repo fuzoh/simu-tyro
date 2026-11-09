@@ -64,12 +64,22 @@ export const QUASI_STATIC_LABEL = "Rapport v/c maximal";
 
 /**
  * §12.1's check over the two rides: the largest `v/c` and where it is reached, and its
- * Avertissement — without its glyph — above the 0,2 threshold. `null` where there is no ride: an
- * unsolved line or an incomplete traverse.
+ * Avertissement — without its glyph — above the 0,2 threshold.
+ *
+ * @param withheld why the gates withhold the rides (`rideCause`), said on the row in place of a
+ *   figure, or `null`.
+ * @returns `null` where there is no ride and nothing withholds one: an unsolved line, whose cause is
+ *   said elsewhere, or an incomplete traverse.
  */
 export function quasiStaticRow(
   reading: Pick<DynamicsReading, "quasiStatic"> | null,
-): { readonly value: string; readonly warning: string | null } | null {
+  withheld: string | null = null,
+): {
+  readonly value: string | null;
+  readonly warning: string | null;
+  readonly cause: string | null;
+} | null {
+  if (withheld !== null) return { value: null, warning: null, cause: withheld };
   if (reading === null) return null;
   const { ratio, atX, exceeded } = reading.quasiStatic;
   const shown = (value: number) => value.toFixed(2).replace(".", DECIMAL_MARK);
@@ -79,5 +89,6 @@ export function quasiStaticRow(
       ? `au-dessus de ${shown(DYNAMICS.quasiStaticLimit)} (§12.1) : la trajectoire figée décrit mal ` +
         "la traversée, et les sorties de la dynamique ne sont plus quasi statiques."
       : null,
+    cause: null,
   };
 }

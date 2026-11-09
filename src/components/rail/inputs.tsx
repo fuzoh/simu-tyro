@@ -319,6 +319,7 @@ export function RailInputs({
   deduced,
   dynamics,
   rail,
+  rideCause,
   children,
 }: {
   /**
@@ -333,6 +334,8 @@ export function RailInputs({
    */
   dynamics: DynamicsReading | null;
   rail: RailFormState;
+  /** Why the gates withhold the rides from a line that stands — said on §12.1's row — or `null`. */
+  rideCause: string | null;
   /**
    * Where the two sections go. `Paramètres` and `Valeurs déduites` share one field-row context —
    * `Valeurs déduites` holds the three override fields — but stand in different columns of the
@@ -399,7 +402,7 @@ export function RailInputs({
   const rho = airDensityShown(
     airDensityOf(scenario.dynamics.rho, scenario.geometry.source === "trace" ? trace : null),
   );
-  const quasiStatic = quasiStaticRow(dynamics);
+  const quasiStatic = quasiStaticRow(dynamics, rideCause);
   const muChip = trolleyMuChip(scenario.dynamics.mu);
 
   const parameters = (
@@ -663,6 +666,9 @@ export function RailInputs({
               value={quasiStatic.value}
               warning={quasiStatic.warning}
             />
+          )}
+          {quasiStatic?.cause != null && (
+            <p className="text-muted-foreground text-xs">{quasiStatic.cause}</p>
           )}
         </Group>
 

@@ -9,6 +9,8 @@
  * derives a second copy of a number Avancé prints.
  */
 
+import { useMemo } from "react";
+
 import type { FieldId } from "@/lib/rail/fields.ts";
 
 import { jumpOrAvance } from "@/components/app/avance-notice.tsx";
@@ -20,7 +22,8 @@ import { useViewport } from "@/components/app/use-viewport.ts";
 import { ChartBlock } from "@/components/chart/chart-block.tsx";
 import { useChartWidth } from "@/components/chart/use-chart-width.ts";
 import { TopMap } from "@/components/map/top-map.tsx";
-import { shownOnStatique } from "@/lib/statique/fields.ts";
+import { banner, pageReport } from "@/lib/app/banner.ts";
+import { shownOnStatique, STATIQUE_GATES } from "@/lib/statique/fields.ts";
 import { statiqueOutputs } from "@/lib/statique/outputs.ts";
 
 import { StatiqueFields } from "./fields.tsx";
@@ -47,8 +50,20 @@ function Live({ page }: { page: string }) {
     page,
     register: "terrain",
   });
-  const { cause, clearance, frame, occupant, results, saisie, solved } = surfaces;
+  const { cause, clearance, frame, refusal, results, saisie, solved, windCause } = surfaces;
   const model = statiqueOutputs({ scenario: state.scenario, deduced, results, cause });
+  // No ride is printed here: a Ride Gate breach does not take the slot from the Verdict.
+  const occupant = useMemo(
+    () =>
+      banner({
+        report: pageReport(rail.report, STATIQUE_GATES),
+        refusal,
+        saisie,
+        verdict: results?.banner ?? null,
+        register: "terrain",
+      }),
+    [rail.report, refusal, saisie, results],
+  );
 
   const jump = (field: FieldId) => jumpOrAvance(field, shownOnStatique(field, state.scenario));
 
@@ -73,7 +88,7 @@ function Live({ page }: { page: string }) {
       }
       sectionRef={ref}
       strip={<LinkStripNotice strip={strip} />}
-      topView={<TopMap frame={frame} solved={solved} />}
+      topView={<TopMap frame={frame} solved={solved} windCause={windCause} />}
     />
   );
 }

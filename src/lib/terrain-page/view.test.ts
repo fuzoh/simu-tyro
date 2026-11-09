@@ -6,7 +6,7 @@ import type { Ride, VerdictState } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 import type { Register } from "@/lib/vocabulary/labels.ts";
 
-import { errorSurfaces } from "@/lib/app/surfaces.ts";
+import { errorSurfaces, gatedRides } from "@/lib/app/surfaces.ts";
 import { buildSceneBase, buildSceneFrame } from "@/lib/chart/scene.ts";
 import { ridesUnder } from "@/lib/dynamique/__fixtures__/rides.ts";
 import { INCOMPLETE } from "@/lib/dynamique/copy.ts";
@@ -16,12 +16,13 @@ import { deducedFrom, deducedRows } from "@/lib/rail/deduced.ts";
 import { evaluateGates } from "@/lib/rail/gates.ts";
 import { applyMaterialPreset } from "@/lib/rail/presets.ts";
 import { drivingField, railValues } from "@/lib/rail/values.ts";
-import { readDynamics } from "@/lib/scenario/dynamics.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { sweepRiderOf, traverseInputs, traverseScenario } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { CANONICAL_LINKS } from "@/lib/url/__fixtures__/canonical-links.ts";
 import { decodeP1 } from "@/lib/url/p1.ts";
+import { completeFromDefaults, searchToScenario } from "@/lib/url/scenario.ts";
+import { parseLinkSearch, validateSearch } from "@/lib/url/schema.ts";
 
 import type { TerrainTile, TerrainTileId, TerrainView } from "./view.ts";
 
@@ -58,10 +59,18 @@ function pagesOn(scenario: ScenarioDraft) {
     });
 
   const avance = surfacesIn("exact");
-  const { results, cause, solved: gated } = surfacesIn("terrain");
-  const reading = gated === null ? null : readDynamics(scenario, gated, gated, trace);
-  const terrain = terrainView({ scenario, deduced, results, cause, reading });
-  return { deduced, avance, cause, reading, terrain };
+  const surfaces = surfacesIn("terrain");
+  const { results, cause, rideCause } = surfaces;
+  const reading = gatedRides(surfaces, traverse, trace);
+  const terrain = terrainView({ scenario, deduced, results, cause, rideCause, reading });
+  return { deduced, avance, cause, reading, surfaces, terrain };
+}
+
+/** A link as the app holds it once it has arrived: parsed, validated, completed. */
+function arrived(query: string): ScenarioDraft {
+  const search = validateSearch(parseLinkSearch(query));
+  if (search.refused !== undefined) throw new Error(`${query} refused`);
+  return searchToScenario(completeFromDefaults(search).search);
 }
 
 function tile(view: TerrainView, id: TerrainTileId): TerrainTile {
@@ -247,6 +256,7 @@ describe("the vitesse d'arrivée", () => {
       deduced: pagesOn(SHIPPED).deduced,
       results: null,
       cause: null,
+      rideCause: null,
       reading: { ...reading, calm: swinging, windy: swinging },
     });
     expect(tile(view, "arrival")).toMatchObject({
@@ -268,10 +278,70 @@ describe("the vitesse d'arrivée", () => {
       deduced: refused.deduced,
       results: null,
       cause: null,
+      rideCause: null,
       reading: null,
     });
     expect(tile(incomplete, "arrival")).toMatchObject({ kind: "absent", value: INCOMPLETE });
   });
+});
+
+/**
+ * A ride value the app refuses arrives as given and is gated (ADR-0001): the tile withholds the
+ * ride rather than integrate it, and says why — this Page has no field to carry the ⛔.
+ */
+describe("the vitesse d'arrivée under a ride value the app refuses", () => {
+  const LINE = "?L=200&h=-20&fl=6";
+
+  test("the line itself arrives, and its vitesse d'arrivée is printed", () => {
+    expect(tile(pagesOn(arrived(LINE)).terrain, "arrival")).toMatchObject({
+      kind: "quantity",
+      notes: [expect.stringMatching(/ m\/s$/), "estimation"],
+    });
+  });
+
+  test("a negative wind speed is not read as a tail wind: no ride, and the field named", () => {
+    const { reading, surfaces, terrain } = pagesOn(arrived(`${LINE}&ws=-60&wd=0`));
+    expect(reading).toBeNull();
+    expect(tile(terrain, "arrival")).toMatchObject({
+      kind: "absent",
+      tone: "muted",
+      value: "Aucune estimation — vitesse du vent invalide.",
+      notes: [],
+    });
+    // The rose and the Banane withhold the same Vent.
+    expect(surfaces.windCause).toBe("Vent indisponible — vitesse du vent invalide.");
+    expect(surfaces.occupant).toMatchObject({
+      rank: 1,
+      text: "⛔ 1 erreur bloquante — vent indisponible",
+      target: "windSpeed",
+    });
+  });
+
+  test.each([
+    ["a negative C_dA", "cda=-0.45", "CdA"],
+    ["a negative air density", "rho=-1.2", "rho"],
+  ] as const)(
+    "%s does not speed the passager up: no ride, and Avancé named",
+    (_name, key, field) => {
+      const { reading, surfaces, terrain } = pagesOn(arrived(`${LINE}&${key}`));
+      expect(reading).toBeNull();
+      expect(tile(terrain, "arrival")).toMatchObject({
+        kind: "absent",
+        value: "Aucune estimation — réglage de la Page Avancé invalide.",
+      });
+      expect(surfaces.windCause).toBeNull();
+      expect(surfaces.occupant).toMatchObject({
+        rank: 1,
+        text: "⛔ 1 erreur bloquante — aucune estimation",
+        target: field,
+      });
+      // The statics stand: the other tiles read as on the line without the bad value.
+      const sound = pagesOn(arrived(LINE)).terrain;
+      for (const id of ["pretension", "sag", "clearance"] as const) {
+        expect(tile(terrain, id)).toEqual(tile(sound, id));
+      }
+    },
+  );
 });
 
 describe("the Verdict tile", () => {

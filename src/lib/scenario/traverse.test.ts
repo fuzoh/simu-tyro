@@ -26,6 +26,8 @@ const KEYS: readonly (keyof TraverseInputs)[] = [
   "tightness",
   "material",
   "terminations",
+  "wind",
+  "dynamics",
   "mp",
   "hRider",
   "hClearMin",
@@ -36,7 +38,7 @@ describe("`traverseInputs` — the fields a memo keys on", () => {
   const before = firstRunDefaults() as ScenarioDraft;
   const inputs = traverseInputs(before);
 
-  test("the Scenario's fourteen Traverse-scope fields, and no `x_D`", () => {
+  test("the Scenario's sixteen Traverse-scope fields, and no `x_D`", () => {
     expect(Object.keys(inputs).sort()).toEqual([...KEYS].sort());
   });
 
@@ -46,9 +48,11 @@ describe("`traverseInputs` — the fields a memo keys on", () => {
     for (const key of KEYS) expect(scrubbed[key]).toBe(inputs[key]);
   });
 
-  test("a wind edit changes no Traverse-scope field, so it cannot re-run the Sweep (#87)", () => {
-    const windy = traverseInputs({ ...before, wind: { speedKmh: 50, directionDeg: 45 } });
-    for (const key of KEYS) expect(windy[key]).toBe(inputs[key]);
+  test("a wind edit changes `wind` alone: the Wind Gate judges it, no statics number reads it", () => {
+    const wind = { speedKmh: 50, directionDeg: 45 };
+    const windy = traverseInputs({ ...before, wind });
+    expect(windy.wind).toBe(wind);
+    for (const key of KEYS.filter((key) => key !== "wind")) expect(windy[key]).toBe(inputs[key]);
   });
 
   test("a « Garde min. admise » edit changes `hClearMin`, and nothing else", () => {
