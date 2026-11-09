@@ -253,7 +253,8 @@ describe("the thirteen reported values, on the shipped line under EN 15567-1", (
   test("both traverse-scope labels carry their parenthesis", () => {
     const labels = results.rows.map((row) => row.label);
     expect(labels).toContain("T max (traversée)");
-    expect(labels).toContain("Garde min (traversée)");
+    // The shipped 10 m Zones d'ancrage are named on the judged garde's own label (#106).
+    expect(labels).toContain("Garde min (traversée), hors zones d'ancrage");
     expect(results.scope).toBe(TRAVERSE_SCOPE);
     expect(results.aside).toBeNull();
   });
@@ -758,6 +759,17 @@ describe("the Zones d'ancrage on Avancé's `Résultats` (#106)", () => {
     expect(rowIds(results)).toContain("clearance");
     expect(rowIds(results)).not.toContain("clearanceWhole");
     expect(results.clearanceScope).toBe(TRAVERSE_SCOPE);
+    // Its label is the one from before the zones: nothing is left out, so nothing is said.
+    expect(clearanceRow(results)?.label).toBe("Garde min (traversée)");
+  });
+
+  test("with zones the judged row says it leaves them out, beside the row that keeps them", () => {
+    // Under the block's « sur toute la traversée » header, the two labels are the two scopes.
+    const results = resultsOf();
+    expect(clearanceRow(results)?.label).toBe("Garde min (traversée), hors zones d'ancrage");
+    expect(results.rows.find((row) => row.id === "clearanceWhole")?.label).toBe(
+      "Garde min (traversée), zones d'ancrage comprises",
+    );
   });
 
   test("zones that leave no swept passager between them remove both garde rows, as a breach", () => {

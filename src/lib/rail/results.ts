@@ -167,7 +167,8 @@ export type Results = {
   /**
    * The garde's own scope, which leaves the Zones d'ancrage out — « sur la traversée, hors zones
    * d'ancrage » — and is {@link scope} itself where there is no zone. The simplified Pages print
-   * it over their garde tile; Avancé's block keeps one header and says it on the row's help.
+   * it over their garde tile; Avancé's block keeps one header and says it on the row's label,
+   * {@link CLEARANCE_ZONED_LABEL}.
    */
   readonly clearanceScope: string;
   /** « aucun régime choisi », beside the scope label, or `null`. */
@@ -196,8 +197,11 @@ export const TRAVERSE_SCOPE = "sur toute la traversée";
 /** With two Brins porteurs every row is one member's, and the header says so once (#4). */
 export const PER_LINE_SCOPE = `${TRAVERSE_SCOPE}, par ${label("line", "exact")}`;
 
+/** What the garde leaves out, where there are zones (#106). */
+const OUTSIDE_ZONES = `hors ${label("anchorZones", "exact")}`;
+
 /** The garde's scope: the traverse less its two ends, where nothing is judged (#106). */
-export const CLEARANCE_SCOPE = `sur la ${label("traverse", "exact")}, hors ${label("anchorZones", "exact")}`;
+export const CLEARANCE_SCOPE = `sur la ${label("traverse", "exact")}, ${OUTSIDE_ZONES}`;
 
 /** The same with two Brins porteurs, whose every row is one member's. */
 export const CLEARANCE_PER_LINE_SCOPE = `${CLEARANCE_SCOPE}, par ${label("line", "exact")}`;
@@ -207,6 +211,13 @@ export const CLEARANCE_PER_LINE_SCOPE = `${CLEARANCE_SCOPE}, par ${label("line",
  * beside the judged one on Avancé (#106).
  */
 export const CLEARANCE_WHOLE_LABEL = `${heading("traverseClearance", "exact")}, ${label("anchorZones", "exact")} comprises`;
+
+/**
+ * « Garde min (traversée), hors zones d'ancrage » — the judged row's label where there are zones,
+ * because it sits under the block's « sur toute la traversée » and beside
+ * {@link CLEARANCE_WHOLE_LABEL}, and the two must not read as the same scope (#106).
+ */
+export const CLEARANCE_ZONED_LABEL = `${heading("traverseClearance", "exact")}, ${OUTSIDE_ZONES}`;
 
 /** Its qualifier's first clause: the row is a reading, not a criterion. */
 export const NOT_JUDGED = "non jugée";
@@ -376,7 +387,7 @@ export function deriveResults({
     rows.push({
       ...row(
         "clearance",
-        heading("traverseClearance", "exact"),
+        zoned ? CLEARANCE_ZONED_LABEL : heading("traverseClearance", "exact"),
         formatQuantity("clearance", clearance.hMin),
         qualify(
           breach
