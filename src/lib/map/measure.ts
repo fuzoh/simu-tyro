@@ -30,8 +30,8 @@ import { samePosition } from "@/lib/terrain/trace.ts";
 export type MeasurePoints = readonly Position[];
 
 /** The ellipsoid WGS84's defining constants: semi-major axis, m, and flattening. */
-const WGS84_A = 6378137;
-const WGS84_F = 1 / 298.257223563;
+export const WGS84_A = 6378137;
+export const WGS84_F = 1 / 298.257223563;
 
 /**
  * How far from the profil a click may land and still be on it, m. A `[CONVENTION]`: a pick
