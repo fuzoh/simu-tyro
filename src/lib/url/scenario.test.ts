@@ -52,7 +52,7 @@ const TRACE = encodeP1({
   dev: null,
 });
 
-/** Three stations `(20,500) (70,496) (120,491)`: a Trace starting after 0, ending before 150 m. */
+/** Three samples `(20,500) (70,496) (120,491)`: a Trace starting after 0, ending before 150 m. */
 const OFFSET_TRACE = encodeP1({
   d: Float64Array.from([20, 70, 120]),
   z: Float64Array.from([500, 496, 491]),
@@ -66,7 +66,7 @@ const ALWAYS_COMPLETED = [
   "use",
   "za",
   "zb",
-  "fl",
+  "tp",
   "fam",
   "ta",
   "tb",
@@ -102,7 +102,7 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
       h: -40,
       za: 12,
       zb: 12,
-      fl: 6,
+      tp: 263.4,
       fam: "ac",
       d: 12,
       r0: 1770,
@@ -123,7 +123,7 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
       "use",
       "za",
       "zb",
-      "fl",
+      "tp",
       "fam",
       "d",
       "r0",
@@ -138,8 +138,20 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
       "daf",
       "x",
     ]);
-    // § 7's measurement: `fl` completes to 6,0 m literally and never to 4 % of the arriving span.
-    expect(search.fl).toBe(FIRST_RUN_SCENARIO.tightness.D_target);
+    // § 7's measurement: the driver completes literally — never to a flèche of 4 % of the arriving
+    // span. It is the tension de pose, 263,4 daN, and no `fl` rides along beside it.
+    expect(search.tp).toBe(263.4);
+    expect("fl" in search).toBe(false);
+  });
+
+  test("a link that carries its own driver keeps it, and `tp` is not added beside it", () => {
+    // ADR-0001: a link opens as given. Two drivers would be a contradiction the link is refused for.
+    for (const key of ["fl=6", "te=253.5", "lo=151.64", "vr=0.82"]) {
+      const { search, completed } = complete(`?L=250&h=-40&${key}`);
+      expect("tp" in search).toBe(false);
+      expect(completed).not.toContain("tp");
+    }
+    expect(complete("?L=250&h=-40&fl=6").search.fl).toBe(6);
   });
 
   test("`reg` is exempt — its absence is « — choisir — », never a value waiting to be filled", () => {
@@ -172,20 +184,17 @@ describe("recognised absent keys are completed from FIRST_RUN_SCENARIO", () => {
     expect("te" in search).toBe(false);
   });
 
-  test("an imported link keeps `tr`/`sa`/`sb` and grows no `L`/`h`", () => {
-    const { search } = complete(`?tr=${TRACE}&sa=10&sb=90`);
+  test("an imported link keeps `tr` and grows no `L`/`h`", () => {
+    const { search } = complete(`?tr=${TRACE}`);
     expect(search.tr).toBe(TRACE);
-    expect(search.sa).toBe(10);
-    expect(search.sb).toBe(90);
     expect("L" in search).toBe(false);
     expect("h" in search).toBe(false);
-    // `L = sb − sa`, so `x` completes to 40,0 m — half of the *imported* span.
-    expect(search.x).toBe(40);
+    // The profil runs 0 → 100 m and is the span, so `x` completes to 50,0 m.
+    expect(search.x).toBe(50);
   });
 
-  test("a manual link never grows `sa` / `sb`, and a `tr`-less link never grows `tr`", () => {
-    const { search } = complete("?L=250");
-    for (const key of ["sa", "sb", "tr"] satisfies SearchKey[]) expect(key in search).toBe(false);
+  test("a `tr`-less link never grows `tr`", () => {
+    expect("tr" in complete("?L=250").search).toBe(false);
   });
 
   test("`fam=tx` completes no steel key and invents no rope — `MBL` and `μ` stay blank", () => {
@@ -267,28 +276,19 @@ describe("completion follows the active family and names every key it fills", ()
     });
   });
 
-  test("an imported link with no stations completes them to the Trace's ends, and names them", () => {
-    // #55: the 100 m TRACE ends before the old « `sa` + 150 m », which put station B off the Trace.
+  test("an imported link completes no geometry key: the profil is taken whole (#88)", () => {
     const { search, completed } = complete(`?tr=${TRACE}`);
-    expect(search).toMatchObject({ sa: 0, sb: 100 });
-    expect(completed).toEqual(expect.arrayContaining(["sa", "sb"]));
-    expect(searchToScenario(search).geometry).toEqual({
-      source: "trace",
-      trace: TRACE,
-      sa: 0,
-      sb: 100,
-    });
+    expect(completed).not.toContain("tr");
+    expect(completed).not.toContain("L");
+    expect(completed).not.toContain("h");
+    expect(searchToScenario(search).geometry).toEqual({ source: "trace", trace: TRACE });
   });
 
   test.each([
     { config: "steel, manual", query: "?fam=ac", keys: ["L", "h", "d", "r0", "cst"] },
-    {
-      config: "steel, imported",
-      query: `?fam=ac&tr=${TRACE}`,
-      keys: ["tr", "sa", "sb", "d", "r0", "cst"],
-    },
+    { config: "steel, imported", query: `?fam=ac&tr=${TRACE}`, keys: ["tr", "d", "r0", "cst"] },
     { config: "textile, manual", query: "?fam=tx", keys: ["L", "h", "cls"] },
-    { config: "textile, imported", query: `?fam=tx&tr=${TRACE}`, keys: ["tr", "sa", "sb", "cls"] },
+    { config: "textile, imported", query: `?fam=tx&tr=${TRACE}`, keys: ["tr", "cls"] },
   ] satisfies { config: string; query: string; keys: SearchKey[] }[])(
     "a $config link completes every key its configuration needs",
     ({ query, keys }) => {
@@ -300,11 +300,9 @@ describe("completion follows the active family and names every key it fills", ()
   test.each([
     { path: "manual, `L` given", query: "?L=250", x: 125 },
     { path: "manual, `L` completed to 150", query: "?h=-40", x: 75 },
-    { path: "imported, stations 10 → 90", query: `?tr=${TRACE}&sa=10&sb=90`, x: 40 },
-    { path: "imported, `sa` completed to 0 before 90", query: `?tr=${TRACE}&sb=90`, x: 45 },
-    { path: "imported, `sb` completed to the Trace's end 100", query: `?tr=${TRACE}&sa=10`, x: 45 },
-    { path: "imported, both stations completed to 0 → 100", query: `?tr=${TRACE}`, x: 50 },
-    { path: "imported, both completed to 20 → 120", query: `?tr=${OFFSET_TRACE}`, x: 50 },
+    { path: "imported, a 0 → 100 profil", query: `?tr=${TRACE}`, x: 50 },
+    { path: "imported, a 20 → 120 profil", query: `?tr=${OFFSET_TRACE}`, x: 50 },
+    { path: "imported, a pre-#88 link's stations", query: `?tr=${TRACE}&sa=10&sb=90`, x: 50 },
   ])("`x` completes to half the completed span — $path", ({ query, x }) => {
     const { search, completed } = complete(query);
     expect(search.x).toBe(x);
@@ -313,68 +311,39 @@ describe("completion follows the active family and names every key it fills", ()
   });
 });
 
-describe("an imported link's absent stations complete to the Trace's ends — #55", () => {
+describe("an imported link is the whole profil — #88", () => {
   /** The Trace a link's `tr` names, as `initialAppState` decodes it beside the Scenario. */
-  const traceOf = (tr: string): Trace => ({ ...decodeP1(tr), fileName: null });
+  const traceOf = (tr: string): Trace => ({ ...decodeP1(tr), origin: { kind: "lien" } });
 
-  /** The gates' errors on a completed link, read with its Trace beside it. */
-  const errorsOf = (query: string, tr: string) =>
-    evaluateGates({ scenario: decode(query), trace: traceOf(tr) }).errors.map(
-      ({ field, message }) => ({ field, message }),
-    );
-
-  test("neither station given: `sa` and `sb` complete to the first and last Trace distance", () => {
-    // A Trace that starts after 0 and ends before 150 m: both of the old constants fell off it.
-    const { search, completed } = complete(`?tr=${OFFSET_TRACE}`);
-    expect(search).toMatchObject({ sa: 20, sb: 120 });
-    expect(completed).toEqual(expect.arrayContaining(["sa", "sb"]));
-    expect(errorsOf(`?tr=${OFFSET_TRACE}`, OFFSET_TRACE)).toEqual([]);
+  test("a completed imported link passes the gates with nothing placed", () => {
+    expect(evaluateGates({ scenario: decode(`?tr=${OFFSET_TRACE}`) }).errors).toEqual([]);
   });
 
-  test("the completed stations are where an in-app import places them", () => {
+  test("the completed geometry is the one an in-app import holds", () => {
     const imported = appReducer(initialAppState({ query: "", session: null }), {
       type: "tracé/importé",
-      trace: { ...traceOf(OFFSET_TRACE), fileName: "t.csv" },
+      trace: { ...traceOf(OFFSET_TRACE), origin: { kind: "csv", fileName: "t.csv" } },
       tr: OFFSET_TRACE,
     }).scenario.geometry;
     expect(decode(`?tr=${OFFSET_TRACE}`).geometry).toEqual(imported);
   });
 
-  test("a Trace shorter than 150 m with only `sa` inside it completes `sb` to its end", () => {
-    const { search, completed } = complete(`?tr=${OFFSET_TRACE}&sa=40`);
-    expect(search).toMatchObject({ sa: 40, sb: 120, x: 40 });
-    expect(completed).toContain("sb");
-    expect(completed).not.toContain("sa");
-    expect(errorsOf(`?tr=${OFFSET_TRACE}&sa=40`, OFFSET_TRACE)).toEqual([]);
-  });
-
-  test("an explicit `sb` past the Trace's end is kept as given and raises « Station hors du tracé »", () => {
-    // ADR-0001: a station the link carries is never moved back onto the Trace.
-    const { search, completed } = complete(`?tr=${OFFSET_TRACE}&sb=300`);
-    expect(search).toMatchObject({ sa: 20, sb: 300 });
-    expect(completed).not.toContain("sb");
-    expect(errorsOf(`?tr=${OFFSET_TRACE}&sb=300`, OFFSET_TRACE)).toEqual([
-      { field: "sb", message: "⛔ Station hors du tracé (20,0 – 120,0 m). Valeur : 300,0 m." },
+  test("a link from before #88 drops `sa` and `sb` as unknown keys and keeps its profil whole", () => {
+    // An explicit station past the profil's end used to be kept and raise « Distance hors du
+    // profil »; it is now a key nothing reads, so the link opens on its whole profil instead.
+    const query = `?tr=${OFFSET_TRACE}&sa=40&sb=300`;
+    expect(salvageSearch(parse(query)).dropped).toEqual([
+      { key: "sa", reason: "clé-inconnue" },
+      { key: "sb", reason: "clé-inconnue" },
     ]);
+    expect(decode(query).geometry).toEqual({ source: "trace", trace: OFFSET_TRACE });
+    expect(evaluateGates({ scenario: decode(query) }).errors).toEqual([]);
   });
 
-  test("the completed `x` is half of `sb − sa` for the completed stations", () => {
-    for (const query of [
-      `?tr=${OFFSET_TRACE}`,
-      `?tr=${OFFSET_TRACE}&sa=40`,
-      `?tr=${TRACE}&sb=60`,
-    ]) {
-      const { search } = complete(query);
-      if (search.tr === undefined) throw new Error(`${query} completed to a manual link`);
-      expect(search.x).toBe((search.sb - search.sa) / 2);
-    }
-  });
-
-  test("a `tr` that does not decode keeps the old completion — the file origin, then 150 m", () => {
+  test("a `tr` that does not decode completes `x` against the shipped 150 m", () => {
     // Unreachable through the validator, which refuses such a payload whole; completion still must
-    // not throw on one, and #55 does not change how a bad `tr` is handled.
-    const { search } = completeFromDefaults({ tr: "p1.AAAA" });
-    expect(search).toMatchObject({ sa: 0, sb: 150, x: 75 });
+    // not throw on one.
+    expect(completeFromDefaults({ tr: "p1.AAAA" }).search.x).toBe(75);
   });
 });
 
@@ -399,12 +368,12 @@ describe("the token tables", () => {
 describe("the first-run link", () => {
   test("is § 9's shipped scenario, in canonical order", () => {
     expect(FIRST_RUN_LINK).toBe(
-      "/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&fam=ac&d=12&r0=1770" +
+      "/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&tp=263.4&fam=ac&d=12&r0=1770" +
         "&cst=iwrc&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=75",
     );
   });
 
-  test("is 142 characters — `reg` absent, `mbf`/`ea`/`mu` absent", () => {
+  test("is 146 characters — `reg` absent, `mbf`/`ea`/`mu` absent", () => {
     // § 7/§ 9/§ 11 quote **141**, counted off § 9's *printed* sketch, which spells `fl=6.0` and
     // `x=75.0`. That sketch is not emittable: the spec keeps the router's default codecs, and
     // `stringifySearchWith(JSON.stringify, JSON.parse)` renders the number 6 as `6` and the
@@ -412,8 +381,9 @@ describe("the first-run link", () => {
     // display-only: state holds a number whose value equals the displayed value, so the URL
     // serialises `6` ». So 141 − 4 = **137**, measured against the installed router; the two
     // absence meanings the count exists to lock are asserted below, unchanged. **142 since
-    // 2026-09-23**: `&gm=1` — « Garde min. admise » — is five more characters.
-    expect(FIRST_RUN_LINK).toHaveLength(142);
+    // 2026-09-23**: `&gm=1` — « Garde exigée » — is five more characters. **146 since the first-run
+    // driver became the tension de pose**: `tp=263.4` is four characters longer than `fl=6`.
+    expect(FIRST_RUN_LINK).toHaveLength(146);
     expect(FIRST_RUN_LINK).not.toContain("reg=");
     expect(FIRST_RUN_LINK).not.toContain("mbf=");
     expect(FIRST_RUN_LINK).not.toContain("ea=");
@@ -423,7 +393,7 @@ describe("the first-run link", () => {
   test("round-trips: parsing it back yields the same bag, and re-emitting the same string", () => {
     const search = validateSearch(parse(FIRST_RUN_LINK.slice(1)));
     expect(search).toEqual(scenarioToSearch(FIRST_RUN_SCENARIO));
-    expect(canonicalLink(search)).toBe(FIRST_RUN_LINK);
+    expect(canonicalLink(search, "/")).toBe(FIRST_RUN_LINK);
     expect(complete(FIRST_RUN_LINK.slice(1)).completed).toEqual([]);
   });
 });
@@ -475,15 +445,13 @@ describe("scenarioToSearch — the write side", () => {
     }
   });
 
-  test("an imported scenario emits `tr`/`sa`/`sb` and no `L`/`h`", () => {
+  test("an imported scenario emits `tr` and no `L`/`h`", () => {
     const scenario: Scenario = {
       ...structuredClone<Scenario>(FIRST_RUN_SCENARIO),
-      geometry: { source: "trace", trace: TRACE, sa: 10, sb: 90 },
+      geometry: { source: "trace", trace: TRACE },
     };
     const search = scenarioToSearch(scenario);
     expect(search.tr).toBe(TRACE);
-    expect(search.sa).toBe(10);
-    expect(search.sb).toBe(90);
     expect("L" in search).toBe(false);
     expect("h" in search).toBe(false);
   });
@@ -519,7 +487,7 @@ describe("scenarioToSearch — the write side", () => {
       // The consequence, stated where a reader will look for it: « Copier le lien » builds its href
       // with `canonicalLink`, the address bar gets this bag as-is, and § 7 requires the two strings
       // to be identical (« two links to the same Scenario are then string-identical »).
-      expect(`/${defaultStringifySearch(search)}`).toBe(canonicalLink(search));
+      expect(`/${defaultStringifySearch(search)}`).toBe(canonicalLink(search, "/"));
     }
   });
 });
@@ -534,8 +502,145 @@ describe("searchToScenario — the read side of § 7's key table", () => {
     expect(decode("?L=250&reg=en15567").regime).toBe("en15567");
   });
 
-  it("turns the URL's daN back into the state's newtons — `te` and `mbl`", () => {
+  it("reads `bp` absent as one Brin porteur — and neither completes nor names it (#84)", () => {
+    // A link from before the key: one member, and nothing in the strip or the address bar moves.
+    const { search, completed } = complete("?L=250&h=-40");
+    expect(searchToScenario(search).carryingLines).toBe(1);
+    expect(search.bp).toBeUndefined();
+    expect(completed).not.toContain("bp");
+    expect(decode("?L=250&bp=2").carryingLines).toBe(2);
+    expect(decode("?L=250&bp=1").carryingLines).toBe(1);
+  });
+
+  it("reads `cp` absent as the Mise en tension at A — and neither completes nor names it (#85)", () => {
+    const { search, completed } = complete("?L=250&h=-40");
+    expect(searchToScenario(search).tensioningSide).toBe("A");
+    expect(search.cp).toBeUndefined();
+    expect(completed).not.toContain("cp");
+    expect(decode("?L=250&cp=b").tensioningSide).toBe("B");
+    expect(decode("?L=250&cp=a").tensioningSide).toBe("A");
+  });
+
+  it("reads `mt` absent as the mouflage — and neither completes nor names it (#86)", () => {
+    const { search, completed } = complete("?L=250&h=-40");
+    expect(searchToScenario(search).tensioningDevice).toBe("pulley");
+    expect(search.mt).toBeUndefined();
+    expect(completed).not.toContain("mt");
+    expect(decode("?L=250&mt=ms").tensioningDevice).toBe("maestro-s");
+    expect(decode("?L=250&mt=ml").tensioningDevice).toBe("maestro-l");
+    expect(decode("?L=250&mt=mou").tensioningDevice).toBe("pulley");
+  });
+
+  it("reads `ws` and `wd` absent as no wind — and neither completes nor names them (#87)", () => {
+    const { search, completed } = complete("?L=250&h=-40");
+    expect(searchToScenario(search).wind).toEqual({ speedKmh: 0, directionDeg: 0 });
+    expect(search.ws).toBeUndefined();
+    expect(search.wd).toBeUndefined();
+    expect(completed).not.toContain("ws");
+    expect(completed).not.toContain("wd");
+    expect(decode("?L=250&ws=50&wd=45").wind).toEqual({ speedKmh: 50, directionDeg: 45 });
+    // Each key stands alone: a direction without a speed, and a speed without a direction.
+    expect(decode("?L=250&wd=270").wind).toEqual({ speedKmh: 0, directionDeg: 270 });
+    expect(decode("?L=250&ws=30").wind).toEqual({ speedKmh: 30, directionDeg: 0 });
+  });
+
+  it("reads the four coordinates absent as Positions unknown — and neither completes nor names them (#90)", () => {
+    const { search, completed } = complete("?L=250&h=-40");
+    expect(searchToScenario(search).positions).toEqual({ A: null, B: null });
+    for (const key of ["lata", "lona", "latb", "lonb"] as const) {
+      expect(search[key]).toBeUndefined();
+      expect(completed).not.toContain(key);
+    }
+  });
+
+  it("reads each anchor's pair on its own, and writes none for an unknown one", () => {
+    const decoded = decode("?L=250&latb=46.846166&lonb=6.520783");
+    expect(decoded.positions).toEqual({ A: null, B: { lat: 46.846166, lon: 6.520783 } });
+    const out = scenarioToSearch({ ...FIRST_RUN_SCENARIO, positions: decoded.positions });
+    expect(out.lata).toBeUndefined();
+    expect(out.latb).toBe(46.846166);
+    expect(out.lonb).toBe(6.520783);
+  });
+
+  it("reads `ph` as a profil that does not run between the Positions, and absent as one that does", () => {
+    const positions = "lata=46.843556&lona=6.525035&latb=46.858&lonb=6.520783";
+    expect(decode(`?${positions}&ph=1&tr=${TRACE}`).geometry).toEqual({
+      source: "trace",
+      trace: TRACE,
+      offPositions: true,
+    });
+    const { search, completed } = complete(`?${positions}&tr=${TRACE}`);
+    expect(search.ph).toBeUndefined();
+    expect(completed).not.toContain("ph");
+    expect(searchToScenario(search).geometry).toEqual({ source: "trace", trace: TRACE });
+  });
+
+  it("drops `ph` without a profil or without both Positions: there is no line for it to run off", () => {
+    expect("ph" in complete("?L=250&lata=46.8&lona=6.5&latb=46.9&lonb=6.6&ph=1").search).toBe(
+      false,
+    );
+    expect("ph" in complete(`?lata=46.8&lona=6.5&ph=1&tr=${TRACE}`).search).toBe(false);
+  });
+
+  it("keeps a negative wind speed as it arrived, for the form to refuse (ADR-0001)", () => {
+    expect(decode("?L=250&ws=-5").wind.speedKmh).toBe(-5);
+  });
+
+  it("reads the ride's keys absent as §12.2's defaults — and neither completes nor names them (#89)", () => {
+    for (const fam of ["ac", "tx"] as const) {
+      const { search, completed } = complete(`?L=250&fam=${fam}`);
+      for (const key of ["cda", "f0", "kv", "mur", "rho"] as const) {
+        expect(search[key]).toBeUndefined();
+        expect(completed).not.toContain(key);
+      }
+      expect(decode(`?L=250&fam=${fam}`).dynamics).toEqual({
+        CdA: 0.45,
+        rho: null,
+        F0: 15,
+        kv: 1.5,
+        mu: 0.015,
+      });
+    }
+  });
+
+  it("reads `f0` in daN, and each trolley key only under its own family", () => {
+    expect(decode("?L=250&fam=tx&f0=2.5&kv=2").dynamics).toMatchObject({ F0: 25, kv: 2 });
+    expect(decode("?L=250&fam=ac&mur=0.02").dynamics.mu).toBe(0.02);
+    // The other family's keys are out of the active configuration, so they are not read.
+    expect(decode("?L=250&fam=ac&f0=2.5&kv=2").dynamics).toMatchObject({ F0: 15, kv: 1.5 });
+    expect(decode("?L=250&fam=tx&mur=0.02").dynamics.mu).toBe(0.015);
+  });
+
+  it("writes only the active family's trolley: a câble's `μ` held on a corde stays out of the link", () => {
+    const cable = firstRunDefaults();
+    const corde: Scenario = {
+      ...cable,
+      usage: "TEMPORAIRE",
+      material: { family: "textile", ropeClass: "hmpe", MBL: 300000, mu: 0.16, k: 22 },
+      terminations: structuredClone(FIRST_RUN_RETAINED_TEXTILE.terminations),
+    };
+    const onCorde = scenarioToSearch({ ...corde, dynamics: { ...corde.dynamics, mu: 0.02 } });
+    expect(onCorde).not.toHaveProperty("mur");
+    const onCable = scenarioToSearch({ ...cable, dynamics: { ...cable.dynamics, F0: 20, kv: 2 } });
+    expect(onCable).not.toHaveProperty("f0");
+    expect(onCable).not.toHaveProperty("kv");
+  });
+
+  it("keeps a typed ρ, and a non-positive C_dA as it arrived (ADR-0001)", () => {
+    expect(decode("?L=250&rho=1.069").dynamics.rho).toBe(1.069);
+    expect(decode("?L=250&cda=-0.1").dynamics.CdA).toBe(-0.1);
+  });
+
+  it("keeps a Maestro that arrives beside a câble, as given (ADR-0001)", () => {
+    const scenario = decode("?L=250&fam=ac&d=12&r0=1770&cst=iwrc&mt=ms");
+    expect(scenario.material.family).toBe("steel");
+    expect(scenario.tensioningDevice).toBe("maestro-s");
+  });
+
+  it("turns the URL's daN back into the state's newtons — `te`, `tp` and `mbl`", () => {
+    // A link written before #85 keeps meaning what it meant: `te` is still `H`.
     expect(decode("?te=253.5").tightness).toEqual({ mode: "tension", H_target: 2535 });
+    expect(decode("?tp=263.4").tightness).toEqual({ mode: "anchor", T_target: 2634 });
     expect(decode("?fam=tx&cls=hmpe&mbl=10000&mu=0.1&k=22").material).toEqual({
       family: "textile",
       ropeClass: "hmpe",
@@ -592,18 +697,13 @@ describe("searchToScenario — the read side of § 7's key table", () => {
   });
 
   it("carries an imported link's `tr` verbatim and never decodes it", () => {
-    expect(decode(`?tr=${TRACE}&sa=10&sb=210`).geometry).toEqual({
-      source: "trace",
-      trace: TRACE,
-      sa: 10,
-      sb: 210,
-    });
+    expect(decode(`?tr=${TRACE}`).geometry).toEqual({ source: "trace", trace: TRACE });
   });
 
   it("clamps `x` to the span on arrival — the one elected exception", () => {
     expect(decode("?L=150&h=0&x=400").rider.xD).toBe(150);
     expect(decode("?L=150&h=0&x=-12").rider.xD).toBe(0);
-    expect(decode(`?tr=${TRACE}&sa=10&sb=210&x=500`).rider.xD).toBe(200);
+    expect(decode(`?tr=${TRACE}&x=500`).rider.xD).toBe(100);
   });
 
   it("applies an out-of-range value as it arrived — everything but `x`", () => {
@@ -616,8 +716,8 @@ describe("searchToScenario — the read side of § 7's key table", () => {
   it("is total over a completed link — every field is filled or blank on purpose", () => {
     const scenario = decode("?L=250&h=-40");
     expect(scenario.geometry).toEqual({ source: "manual", L: 250, h: -40 });
-    // § 7 completes `fl` **literally** to 6,0 m, and `x` to `L/2` of the *completed* span.
-    expect(scenario.tightness).toEqual({ mode: "sag", D_target: 6 });
+    // § 7 completes the driver **literally** — `tp` 263,4 daN — and `x` to `L/2` of the *completed* span.
+    expect(scenario.tightness).toEqual({ mode: "anchor", T_target: 2634 });
     expect(scenario.rider.xD).toBe(125);
   });
 });
@@ -631,7 +731,7 @@ describe("ADR-0001 — a link arrives as given, and the gates judge it", () => {
       A: { id: "noeud-de-huit", eta: 0.6 },
       B: { id: "noeud-de-chaise", eta: 0.55 },
     });
-    const { errors } = evaluateGates({ scenario: link, trace: null });
+    const { errors } = evaluateGates({ scenario: link });
     expect(errors).toEqual([
       {
         gate: "verdict",
@@ -645,15 +745,13 @@ describe("ADR-0001 — a link arrives as given, and the gates judge it", () => {
       },
     ]);
     const fixed = applyShippedTerminations(link, errors[0]);
-    expect(evaluateGates({ scenario: fixed, trace: null }).errors).toEqual([]);
+    expect(evaluateGates({ scenario: fixed }).errors).toEqual([]);
   });
 
   test("an end of the other family is kept, not swapped for the family's own", () => {
     expect(decode("?fam=ac&ta=huit").terminations.A).toEqual({ id: "noeud-de-huit", eta: 0.6 });
     const steelEnd = decode("?use=tempo&fam=tx&cls=pa&mbl=30000&mu=0.08&tb=cosse");
     expect(steelEnd.terminations.B).toEqual({ id: "cosse-oeil-flamand", eta: 0.9 });
-    expect(evaluateGates({ scenario: steelEnd, trace: null }).errors.map((e) => e.field)).toEqual([
-      "tb",
-    ]);
+    expect(evaluateGates({ scenario: steelEnd }).errors.map((e) => e.field)).toEqual(["tb"]);
   });
 });

@@ -12,7 +12,7 @@
  *
  * - **Three tiers, because § 8 suppresses three different amounts of picture.**
  *   {@link buildSceneFrame} is the input half — terrain, both anchors, the span markers, the 5 %
- *   margin — and it fails **only** for « l'exception géométrique » (`L` / `h` / station), the one
+ *   margin — and it fails **only** for « l'exception géométrique » (`L` / `h` / no profil), the one
  *   state where there is no shared x domain and the scrub track stops being a pointer path.
  *   {@link buildSceneBase} is the solved half on top of it, and its `null` is « Aucun résultat »,
  *   where « les entrées se dessinent toujours ». Returning one `null` for both — a blank textile
@@ -23,7 +23,8 @@
  *   and {@link placeRider} runs the rider's exact solve and its one-step clearance. That split
  *   **is** § 7's « memo on the solve inputs behind the `useSweep` seam »: dragging the rider
  *   dispatches a new Scenario on every `pointermove`, and only the second half may re-run for it.
- *   `unloadedInputs`, `mp` and `hRider` are what a memo keys on, and `x_D` is absent from them.
+ *   `unloadedInputs`, `mp`, `hRider` and the member count are what a memo keys on, and `x_D` is
+ *   absent from them.
  * - **No polyline is ever stored in a result object.** The cable is regenerated per render from
  *   `sampleCable(state, n)`; what is stored here is this render's samples, not a field on a
  *   `SpanState` — voir § 2 — le contrat du moteur.
@@ -47,11 +48,12 @@
  *   minimum sits at **−0,36 m** against a ridge, so one linear axis leaves the crossing this whole
  *   Chart Block exists to show **0,2 px** tall at § 5's reference column.
  * - **Terrain enters at one joint.** `placeSpan` builds the engine's `Terrain` over `[0, L]`; the
- *   *drawn* ground spans the whole shared domain, holding the ends exactly as `zGroundAt` does.
+ *   *drawn* ground spans the whole shared domain, holding the ends exactly as `zGroundAt` does. An
+ *   imported profil runs anchor to anchor, so there the domain is the span and the two are one.
  */
 
 import type { SweepRider } from "@/lib/scenario/traverse.ts";
-import type { ScenarioDraft } from "@/lib/scenario/types.ts";
+import type { CarryingLines, ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { Unloaded } from "@/lib/scenario/unloaded.ts";
 import type {
   ClearanceResult,
@@ -62,11 +64,11 @@ import type {
   SweepStep,
   Terrain,
 } from "@/lib/sim";
-import type { AnchorPlacement, Trace } from "@/lib/terrain/trace.ts";
+import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { xDomain } from "@/lib/layout/contract.ts";
 import { clampX, type PlacedSpan } from "@/lib/scenario/geometry.ts";
-import { sweepRider } from "@/lib/scenario/traverse.ts";
+import { sweepRider, sweepRiderOf } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import {
   evaluateClearance,
@@ -75,7 +77,6 @@ import {
   sweepStep,
   zGroundAt,
 } from "@/lib/sim";
-import { altitudeAt } from "@/lib/terrain/trace.ts";
 
 /**
  * Vertices minus one on a drawn cable. Nothing downstream is measured against it — it is a drawing
@@ -94,6 +95,23 @@ export type Polyline = {
 
 /** One closed interval of rider positions, m. Signal 3 draws one tinted band per entry. */
 export type Band = { readonly from: number; readonly to: number };
+
+/**
+ * Centre-to-centre gap between two drawn Brins porteurs, px — a drawing constant, never metres:
+ * the gap is not a parameter and enters no computation (#4). Two `stroke-2` lines 6 px apart keep
+ * 4 px of air between them at every span.
+ */
+export const MEMBER_GAP_PX = 6;
+
+/**
+ * One member as the profile draws it: the solved line, shifted **in pixels** — down is positive, as
+ * in SVG. Both members are the same solve, so the shift is the only thing telling them apart.
+ */
+export type DrawnMember = {
+  /** « ligne » alone, or « ligne du haut » / « ligne du bas ». */
+  readonly line: "line" | "upperLine" | "lowerLine";
+  readonly offsetPx: number;
+};
 
 /** Everything the two charts know about where the rider is and what it costs. */
 export type SceneRider = {
@@ -121,7 +139,7 @@ export type SceneRider = {
    */
   readonly worst: { readonly hClear: number; readonly atX: number };
   /**
-   * « Garde sous le passager », m — `z_D − z_ground(x_D) − h_rider`, the clearance under the rider's
+   * « Garde au sol », m — `z_D − z_ground(x_D) − h_rider`, the clearance under the rider's
    * **own feet** rather than at {@link worst}'s governing point.
    *
    * It is **not** a second criterion and nothing judges it: it exists because it is the quantity the
@@ -182,8 +200,8 @@ export type SceneRider = {
  *
  * `null` from {@link buildSceneFrame} is the **only** state § 8 lets collapse both plots to an
  * empty frame with no ticks and an inert scrub track — « l'exception géométrique », scoped to `L` /
- * `h` / station failures, and written down as an exception precisely so nobody applies it to every
- * failure alike.
+ * `h` failures and an imported line with no profil, and written down as an exception precisely so
+ * nobody applies it to every failure alike.
  */
 export type SceneFrame = {
   /** Portée, m. */
@@ -194,6 +212,11 @@ export type SceneFrame = {
   readonly domain: readonly [number, number];
   /** The terrain's own horizontal extent in the span frame, or `null` in manual mode. */
   readonly extent: { readonly min: number; readonly max: number } | null;
+  /**
+   * The ground altitude under each anchor in the profil's own frame — what turns a height of the
+   * frame into an altitude. `null` in manual mode, whose ground has none.
+   */
+  readonly bases: PlacedSpan["bases"];
   /** The engine's ground, over `[0, L]` — the one terrain joint. */
   readonly terrain: Terrain;
   /** The **drawn** ground, over the whole shared domain, ends held exactly as `zGroundAt` holds them. */
@@ -215,15 +238,18 @@ export type SceneFrame = {
  * curve, the danger bands and the rider marker go, while the {@link SceneFrame} it was built on
  * keeps drawing.
  *
- * This is the expensive half: the sweep plus the clearance reducer, p95 1,30 ms at 240 steps. It is
- * a function of the frame, the unloaded line, `mp` and `hRider` alone, so a scrub — which changes
- * `x_D` and nothing else — cannot invalidate it.
+ * This is the expensive half: the sweep plus the clearance reducer, p95 1,30 ms at 240 steps, and
+ * a second tension-only sweep with two Brins porteurs. It is a function of the frame, the unloaded
+ * line, `mp`, `hRider` and the member count alone, so a scrub — which changes `x_D` and nothing
+ * else — cannot invalidate it.
  */
 export type SceneBase = SceneFrame & {
   /** The span posed to the solver, rider excluded. */
   readonly span: SpanInput;
-  /** The rider's design load, N. */
+  /** The load one member carries, N — the whole design load on one member, half on each of two. */
   readonly P: number;
+  /** The Brins porteurs to draw, top first: one line, or two offset by {@link MEMBER_GAP_PX}. */
+  readonly members: readonly DrawnMember[];
   /** What the solver consumed. */
   readonly material: DerivedMaterial;
   /** The unloaded line — « ligne à vide », the layer that is **off** by default. */
@@ -232,6 +258,8 @@ export type SceneBase = SceneFrame & {
   readonly unloadedCable: Polyline;
   /** The precomputed traverse. `coverage < 1` is `Indéterminé` and the scrub track gains gaps. */
   readonly traverse: SweepResult;
+  /** One member under the whole design load — `sweepRider`'s « cas défavorable », never drawn. */
+  readonly soleCarrier: SweepResult | null;
   /**
    * « Trajectoire » — the load's own path, `(x_D, z_D)` over every solved step, **split at
    * `Indéterminé`'s gaps** rather than bridged across them: a line through a step that did not solve
@@ -259,19 +287,20 @@ export type ChartScene = SceneBase & {
  * @param placed the unloaded line's `span`, which every outcome but stage `geometry` carries: the
  *   frame is drawn on the placement the line was solved on, and `placeSpan` runs once per edit.
  * @returns `null` for § 8's *exception géométrique* and nothing else — a `null` placement: a
- *   non-finite or non-positive `L`, a non-finite `h`, `station B ≤ station A`, or a `tr` geometry
- *   with no Trace. Those are the states where the shared x domain — span + 5 % — does not exist,
+ *   non-finite or non-positive `L`, a non-finite `h`, or a `tr` geometry with no Trace. Those are
+ *   the states where the shared x domain — span + 5 % — does not exist,
  *   so `x_D` has no interval to live in and the scrub track has nothing to be a pointer path over.
  */
 export function buildSceneFrame(placed: PlacedSpan | null): SceneFrame | null {
   if (placed === null) return null;
-  const { L, h, anchors, terrain } = placed;
+  const { L, h, anchors, terrain, bases } = placed;
   const { ground, extent } = drawnGround(placed);
   return {
     L,
     h,
     domain: xDomain(L, extent),
     extent,
+    bases,
     terrain,
     ground,
     anchors,
@@ -301,17 +330,19 @@ export function buildSceneBase(
   const swept = sweepRider(unloaded, rider);
   if (swept === null) return null;
   const { input: span, material, state } = unloaded;
-  const { P, traverse, clearance } = swept;
+  const { P, traverse, clearance, soleCarrier } = swept;
   const unloadedCable = polyline(sampleCable(state, CABLE_SAMPLES));
 
   return {
     ...frame,
     span,
     P,
+    members: drawnMembers(rider.carryingLines),
     material,
     unloaded: state,
     unloadedCable,
     traverse,
+    soleCarrier,
     trajectory: trajectoryRuns(traverse),
     clearance,
     hRider: rider.hRider,
@@ -334,10 +365,19 @@ export function buildScene({
   trace: Trace | null;
 }): ChartScene | null {
   const unloaded = deriveUnloaded(unloadedInputs(scenario, trace));
-  const base = buildSceneBase(buildSceneFrame(unloaded.span), unloaded, scenario.rider);
+  const base = buildSceneBase(buildSceneFrame(unloaded.span), unloaded, sweepRiderOf(scenario));
   if (base === null) return null;
   const rider = placeRider(base, scenario.rider.xD);
   return rider === null ? null : { ...base, rider };
+}
+
+/** One line drawn where it solved, or two centred on it, {@link MEMBER_GAP_PX} apart. */
+function drawnMembers(carryingLines: CarryingLines): readonly DrawnMember[] {
+  if (carryingLines === 1) return [{ line: "line", offsetPx: 0 }];
+  return [
+    { line: "upperLine", offsetPx: -MEMBER_GAP_PX / 2 },
+    { line: "lowerLine", offsetPx: MEMBER_GAP_PX / 2 },
+  ];
 }
 
 /**
@@ -361,11 +401,11 @@ export function snapToStep(traverse: SweepResult, x: number): number | null {
 }
 
 /** What only the picture needs on top of the placement: the drawn ground and the trace's extent. */
-function drawnGround({ L, terrain, onTrace }: PlacedSpan): {
+function drawnGround({ L, terrain, bases }: PlacedSpan): {
   ground: Polyline;
   extent: { min: number; max: number } | null;
 } {
-  if (onTrace === null) {
+  if (bases === null) {
     const [lo, hi] = xDomain(L, null);
     const zBaseA = zGroundAt(terrain, 0);
     const zBaseB = zGroundAt(terrain, L);
@@ -379,37 +419,10 @@ function drawnGround({ L, terrain, onTrace }: PlacedSpan): {
     };
   }
 
-  const { trace, a } = onTrace;
-  const extent = {
-    min: trace.d[0] - a.station,
-    max: trace.d[trace.d.length - 1] - a.station,
-  };
-  return { ground: drawnTrace(trace, a, xDomain(L, extent)), extent };
-}
-
-/**
- * The imported profile over the **whole** shared domain, translated into the anchor-A-top frame.
- *
- * The file's own samples, **never a resampling** — § 4 killed resampling for making a coarse import
- * indistinguishable from a fine one, and that rule does not stop at the engine's edge.
- */
-function drawnTrace(
-  trace: Trace,
-  a: AnchorPlacement,
-  [lo, hi]: readonly [number, number],
-): Polyline {
-  const zRef = altitudeAt(trace, a.station) + a.height;
-  const xs: number[] = [lo];
-  const zs: number[] = [altitudeAt(trace, lo + a.station) - zRef];
-  for (let i = 0; i < trace.d.length; i++) {
-    const x = trace.d[i] - a.station;
-    if (x <= lo || x >= hi) continue;
-    xs.push(x);
-    zs.push(trace.z[i] - zRef);
-  }
-  xs.push(hi);
-  zs.push(altitudeAt(trace, hi + a.station) - zRef);
-  return { xs: Float64Array.from(xs), zs: Float64Array.from(zs) };
+  // The profil runs anchor to anchor, so the domain clamps to the span and the drawn ground is the
+  // engine's own: the file's samples, **never a resampling** — § 4 killed resampling for making a
+  // coarse import indistinguishable from a fine one, and that rule does not stop at the engine's edge.
+  return { ground: terrain, extent: { min: 0, max: L } };
 }
 
 /**

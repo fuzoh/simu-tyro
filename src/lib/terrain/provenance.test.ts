@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest";
 import type { Trace } from "./trace.ts";
 
 import { parseProfileCsv } from "./csv.ts";
-import { isStraight, terrainDisclosure } from "./provenance.ts";
+import { isStraight, terrainDisclosure, terrainSource, traceName } from "./provenance.ts";
 
 /**
  * The terrain-provenance disclosure block — « v1 build spec » § 6 (*La qualité du terrain est
@@ -21,7 +21,7 @@ function trace(d: readonly number[], dev: number | null): Trace {
     d: Float64Array.from(d),
     z: Float64Array.from(d.map(() => 100)),
     dev,
-    fileName: "t.csv",
+    origin: { kind: "csv", fileName: "t.csv" },
   };
 }
 
@@ -47,8 +47,38 @@ describe("manual ground", () => {
   test("and it carries the measured consequence, not only the model", () => {
     // Without this sentence a user modelling a gorge by hand reads a failure that does not exist.
     expect(lines[0].detail).toContain("le dénivelé ne gagne aucune garde");
-    expect(lines[0].detail).toContain("garde min 2,43 / 2,42 / 2,34 / 2,22 m");
+    expect(lines[0].detail).toContain("garde au sol minimale 2,43 / 2,42 / 2,34 / 2,22 m");
     expect(lines[0].detail).toContain("−62,8 m sur une ligne de 1109 m");
+  });
+});
+
+describe("the source every Page discloses (#91)", () => {
+  const cached = exported(183.4, 0.007);
+
+  test("is the active Trace", () => {
+    expect(terrainSource("trace", cached)).toEqual({ kind: "trace", trace: cached });
+  });
+
+  test("is manual ground under manual geometry, even with a Trace in memory", () => {
+    expect(terrainSource("manual", cached)).toEqual({ kind: "manual" });
+    expect(terrainSource("trace", null)).toEqual({ kind: "manual" });
+  });
+});
+
+describe("a profil geo.admin (#103)", () => {
+  const geoadmin: Trace = { ...exported(435.2, 0.0005), origin: { kind: "geoadmin" } };
+
+  test("is named as one, with its point count, its spacing and swisstopo's attribution", () => {
+    const [identity] = terrainDisclosure({ kind: "trace", trace: geoadmin });
+    expect(identity.tier).toBe("plain");
+    expect(identity.text).toBe("Profil geo.admin · 200 points · pas max 2,2 m");
+    expect(identity.detail).toContain("© swisstopo");
+  });
+
+  test("the Rail names each origin, and only a CSV by its file", () => {
+    expect(traceName({ kind: "geoadmin" })).toBe("profil geo.admin");
+    expect(traceName({ kind: "lien" })).toBe("profil reçu par lien");
+    expect(traceName({ kind: "csv", fileName: "pont.csv" })).toBe("pont.csv");
   });
 });
 
@@ -60,7 +90,7 @@ describe("an imported profile", () => {
       tier: "plain",
       text: "Profil importé · 200 points · pas max 0,9 m",
     });
-    expect(lines[1]).toEqual({ tier: "ok", text: "Tracé rectiligne (écart max 0,01 m)" });
+    expect(lines[1]).toEqual({ tier: "ok", text: "Profil rectiligne (écart max 0,01 m)" });
   });
 
   test("the real trace1 reads exactly as § 6's clean case", () => {
@@ -73,7 +103,7 @@ describe("an imported profile", () => {
 
     const lines = terrainDisclosure({ kind: "trace", trace: result.trace });
     expect(lines[0].text).toBe("Profil importé · 200 points · pas max 1,0 m");
-    expect(lines[1]).toEqual({ tier: "ok", text: "Tracé rectiligne (écart max 0,01 m)" });
+    expect(lines[1]).toEqual({ tier: "ok", text: "Profil rectiligne (écart max 0,01 m)" });
   });
 
   test("a coarse import warns, and the copy states the cap is per export", () => {
@@ -106,16 +136,16 @@ describe("straightness — three states, and the third is about a missing check"
   test("✓ rectiligne names the measured deviation", () => {
     expect(linesFor(0.009)[1]).toEqual({
       tier: "ok",
-      text: "Tracé rectiligne (écart max 0,01 m)",
+      text: "Profil rectiligne (écart max 0,01 m)",
     });
   });
 
   test("⚠ non rectiligne says L is therefore overestimated", () => {
     expect(linesFor(34)[1]).toEqual({
       tier: "warn",
-      text: "Tracé non rectiligne (écart max 34,00 m sur 220,0 m).",
+      text: "Profil non rectiligne (écart max 34,00 m sur 220,0 m).",
       detail:
-        "La portée L est mesurée le long du tracé, pas en ligne droite — elle est surestimée.",
+        "La portée L est mesurée le long du profil, pas en ligne droite — elle est surestimée.",
     });
   });
 

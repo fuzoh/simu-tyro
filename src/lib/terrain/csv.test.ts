@@ -65,7 +65,7 @@ describe("the three real traces — the gate", () => {
     expect(traceExtent(trace)).toBeCloseTo(extent, 10);
     // A fixed 200 points and not a fixed pitch: spacing is `length/199`.
     expect(maxSpacing(trace)).toBeCloseTo(spacing, 10);
-    expect(trace.fileName).toBe(`example-profile-trace${n}.csv`);
+    expect(trace.origin).toEqual({ kind: "csv", fileName: `example-profile-trace${n}.csv` });
   });
 
   test.each(CASES)("trace$n has strictly increasing Distance and no missing Altitude", ({ n }) => {
@@ -300,5 +300,75 @@ describe("the seven parse failures", () => {
     );
     const failure = expectFailure(parseProfileCsv(file("Distance;Altitude", rows), "petit.csv"));
     expect(failure.kind).toBe("distance-dupliquée");
+  });
+});
+
+describe("the two ends' Positions (#90)", () => {
+  const VERIFIED = readFileSync(
+    new URL("../../../docs/mesures dynamometre/trace-geoadmin-2026-11-08.csv", import.meta.url),
+    "utf8",
+  );
+
+  test("the verified trace fills A from its first row and B from its last", () => {
+    const trace = expectOk(parseProfileCsv(VERIFIED, "trace-geoadmin-2026-11-08.csv"));
+    expect(trace.ends).toEqual({
+      A: { lat: 46.843556, lon: 6.525035 },
+      B: { lat: 46.846166, lon: 6.520783 },
+    });
+  });
+
+  test("a file without Longitude and Latitude has no ends, and imports without error", () => {
+    const trace = expectOk(parseProfileCsv(file("Distance;Altitude", goodRows(3)), "plain.csv"));
+    expect(trace.ends).toBeUndefined();
+    const oneColumn = file("Distance;Altitude;Longitude", ["0;100;6.5", "10;99;6.6"]);
+    expect(expectOk(parseProfileCsv(oneColumn, "lon-only.csv")).ends).toBeUndefined();
+  });
+
+  test("a comma decimal mark reads the coordinates too", () => {
+    const text = file("Distance;Altitude;Longitude;Latitude", [
+      "0;100,5;6,525035;46,843556",
+      "10;99,5;6,520783;46,846166",
+    ]);
+    expect(expectOk(parseProfileCsv(text, "fr.csv")).ends?.B).toEqual({
+      lat: 46.846166,
+      lon: 6.520783,
+    });
+  });
+
+  test.each([
+    { name: "a text", cell: "n/a" },
+    { name: "an infinite value", cell: "1e999" },
+    { name: "an empty cell", cell: "" },
+  ])(
+    "$name in a coordinate of the last row refuses the file with the existing message",
+    ({ cell }) => {
+      const text = file("Distance;Altitude;Longitude;Latitude", [
+        "0;100;6.5;46.8",
+        `10;99;${cell};46.9`,
+      ]);
+      const failure = expectFailure(parseProfileCsv(text, "profil-2.csv"));
+      expect(failure.kind).toBe("valeur-non-numérique");
+      expect(parseFailureMessage(failure)).toBe(
+        "profil-2.csv — valeur illisible ligne 3, colonne Longitude.",
+      );
+    },
+  );
+
+  test("an unreadable latitude on the first row names Latitude and its line", () => {
+    const text = file("Distance;Altitude;Longitude;Latitude", ["0;100;6.5;x", "10;99;6.6;46.9"]);
+    expect(parseFailureMessage(expectFailure(parseProfileCsv(text, "profil-2.csv")))).toBe(
+      "profil-2.csv — valeur illisible ligne 2, colonne Latitude.",
+    );
+  });
+
+  test("a bad coordinate in the middle of the file is not an end, and still imports", () => {
+    const text = file("Distance;Altitude;Longitude;Latitude", [
+      "0;100;6.5;46.8",
+      "5;99.5;oops;46.85",
+      "10;99;6.6;46.9",
+    ]);
+    const trace = expectOk(parseProfileCsv(text, "mid.csv"));
+    expect(trace.ends?.A).toEqual({ lat: 46.8, lon: 6.5 });
+    expect(trace.dev).toBeNull();
   });
 });

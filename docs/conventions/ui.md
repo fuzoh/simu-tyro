@@ -49,9 +49,10 @@ empty `ui/`.
 - **`text-sm` and `text-xl` do not exist in this app** — including on the two full-page error
   screens, whose headings are `text-lg`. Three sizes with zero exceptions is a rule that survives
   contact with future diffs; « except on … » is how the eight came back.
-- **`<text>` inside the two SVG charts is drawing, not chrome.** `strip.tsx` and `profile.tsx` size
-  their labels inside a hand-written affine scale; those sizes are out of this scale entirely and
-  are not to be folded into it.
+- **`<text>` inside the hand-rolled SVG charts is drawing, not chrome.** `strip.tsx`, `profile.tsx`
+  and `dynamique.tsx` — everything under `src/components/chart/` — size their labels inside a
+  hand-written affine scale; those sizes are out of this scale entirely and are not to be folded
+  into it. A chart that draws `<text>` lives in that directory, which is what the grep excludes.
 
 ### Numbers are mono, everything else is sans
 
@@ -79,7 +80,7 @@ empty `ui/`.
 `--radius: 0`, which is what the installed `base-lyra` style already assumes — its `button` and
 `native-select` are `rounded-none` in every size variant. So a freshly-added component needs no
 patch, forever. `rounded-full` survives for **circular marks only** (status dots, the rider grab
-handle): a dot is a shape, not a corner radius. `rounded-md`, `rounded-sm` and bare `rounded`
+handle, the vue de dessus's anchor markers, its hover point and the rose des vents's handle): a dot is a shape, not a corner radius. `rounded-md`, `rounded-sm` and bare `rounded`
 appear nowhere.
 
 ### One control height: 28 px
@@ -126,6 +127,10 @@ one grep.
 **No `amber-*` literal anywhere in `src/`.** **One** warning role, not two: § 7's precedence ladder
 is a semantic ordering, and `destructive` covers both text and chip with a single token.
 
+A Verdict's colour is a `Tone` (`src/lib/app/tone.ts`, `VERDICT_TONE`) before it is a class, so a
+view model carries it and its test reads it; `TONE_CLASS` in `src/components/app/banner.tsx` is
+the one place a Tone becomes a token.
+
 ### Every control comes from `src/components/ui/`
 
 No hand-rolled `<button>`, `<input>`, `<select>` or `<label>` outside it. Three registry choices
@@ -143,7 +148,7 @@ that are decisions rather than defaults:
   `FieldLegend` `text-xs` (`FieldDescription` already ships at `text-xs` in `base-lyra` — the
   `text-sm` figure circulating in ticket 40 is `new-york`'s).
 
-**Two customisations in `ui/` that a re-`add` will silently undo.** Both are load-bearing; re-check
+**Three customisations in `ui/` that a re-`add` will silently undo.** All are load-bearing; re-check
 them after any `bunx shadcn@latest add`:
 
 - **`ui/input.tsx` must not carry `md:text-xs`.** `base-lyra` ships `text-xs md:text-xs`, where the
@@ -156,6 +161,73 @@ them after any `bunx shadcn@latest add`:
 - **`ui/input.tsx` is `h-7`, not `h-8`.** It is the only added component with no size variant, so
   its single height is the app's height. A future 32 px input is a new decision and gets
   `native-select`'s `data-size` pattern, not an invented variant API.
+- **`ui/checkbox.tsx` imports `cn` from `@/lib/utils`.** The registry item (added for the Couche
+  pentes, #93) arrives importing it from `"cn"`, a module this app does not have.
+
+### The map paints in literals
+
+MapLibre's paint properties take colours, not CSS custom properties, so the vue de dessus's plain
+background, the ligne A–B and the Mesure (`MEASURE_INK`, a burnt orange that never reads as the
+line) are hex literals in `src/lib/map/style.ts` — the only ones in the app's code, and the only place that may hold them. Everything around the canvas — the anchor
+markers, « Placer A / B », the attribution — is HTML over it and takes the tokens as everywhere
+else.
+
+The Vue 3D (#95) is the same case: CesiumJS takes a `Color`, so `vue-3d-renderer.ts` reads those
+very literals from `style.ts` — the globe's background is `PLAIN`, the lines and the Fils à plomb
+`LINE_INK` cased in `LINE_CASING` — and holds none of its own. The attribution and the messages
+under it are HTML, on the tokens.
+
+**The carte claire has no raster twin, so the Vue 3D drapes its nearest one.** The carte claire is
+swisstopo's vector `ch.swisstopo.lightbasemap.vt`, which CesiumJS cannot drape; the WMTS
+capabilities read on 2026-11-08 offer no raster light base map (only its relief shading), so the
+Vue 3D drapes `ch.swisstopo.pixelkarte-grau`, the grey national map — light, neutral, the ligne
+A–B legible on it. `DRAPED` in `src/lib/map/vue-3d.ts` is the table; the orthophoto and the carte
+nationale drape the very tiles the vue de dessus shows.
+
+## Avancé's three columns
+
+The Page Avancé (`/avance`) stands on **three columns from 1024 px of viewport** and on one below
+it. The numbers are `THREE_COLUMN_PX`, `RAIL_WIDTH` (left), `RIGHT_COLUMN_WIDTH` and
+`SHELL_MAX_PX` in `src/lib/layout/contract.ts`; the classes spell them as `min-[1024px]:` and
+`w-72`, and `contract.test.ts` holds the two together.
+
+- **Left** — the Rail Header and `Paramètres`. **Middle** — the Chart Block, then Statique's vue
+  de dessus (`TopMap`, the same component and the same gestures — #104). **Right** — `Valeurs
+  déduites`, `Résultats`, `Provenance`, `Ce que cet outil ne calcule pas`. Both side columns are
+  288 px, and all three scroll on their own.
+- **The middle column scrolls, block first** — the way Statique's right column does. Holding the
+  block still over a residual scroller was rejected: at 1024 × 768 it leaves the map 116 px. The
+  column reserves its scrollbar gutter (`scrollbar-gutter: stable`), so a scrollbar that comes and
+  goes cannot move the width every band is a function of; on a platform with classic scrollbars the
+  measured column is that gutter narrower than `chartColumnWidth()`.
+- **The vue de dessus is three columns only.** Below 1024 its box is `display: none`, and the map
+  is not started there at all — `threeColumns()` in `contract.ts`, the same B2, decides what to
+  *mount*, never a size: a MapLibre map started in a box with no size holds a WebGL context for
+  nothing and has no box to fit its camera to. The Position and Vent fields stay in `Paramètres`,
+  in clear at every width, and read the same Scenario the map and the rose write.
+- **Why 1024.** A stacked block is sized from the *whole* viewport width and owes `MIN_RAIL` under
+  it, so stacking costs the chart its profile on any screen that is not tall: at 1024 × 768 it is a
+  782 px block against 612 px left, and Avancé opens on « Garde min. ligne » alone (measured at the
+  built `/avance`, with 1180 × 820 and 1194 × 834 the same). In three columns the same screens keep
+  everything: 1024 × 768 is a 448 px middle column, a 616 px block and 732 px of height. **What it
+  costs**: at the switch the middle column is under B1 (`CELL_WRAP_PX`, 624) and under 768, so the
+  banner takes three lines and the View Strip its short labels (« à vide », « A–B »); the column
+  clears B1 from 1200.
+- **Stacked below 1024 and short**: the whole block plus `MIN_RAIL` and the navigation bar need
+  `block + 156` px of height — 842 px at 768 wide, 938 px at 1023. Portrait tablets (768 × 1024,
+  810 × 1080, 820 × 1180, 834 × 1194) clear it; a narrow desktop window such as 1000 × 900 does not
+  and opens on the Pinned Safety Header alone until the window is taller. That is the collapse the
+  ticket keeps (« le Pinned Safety Header reste »), accepted rather than capped around.
+- **Why the cap.** The shell stops at 1728 px, and `1728 − 576 = 1152` is `REFERENCE_COLUMN_PX`:
+  the middle column never outgrows the plot's ceiling, so the Plot Aspect Band holds at every
+  width (`contract.test.ts` walks it).
+- **Stacked, the order is the Chart Block, then the Rail's sections in their own order** — the
+  Pinned Safety Header and its collapse are unchanged, and now apply below 1024 instead of below 768
+  (the `width < 1024px` arm in `src/styles.css`). The one scroller is a wrapper that is
+  `display: contents` from 1024 up: both columns become the chart's flex siblings, and a focus
+  inside either still bubbles to the wrapper's handlers.
+- **`Valeurs déduites` holds editable rows**, so it shares `Paramètres`' field-row context: `RailInputs`
+  owns the context and hands the two sections back through a render prop.
 
 ## Charts
 
@@ -200,6 +272,27 @@ the two scales are *deliberately mismatched*, which is the whole point (« v1 bu
 - `visx`'s low-level primitives are the **pre-approved fallback** if the hand-rolled path logic
   becomes unwieldy; it is not a new decision.
 
+## Wording
+
+Two registers, one table: Terrain, Statique and Dynamique speak as people do on site; Avancé keeps
+the exact term. A quantity is named by its id in `src/lib/vocabulary/labels.ts`, never by a string
+typed where it is shown — `label(id, register)` — so renaming is one edit. `GLOSSARY.md` holds
+each term's meaning and its _Avoid_ words; `PROSCRIBED_WORDS` is those words as a guard, and
+`labels.test.ts` reads every string in `src/` against it, whichever Page prints it.
+
+- **A new term enters the glossary in the same change.** `labels.test.ts` fails on a wording of the
+  vocabulary table that neither the glossary nor §1 of `docs/simulation-theory.md` mentions, and on
+  a short list of terms printed outside the table (Écart à vide, Cas défavorable, Réserve de tension,
+  Pilote de tension, trajet, ligne hors cadre, ligne entière) that is not a bold glossary name. A term
+  printed anywhere else is held by this rule and by review, not by the test.
+- **The exact register stays on Avancé.** Prétension, régime de sécurité, FS, rapport V,
+  terminaison, rendement, η and DAF appear in no table a simplified Page consumes.
+- **« Estimation » rides every dynamic value** (Point d'arrêt, vitesse d'arrivée, durée, the
+  curves, the coupe's dynamic marks), and no static one.
+- **The essai is « cohérent », never « validé »**; what it does not show is « pas confirmé ».
+- **The interface never prints** a lateral drift in metres, a garde au sol under wind with a
+  passager, a predicted retension, or a rendement or a rapport V off Avancé.
+
 ## Forms
 
 **`@tanstack/react-form` owns field state; per-field validators are `valibot` Standard Schemas**
@@ -207,10 +300,10 @@ the two scales are *deliberately mismatched*, which is the whole point (« v1 bu
 negotiable, and both are why `src/lib/rail/` exists as pure modules rather than as hook bodies:
 
 - **Form validators own exactly tier one** — what needs no physics. `src/lib/rail/fields.ts` is
-  that tier: emptiness, readability, a sign rule, the stations' in-trace bound. **The three gates
-  are not form validators**: Solve / Clearance / Verdict are cross-field predicates over the derived
-  Scenario (`src/lib/rail/gates.ts`), because a per-field validator would split one gate across
-  seventeen fields.
+  that tier: emptiness, readability, a sign rule. **The five gates are not form validators**:
+  Solve / Clearance / Verdict, then the Wind and Ride gates the passager's ride adds, are
+  cross-field predicates over the derived Scenario (`src/lib/rail/gates.ts`, `GATE_IDS`), because a
+  per-field validator would split one gate across seventeen fields.
 - **§5.4's chord bound stays in the engine.** No form validator re-derives it, and « Tension
   impossible » is an engine refusal the UI surfaces, never a field error.
 

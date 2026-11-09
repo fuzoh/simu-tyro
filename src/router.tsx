@@ -18,7 +18,16 @@ export function getRouter() {
      */
     basepath: import.meta.env.BASE_URL,
 
-    scrollRestoration: true,
+    /**
+     * **Off, on purpose.** The layout scrolls inside its own containers (the Rail, the columns), and
+     * the router identifies one by its position in the DOM (`div:nth-child(2) > …`), which two Pages
+     * share. On every navigation it copies the scroll offsets of the Page it leaves to the location
+     * it opens, then applies them by that selector — so the next Page opened with its middle column
+     * already scrolled, the top of the coupe hidden. Measured: 247 px carried from Dynamique to
+     * Avancé. A Page switch opens at the top, Back and Forward included; the router still resets the
+     * window itself.
+     */
+    scrollRestoration: false,
     defaultPreload: "intent",
     defaultPreloadStaleTime: 0,
   });

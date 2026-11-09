@@ -1,6 +1,7 @@
 /**
  * The Scenario **without `x_D`**, at the app root, for the two Traverse-scope readers: the gate
- * report (`useRailForm`) and the `Résultats` (`useResults`). Both key their memo on this object.
+ * report (`useRailForm`) and the `Résultats` (`useErrorSurfaces`). Both key their memo on this
+ * object.
  *
  * A scrub dispatches a fresh Scenario, and a fresh `rider`, on every frame. Keyed on either, the
  * report and the results re-ran `evaluateVerdict` over the whole Sweep per frame while nothing
@@ -23,9 +24,14 @@ export function useTraverse(): TraverseScenario {
     regime,
     geometry,
     anchors,
+    carryingLines,
+    tensioningSide,
     tightness,
     material,
     terminations,
+    wind,
+    dynamics,
+    positions,
     mp,
     hRider,
     hClearMin,
@@ -39,9 +45,14 @@ export function useTraverse(): TraverseScenario {
         regime,
         geometry,
         anchors,
+        carryingLines,
+        tensioningSide,
         tightness,
         material,
         terminations,
+        wind,
+        dynamics,
+        positions,
         mp,
         hRider,
         hClearMin,
@@ -53,9 +64,14 @@ export function useTraverse(): TraverseScenario {
       regime,
       geometry,
       anchors,
+      carryingLines,
+      tensioningSide,
       tightness,
       material,
       terminations,
+      wind,
+      dynamics,
+      positions,
       mp,
       hRider,
       hClearMin,

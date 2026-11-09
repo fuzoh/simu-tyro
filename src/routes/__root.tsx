@@ -2,16 +2,13 @@
  * The document, and nothing visible — « v1 build spec » § 7 (*`__root.tsx` carries the document and
  * nothing visible*) and `docs/conventions/routing.md`.
  *
- * **No header, no app bar, no root `component`, no print stylesheet.** It *can* be document-only
- * because the ten controls that had no address now have three homes — the Rail Header, the View
- * Strip and `Paramètres › Géométrie`. This is not chrome deferred, it is chrome placed elsewhere,
- * and the arithmetic is why: at 390×664 the whole stack leaves **124 px**, which *is* the Rail's
- * resting height against `MIN_RAIL = 120`, so a 44 px title bar would be spent straight out of the
- * form.
+ * **No header, no navigation bar, no root `component`, no print stylesheet.** The navigation bar
+ * every app Page shares is the pathless layout's, `src/routes/_app.tsx` (ADR-0002): rendered here
+ * it would also sit above `/docs` and above the not-found page, which are not app Pages.
  *
- * `shellComponent` stays **server-rendered** — document, head, CSS, scripts — while
- * `src/routes/index.tsx` sets `ssr: false`. That split is the whole SSR policy, and it goes on the
- * route: `defaultSsr` in `src/router.tsx` is a measured **silent no-op**.
+ * `shellComponent` stays **server-rendered** — document, head, CSS, scripts — while each app Page
+ * sets `ssr: false`. That split is the whole SSR policy, and it goes on the routes:
+ * `defaultSsr` in `src/router.tsx` is a measured **silent no-op**.
  */
 
 import charonMonoLatin from "@fontsource/iosevka-charon-mono/files/iosevka-charon-mono-latin-400-normal.woff2?url";
@@ -59,7 +56,7 @@ export const Route = createRootRoute({
     links: [...fontPreloads, { href: appCss, rel: "stylesheet" }],
   }),
   /**
-   * **An unknown path 404s. It does not redirect to `/`.** The asymmetry with the index route's
+   * **An unknown path 404s. It does not redirect to `/`.** The asymmetry with the app Pages'
    * error handling is deliberate: for an unmatched path there is no child match to render into, so
    * replacing the Outlet's content is correct — and a redirect would silently turn a mistyped or
    * chat-client-truncated link into a working app on somebody else's default scenario,

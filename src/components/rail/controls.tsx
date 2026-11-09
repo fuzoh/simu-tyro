@@ -41,7 +41,16 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { formatValue } from "@/lib/format/quantity.ts";
+import { PICKER_COPY } from "@/lib/rail/fields.ts";
 import { cn } from "@/lib/utils.ts";
+
+/**
+ * A field group's heading — the live groups' and the Skeletons', so a Skeleton reserves the height
+ * the first live frame lands in.
+ */
+export function GroupHeading({ title }: { title: string }) {
+  return <h3 className="text-foreground/70 text-xs font-semibold">{title}</h3>;
+}
 
 /**
  * One labelled row of the Rail: control on the right, messages under the pair.
@@ -195,6 +204,7 @@ export function NumericInput({
   id,
   value,
   invalid = false,
+  disabled = false,
   onChange,
   onFocus,
   onBlur,
@@ -202,6 +212,8 @@ export function NumericInput({
   id: string;
   value: string;
   invalid?: boolean;
+  /** Visible but not typed into: the row says why, as every disabled choice does (§ 10.1). */
+  disabled?: boolean;
   onChange: (raw: string) => void;
   onFocus: () => void;
   onBlur: (raw: string) => void;
@@ -214,6 +226,7 @@ export function NumericInput({
     <Input
       aria-invalid={invalid || undefined}
       className="w-24 text-right font-mono text-base"
+      disabled={disabled}
       // Enter commits and blurs: on iOS there is otherwise no way to dismiss the keypad.
       enterKeyHint="done"
       id={id}
@@ -262,10 +275,10 @@ export function Picker<T extends string>({
       size="sm"
       value={value}
     >
-      {value === "" && <NativeSelectOption value="">— choisir —</NativeSelectOption>}
+      {value === "" && <NativeSelectOption value="">{PICKER_COPY.empty}</NativeSelectOption>}
       {options.map((option) => (
         <NativeSelectOption disabled={option.disabled} key={option.value} value={option.value}>
-          {option.disabled === true ? `${option.label} — indisponible` : option.label}
+          {option.disabled === true ? `${option.label} — ${PICKER_COPY.unavailable}` : option.label}
         </NativeSelectOption>
       ))}
     </NativeSelect>
@@ -296,8 +309,13 @@ export function Choice<T extends string>({
     // It also renders a `<div role="radiogroup">`, which retires the `<fieldset>` this control used
     // to be — and with it the UA `min-inline-size: min-content` that {@link Row.stacked} exists to
     // work around. `stacked` stays because label-above is still the right shape at 288 px.
+    //
+    // `relative`: Base UI renders each option's visually-hidden `<input>` as a `position: absolute`
+    // sibling of the item. With no positioned ancestor its containing block is `<body>`, so inside a
+    // scrolled Rail it is laid out at its in-flow y (≈ 1300) and stretches the *document* past
+    // `100dvh` — a wheel over the nav bar then scrolls the window. The group is its own containing block.
     <RadioGroup
-      className="gap-1"
+      className="relative gap-1"
       name={name}
       onValueChange={(next: unknown) => onChange(next as T)}
       value={value}
@@ -310,7 +328,7 @@ export function Choice<T extends string>({
           <RadioGroupItem disabled={option.disabled} value={option.value} />
           <span>
             {option.label}
-            {option.disabled === true && " — indisponible"}
+            {option.disabled === true && ` — ${PICKER_COPY.unavailable}`}
           </span>
         </Label>
       ))}
@@ -351,8 +369,10 @@ export function Segmented<T extends string>({
       value={[value]}
       variant="outline"
     >
+      {/* Content-sized, not equal: five driver labels fit the rail only if « H » gives its share
+          to « Prétension » (#85). */}
       {options.map((option) => (
-        <ToggleGroupItem className="flex-1" key={option.value} value={option.value}>
+        <ToggleGroupItem className="flex-auto" key={option.value} value={option.value}>
           {option.label}
         </ToggleGroupItem>
       ))}
@@ -368,8 +388,9 @@ export function Segmented<T extends string>({
  * **The popover opens on hover, not on click** — decision of 2026-09-23, replacing the `<details>`
  * disclosure. Keyboard users get the same on focus: the badge is in the tab order and the popover
  * is shown under `group-focus-within`, so nothing is hover-only. Since ticket 41's simplification
- * the « non confirmé » chips live in the `Provenance` section alone, so the field rows carry no
- * warning chips at all.
+ * the « non confirmé » chips live in the `Provenance` section, and a field row carries one only for
+ * a preset's deduced `k` and for the câble's trolley `μ` (#104), which feeds no Verdict and so is
+ * in no aggregate.
  */
 export function Chip({
   label,

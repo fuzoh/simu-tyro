@@ -45,10 +45,14 @@ import type { RegimeId, TerminationId, VerdictWarningId } from "@/lib/sim";
 import { equalAtDisplayPrecision, formatQuantity } from "@/lib/format/quantity.ts";
 import { FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 import { lineWarnings, REGIMES, TERMINATIONS } from "@/lib/sim";
+import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 import type { StrengthSymbol } from "./fields.ts";
+import type { Results } from "./results.ts";
 
 import { strengthSymbol } from "./fields.ts";
+import { presetProvenance } from "./presets.ts";
+import { deviceOnCableWarning, overLimitWarning, tmaxAtTensioningAnchor } from "./tensioning.ts";
 
 /**
  * The popover copy, one entry per provenance surface. §0.2's fine-grained tag and the
@@ -63,16 +67,22 @@ export const PROVENANCE_COPY = {
     "Le régime choisi multiplie dans chaque marge de la grille. Trois des cinq entrées sont [CONVENTION] ou [UNVERIFIED:R1], et [R1] et [R2] se contredisent sur le rapport ACCT.\n§10.1 · docs/simulation-theory.md",
   mp: "120 kg attribué à EN 15567-1 §4.1.2 mais introuvable dans le texte primaire [UNVERIFIED:R1]. Acheter la norme.\n§8.1 · docs/simulation-theory.md",
   hRider:
-    "Enveloppe passager 2,1 m — [CONVENTION]. Aucune valeur normative publiée.\n§11 · docs/simulation-theory.md",
-  DAF: "Coefficient dynamique 1,2 — [FIELD:SSF], le tag de plus haute confiance de la référence. Configurable, et sans pastille « non confirmé ».\n§8.2 · docs/simulation-theory.md",
+    "Gabarit du passager 2,1 m — [CONVENTION]. Aucune valeur normative publiée.\n§11 · docs/simulation-theory.md",
+  DAF: "Majoration au départ 1,2 — [FIELD:SSF], le tag de plus haute confiance de la référence. Configurable, et sans pastille « non confirmé ».\n§8.2 · docs/simulation-theory.md",
   EA: "EA = E_app·C·d² avec E_app 115 GPa et C 0,4165, les milieux des plages §13.1 (100–130 GPa, 0,384–0,449). La plage complète donne 5,53–8,41 MN à 12 mm, soit ×1,52.\n§13.1 · docs/simulation-theory.md",
   mu: "μ = W·d²/100 avec W 0,3795, le milieu de la plage §13.1 (0,359–0,400) [STD-ATTESTED].\n§13.1 · docs/simulation-theory.md",
-  MBF: "MBF = K·d²·R₀/1000, K 0,330 (âme textile) / 0,356 (âme métallique) [STD-ATTESTED]. Les tables EN 12385-4 complètes sont [PAYWALLED].\n§13.1 · docs/simulation-theory.md",
+  MBF: "MBF = K·d²·R₀/1000, K 0,330 (6×19) / 0,356 (6×19 métallique) [STD-ATTESTED]. Les tables EN 12385-4 complètes sont [PAYWALLED].\n§13.1 · docs/simulation-theory.md",
   k: "k = EA/MBL — §13.2 publie 22 à 10 % MBL et 31 à 30 % MBL, et une tyrolienne n'entre jamais dans cette bande (0,6 % à vide, 6,3 % chargée).\n§13.2 · docs/simulation-theory.md",
   termination:
     "Rendement de terminaison — chaque plage §10.2/§10.3 est prise à son extrémité conservatrice.\n§10.2, §10.3 · docs/simulation-theory.md",
   EAtextile:
     "EA = k·MBL — la raideur relative §13.2 [DATASHEET], mesurée hors de la bande où une tyrolienne travaille.\n§13.2 · docs/simulation-theory.md",
+  CdA: "C_dA 0,45 m² — ajustement de la SSF sur sa ligne instrumentée de 1109 m [FIELD:SSF] : une campagne, un spéléologue en harnais sur corde. La plage 0,30–0,60 m² du champ n'est pas sur la page SSF [CONVENTION].\n§12.2 · docs/simulation-theory.md",
+  trolleyFriction:
+    "F₀ 15 N et k_v 1,5 kg/s — ajustement mesuré par la SSF sur corde [FIELD:SSF], indépendant du poids du passager. La page SSF ne nomme aucune poulie.\n§12.2 · docs/simulation-theory.md",
+  trolleyMu:
+    "μ 0,015 — repli à μ constant, extrémité basse de la plage 0,015–0,02, sans source primaire ouverte [CONVENTION]. Aucune source ouverte ne sépare le câble de la corde.\n§12.2 · docs/simulation-theory.md",
+  rho: "ρ — atmosphère type (ISA), ρ = p/(R_s·T) à l'altitude moyenne du profil importé, 1,225 kg/m³ sans profil ; [R1] et [R2] concordent. Une valeur saisie la remplace.\n§12.2 · docs/simulation-theory.md",
 } as const;
 
 /** Which aggregate line this is. Membership is mechanically derivable from § 6's own table. */
@@ -151,7 +161,7 @@ export function provenanceAggregate(scenario: ScenarioDraft, deduced?: Deduced):
   });
   entries.push({
     id: "hRider",
-    label: "Enveloppe passager",
+    label: heading("riderEnvelope", "exact"),
     value: formatQuantity("h_rider", scenario.rider.hRider),
     chip: edited("h_rider", scenario.rider.hRider, FIRST_RUN_SCENARIO.rider.hRider)
       ? "valeur utilisateur"
@@ -194,12 +204,16 @@ export function provenanceAggregate(scenario: ScenarioDraft, deduced?: Deduced):
     }
   } else {
     const spec = scenario.material;
+    // The preset's `k` is a deduction with its own note; the aggregate carries it so the field
+    // chip and this entry cannot disagree about what backs the value.
+    const deduction = presetProvenance(spec).k;
+    const presetNote = deduction?.tone === "warning" ? `\n${deduction.detail}` : "";
     entries.push({
       id: "EAtextile",
       label: "Raideur axiale EA",
       value: reading("EA", deduced?.material.EA),
       chip: "non confirmé",
-      detail: PROVENANCE_COPY.EAtextile,
+      detail: PROVENANCE_COPY.EAtextile + presetNote,
       pinned: false,
     });
     entries.push({
@@ -207,7 +221,7 @@ export function provenanceAggregate(scenario: ScenarioDraft, deduced?: Deduced):
       label: "Raideur relative k",
       value: reading("k", spec.k),
       chip: "non confirmé",
-      detail: PROVENANCE_COPY.k,
+      detail: PROVENANCE_COPY.k + presetNote,
       pinned: false,
     });
   }
@@ -285,7 +299,7 @@ export type WarningTier =
   | "ambiant"
   /** ⚠ inline on the row it qualifies. Conditional on something the user controls. */
   | "avertissement"
-  /** The banner, state `Refusé`. A `[REGULATOR]` prohibition, not advice. */
+  /** The banner, state `Interdit`. A `[REGULATOR]` prohibition, not advice. */
   | "verdict";
 
 /**
@@ -296,7 +310,11 @@ export type LadderId =
   | "k-hors-bande"
   | VerdictWarningId
   | "terrain-grossier"
-  | "serre-cables-refuse";
+  | "serre-cables-refuse"
+  | TensioningRungId;
+
+/** The two rungs the Mise en tension adds (#86). Both are descriptive: neither touches a result. */
+export type TensioningRungId = "tension-sur-limite-du-dispositif" | "maestro-sur-cable";
 
 /** Which surface renders a rung — so nothing is rendered twice and nothing has no owner. */
 export type LadderOwner =
@@ -323,10 +341,22 @@ export const WARNING_LADDER: Record<LadderId, { tier: WarningTier; owner: Ladder
   "terrain-grossier": { tier: "avertissement", owner: "terrain" },
   // §10.2's `[REGULATOR]` prohibition. It survives an ample margin, so it cannot be a warning.
   "serre-cables-refuse": { tier: "verdict", owner: "banner" },
+  // Conditional on the device and the diameter the user chose, and read on the line's « T max »
+  // at the anchor carrying the device. The limit is a charge d'utilisation, so it warns and never
+  // blocks: nothing downstream reads the device.
+  "tension-sur-limite-du-dispositif": { tier: "avertissement", owner: "rail-row" },
+  // A Maestro that arrived on a câble: kept as given (ADR-0001), said once, with a Fix Action.
+  "maestro-sur-cable": { tier: "avertissement", owner: "rail-row" },
 };
 
 /** Which Rail row a rung hangs on. */
-export type LadderRow = "k" | "standingTension" | "sagRatio" | "DAF";
+export type LadderRow =
+  | "k"
+  | "standingTension"
+  | "sagRatio"
+  | "DAF"
+  | "pretension"
+  | "tensioningDevice";
 
 /** One rung that is currently firing. */
 export type LadderWarning = {
@@ -348,7 +378,7 @@ const LINE_WARNING_RUNGS: Record<
   "tension-permanente-sur-30-pct-mbl": {
     row: "standingTension",
     text: (strength) =>
-      `tension permanente au-dessus de 30 % ${strength} — fluage et durée de vie (§9.2), pas résistance.`,
+      `${label("standingTension", "exact")} au-dessus de 30 % ${strength} — fluage et durée de vie (§9.2), pas résistance.`,
   },
   "fleche-sur-portee-sous-3-pct": {
     row: "sagRatio",
@@ -376,7 +406,11 @@ const LINE_WARNING_RUNGS: Record<
  * `lineWarnings` rather than from `evaluateVerdict`: the verdict is not called at all on a
  * régime-less screen, and « flèche / portée 2,4 % » is true whatever the user has selected.
  */
-export function warningLadder(scenario: ScenarioDraft, deduced: Deduced): readonly LadderWarning[] {
+export function warningLadder(
+  scenario: ScenarioDraft,
+  deduced: Deduced,
+  results: Results | null = null,
+): readonly LadderWarning[] {
   const warnings: LadderWarning[] = [];
   const spec = scenario.material;
 
@@ -386,6 +420,26 @@ export function warningLadder(scenario: ScenarioDraft, deduced: Deduced): readon
       tier: "ambiant",
       row: "k",
       text: "k publié pour 10–30 % MBL (§13.2) — une tyrolienne travaille sous cette bande : ≈ 0,6 % MBL au repos, ≈ 6,3 % chargée.",
+    });
+  }
+
+  // Before the solve guard: a Maestro on a câble is a fact of the Scenario.
+  const onCable = deviceOnCableWarning(scenario);
+  if (onCable !== null) {
+    warnings.push({
+      id: "maestro-sur-cable",
+      tier: WARNING_LADDER["maestro-sur-cable"].tier,
+      row: "tensioningDevice",
+      text: onCable,
+    });
+  }
+  const overLimit = overLimitWarning(scenario, tmaxAtTensioningAnchor(scenario, results));
+  if (overLimit !== null) {
+    warnings.push({
+      id: "tension-sur-limite-du-dispositif",
+      tier: WARNING_LADDER["tension-sur-limite-du-dispositif"].tier,
+      row: "pretension",
+      text: overLimit,
     });
   }
 
@@ -422,8 +476,8 @@ export function warningLadder(scenario: ScenarioDraft, deduced: Deduced): readon
 export const NOT_COMPUTED_LINES = [
   "La combinaison de charges normative EN 15567 n'est pas appliquée — texte payant.",
   "L'essai de charge 2× (WorkSafe QLD) n'est pas évalué.",
-  "Vent et déport latéral : hors périmètre (§8.4, modèle 2-D).",
-  "Dynamique, vitesse et freinage : hors périmètre (§12).",
+  "Banane chiffrée en mètres et garde au sol sous vent avec passager : hors périmètre (§8.4, modèle 2-D). La Banane n'est qu'une allure dessinée.",
+  "Freinage et tension dynamique de la ligne : hors périmètre (§12.2, §12.3). La dynamique du passager n'est qu'une estimation, hors verdict.",
   "Aucune attestation de conformité.",
 ] as const;
 

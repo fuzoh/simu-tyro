@@ -27,47 +27,62 @@ _Avoid_: montage, brin (for a member), double tyrolienne, redondance (when that 
 
 **Mise en tension**:
 The device that tensions the line and holds it. A Maestro is a progress-capture pulley
-used in place of a mouflage. Distinct from a termination: it does not set termination
-efficiency.
+used in place of a mouflage (the default); the Maestro S and L exist on a corde only. Distinct from
+a termination: it does not set termination efficiency. It is descriptive: it changes no result, and
+only selects the **limite de tension**, the working load Petzl publishes for that Maestro at the rope
+diameter typed — never the slip threshold, and slipping is not a fuse. The limit is read against the
+greatest tension one line carries at the côté de la Mise en tension over the whole traverse (« T max
+ancrage A/B »: normal split between the Brins porteurs, majoration au départ included), not against
+the tension de pose, since the device holds the line while the rider is on it; with no result there is
+nothing to compare. Exceeding it is an Avertissement only: it changes no result.
+The **côté de la Mise en tension** is the anchor, A or B, that carries it.
 Montage is the act of installing the line (« on va monter »), not this device and not a catalogue of rigs. The point and its height are an ancrage. The manufactured end of the corde or câble is a terminaison, and it is not this device.
 _Avoid_: montage, terminaison, ancrage
 
 **Tension de pose**:
 The tension wanted on the unloaded line, read **at the anchor that carries the Mise en
 tension**, per member: what a dynamometer rigged between that ancrage and the Maestro
-shows. Not the horizontal component `H` the engine drives today; Avancé shows that one
-beside it as tension horizontale. Simplified Pages say tension de pose; Avancé says
-prétension.
+shows. That anchor is A or B, held by the Scenario (`cp`; absent is A). It is a Tightness
+Driver of its own (`tp`), not the horizontal component `H`; Avancé shows that one beside it
+as tension horizontale. Simplified Pages say tension de pose; Avancé says prétension.
 _Avoid_: tension cible, tension permanente, pretension setting, tension horizontale (as the
 simplified label)
+
+**Tension à vide**:
+The largest anchor tension of the unloaded line, as a share of the breaking load. A
+reading of the line as installed, not a wanted value and not the tension de pose. Named only
+on Avancé.
+_Avoid_: tension permanente, tension de pose
 
 **Majoration au départ**:
 The multiplier on the passager's extra tension because a controlled step-off sets the passager in motion. Not the static supplement the weight already produces, and not a limit. Default 1,2. Simplified Pages assume it and do not ask. Avancé names the field majoration au départ.
 _Avoid_: coefficient dynamique, DAF, limite, marge
 
 **Rapport V**:
-A way to ask for the unloaded tension: passenger weight divided by horizontal tension de pose. Not the measured depth of the V. A larger rapport V asks for a slacker line, and the deep V under the passager is the consequence. Named only on Avancé.
+A way to ask for the unloaded tension: passenger weight divided by the tension horizontale `H`. Not the measured depth of the V. A larger rapport V asks for a slacker line, and the deep V under the passager is the consequence. Named only on Avancé.
 _Avoid_: poids / tension, creux, flèche
 
 **Tightness Spec**:
 The user's chosen way of saying how tight the line is: unstretched length directly, a
-target installed tension, a target unloaded sag, or a target V ratio. Whichever is chosen,
-it resolves to an unstretched length before anything is computed.
+target tension de pose, a target horizontal tension, a target unloaded sag, or a target V
+ratio. Whichever is chosen, it resolves to an unstretched length before anything is computed.
 _Avoid_: tension mode, pretension setting, parameterisation mode
 
 **Tightness Driver**:
-Which one of the four tightness quantities — target sag, tension, unstressed length and
-V ratio — is the editable one. Exactly one is the driver and the other three are
-read-outs derived from it, so the driver is state: it is encoded by *which key is
-present* (`fl` / `te` / `lo` / `vr`), never by a mode key beside a
-value. Two drivers arriving at once is a contradiction, not a preference, and the link
-is refused whole.
+Which one of the five tightness quantities — target sag, tension de pose, horizontal
+tension `H`, unstressed length and V ratio — is the editable one. Exactly one is the driver
+and the other four are read-outs derived from it, so the driver is state: it is encoded by
+*which key is present* (`fl` / `tp` / `te` / `lo` / `vr`), never by a mode key beside a
+value. `tp` is the tension de pose, the one the simplified Pages drive; `te` is `H`, still
+valid for the links that carry it. Two drivers arriving at once — any two of the five — is a
+contradiction, not a preference, and the link is refused whole.
+French, on Avancé: the **pilote de tension** — the segmented control that says which of the five is typed. Simplified Pages have no such control.
 _Avoid_: tightness mode, active field, `tm`, parameterisation mode
 
 **Material Spec**:
 The description of what the line is made of — steel wire rope or textile rope — from which
 weight per unit length, axial stiffness and breaking strength are derived. Steel and
-textile are separate specs, never variants of one. French, on every Page: a textile member is a **corde**, a metallic member is a **câble**. On a corde, gaine and âme are both fibre, and neither is a field. On a câble, the two constructions are **6×19** and **6×19 métallique** — no âme, no gaine.
+textile are separate specs, never variants of one. French, on every Page: a textile member is a **corde**, a metallic member is a **câble**. On a corde, gaine and âme are both fibre, and neither is a field. On a câble, the two constructions are **6×19** and **6×19 métallique** — no âme, no gaine. Choosing one of the two is the **famille de ligne**. The fields both carry are the **diamètre** (**diamètre nominal** on Avancé) and the charge de rupture; Avancé adds the **classe de corde**, the grade, the raideur and the **raideur relative EA/MBL**, which is the raideur over the charge de rupture.
 _Avoid_: cable spec, rope config, product, textile, acier, âme, gaine
 
 **Terrain**:
@@ -98,14 +113,16 @@ _Avoid_: station (as the spoken word), offset, position, distance along track, a
 **Anchor Height**:
 How far an anchor stands above the ground beneath it. Feeds the Terrain only, never the
 statics — the solve takes span and elevation difference, which are measured anchor to anchor.
-French: ancrage. An amarrage would be heard as the termination. In the Vue 3D it is read on
+French: **hauteur d'ancrage**, and the pair are the **ancrages**. An amarrage would be heard as the termination. In the Vue 3D it is read on
 the Fil à plomb: the anchor sits that high above the ground mark.
 _Avoid_: pole height, tower height, offset, amarrage
 
 **Position**:
 Where an anchor stands on the earth: its geographic coordinates (WGS84 or LV95). Set by a
-click or a drag on the Fond de carte, or typed. Two Positions fix a Trace end to end; moving
-one means a new line between two points, not an anchor slid along the old profil.
+click or a drag on the Fond de carte, or typed, as **latitude** and **longitude**; a Position read off the map is **approchée** until it is typed. Two Positions fix a Trace end to end; moving
+one means a new line between two points, not an anchor slid along the old profil. The two
+Positions also give the line its bearing A → B, on which the Vent is projected: moving one turns
+the line under the Vent and leaves the Vent as it is.
 _Avoid_: marqueur, marker, pin, point GPS, waypoint, anchor placement
 
 ### What is saved and shared
@@ -162,7 +179,7 @@ _Avoid_: completeness, success rate
 
 **Traverse scope vs Position scope**:
 The two scopes a reported number can have: over the whole traverse (« sur toute la
-traversée ») or at the rider's current position (« à la position du passager »). **The
+traversée ») or at the rider's current position (« à la position du passager »). The Rail's **garde min (traversée)** is the first of them: the closest the passager comes to the ground over the traverse. **The
 Verdict only ever judges Traverse scope.** Every number states its scope three times
 over — section header, row label and a parenthetical — because a reader who takes a
 Position number for the traverse worst case signs off a line that fails 20 m further
@@ -195,12 +212,24 @@ The unstretched length. Simplified Pages say longueur à vide; Avancé says long
 _Avoid_: longueur de corde, longueur de corde à vide
 
 **Flèche**:
-The sag. Unqualified, the unloaded sag wanted on the line. **Flèche chargée** is the sag with the passager on the line. Avancé says flèche à vide for the unloaded one.
+The sag. Unqualified, the unloaded sag wanted on the line; Avancé also reads it as a share of the span, **flèche / portée**. **Flèche chargée** is the sag with the passager on the line. Avancé says flèche à vide for the unloaded one.
 _Avoid_: cible, flèche cible
+
+**Écart à vide**:
+How far the passager hangs below the ligne à vide at the passager's own position, in metres — the loaded line's drop, read like a flèche. A read-out cell on every Page that has the coupe, and also in the coupe's tip beside the passager. Not a garde au sol, which is measured to the ground.
+_Avoid_: flèche locale, écart ligne, descente
 
 **Installation**:
 Whether the line is built to stay: **installation permanente** or **installation temporaire**. A corde in a permanent installation is refused. Not a usage.
 _Avoid_: usage, type d'usage
+
+**Cas défavorable**:
+The row Résultats adds with two Brins porteurs: **une seule ligne porte tout**, one member under the whole passager mass. The essai did not confirm the 50/50 share between the two lignes, so the row gives its tensions alone. It judges nothing: it states what the row is, not a Verdict.
+_Avoid_: pire cas, scénario catastrophe, hypothèse pessimiste
+
+**Réserve de tension**:
+How much the tension can still grow before the facteur de sécurité falls to the marge exigée, in force: the admissible tension minus the maximum, at the end that governs. Positive, it is room left; negative, it is the excess to take off. Absent with no regime chosen.
+_Avoid_: marge de tension, marge de sécurité, tension restante
 
 **Facteur de sécurité**:
 The ratio of available strength to the judged tension, compared with the marge exigée. Simplified Pages spell it out. Avancé may write FS. Not a percentage.
@@ -213,6 +242,22 @@ _Avoid_: câble à vide, corde à vide
 **Banane**:
 The lateral bow of the unloaded line in a cross-wind, seen from above. Qualitative. Not a distance the app states in metres.
 _Avoid_: déport, drift, flèche latérale
+
+**Vent**:
+The wind the Scénario carries: the **vitesse du vent** in km/h (zero or more) and the **direction du vent**. The direction is
+geographic: the azimuth the wind comes **from**, in degrees clockwise from north — 0° du nord,
+90° d'est, 180° du sud, 270° d'ouest — the direction a forecast gives (MeteoSwiss reads
+« d'où vient »). Every field that types it says « d'où vient le vent, en degrés depuis le nord ».
+The engine projects it onto the line through the bearing A → B the two Positions give, as a
+component along it (positive toward B, so a tail wind) and one across it (positive from the right);
+it is a vector, never a whole `±` along the line. Moving an anchor therefore changes those
+components and never the Vent. **The Vent needs Positions**: without A and B on the map the line
+has no bearing, so the wind fields and the Rose des vents' handle are disabled with that reason,
+and the passager's ride and the Banane run without wind. A Vent a link or a Session carries without
+Positions is kept as given, never dropped, and the results read with it say it is not applied and
+why; it is not a Blocking Error and hides no result. No wind is speed 0 and direction 0, and it is
+what a link without `ws` and `wd` reads.
+_Avoid_: rafale, souffle, orientation du vent, direction relative à la ligne (as what is typed)
 
 **Marge exigée**:
 The margin the chosen Safety Regime demands. Not the margin the line actually has — that
@@ -235,14 +280,30 @@ judgement, and a screenshot of it must not read as a pass.
 _Avoid_: no verdict, pending verdict, unrated, empty results
 
 **Passager**:
-The person travelling on the line. A load magnitude on a line or a fitting is a charge, not a passager.
+The person travelling on the line; the **masse du passager** is what the statics and the ride are given. A load magnitude on a line or a fitting is a charge, not a passager.
 _Avoid_: personne, charge
 
 **Point d'arrêt**:
 Where the passager comes to rest on the line short of the arrival. Without wind it is the
 low point of the loaded line plus friction; wind only shifts it. Computed first without wind,
-then with the wind entered.
+then with the wind entered: Dynamique heads the two tiles « Sans vent » and « Avec le vent saisi », marks them on the coupe and in the hover as « sans vent » and « avec vent », and says « arrive au bout » where there is none.
 _Avoid_: blocage, point mort, position finale, arrêt par le vent (as the only cause)
+
+**Vitesse d'arrivée**:
+The passager's speed at B on a ride that reaches it, in km/h and m/s. Terrain reads it with the Vent entered and Dynamique for both rides; a ride that stops short, or never settles, has none and says why instead. Always an estimation.
+_Avoid_: vitesse finale, vitesse maximale
+
+**Estimation**:
+The word every dynamic value carries — Point d'arrêt, vitesse d'arrivée, durée, the speed and acceleration curves, the dynamic marks on the coupe. The passager's ride is a point mass on a frozen line with a fitted drag, not a measurement, and it never judges the Verdict. Never said of the statics, which Statique computes. The essai finds the engine *cohérent avec un essai* at the order of magnitude and shows nothing of the wind; the interface does not say *validé*, and what the essai does not show — the 50/50 share between two lignes — is *pas confirmé*.
+_Avoid_: prédiction, validé, précis, exact
+
+**Trajectoire**:
+The path of the passager's load over the whole traverse — where the trolley hangs at every Sweep Step — drawn dotted on the coupe as the **trajectoire** (**trajet** on the toggle where the row is narrow), against the ligne à vide; the line it hangs from is the **ligne chargée**. The ride follows it as a point mass, frozen: solved once from the statics and never again as the passager moves (§12.1), which is why a swift ride on a slack line warns that it describes the traverse badly. Not the Sweep, which is the set of Span States it is read from.
+_Avoid_: parcours, chemin, animation
+
+**Dynamique du passager**:
+The Avancé group of what the ride is given beside the statics (§12.2): the **surface de traînée C_dA**, the **frottement constant de la poulie F₀** and the **frottement de la poulie proportionnel à la vitesse k_v** on a corde, the **frottement de la poulie μ** on a câble, and the **masse volumique de l'air ρ**. Set on Avancé only, each with its source; Dynamique says where they are set, not what they are. None is fitted on the essai.
+_Avoid_: paramètres de la poulie
 
 **Rider Envelope**:
 The vertical space the rider occupies below the cable — pulley, lanyard and body. Subtracted in
@@ -281,33 +342,48 @@ A routed screen with its own layout and its own information set. The app is seve
 Pages. The Rail is a layout a Page may use, not the navigation model.
 _Avoid_: espace, mode, panel, view
 
+**Navigation Bar**:
+The row above every app Page that lists the Pages, then the documentation. Each link keeps
+the current Scenario in the URL, so changing Page never changes the line. It belongs to the
+Pages' shared layout, never to the document, so the documentation and the not-found page do
+not carry it. French: **barre de navigation**.
+_Avoid_: app bar, header, menu, tabs, Rail Header
+
 **Rail**:
-The app's one scrolling column: Rail Header, then `Paramètres → Valeurs déduites →
-Résultats → Provenance → Ce que cet outil ne calcule pas`. Its upper sections take input
-and its lower sections report, but **there is no results panel and no second column** —
-a right-hand column was rejected because it steals the width a 1500 m span needs, and a
-region under the read-out cells was rejected for pushing them below the fold. Five
-sections, fixed order, one scroll.
-_Avoid_: results panel, output half as a place, sidebar, right column, form
+A layout a Page may use, historical now that Avancé is its only user: Rail Header, then
+`Paramètres → Valeurs déduites → Résultats → Provenance → Ce que cet outil ne calcule pas`.
+Five sections, fixed order. Its upper sections take input and its lower sections report, but
+there is no results panel. From the three-column width (1024 px) Avancé stands the sections
+in two columns either side of the Chart Block — `Paramètres` on the left, the four that
+report on the right; below it they stack into one scroll, Chart Block first, the Rail's
+sections after it in their own order. A right-hand column was once rejected because it steals
+the width a 1500 m span needs; 1024 px is the narrowest landscape tablet, where stacking would
+cost the chart its whole profile; the middle column is then 448 px, and the shell's cap keeps
+it at 1152 px beyond.
+_Avoid_: results panel, output half as a place, sidebar, form
 
 **Rail Header**:
-The single action row at the top of the Rail, above `Paramètres` and scrolling with it:
+The single action row at the top of the Rail — the left column's top from the three-column
+width — above `Paramètres` and scrolling with it:
 the app's name, the force-unit selector, « Copier le lien », and an overflow menu
 holding « Réinitialiser le scénario » and « Effacer la session ». Not a sixth section —
-it holds no parameter, no read-out and no disclosure — and not an app bar: the document
-root carries no visible chrome, and at 390 px a title bar is paid for out of the form's
-own height.
+it holds no parameter, no read-out and no disclosure — and not the Navigation Bar: it
+belongs to the Rail, scrolls with it and names no Page, while the Navigation Bar stands
+above the whole Page and is paid out of every Page's height.
 _Avoid_: app bar, toolbar, navbar, page header, chrome
 
 **Chart Block**:
 The banner slot, profile chart, clearance strip, View Strip and five read-out cells as
-one co-visible unit sharing a single x scale and a single gutter constant. It reflows
-and collapses as a whole; no member is ever hidden or occluded on its own.
-_Avoid_: chart area, main pane, right column, canvas
+one co-visible unit sharing a single x scale and a single gutter constant. On Avancé it heads
+the middle column between the Rail's two, with Statique's vue de dessus under it — never a view
+of Avancé's own. It reflows and collapses as a whole; no member is ever hidden or occluded on
+its own.
+_Avoid_: chart area, main pane, canvas
 
 **View Strip**:
 The one control row inside the Chart Block, below the clearance strip and above the
-read-out cells: the two layer toggles, the « ×1 vraie échelle » control, and the numeric
+read-out cells: the two layer toggles, the « ×1 vraie échelle » control — which becomes
+« voir toute la ligne » where the frame has cut the line out of ×1, the badge then adding **ligne hors cadre**, and **ligne entière** while the whole line is held in view — and the numeric
 rider-position field. It lives here rather than in the Rail because at narrow widths the
 Rail is not co-visible with the chart, so a chart control in the Rail would answer a
 question whose answer is off screen.
@@ -315,10 +391,10 @@ _Avoid_: toolbar, chart controls, options bar, legend
 
 **Handle Lane**:
 The 24 px band between the bottom of the profile's plot area and its x-axis labels,
-holding the two draggable anchor handles — outside the plot area, so they can never be
-confused with the rider. Reserved at every width and in both terrain modes: in manual
-mode it draws the non-interactive span bracket, so the profile's height never changes on
-import.
+holding the non-interactive span bracket from A to B — outside the plot area, so it can
+never be confused with the rider. Reserved at every width and in both terrain modes, so the
+profile's height never changes on import. It holds no anchor handle: the anchors are the
+profil's two ends, and moving one is a new Position, not a drag along the profil.
 _Avoid_: handle row, anchor bar, gutter, axis area
 
 **Pinned Safety Header**:
@@ -339,9 +415,13 @@ _Avoid_: chart ratio, plot proportions, flex ratio, aspect ratio
 
 **Skeleton**:
 The frame the server renders below the document, and the only thing it renders: the
-Rail's five section headings in order, the app's name, two empty chart frames at final
-proportions, and the read-out cells' labels. It carries no number, no Verdict, no
-spinner, no « — » and no live control — only reserved height where one will be. Same CSS
+Navigation Bar's reserved height with the Page names as plain text, then the Page's own
+frame. On Avancé that frame is the Rail's five section headings in order (`Paramètres` in
+the left column, the other four in the right), the app's name,
+two empty chart frames at final proportions, and the read-out cells' labels; on Statique it
+is the field groups' headings, the output tiles' labels, the coupe's empty bands and the vue
+de dessus's frame, on Dynamique the field groups' headings, both rides' tile labels and the coupe's and the curve's empty bands, and on Terrain the vue de dessus's frame over the coupe's empty bands and the five tiles' labels. Each app Page ships its own. It carries no number, no Verdict, no spinner, no « — » and no live control
+(not even a link in the Navigation Bar), only reserved height where one will be. Same CSS
 layout as the app, so it is correct at every width for free, and replaced wholesale at
 hydration.
 _Avoid_: loader, loading state, placeholder, spinner, shell (the shell is the document)
@@ -367,6 +447,10 @@ measurement: it states nothing the coupe does not. Anchors drag there as on the 
 line follows the pointer, the recalculation waits for the release. Loaded only when chosen.
 _Avoid_: 3D map, globe, scene, viewer
 
+**Rose des vents**:
+The compass rose drawn on the vue de dessus, with a handle that sets the Vent's direction and force by dragging. It edits the azimuth directly: on the north-up map the handle stands where the wind comes from. Its reading gives that azimuth and, from the line's bearing, where the wind comes from relative to the line A → B (« Vent d'ouest (264°), 30 km/h : par la gauche à l'avant, 312° par rapport à la ligne A → B »). Without A and B on the map it has no handle and says why. On Terrain it is read-only. It sets the wind that draws the Banane.
+_Avoid_: boussole, anémomètre
+
 **Fil à plomb**:
 The vertical under each anchor in the Vue 3D: a mark on the ground at the anchor's foot
 and a dashed line rising from it until it leaves the view, so it reads at any zoom. The
@@ -385,7 +469,7 @@ _Avoid_: measure tool, ruler, polyline, outil de distance
 A validation failure that suppresses output until it is repaired, always rendered twice:
 the Champ responsable carries the message and its Fix Action, while the banner slot
 carries only the count and a jump link. Each names the gate it breached — Solve,
-Clearance or Verdict — because the gates suppress different things, and Blocking Errors
+Clearance, Verdict, Wind or Ride — because the gates suppress different things, and Blocking Errors
 are a **list**, never a singleton: repairing one leaves the others standing rather than
 cascading a silent second fix.
 _Avoid_: validation error, fatal error, invalid state, form error
@@ -393,7 +477,7 @@ _Avoid_: validation error, fatal error, invalid state, form error
 **Fix Action**:
 A button offered beside a Blocking Error that performs the repair in one press — a
 general affordance of the error surface, not a per-error extra. Its label describes the
-**effect of pressing it** (« Passer à l'acier »), never the act that produced the state,
+**effect of pressing it** (« Passer au câble »), never the act that produced the state,
 because the state may have arrived in a link rather than been typed.
 _Avoid_: quick fix, auto-correct, suggestion, undo
 
@@ -412,6 +496,14 @@ Verdict of « Hors limites », which judges a line that does exist. The copy car
 attainable bound in the driving field's own quantity and offers **no Fix Action**,
 because no unambiguous repair exists.
 _Avoid_: overtension, rupture, invalid length, solver error
+
+**Cible inatteignable**:
+The requested tightness has no solution: no longueur à vide gives the target the driving field names. Not a rupture, which is Tension impossible, and not a failure of the solver. The copy names the target in its own quantity and offers no Fix Action.
+_Avoid_: target unreachable, valeur impossible
+
+**Calcul impossible**:
+The solver did not converge on a configuration the other gates let through: a case that is not supposed to happen. The one refusal that offers « Copier le diagnostic », so the payload can reach whoever maintains the engine.
+_Avoid_: erreur interne, plantage, bug
 
 **Saisie en cours**:
 A required field is empty and being edited. Not an error: the last complete Sweep stays

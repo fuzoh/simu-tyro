@@ -66,14 +66,16 @@ describe("the key table and canonical order", () => {
       "reg",
       "L",
       "h",
-      "sa",
-      "sb",
       "za",
       "zb",
       "fl",
       "te",
       "lo",
       "vr",
+      "tp",
+      "cp",
+      "bp",
+      "mt",
       "fam",
       "d",
       "r0",
@@ -92,7 +94,19 @@ describe("the key table and canonical order", () => {
       "hr",
       "gm",
       "daf",
+      "ws",
+      "wd",
+      "cda",
+      "f0",
+      "kv",
+      "mur",
+      "rho",
       "x",
+      "lata",
+      "lona",
+      "latb",
+      "lonb",
+      "ph",
       "tr",
     ]);
     expect(new Set(CANONICAL_KEYS).size).toBe(CANONICAL_KEYS.length);
@@ -101,8 +115,15 @@ describe("the key table and canonical order", () => {
   test("a bag built out of order is emitted in the key table's order", () => {
     // `qss.encode()` iterates `for (const key in obj)`, so insertion order *is* the query string:
     // two links to the same Scenario are string-identical only if the bag is canonicalised.
-    const link = canonicalLink({ x: 120, L: 250, v: 1, h: -40 });
+    const link = canonicalLink({ x: 120, L: 250, v: 1, h: -40 }, "/");
     expect(link).toBe("/?v=1&L=250&h=-40&x=120");
+  });
+
+  test("two Pages' links to one Scenario differ by the path alone", () => {
+    // One schema for every Page (ADR-0002), so the query is the Scenario and the path is the Page.
+    const search: ValidatedSearch = { x: 120, L: 250, v: 1, h: -40 };
+    expect(canonicalLink(search, "/avance")).toBe("/avance?v=1&L=250&h=-40&x=120");
+    expect(canonicalLink({}, "/avance")).toBe("/avance");
   });
 });
 
@@ -134,6 +155,15 @@ describe("the three refusal classes come back as a marker, never as a throw", ()
       query: "?te=253.5&lo=151.64",
       kind: "deux-directeurs",
     },
+    // The fifth driver joins the same rule (#85): the prétension beside any other is two models.
+    { name: "two tightness drivers — tp + te", query: "?tp=260&te=253.5", kind: "deux-directeurs" },
+    { name: "two tightness drivers — tp + fl", query: "?tp=260&fl=6", kind: "deux-directeurs" },
+    {
+      name: "two tightness drivers — tp + lo",
+      query: "?lo=151.64&tp=260",
+      kind: "deux-directeurs",
+    },
+    { name: "two tightness drivers — tp + vr", query: "?vr=0.8&tp=260", kind: "deux-directeurs" },
     {
       name: "three tightness drivers at once",
       query: "?fl=6&te=253.5&lo=151.64",
@@ -182,7 +212,7 @@ describe("the three refusal classes come back as a marker, never as a throw", ()
     // somehow reached it would produce a bare `/`, never `?refused=…`. The router's own writer is
     // the other half, and it is asserted against a real router below — this assertion alone is
     // vacuous with respect to the path that actually 307s.
-    expect(canonicalLink(validateSearch(parse("?v=3&L=250")))).toBe("/");
+    expect(canonicalLink(validateSearch(parse("?v=3&L=250")), "/")).toBe("/");
   });
 
   test("the marker survives a second pass, because the router validates its own merge", () => {
@@ -212,9 +242,17 @@ describe("the three refusal classes come back as a marker, never as a throw", ()
   });
 
   test("a valid trace is kept verbatim, never decoded into the validated search", () => {
-    const search = validateSearch(parse(`?tr=${TRACE}&sa=0&sb=100`));
+    const search = validateSearch(parse(`?tr=${TRACE}`));
     expect(search.tr).toBe(TRACE);
-    expect(search).toEqual({ tr: TRACE, sa: 0, sb: 100 });
+    expect(search).toEqual({ tr: TRACE });
+  });
+
+  test("the stations of a link from before #88 are unknown keys, not a refusal", () => {
+    expect(validateSearch(parse(`?tr=${TRACE}&sa=0&sb=100`))).toEqual({ tr: TRACE });
+    expect(salvageSearch(parse(`?tr=${TRACE}&sa=0&sb=100`)).dropped).toEqual([
+      { key: "sa", reason: "clé-inconnue" },
+      { key: "sb", reason: "clé-inconnue" },
+    ]);
   });
 });
 
@@ -351,6 +389,51 @@ describe("an unknown or unrepresentable key is ignored and named", () => {
       query: "?fam=ac&d=12&r0=1800&cst=iwrc",
       dropped: [{ key: "r0", reason: "valeur-non-représentable" }],
       kept: { fam: "ac", d: 12, cst: "iwrc" },
+    },
+    {
+      name: "a third Brin porteur, which the schema does not publish",
+      query: "?L=250&bp=3",
+      dropped: [{ key: "bp", reason: "valeur-non-représentable" }],
+      kept: { L: 250 },
+    },
+    {
+      name: "a third anchor for the Mise en tension, which the schema does not publish",
+      query: "?L=250&cp=c",
+      dropped: [{ key: "cp", reason: "valeur-non-représentable" }],
+      kept: { L: 250 },
+    },
+    {
+      name: "a Mise en tension device the schema does not publish",
+      query: "?L=250&mt=mx",
+      dropped: [{ key: "mt", reason: "valeur-non-représentable" }],
+      kept: { L: 250 },
+    },
+    {
+      name: "a latitude without its longitude (#90): half a Position is none",
+      query: "?L=250&lata=46.843556",
+      dropped: [{ key: "lata", reason: "coordonnée-isolée" }],
+      kept: { L: 250 },
+    },
+    {
+      name: "a longitude whose latitude is unreadable: the unreadable one and its orphan both leave",
+      query: "?L=250&latb=oui&lonb=6.52",
+      dropped: [
+        { key: "latb", reason: "valeur-non-représentable" },
+        { key: "lonb", reason: "coordonnée-isolée" },
+      ],
+      kept: { L: 250 },
+    },
+    {
+      name: "one anchor whole and the other's lone coordinate: only the lone one leaves",
+      query: "?L=250&lata=46.8&lona=6.5&lonb=6.52",
+      dropped: [{ key: "lonb", reason: "coordonnée-isolée" }],
+      kept: { L: 250, lata: 46.8, lona: 6.5 },
+    },
+    {
+      name: "a profil off the Positions said with anything but `1`",
+      query: "?L=250&ph=oui",
+      dropped: [{ key: "ph", reason: "valeur-non-représentable" }],
+      kept: { L: 250 },
     },
     {
       name: "a duplicate key, which arrives as an array",

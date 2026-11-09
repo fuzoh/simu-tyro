@@ -1,30 +1,30 @@
 /**
- * The one route — « v1 build spec » § 7 (*The app shell*) and `docs/conventions/routing.md`,
+ * The Page Avancé — « v1 build spec » § 7 (*The app shell*) and `docs/conventions/routing.md`,
  * amended and binding, as [amendment E](../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md)
- * leaves the refusal.
+ * leaves the refusal, and [ADR-0002](../../docs/adr/0002-one-page-per-route-one-scenario-in-the-url.md)
+ * makes it one Page among several. It hosts the Rail as v1 built it.
  *
- * **Exactly one app route, and that is a drift decision.** The router validates search params *per
- * route*, so a second route re-declares the same ~30-key `validateSearch` — and a link that types
- * cleanly on one route and refuses on the other is precisely the failure the typing-boundary rule
- * exists to make impossible. The `/docs` routes (`docs.tsx`, 2026-09-23) are not app routes: they
- * carry no search, read no Session and render markdown. Every state change is a search-param change, so there is no navigation
- * to model; « Ouvrir l'application sans ce lien » is a `<Link to="/" search={{}} replace>` onto this
- * same route, and SVG export is a client-side `XMLSerializer` on the SVG already in the page.
+ * **It declares no `validateSearch`.** The Scenario's schema lives once on the pathless layout
+ * `_app.tsx`, and this Page reads it from there — a second declaration is how a link would come to
+ * type cleanly on one Page and refuse on another. Every state change is a search-param change onto
+ * this same route; « Ouvrir l'application sans ce lien » is a `<Link to="." search={{}} replace>`,
+ * and SVG export is a client-side `XMLSerializer` on the SVG already in the page.
  */
 
 import { createFileRoute } from "@tanstack/react-router";
 
 import { App } from "@/components/app/app.tsx";
+import { LoadFailure } from "@/components/app/load-failure.tsx";
 import { LinkRefusalSurface } from "@/components/app/refusal.tsx";
 import { Skeleton } from "@/components/app/skeleton.tsx";
-import { keepRefusalOutOfTheAddressBar, validateSearch } from "@/lib/url/schema.ts";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_app/avance")({
   /**
-   * `ssr: false` on **this route only** — `__root.tsx`'s `shellComponent` stays server-rendered.
+   * `ssr: false` on **every app Page**, this one included — `__root.tsx`'s `shellComponent` and the
+   * layout's navigation bar stay server-rendered.
    *
    * Full SSR was rejected on **provenance, not cost**: for a bare `/` the server would paint the
-   * shipped defaults (Portée 150,0 m, Flèche 6,0 m) and the Session read would replace them a tick
+   * shipped defaults (Portée 150,0 m, tension de pose 263,4 daN) and the Session read would replace them a tick
    * later. A flash of somebody else's numbers is the exact failure this app exists to refuse, and
    * it lands on the input half too — a rigger who glances at a painted 150,0 m and then sees
    * 250,0 m has been shown a number with no provenance. Two more, both measured: a *genuine* throw
@@ -36,17 +36,6 @@ export const Route = createFileRoute("/")({
    * someone who "tidies" this option into the router loses the opt-out and **gets no error**.
    */
   ssr: false,
-  validateSearch,
-  /**
-   * **Not optional**, and measured as probe 6. `applySearchMiddleware` wraps the validator in a
-   * middleware returning `{ ...incoming, ...validated }`, `buildLocation` stringifies that merge —
-   * every key of it — and `loadServerRoute` rebuilds the canonical location on every document
-   * request and 307s when the href differs. `refused` is the one key `validateSearch` synthesises,
-   * so without this it lands in the address bar as JSON and « Copier le lien » ships it.
-   * `matchRoutes` runs no search middleware, so `Route.useSearch().refused` still carries the
-   * marker.
-   */
-  search: { middlewares: [keepRefusalOutOfTheAddressBar] },
   /**
    * The Skeleton — **not optional either**. Measured: with no `pendingComponent` the server ships
    * an empty `<body>`, because the `ClientOnly` wrapper `ssr: false` installs defaults its fallback
@@ -60,10 +49,10 @@ export const Route = createFileRoute("/")({
    * parent's, and on the root that would replace the shell and leave no way back into the app.
    */
   errorComponent: LoadFailure,
-  component: IndexRoute,
+  component: AvanceRoute,
 });
 
-function IndexRoute() {
+function AvanceRoute() {
   // The one thing app code reads off the router. `Route.useSearch()` is **raw ∪ validated** at
   // runtime while typed validated-only, so nothing else here touches it: the store rebuilds the
   // validated bag from the raw query string, which is also the only transport the dropped-keys
@@ -75,22 +64,5 @@ function IndexRoute() {
   // an error interrupting a load.
   if (refused !== undefined) return <LinkRefusalSurface refusal={refused} />;
 
-  return <App />;
-}
-
-/**
- * A genuine load failure — the state that is now the only occupant of `errorComponent`. It says so
- * plainly, which is the one thing the refusal surface may **not** say: there, nothing failed and
- * the status line agrees; here, something did.
- */
-function LoadFailure() {
-  return (
-    <main className="mx-auto flex max-w-md flex-col items-start gap-3 p-6 pt-16" role="alert">
-      {/* `text-lg` / `text-xs`: the three-size scale covers the error screens too. */}
-      <h1 className="font-heading text-lg font-semibold tracking-tight">
-        Le simulateur n'a pas pu démarrer.
-      </h1>
-      <p className="text-muted-foreground text-xs">Rechargez la page.</p>
-    </main>
-  );
+  return <App page={Route.fullPath} />;
 }

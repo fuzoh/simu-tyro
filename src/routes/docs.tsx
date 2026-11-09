@@ -1,7 +1,7 @@
 /**
  * The documentation layout — the one piece of chrome the simulator itself refuses to carry.
  *
- * `src/routes/index.tsx` is the app and stays `ssr: false`; these pages are prose and are
+ * The app Pages (`src/routes/_app.*.tsx`) stay `ssr: false`; these pages are prose and are
  * **server-rendered and prerendered** (`vite.config.ts` › `pages`), so a shared `/docs/modele#s-10-4`
  * lands on the text with a 200 and no client work. They declare no `validateSearch`: the URL
  * carries nothing here but the path and a hash.

@@ -28,6 +28,8 @@ export type UnloadedInputs = {
   readonly anchors: ScenarioDraft["anchors"];
   readonly material: ScenarioDraft["material"];
   readonly tightness: ScenarioDraft["tightness"];
+  /** The anchor a prétension is read at — the prétension driver resolves `L₀` against it. */
+  readonly tensioningSide: ScenarioDraft["tensioningSide"];
   /** Passenger mass, kg — « Rapport V » resolves `L₀` against it. */
   readonly mp: number;
   /** The imported profile, or `null` in manual mode. */
@@ -39,8 +41,8 @@ export type UnloadedInputs = {
  * not touch one — a scrub of `x_D` — leaves it identical and a memo keyed on the fields holds.
  */
 export function unloadedInputs(scenario: ScenarioDraft, trace: Trace | null): UnloadedInputs {
-  const { geometry, anchors, material, tightness } = scenario;
-  return { geometry, anchors, material, tightness, mp: scenario.rider.mp, trace };
+  const { geometry, anchors, material, tightness, tensioningSide } = scenario;
+  return { geometry, anchors, material, tightness, tensioningSide, mp: scenario.rider.mp, trace };
 }
 
 /**
@@ -97,7 +99,12 @@ export function deriveUnloaded(inputs: UnloadedInputs): Unloaded {
  */
 export function unloadedOn(
   span: PlacedSpan | null,
-  { material: spec, tightness, mp }: Pick<UnloadedInputs, "material" | "tightness" | "mp">,
+  {
+    material: spec,
+    tightness,
+    tensioningSide,
+    mp,
+  }: Pick<UnloadedInputs, "material" | "tightness" | "tensioningSide" | "mp">,
 ): Unloaded {
   if (span === null) return { ok: false, stage: "geometry", error: null, span };
 
@@ -105,7 +112,7 @@ export function unloadedOn(
   if (material === null) return { ok: false, stage: "material", error: null, span };
 
   const { L, h } = span;
-  const L0 = resolveL0(engineTightness(tightness, mp), { L, h, ...material });
+  const L0 = resolveL0(engineTightness(tightness, mp, tensioningSide), { L, h, ...material });
   if (!L0.ok) return { ok: false, stage: "L0", error: L0.error, span };
 
   const input: SpanInput = {

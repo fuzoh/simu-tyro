@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import type { Scenario } from "@/lib/scenario/types.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
+import { DEFAULT_MAP_DISPLAY } from "@/lib/map/display.ts";
 import { evaluateGates } from "@/lib/rail/gates.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { encodeP1, URL_BUDGET_CHARS } from "@/lib/url/p1.ts";
@@ -68,7 +69,7 @@ const TRACE: Trace = {
   d: Float64Array.from([0, 12.5, 40.25, 183.4]),
   z: Float64Array.from([1234.5678, 1230.1234, 1221.9999, 1196.0401]),
   dev: 0.4231,
-  fileName: "pont-du-diable.csv",
+  origin: { kind: "csv", fileName: "pont-du-diable.csv" },
 };
 
 /** The same profile as a link carries it — `tr` verbatim, and no filename. */
@@ -85,7 +86,7 @@ function denseTrace(points: number): Trace {
     d[i] = Math.round(i * 24.7) / 100;
     z[i] = Math.round(54000 + 300 * Math.sin(i / 40)) / 100;
   }
-  return { d, z, dev: null, fileName: "profil-dense.csv" };
+  return { d, z, dev: null, origin: { kind: "csv", fileName: "profil-dense.csv" } };
 }
 
 /** That profile's `tr` value — over budget by construction, asserted in the case that uses it. */
@@ -98,7 +99,9 @@ function bareSession(): Session {
     retainedMaterial: null,
     retainedManual: null,
     trace: null,
+    retainedCsv: null,
     layers: DEFAULT_LAYERS,
+    map: DEFAULT_MAP_DISPLAY,
   };
 }
 
@@ -109,14 +112,16 @@ function fullSession(): Session {
     retainedMaterial: FIRST_RUN_RETAINED_TEXTILE,
     retainedManual: { L: 150, h: -18 },
     trace: TRACE,
+    retainedCsv: null,
     layers: { unloadedLine: true, chordAB: false, riderTip: false, trajectory: true },
+    map: { fond: "carte-nationale", pentes: true, view: "3d" },
   };
 }
 
-/** § 9's scenario re-anchored on the imported profile — `tr` verbatim, `L`/`h` derived. */
+/** § 9's scenario on the imported profile, taken whole — `tr` verbatim, `L`/`h` derived. */
 function importedScenario(): Scenario {
   const scenario = firstRunDefaults();
-  scenario.geometry = { source: "trace", trace: PAYLOAD, sa: 12.5, sb: 183.4 };
+  scenario.geometry = { source: "trace", trace: PAYLOAD };
   return scenario;
 }
 
@@ -175,26 +180,77 @@ describe("the round-trip", () => {
     expect(trace?.d).toEqual(TRACE.d);
     expect(trace?.z).toEqual(TRACE.z);
     expect(trace?.dev).toBe(TRACE.dev);
-    expect(trace?.fileName).toBe(TRACE.fileName);
+    expect(trace?.origin).toEqual({ kind: "csv", fileName: "pont-du-diable.csv" });
   });
 
-  test("« tracé reçu par lien » round-trips as `fileName: null`, not as an empty string", () => {
+  test("« profil reçu par lien » round-trips as its own origin, with no filename", () => {
     const storage = memoryStorage();
-    writeSession(storage, { ...fullSession(), trace: { ...TRACE, fileName: null } });
+    writeSession(storage, { ...fullSession(), trace: { ...TRACE, origin: { kind: "lien" } } });
 
-    expect(readSession(storage)?.trace?.fileName).toBeNull();
+    expect(readSession(storage)?.trace?.origin).toEqual({ kind: "lien" });
+  });
+
+  test("a profil geo.admin comes back as one, with the CSV it displaced kept beside it (#103)", () => {
+    const storage = memoryStorage();
+    const geoadmin: Trace = { ...TRACE, origin: { kind: "geoadmin" } };
+    writeSession(storage, { ...fullSession(), trace: geoadmin, retainedCsv: TRACE });
+
+    const restored = readSession(storage);
+    expect(restored?.trace?.origin).toEqual({ kind: "geoadmin" });
+    expect(restored?.retainedCsv?.origin).toEqual({
+      kind: "csv",
+      fileName: "pont-du-diable.csv",
+    });
+    expect(restored?.retainedCsv?.z).toEqual(TRACE.z);
+  });
+
+  test("a Session stored before #103 keeps its cached profil: the filename names its origin", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const { origin: _origin, ...samples } = blob.trace as Record<string, unknown>;
+    const { retainedCsv: _retainedCsv, ...before } = blob;
+    storage.map.set(
+      SESSION_KEY,
+      JSON.stringify({ ...before, trace: { ...samples, fileName: "pont-du-diable.csv" } }),
+    );
+    expect(readSession(storage)?.trace?.origin).toEqual({
+      kind: "csv",
+      fileName: "pont-du-diable.csv",
+    });
+    expect(readSession(storage)?.retainedCsv).toBeNull();
+
+    storage.map.set(
+      SESSION_KEY,
+      JSON.stringify({ ...before, trace: { ...samples, fileName: null } }),
+    );
+    expect(readSession(storage)?.trace?.origin).toEqual({ kind: "lien" });
   });
 
   test("an imported geometry keeps its `p1.` payload verbatim", () => {
     const storage = memoryStorage();
     writeSession(storage, { ...fullSession(), scenario: importedScenario() });
 
-    expect(readSession(storage)?.scenario.geometry).toEqual({
-      source: "trace",
-      trace: PAYLOAD,
-      sa: 12.5,
-      sb: 183.4,
-    });
+    expect(readSession(storage)?.scenario.geometry).toEqual({ source: "trace", trace: PAYLOAD });
+  });
+
+  test("a Session from before #88 restores its profil whole: the stored stations are dropped", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob({ ...fullSession(), scenario: importedScenario() });
+    const scenario = blob.scenario as Record<string, unknown>;
+    storage.map.set(
+      SESSION_KEY,
+      JSON.stringify({
+        ...blob,
+        scenario: {
+          ...scenario,
+          geometry: { source: "trace", trace: PAYLOAD, sa: 12.5, sb: 183.4 },
+        },
+      }),
+    );
+
+    const restored = readSession(storage);
+    expect(restored?.scenario.geometry).toEqual({ source: "trace", trace: PAYLOAD });
+    expect(restored?.trace).toEqual(TRACE);
   });
 
   test("an over-budget import round-trips: the 2000 characters are the URL's rule, not the Session's", () => {
@@ -206,7 +262,7 @@ describe("the round-trip", () => {
       ...fullSession(),
       scenario: {
         ...firstRunDefaults(),
-        geometry: { source: "trace", trace: OVERSIZE_PAYLOAD, sa: 0, sb: 1188.4 },
+        geometry: { source: "trace", trace: OVERSIZE_PAYLOAD },
       } satisfies Scenario,
     };
 
@@ -349,14 +405,14 @@ describe("a blob that fails its schema is discarded, whole", () => {
       name: "a cached Trace whose two columns disagree",
       blob: JSON.stringify({
         ...storedBlob(fullSession()),
-        trace: { d: [0, 10, 20], z: [1, 2], dev: null, fileName: null },
+        trace: { d: [0, 10, 20], z: [1, 2], dev: null, origin: { kind: "lien" } },
       }),
     },
     {
       name: "an empty cached Trace",
       blob: JSON.stringify({
         ...storedBlob(fullSession()),
-        trace: { d: [], z: [], dev: null, fileName: null },
+        trace: { d: [], z: [], dev: null, origin: { kind: "lien" } },
       }),
     },
     {
@@ -365,7 +421,7 @@ describe("a blob that fails its schema is discarded, whole", () => {
         ...storedBlob(bareSession()),
         scenario: {
           ...firstRunDefaults(),
-          geometry: { source: "trace", trace: "p1.@@@@", sa: 0, sb: 100 },
+          geometry: { source: "trace", trace: "p1.@@@@" },
         },
       }),
     },
@@ -375,7 +431,7 @@ describe("a blob that fails its schema is discarded, whole", () => {
         ...storedBlob(bareSession()),
         scenario: {
           ...firstRunDefaults(),
-          geometry: { source: "trace", trace: PAYLOAD.slice(0, 20), sa: 0, sb: 100 },
+          geometry: { source: "trace", trace: PAYLOAD.slice(0, 20) },
         },
       }),
     },
@@ -448,18 +504,28 @@ describe("the quota rule — store the scenario without the Trace, and say so", 
     expect(restored?.retainedMaterial).toEqual(FIRST_RUN_RETAINED_TEXTILE);
   });
 
+  test("the CSV kept behind a profil geo.admin is dropped with the Trace, never alone", () => {
+    const storage = memoryStorage();
+    const session = { ...fullSession(), retainedCsv: TRACE };
+    storage.budget = JSON.stringify({
+      ...storedBlob(session),
+      trace: null,
+      retainedCsv: null,
+    }).length;
+
+    expect(writeSession(storage, session)).toBe("sans-tracé");
+    const restored = readSession(storage);
+    expect(restored?.trace).toBeNull();
+    expect(restored?.retainedCsv).toBeNull();
+  });
+
   test("an imported line survives a dropped cache: the payload rides in the Scenario", () => {
     const storage = memoryStorage();
     const session = { ...fullSession(), scenario: importedScenario() };
     storage.budget = JSON.stringify({ ...storedBlob(session), trace: null }).length;
 
     expect(writeSession(storage, session)).toBe("sans-tracé");
-    expect(readSession(storage)?.scenario.geometry).toEqual({
-      source: "trace",
-      trace: PAYLOAD,
-      sa: 12.5,
-      sb: 183.4,
-    });
+    expect(readSession(storage)?.scenario.geometry).toEqual({ source: "trace", trace: PAYLOAD });
   });
 
   test("a storage that refuses even the scenario reports « échec » and destroys nothing", () => {
@@ -514,6 +580,184 @@ describe("a storage that throws is « no session », never a crash", () => {
   });
 });
 
+describe("a textile spec carrying its diameter", () => {
+  test("`d` survives a write and a read", () => {
+    const scenario: Scenario = {
+      ...firstRunDefaults(),
+      usage: "TEMPORAIRE",
+      regime: "secours10",
+      material: {
+        family: "textile",
+        ropeClass: "pa-en1891a",
+        MBL: 31_000,
+        mu: 0.073,
+        k: 1.27,
+        d: 11,
+      },
+      terminations: structuredClone(FIRST_RUN_RETAINED_TEXTILE.terminations),
+    };
+    const storage = memoryStorage();
+    writeSession(storage, { ...bareSession(), scenario });
+    expect(readSession(storage)?.scenario.material).toEqual(scenario.material);
+  });
+});
+
+describe("Brins porteurs in the Session (#84)", () => {
+  test("two members survive a write and a read", () => {
+    const storage = memoryStorage();
+    writeSession(storage, {
+      ...bareSession(),
+      scenario: { ...firstRunDefaults(), carryingLines: 2 },
+    });
+    expect(readSession(storage)?.scenario.carryingLines).toBe(2);
+  });
+
+  test("a Session stored before the key is kept, and reads one member", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const older = { ...(blob.scenario as Record<string, unknown>) };
+    delete older.carryingLines;
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: older }));
+
+    const restored = readSession(storage);
+    // Not discarded: its cached Trace survives a key it could not have held.
+    expect(restored?.trace).not.toBeNull();
+    expect(restored?.scenario.carryingLines).toBe(1);
+  });
+
+  test("a third member is not a Session — the blob is discarded whole", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const scenario = { ...(blob.scenario as Record<string, unknown>), carryingLines: 3 };
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario }));
+    expect(readSession(storage)).toBeNull();
+  });
+});
+
+describe("the tensioning side and the prétension driver in the Session (#85)", () => {
+  test("side B and a prétension driver survive a write and a read", () => {
+    const storage = memoryStorage();
+    const scenario: Scenario = {
+      ...firstRunDefaults(),
+      tensioningSide: "B",
+      tightness: { mode: "anchor", T_target: 2500 },
+    };
+    writeSession(storage, { ...bareSession(), scenario });
+    expect(readSession(storage)?.scenario).toMatchObject({
+      tensioningSide: "B",
+      tightness: { mode: "anchor", T_target: 2500 },
+    });
+  });
+
+  test("a Session stored before the key is kept, and reads side A", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const older = { ...(blob.scenario as Record<string, unknown>) };
+    delete older.tensioningSide;
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: older }));
+
+    const restored = readSession(storage);
+    expect(restored?.trace).not.toBeNull();
+    expect(restored?.scenario.tensioningSide).toBe("A");
+  });
+
+  test("a third side is not a Session — the blob is discarded whole", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const scenario = { ...(blob.scenario as Record<string, unknown>), tensioningSide: "C" };
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario }));
+    expect(readSession(storage)).toBeNull();
+  });
+});
+
+describe("the Mise en tension device in the Session (#86)", () => {
+  test("a Maestro survives a write and a read", () => {
+    const storage = memoryStorage();
+    writeSession(storage, {
+      ...bareSession(),
+      scenario: { ...firstRunDefaults(), tensioningDevice: "maestro-l" },
+    });
+    expect(readSession(storage)?.scenario.tensioningDevice).toBe("maestro-l");
+  });
+
+  test("a Session stored before the key is kept, and reads the mouflage", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const older = { ...(blob.scenario as Record<string, unknown>) };
+    delete older.tensioningDevice;
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: older }));
+
+    const restored = readSession(storage);
+    expect(restored?.trace).not.toBeNull();
+    expect(restored?.scenario.tensioningDevice).toBe("pulley");
+  });
+
+  test("an unknown device is not a Session — the blob is discarded whole", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const scenario = { ...(blob.scenario as Record<string, unknown>), tensioningDevice: "rig" };
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario }));
+    expect(readSession(storage)).toBeNull();
+  });
+});
+
+describe("the Vent in the Session (#87)", () => {
+  test("a wind survives a write and a read", () => {
+    const storage = memoryStorage();
+    const wind = { speedKmh: 50, directionDeg: 45 };
+    writeSession(storage, { ...bareSession(), scenario: { ...firstRunDefaults(), wind } });
+    expect(readSession(storage)?.scenario.wind).toEqual(wind);
+  });
+
+  test("a Session stored before the key is kept, and reads no wind", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const older = { ...(blob.scenario as Record<string, unknown>) };
+    delete older.wind;
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: older }));
+
+    const restored = readSession(storage);
+    expect(restored?.trace).not.toBeNull();
+    expect(restored?.scenario.wind).toEqual({ speedKmh: 0, directionDeg: 0 });
+  });
+});
+
+describe("the ride's constants in the Session (#89)", () => {
+  test("typed constants survive a write and a read, `ρ` included", () => {
+    const storage = memoryStorage();
+    const dynamics = { CdA: 0.5, rho: 1.069, F0: 20, kv: 2, mu: 0.02 };
+    writeSession(storage, { ...bareSession(), scenario: { ...firstRunDefaults(), dynamics } });
+    expect(readSession(storage)?.scenario.dynamics).toEqual(dynamics);
+  });
+
+  test("a Session stored before the key is kept, and rides on §12.2's defaults", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const older = { ...(blob.scenario as Record<string, unknown>) };
+    delete older.dynamics;
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: older }));
+
+    const restored = readSession(storage);
+    expect(restored?.trace).not.toBeNull();
+    expect(restored?.scenario.dynamics).toEqual({
+      CdA: 0.45,
+      rho: null,
+      F0: 15,
+      kv: 1.5,
+      mu: 0.015,
+    });
+  });
+
+  test("a constant that is not a number is not a Session — the blob is discarded whole", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const scenario = blob.scenario as Record<string, unknown>;
+    const dynamics = { ...(scenario.dynamics as Record<string, unknown>), CdA: "0,45" };
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: { ...scenario, dynamics } }));
+    expect(readSession(storage)).toBeNull();
+  });
+});
+
 describe("ADR-0001 — a restored Session is kept as given, and the gates judge it", () => {
   test("a knot on HMPE comes back unchanged and blocks the verdict on Terminaison A", () => {
     const knotted: Scenario = {
@@ -532,7 +776,7 @@ describe("ADR-0001 — a restored Session is kept as given, and the gates judge 
     const restored = readSession(storage);
     if (restored === null) throw new Error("the stored Session was discarded");
     expect(restored.scenario.terminations).toEqual(knotted.terminations);
-    expect(evaluateGates({ scenario: restored.scenario, trace: null }).errors).toEqual([
+    expect(evaluateGates({ scenario: restored.scenario }).errors).toEqual([
       {
         gate: "verdict",
         kind: "invalid",
@@ -544,5 +788,97 @@ describe("ADR-0001 — a restored Session is kept as given, and the gates judge 
         ],
       },
     ]);
+  });
+});
+
+describe("the Positions in the Session (#90)", () => {
+  const A = { lat: 46.843556, lon: 6.525035 };
+  const B = { lat: 46.846166, lon: 6.520783 };
+
+  test("Positions survive a write and a read", () => {
+    const storage = memoryStorage();
+    const positions = { A, B: null };
+    writeSession(storage, { ...bareSession(), scenario: { ...firstRunDefaults(), positions } });
+    expect(readSession(storage)?.scenario.positions).toEqual(positions);
+  });
+
+  test("a cached Trace keeps the coordinates of its ends, and one without has none", () => {
+    const storage = memoryStorage();
+    writeSession(storage, { ...bareSession(), trace: { ...TRACE, ends: { A, B } } });
+    expect(readSession(storage)?.trace?.ends).toEqual({ A, B });
+
+    writeSession(storage, { ...bareSession(), trace: TRACE });
+    expect(readSession(storage)?.trace).not.toHaveProperty("ends");
+  });
+
+  test("a profil the Positions were typed off stays off them through a write and a read", () => {
+    const storage = memoryStorage();
+    const geometry = { source: "trace", trace: PAYLOAD, offPositions: true } as const;
+    const scenario = { ...firstRunDefaults(), geometry, positions: { A, B } };
+    writeSession(storage, { ...bareSession(), scenario, trace: TRACE });
+    expect(readSession(storage)?.scenario.geometry).toEqual(geometry);
+  });
+
+  test("a Session stored before the key is kept, and reads both Positions unknown", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const older = { ...(blob.scenario as Record<string, unknown>) };
+    delete older.positions;
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: older }));
+
+    const restored = readSession(storage);
+    expect(restored?.trace).not.toBeNull();
+    expect(restored?.scenario.positions).toEqual({ A: null, B: null });
+  });
+
+  test("a coordinate that is not a number is not a Session — the blob is discarded whole", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const scenario = blob.scenario as Record<string, unknown>;
+    const positions = { A: { lat: "46,84", lon: 6.5 }, B: null };
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: { ...scenario, positions } }));
+    expect(readSession(storage)).toBeNull();
+  });
+});
+
+describe("the vue de dessus's Fond de carte and Couche pentes (#93), 2D or 3D (#95), in the Session", () => {
+  test("the orthophoto under the Couche pentes, in 3D, survives a write and a read", () => {
+    const storage = memoryStorage();
+    const map = { fond: "orthophoto", pentes: true, view: "3d" } as const;
+    writeSession(storage, { ...bareSession(), map });
+    expect(readSession(storage)?.map).toEqual(map);
+  });
+
+  test("a Session stored before the key is kept, and reads the carte claire alone", () => {
+    const storage = memoryStorage();
+    const { map: _map, ...older } = storedBlob(fullSession());
+    storage.setItem(SESSION_KEY, JSON.stringify(older));
+
+    const restored = readSession(storage);
+    expect(restored?.trace).not.toBeNull();
+    expect(restored?.map).toEqual({ fond: "carte-claire", pentes: false, view: "2d" });
+  });
+
+  test("a Session stored before the Vue 3D keeps its Fond and reads the vue de dessus", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const before95 = { fond: "carte-nationale", pentes: true };
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, map: before95 }));
+    expect(readSession(storage)?.map).toEqual({ ...before95, view: "2d" });
+  });
+
+  test("a view the app does not know is not a Session — the blob is discarded whole", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const map = { fond: "carte-claire", pentes: false, view: "vr" };
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, map }));
+    expect(readSession(storage)).toBeNull();
+  });
+
+  test("a Fond the app does not know is not a Session — the blob is discarded whole", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, map: { fond: "osm", pentes: false } }));
+    expect(readSession(storage)).toBeNull();
   });
 });

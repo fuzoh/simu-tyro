@@ -35,7 +35,7 @@ describe("golden canonical links", () => {
 
   describe.each(CANONICAL_LINKS.map((f) => [f.name, f] as const))("%s", (_name, fixture) => {
     test("encodes to the pinned string", () => {
-      expect(canonicalLink(scenarioToSearch(fixture.scenario))).toBe(fixture.link);
+      expect(canonicalLink(scenarioToSearch(fixture.scenario), "/")).toBe(fixture.link);
     });
 
     test("decodes back to the scenario, completing nothing", () => {
@@ -55,7 +55,7 @@ describe("golden canonical links", () => {
     "%s, re-encoded",
     (_name, fixture) => {
       test("the decoded scenario encodes to the canonical link", () => {
-        expect(canonicalLink(scenarioToSearch(fixture.scenario))).toBe(fixture.canonical);
+        expect(canonicalLink(scenarioToSearch(fixture.scenario), "/")).toBe(fixture.canonical);
       });
     },
   );
@@ -64,7 +64,7 @@ describe("golden canonical links", () => {
     DECODE_ONLY_LINKS.filter((f) => f.canonical === null).map((f) => [f.name, f] as const),
   )("%s, blanks", (_name, fixture) => {
     test("the link is canonical as written", () => {
-      expect(canonicalLink(decode(fixture.link).completion.search)).toBe(fixture.link);
+      expect(canonicalLink(decode(fixture.link).completion.search, "/")).toBe(fixture.link);
     });
   });
 });

@@ -15,15 +15,15 @@ import { describe, expect, it } from "vitest";
 import { formatValue } from "@/lib/format/quantity.ts";
 
 import {
-  ANCHOR_TARGET,
-  anchorTarget,
   BANNER,
+  BANNER_TWO_LINES_PX,
   bannerBudget,
   CELL_BASIS_PX,
   CELL_ROW,
   CELL_WRAP_PX,
   cellRows,
   chartBlockHeight,
+  chartColumnWidth,
   CLEARANCE_EMPTY,
   clearanceDomain,
   clearanceTickLabel,
@@ -39,17 +39,19 @@ import {
   plotAspect,
   profileOuterHeight,
   PROFILE_ASPECT,
-  PROFILE_CHROME,
   PROFILE_CHROME_HEIGHT,
   profilePlotHeight,
   PROFILE_PLOT_MAX,
-  RAIL_REFLOW_PX,
   RAIL_WIDTH,
   READ_OUT_SPANS,
   REFERENCE_COLUMN_PX,
   REFERENCE_DESKTOP_PX,
+  RIGHT_COLUMN_WIDTH,
+  SHELL_MAX_PX,
   STRIP,
   STRIP_POLICY_BAND,
+  THREE_COLUMN_PX,
+  threeColumns,
   stripOuterHeight,
   VE_BAND,
   veBadgeLabel,
@@ -58,7 +60,11 @@ import {
   Z_MARGIN,
 } from "./contract.ts";
 
-/** § 5, *The three pixel budgets, each summing to the viewport*. */
+/**
+ * § 5, *The three pixel budgets, each summing to the viewport*. The columns are the budgets' own:
+ * B and C were written with one Rail beside the chart, and in Avancé's three columns they are
+ * reached at 480 px and 1728 px of viewport (`chartColumnWidth`), not at 768 and 1440.
+ */
 const BUDGETS = [
   {
     name: "A · 390×664",
@@ -218,11 +224,13 @@ describe("§ 5 — the layout contract", () => {
     expect(CELL_BASIS_PX * 5).toBeLessThanOrEqual(CELL_WRAP_PX);
     expect(READ_OUT_SPANS).toHaveLength(7);
     expect(READ_OUT_SPANS.reduce((sum, span) => sum + span, 0)).toBe(8);
-    // Eight units are a 1280 px laptop's chart column, to the pixel: that laptop keeps one line.
-    expect(CELL_BASIS_PX * 8).toBe(1280 - RAIL_WIDTH);
-    expect(cellRows(1280 - RAIL_WIDTH)).toBe(1);
-    expect(cellRows(1280 - RAIL_WIDTH - 1)).toBe(2);
+    // Eight units are 992 px, to the pixel. That was a 1280 px laptop's chart column beside one Rail;
+    // in Avancé's three columns it is the shell's cap that reaches it, and 1280 gets two lines.
+    expect(CELL_BASIS_PX * 8).toBe(992);
+    expect(cellRows(992)).toBe(1);
+    expect(cellRows(991)).toBe(2);
     expect(cellRows(REFERENCE_COLUMN_PX)).toBe(1);
+    expect(cellRows(chartColumnWidth(1280))).toBe(2);
     // « Garde min. ligne » and the two tensions fill the first line from 496 px.
     expect(cellRows(4 * CELL_BASIS_PX)).toBe(2);
     expect(cellRows(4 * CELL_BASIS_PX - 1)).toBe(3);
@@ -357,13 +365,12 @@ describe("amendment F — the plot's ceiling at wide widths", () => {
     expect(900 - chartBlockHeight(REFERENCE_COLUMN_PX)).toBeCloseTo(43.68, 9);
   });
 
-  it("the cap cannot reach below B2, so the narrow budgets are untouchable by construction", () => {
-    // Below B2 the chart column *is* the viewport, so the widest column that arm can produce is 767
-    // px — 719 of `W_inner`, a 302 px plot. The cap is 161 px above anything narrow can ask for.
-    expect(profilePlotHeight(innerWidth(RAIL_REFLOW_PX - 1))).toBeLessThan(PROFILE_PLOT_MAX);
-    expect(profilePlotHeight(innerWidth(RAIL_REFLOW_PX - 1))).toBe(
-      PROFILE_ASPECT * innerWidth(RAIL_REFLOW_PX - 1),
-    );
+  it("the cap cannot reach a phone's column, so the narrow budgets are untouchable by construction", () => {
+    // A phone's chart column *is* the viewport — 767 px at most — which is 719 of `W_inner` and a
+    // 302 px plot, 161 px under the cap. (Stacked tablets up to 1279 px do reach it; they are not
+    // the narrow budgets.)
+    expect(profilePlotHeight(innerWidth(767))).toBeLessThan(PROFILE_PLOT_MAX);
+    expect(profilePlotHeight(innerWidth(767))).toBe(PROFILE_ASPECT * innerWidth(767));
     for (const column of [320, 390, 480, 600, 767]) {
       expect(chartBlockHeight(column)).toBe(uncappedBlock(column));
     }
@@ -465,7 +472,7 @@ describe("amendment F — the plot's ceiling at wide widths", () => {
     expect(wide.peekEnabled).toBe(false);
     // **VE never compresses, at any width** — the guarantee the cap may not touch. § 5's seven all
     // stay inside the published band, and the flattest-drawing of them (the `k` 3,696 row) is the one
-    // that reaches « câble hors cadre » at 2560 px.
+    // that reaches « ligne hors cadre » at 2560 px.
     for (const wInner of [342, 432, 1104, 1264, 1584, 2224, 10_000]) {
       for (const scenario of SCENARIOS) {
         const ve = veAt(plotAspect(wInner), scenario);
@@ -504,6 +511,89 @@ const SCENARIOS = [
 
 /** « mou profond — hors des sept »: 200 m at `L₀` 400 m, `k` 0,972 ⇒ auto-fit ×0,41 at every aspect. */
 const DEEP_SLACK = { L: 200, zSpan: 182.5, k: 0.972 } as const;
+
+describe("Avancé's three columns — the middle column is the chart column", () => {
+  it("the switch is at 1024, the narrowest landscape tablet, and 1280 is three columns", () => {
+    expect(THREE_COLUMN_PX).toBe(1024);
+    expect(RAIL_WIDTH).toBe(288);
+    expect(RIGHT_COLUMN_WIDTH).toBe(288);
+    expect(chartColumnWidth(THREE_COLUMN_PX)).toBe(1024 - 288 - 288);
+    expect(chartColumnWidth(1280)).toBe(1280 - 288 - 288);
+    expect(chartColumnWidth(1280)).toBeGreaterThanOrEqual(CELL_WRAP_PX);
+    // The cost of the switch, stated: at it the middle column is under B1, and it clears B1 only
+    // from `CELL_WRAP_PX + 576`.
+    expect(chartColumnWidth(THREE_COLUMN_PX)).toBeLessThan(CELL_WRAP_PX);
+    expect(chartColumnWidth(CELL_WRAP_PX + RAIL_WIDTH + RIGHT_COLUMN_WIDTH)).toBe(CELL_WRAP_PX);
+  });
+
+  it("the vue de dessus starts on the same side of the switch the classes show it on (#104)", () => {
+    expect(threeColumns(THREE_COLUMN_PX - 1)).toBe(false);
+    expect(threeColumns(THREE_COLUMN_PX)).toBe(true);
+    const root = fileURLToPath(new URL("../../..", import.meta.url));
+    const shell = readFileSync(join(root, "src/components/app/shell.tsx"), "utf8");
+    // The views' box: `display: none` until B2, and the same B2 the predicate reads.
+    expect(shell).toContain(`hidden border-t px-3 py-3 min-[${THREE_COLUMN_PX}px]:block`);
+  });
+
+  it("the middle column's views are Statique's own component, so no view is Avancé's alone", () => {
+    // #12: « la colonne du milieu reprend les vues et gestes de Statique … Aucune vue propre ».
+    // The gestures themselves are pure view models (`@/lib/map/`), and the Rail reading what they
+    // write is `@/lib/rail/values.test.ts`'s; what is source is that both Pages stand the very same
+    // component, with the same three inputs, and that Avancé's own files draw no map of their own.
+    const root = fileURLToPath(new URL("../../..", import.meta.url));
+    const read = (path: string) => readFileSync(join(root, path), "utf8");
+    const pages = ["src/components/app/app.tsx", "src/components/statique/statique.tsx"];
+    for (const page of pages) {
+      expect(read(page)).toContain('import { TopMap } from "@/components/map/top-map.tsx";');
+      expect(read(page)).toContain(
+        "<TopMap frame={frame} solved={solved} windCause={windCause} />",
+      );
+    }
+    const avance = readdirSync(join(root, "src/components/app")).map((name) =>
+      read(`src/components/app/${name}`),
+    );
+    expect(avance.some((source) => /maplibre|cesium/i.test(source))).toBe(false);
+  });
+
+  it("below the switch the columns stack, and the chart column is the whole viewport", () => {
+    expect(chartColumnWidth(THREE_COLUMN_PX - 1)).toBe(THREE_COLUMN_PX - 1);
+    expect(chartColumnWidth(390)).toBe(390);
+    expect(chartColumnWidth(768)).toBe(768);
+  });
+
+  it("the shell's cap leaves exactly the reference column, so the plot never outgrows its ceiling", () => {
+    expect(SHELL_MAX_PX - RAIL_WIDTH - RIGHT_COLUMN_WIDTH).toBe(REFERENCE_COLUMN_PX);
+    for (const viewport of [1728, 1920, 2560, 3440]) {
+      expect(chartColumnWidth(viewport)).toBe(REFERENCE_COLUMN_PX);
+    }
+  });
+
+  it("the Plot Aspect Band holds in the chart column at every viewport width, stacked or in three columns", () => {
+    // From 768, so the stacked widths — where the column is the whole viewport — are walked too.
+    for (let viewport = 768; viewport <= 3440; viewport += 8) {
+      const aspect = plotAspect(innerWidth(chartColumnWidth(viewport)));
+      expect({
+        viewport,
+        ok: aspect >= PLOT_ASPECT_BAND.min && aspect <= PLOT_ASPECT_BAND.max,
+      }).toStrictEqual({ viewport, ok: true });
+    }
+  });
+
+  it("the shell spells the contract's numbers, and styles.css gates on the same B2", () => {
+    const root = fileURLToPath(new URL("../../..", import.meta.url));
+    const shell = readFileSync(join(root, "src/components/app/shell.tsx"), "utf8");
+    const styles = readFileSync(join(root, "src/styles.css"), "utf8");
+    const wide = `min-[${THREE_COLUMN_PX}px]:`;
+    // `w-72` is 18 rem: the two columns' 288 px, written as a Tailwind step.
+    expect(RAIL_WIDTH).toBe(18 * 16);
+    expect(RIGHT_COLUMN_WIDTH).toBe(18 * 16);
+    for (const cls of ["flex-row", "contents", "w-72", "order-first", "order-last", "flex-1"]) {
+      expect(shell).toContain(`${wide}${cls}`);
+    }
+    expect(shell).toContain(`max-w-[${SHELL_MAX_PX}px]`);
+    expect(styles).toContain(`@media (width < ${THREE_COLUMN_PX}px)`);
+  });
+});
 
 /** `VE = plot aspect × (x span / z span)` at a given aspect, for one row of the table. */
 function veAt(aspect: number, scenario: { L: number; zSpan: number }) {
@@ -638,7 +728,7 @@ describe("§ 5 — vertical exaggeration", () => {
     // Clamped to ×1 the plot shows less z than the data has, so the belly leaves the frame.
     expect(ve.zVisibleSpan).toBeLessThan(DEEP_SLACK.zSpan);
     expect(ve.state).toBe("true-scale-clipped");
-    expect(veBadgeLabel(ve)).toBe("Éch. verticale ×1 — vraie échelle · câble hors cadre");
+    expect(veBadgeLabel(ve)).toBe("Éch. verticale ×1 — vraie échelle · ligne hors cadre");
     // « Disabled whenever the ×1 clamp is already in force » — it cannot peek at what it is doing.
     expect(ve.peekEnabled).toBe(false);
     for (const aspect of [PLOT_ASPECT_BAND.min, PLOT_ASPECT_BAND.max]) {
@@ -769,11 +859,11 @@ describe("amendment F, cost 2 — the peek where the cap cuts the cable (décisi
 
   it("the held badge names the compression rather than borrowing the ×1 row's words", () => {
     expect(peekBadgeLabel(boxClipped)).toBe(
-      "Éch. verticale ×0,8 — sous la vraie échelle · câble entier",
+      "Éch. verticale ×0,8 — sous la vraie échelle · ligne entière",
     );
-    // « câble entier » where the resting row reads « câble hors cadre »: the badge describes what is
+    // « ligne entière » where the resting row reads « ligne hors cadre »: the badge describes what is
     // drawn, and the two rows describe two different pictures of the same line.
-    expect(veBadgeLabel(boxClipped)).toBe("Éch. verticale ×1 — vraie échelle · câble hors cadre");
+    expect(veBadgeLabel(boxClipped)).toBe("Éch. verticale ×1 — vraie échelle · ligne hors cadre");
     // A `"fit"` factor can never round to « ×0,0 »: the mode requires the line to be whole at 0,42,
     // i.e. `k ≥ 1 / (1,24 × 0,42)` = 1,92, so the factor is bounded below by `plotAspect × 1,92`.
     expect(1 / ((1 + 2 * Z_MARGIN) * PROFILE_ASPECT)).toBeCloseTo(1.92, 2);
@@ -904,52 +994,9 @@ describe("§ 5 — SharedX, one object for both charts", () => {
   });
 
   it("a degenerate span is a caller bug, not a state to render", () => {
-    // `station B ≤ station A` is § 4's blocked placement, repaired by `[ Inverser A et B ]`.
+    // A geometry with no span is § 8's geometric exception, which never reaches the scale.
     expect(() => createSharedX({ width: 390, L: 0 })).toThrow(RangeError);
     expect(() => createSharedX({ width: 390, L: Number.NaN })).toThrow(RangeError);
-  });
-});
-
-/**
- * § 5's Handle Lane — « the two anchors move down here, each with a **44 × 48 px** hit target
- * spanning the lane plus the label band, **entirely below the plot area** ».
- *
- * Where those rectangles land on a real screen is `agent-browser`'s (tickets 29 and 30); what is
- * pure is the geometry that makes confusing an anchor with the rider impossible — the target's
- * size, and the fact that it starts where the plot ends.
- */
-describe("§ 5 — the anchor targets in the Handle Lane", () => {
-  it("44 × 48, and the 48 is the two rows rather than a second number", () => {
-    expect(ANCHOR_TARGET.width).toBe(44);
-    expect(ANCHOR_TARGET.height).toBe(48);
-    expect(ANCHOR_TARGET.height).toBe(PROFILE_CHROME.handleLane + PROFILE_CHROME.xLabels);
-    // The coarse-pointer minimum, which the rider's grab circle also meets — voir `.chart-grab`.
-    expect(ANCHOR_TARGET.width).toBeGreaterThanOrEqual(44);
-  });
-
-  it("entirely below the plot area, at both ends of the domain", () => {
-    const x = createSharedX({ width: 390, L: 1000 });
-    const plot = { top: PROFILE_CHROME.badge, height: profilePlotHeight(innerWidth(390)) };
-    const laneTop = plot.top + plot.height;
-    for (const at of [0, 1000]) {
-      const target = anchorTarget(x.x(at), laneTop);
-      expect(target.y).toBe(laneTop);
-      expect(target.y).toBeGreaterThanOrEqual(plot.top + plot.height);
-      // …and it does not reach back up into the plot, which is the collision the lane retires.
-      expect(target.y + target.height).toBe(laneTop + ANCHOR_TARGET.height);
-    }
-  });
-
-  it("centred on the anchor, which is why the two never overlap at 390 px", () => {
-    const x = createSharedX({ width: 390, L: 1000 });
-    const a = anchorTarget(x.x(0), 200);
-    const b = anchorTarget(x.x(1000), 200);
-    expect(a.x + a.width / 2).toBeCloseTo(x.x(0), 9);
-    expect(b.x + b.width / 2).toBeCloseTo(x.x(1000), 9);
-    // 342 px of inner width against two 44 px targets: they clear each other by 298 px, and § 5's
-    // « 44 px covers the first and last 12 % of the span » is exactly this ratio.
-    expect(b.x - (a.x + a.width)).toBeGreaterThan(0);
-    expect(ANCHOR_TARGET.width / innerWidth(390)).toBeCloseTo(0.1287, 4);
   });
 });
 
@@ -1205,16 +1252,14 @@ describe("§ 5 — the two mechanisms the layout may not use", () => {
     expect(shell).toContain('"--banner": `${BANNER.oneLine}px`');
     expect(shell).toContain('"--banner-two-lines": `${BANNER.twoLines}px`');
     expect(shell).toContain('"--banner-three-lines": `${BANNER.threeLines}px`');
-    // And the two container queries are B1 and the column B2 produces — **no third breakpoint**.
+    // And the two container queries are B1 and the banner's own wrap width — **no third breakpoint**.
     // Tailwind emits `@max-[N]` as `(width < N)` and `@min-[N]` as `(width >= N)`, which is exactly
     // where `bannerBudget` steps, so the rendered band and (c)'s term cannot disagree by a pixel.
-    const twoLines = `@min-[${RAIL_REFLOW_PX - RAIL_WIDTH}px]:@max-[${CELL_WRAP_PX}px]:[--banner:var(--banner-two-lines)]`;
+    const twoLines = `@min-[${BANNER_TWO_LINES_PX}px]:@max-[${CELL_WRAP_PX}px]:[--banner:var(--banner-two-lines)]`;
     expect(shell).toContain(twoLines);
-    expect(shell).toContain(
-      `@max-[${RAIL_REFLOW_PX - RAIL_WIDTH}px]:[--banner:var(--banner-three-lines)]`,
-    );
-    expect(bannerBudget(RAIL_REFLOW_PX - RAIL_WIDTH - 1)).toBe(BANNER.threeLines);
-    expect(bannerBudget(RAIL_REFLOW_PX - RAIL_WIDTH)).toBe(BANNER.twoLines);
+    expect(shell).toContain(`@max-[${BANNER_TWO_LINES_PX}px]:[--banner:var(--banner-three-lines)]`);
+    expect(bannerBudget(BANNER_TWO_LINES_PX - 1)).toBe(BANNER.threeLines);
+    expect(bannerBudget(BANNER_TWO_LINES_PX)).toBe(BANNER.twoLines);
     expect(bannerBudget(CELL_WRAP_PX - 1)).toBe(BANNER.twoLines);
     expect(bannerBudget(CELL_WRAP_PX)).toBe(BANNER.oneLine);
   });
@@ -1241,6 +1286,14 @@ describe("§ 5 — the two mechanisms the layout may not use", () => {
       padding: tokens.has("pb-[var(--kb,0px)]"),
       scrollPadding: tokens.has("scroll-pb-[var(--kb,0px)]"),
     }).toStrictEqual({ padding: true, scrollPadding: true });
+    // From B2 up the wrapper is `display: contents` and each of the three columns is its own
+    // scroller — the middle one since its views stand under the block (#104) — so each spends the
+    // same pair on itself.
+    const wide = `min-[${THREE_COLUMN_PX}px]:`;
+    expect(tokens.has(`${wide}contents`)).toBe(true);
+    for (const token of ["pb-[var(--kb,0px)]", "scroll-pb-[var(--kb,0px)]", "overflow-y-auto"]) {
+      expect(shell.split(`${wide}${token}`).length - 1).toBe(3);
+    }
     // And no second scroll mechanism was added to pay for it: piece 3 is still one centring call
     // with `behavior` left at `auto`, and the Rail's own scroll is still nobody's to set.
     expect(shell).toContain("target.scrollIntoView(CENTRE_IN_RAIL)");

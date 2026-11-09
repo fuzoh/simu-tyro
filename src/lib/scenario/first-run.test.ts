@@ -28,7 +28,7 @@ import { engineTightness } from "./tightness.ts";
  *
  * It is also the engine's only **end-to-end** test: § 9's figures are reproduced *from the
  * shipped constant*, through the same chain a parameter change runs — derive the material,
- * resolve `L₀` from the flèche target, solve the unloaded line, sweep the traverse, reduce §11
+ * resolve `L₀` from the tension de pose, solve the unloaded line, sweep the traverse, reduce §11
  * over it, score §10.
  *
  * **Why the assertion is what the user reads.** `1e-3` relative on `L₀` is ±0,15 m, and 0,15 m of
@@ -42,12 +42,12 @@ import { engineTightness } from "./tightness.ts";
  * all:
  *
  * ```
- * « 151,64 m » · « 253,5 daN » · « 6,00 m » · « 4,00 % » · « 2,90 % » · « 817,1 daN »
- * · « 927,9 daN » · « 7,48 m » · « 2,42 m » · « 8,80 » · « 9,06 »
+ * « 151,64 m » · « 253,6 daN » · « 6,00 m » · « 4,00 % » · « 2,90 % » · « 817,2 daN »
+ * · « 928,0 daN » · « 7,48 m » · « 2,42 m » · « 8,80 » · « 9,06 »
  * ```
  *
  * and with them the **French decimal comma** and every row of the precision table. One collision
- * that lands with them, settled rather than hidden: « 817,1 daN » is frozen at **1 decimal**
+ * that lands with them, settled rather than hidden: « 817,2 daN » is frozen at **1 decimal**
  * while the rail's `T max statique` detail row and the strip's `T_A` cell sketch « 817 daN » at
  * 0 — **the frozen strings govern**. And the Rail's *headline* `T max` is the DAF-amplified
  * **928 daN**, never 817, because `FS effectif` divides by it.
@@ -80,7 +80,11 @@ function openingState(scenario: Scenario) {
   // `g` is § 2's fixed, unexposed constant; A2 owns the app-side copy the Rail will read.
   const P = rider.mp * STEEL.g;
 
-  const L0 = resolveL0(engineTightness(scenario.tightness, rider.mp), { L, h, ...derived });
+  const L0 = resolveL0(engineTightness(scenario.tightness, rider.mp, scenario.tensioningSide), {
+    L,
+    h,
+    ...derived,
+  });
   if (!L0.ok) throw new Error(`expected an L₀, got ${JSON.stringify(L0.error)}`);
 
   const span: SpanInput = {
@@ -164,12 +168,21 @@ describe("FIRST_RUN_SCENARIO — § 9's shipped inputs", () => {
     // opens the app in « Câble au sol ».
     expect(FIRST_RUN_SCENARIO.geometry).toEqual({ source: "manual", L: 150, h: -18 });
     expect(FIRST_RUN_SCENARIO.anchors).toEqual({ zA: 12, zB: 12 });
+    // One Brin porteur — `bp` absent, so § 9's link did not move when the key arrived (#84).
+    expect(FIRST_RUN_SCENARIO.carryingLines).toBe(1);
+    // The Mise en tension at A — `cp` absent, likewise (#85).
+    expect(FIRST_RUN_SCENARIO.tensioningSide).toBe("A");
+    // The mouflage — `mt` absent, likewise (#86).
+    expect(FIRST_RUN_SCENARIO.tensioningDevice).toBe("pulley");
+    // No wind — `ws` and `wd` absent, likewise (#87).
+    expect(FIRST_RUN_SCENARIO.wind).toEqual({ speedKmh: 0, directionDeg: 0 });
   });
 
-  test("Flèche is the active Tightness segment, at 6,0 m", () => {
-    // The only mode whose shipped value is exact at display precision: a direct-`L₀` default
-    // would cost 0,21 m of flèche and 0,20 m of garde — 8 % of the shipped margin.
-    expect(FIRST_RUN_SCENARIO.tightness).toEqual({ mode: "sag", D_target: 6 });
+  test("Tension de pose is the active Tightness segment, at 263,4 daN (2634 N)", () => {
+    // The segment the simplified Pages drive: a flèche driver would hold 6 m through a span change
+    // and move the tension de pose unseen. 263,4 daN is exact at display precision — a direct-`L₀`
+    // default would cost 0,21 m of flèche and 0,20 m of garde, 8 % of the shipped margin.
+    expect(FIRST_RUN_SCENARIO.tightness).toEqual({ mode: "anchor", T_target: 2634 });
   });
 
   test("the material spec is complete and unoverridden — 12 mm, 1770, 6×19 âme métallique", () => {
@@ -273,19 +286,21 @@ describe("firstRunDefaults() — one object, three consumers, no shared mutable 
  * screen drift by 6 % of its safety margin and stay green.
  */
 describe("the opening state — § 9's measured table, from FIRST_RUN_SCENARIO", () => {
-  test("« 151,64 m » — L₀ from the 6,0 m flèche target", () => {
+  test("« 151,64 m » — L₀ from the 263,4 daN tension de pose", () => {
     expect(formatQuantity("L0", opening.L0)).toBe("151,64 m");
   });
 
-  test("« 253,5 daN » — prétension H à vide", () => {
-    expect(formatQuantity("H_target", opening.vide.H)).toBe("253,5 daN");
+  test("« 253,6 daN » — tension horizontale H à vide", () => {
+    // Re-pinned from 253,5 when first run moved from the flèche to the tension de pose: 263,4 daN
+    // is the displayed value of the 6 m line's tension, not its exact one.
+    expect(formatQuantity("H_target", opening.vide.H)).toBe("253,6 daN");
   });
 
-  test("« 6,00 m » — flèche à vide, exact at display precision", () => {
+  test("« 6,00 m » — flèche à vide, now a read-out, still 6 m at display precision", () => {
     expect(formatQuantity("sag", opening.sag)).toBe("6,00 m");
-    // The reason `Flèche` ships as the active segment: the driving input's own value survives a
-    // round trip through the field, so the opening line is the line the defaults describe.
-    expect(roundToDisplay("D_target", opening.sag)).toBe(FIRST_RUN_SCENARIO.tightness.D_target);
+    // The opening line is the one a 6 m flèche gave, to the displayed digit: the flèche is read, not
+    // driven, and a prefill of its field would write 6 back.
+    expect(roundToDisplay("D_target", opening.sag)).toBe(6);
   });
 
   test("« 4,00 % » — flèche / portée, clear of §8.2's 3 % threshold", () => {
@@ -299,14 +314,14 @@ describe("the opening state — § 9's measured table, from FIRST_RUN_SCENARIO",
     expect(formatQuantity("standingTension", standing * 100)).toBe("2,90 %");
   });
 
-  test("« 817,1 daN » — T max statique at anchor A", () => {
+  test("« 817,2 daN » — T max statique at anchor A", () => {
     // 1 decimal governs: the rail's detail row and the strip's `T_A` cell sketch « 817 daN », and
     // anyone who prefers 0 decimals changes this line and § 3's row in the same commit.
-    expect(formatQuantity("Tstatic", opening.verdict.ends.A.Tstatic)).toBe("817,1 daN");
+    expect(formatQuantity("Tstatic", opening.verdict.ends.A.Tstatic)).toBe("817,2 daN");
   });
 
-  test("« 927,9 daN » — the DAF envelope at anchor A, the headline T max", () => {
-    expect(formatQuantity("Tdaf", opening.verdict.ends.A.Tdaf)).toBe("927,9 daN");
+  test("« 928,0 daN » — the DAF envelope at anchor A, the headline T max", () => {
+    expect(formatQuantity("Tdaf", opening.verdict.ends.A.Tdaf)).toBe("928,0 daN");
     // The headline is the amplified envelope, never the static one — `FS effectif` divides by it.
     expect(opening.verdict.headline.end).toBe("A");
     expect(opening.verdict.headline.Tdaf).toBe(opening.verdict.ends.A.Tdaf);
@@ -340,6 +355,39 @@ describe("the opening state — § 9's measured table, from FIRST_RUN_SCENARIO",
     // 2,42 m there, and the window is what keeps the label stable rather than the digits.
     const window = Math.max(1, 0.01 * opening.L);
     expect(Math.abs(FIRST_RUN_SCENARIO.rider.xD - opening.clearance.atX)).toBeLessThan(window);
+  });
+});
+
+/**
+ * The point of driving by the tension de pose, as the user meets it: change the span from the
+ * first-run Scenario — what importing a profile does — and the tension de pose stays, because it
+ * is what the simplified Pages show and edit, while the flèche, a read-out, moves. A flèche driver
+ * did the opposite: it held 6 m and the tension de pose jumped (263,4 → 2119 daN on the 435 m
+ * trial trace) with nothing on the Page to say why.
+ */
+describe("a span change from the first-run Scenario — the tension de pose holds, the flèche moves", () => {
+  function onSpan(L: number, h: number) {
+    const geometry = { source: "manual", L, h } as const;
+    return openingState({ ...firstRunDefaults(), geometry });
+  }
+
+  test.each([
+    ["a longer span", 300, -36],
+    ["a shorter span", 100, -12],
+  ])("%s keeps 263,4 daN at anchor A", (_name, L, h) => {
+    // The first-run Scenario's own figure, read off the unloaded line at the anchor of the Mise en
+    // tension (A, `cp` absent) — not recomputed from anything the engine returned.
+    expect(formatQuantity("T_target", onSpan(L, h).vide.TA)).toBe("263,4 daN");
+  });
+
+  test("the flèche follows the span: deeper when longer, shallower when shorter", () => {
+    // Same tension and the same cable, so the sag scales with the span (`w·L²/8H`, a parabola's
+    // flèche): 2× the span is about 4× the flèche. Bounds, not a re-derivation of the solver.
+    const longer = onSpan(300, -36).sag;
+    const shorter = onSpan(100, -12).sag;
+    expect(longer).toBeGreaterThan(12);
+    expect(shorter).toBeLessThan(4);
+    expect(formatQuantity("sag", longer)).not.toBe("6,00 m");
   });
 });
 

@@ -46,7 +46,7 @@ import {
   NOT_COMPUTED_LINES,
   provenanceAggregate,
 } from "@/lib/rail/provenance.ts";
-import { terrainDisclosure } from "@/lib/terrain/provenance.ts";
+import { terrainDisclosure, terrainSource } from "@/lib/terrain/provenance.ts";
 import { cn } from "@/lib/utils.ts";
 
 import { Chip, InfoTip } from "./controls.tsx";
@@ -173,7 +173,7 @@ function HeadlineRow({ row }: { row: ResultRow }) {
         <InfoTip label={row.label} text={RESULT_HELP[row.id]} />
       </span>
       <div className="flex flex-wrap items-baseline gap-1">
-        {/* « Garde min (traversée) » under « Garde min. admise » is the one headline that judges
+        {/* « Garde min (traversée) » under « Garde exigée » is the one headline that judges
             itself; the colour is the verdict grid's own « hors limites » tint. */}
         <span
           className={cn("font-mono text-base", row.state === "hors-limites" && "text-destructive")}
@@ -188,7 +188,7 @@ function HeadlineRow({ row }: { row: ResultRow }) {
   );
 }
 
-/** One detail row. « ↳ majoration dynamique » is a decomposition of the row above it. */
+/** One detail row. « ↳ majoration au départ » is a decomposition of the row above it. */
 function DetailRow({ row }: { row: ResultRow }) {
   return (
     <div className={cn("flex items-baseline gap-1 py-0.5", row.indent && "pl-3")}>
@@ -273,20 +273,12 @@ function ProvenanceSection({
   trace: Trace | null;
   deduced: Deduced;
 }) {
-  const source =
-    scenario.geometry.source === "trace" && trace !== null
-      ? ({ kind: "trace", trace } as const)
-      : ({ kind: "manual" } as const);
   const aggregate = provenanceAggregate(scenario, deduced);
 
   return (
     <RailSection title="Provenance">
       <div className="mt-2 flex flex-col gap-2">
-        <div className="flex flex-col gap-1">
-          {terrainDisclosure(source).map((line) => (
-            <TerrainLine key={line.text} line={line} />
-          ))}
-        </div>
+        <TerrainDisclosure scenario={scenario} trace={trace} />
 
         <details>
           <summary className="text-warning cursor-pointer list-none text-xs">
@@ -301,6 +293,26 @@ function ProvenanceSection({
         </details>
       </div>
     </RailSection>
+  );
+}
+
+/**
+ * The terrain disclosure block, on every Page that draws the terrain — Avancé's `Provenance`, and
+ * Statique's profil, where a profil geo.admin is otherwise drawn without swisstopo's attribution.
+ */
+export function TerrainDisclosure({
+  scenario,
+  trace,
+}: {
+  scenario: ScenarioDraft;
+  trace: Trace | null;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      {terrainDisclosure(terrainSource(scenario.geometry.source, trace)).map((line) => (
+        <TerrainLine key={line.text} line={line} />
+      ))}
+    </div>
   );
 }
 

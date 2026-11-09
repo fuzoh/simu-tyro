@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { SolveError } from "@/lib/sim";
 
+import { deduceValues } from "@/lib/rail/deduced.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 
 import { diagnosticPayload, engineRefusal, REFUSAL_CAUSE } from "./refusals.ts";
@@ -50,7 +51,7 @@ describe("« Tension impossible » — the bound is the breaking load", () => {
     });
   });
 
-  test("mode Tension quotes a **prétension**, and never « soit L₀ ≥ 197,40 m »", () => {
+  test("mode Tension horizontale quotes a **tension horizontale**, and never « soit L₀ ≥ 197,40 m »", () => {
     // The bound is quoted in the driving field's own quantity and unit, and **never twice**: a
     // second equivalent invites the user to type a length into a tension field, which is the
     // eyeball-confusion class the global force-unit decision refused a `kN` carve-out to avoid.
@@ -68,9 +69,31 @@ describe("« Tension impossible » — the bound is the breaking load", () => {
       { tightness: { mode: "tension", H_target: 2e6 } },
     );
     expect(refusal?.message).toBe(
-      "⛔ Tension impossible — la ligne casserait avant d'atteindre cette tension. Prétension maximale atteignable : 9074,0 daN.",
+      "⛔ Tension impossible — la ligne casserait avant d'atteindre cette tension. Tension horizontale maximale atteignable : 9074,0 daN.",
     );
     expect(refusal?.message).not.toContain("L₀");
+  });
+
+  test("mode Prétension quotes the **prétension** at the tensioning anchor (#85)", () => {
+    const refusal = engineRefusal(
+      {
+        stage: "L0",
+        error: {
+          kind: "invalid-input",
+          field: "T_target",
+          value: 2e6,
+          bound: 90_740,
+          boundKind: "max",
+        },
+      },
+      { tightness: { mode: "anchor", T_target: 2e6 } },
+    );
+    expect(refusal).toEqual({
+      id: "tension-impossible",
+      message:
+        "⛔ Tension impossible — la ligne casserait avant d'atteindre cette tension. Prétension maximale atteignable : 9074,0 daN.",
+      diagnostic: false,
+    });
   });
 
   test("the same bound reads in the selected force unit", () => {
@@ -151,14 +174,29 @@ describe("« Cible inatteignable » — the bracket failure, naming the target",
     });
   });
 
-  test("mode Tension names the prétension instead", () => {
+  test("mode Tension horizontale names the tension horizontale instead", () => {
     const refusal = engineRefusal(
       { stage: "L0", error: { kind: "no-convergence", attempts: 5, residual: 1e-3 } },
       { tightness: { mode: "tension", H_target: 25_350 } },
     );
     expect(refusal?.message).toBe(
-      "⛔ Cible inatteignable — aucune longueur non tendue ne donne cette prétension (2535,0 daN).",
+      "⛔ Cible inatteignable — aucune longueur non tendue ne donne cette tension horizontale (2535,0 daN).",
     );
+  });
+
+  test("mode Prétension names the prétension, with no Fix Action (#85)", () => {
+    // A prétension under the least anchor tension the line can have — a target, not a line, is
+    // wrong, so the copy names it and offers nothing to press.
+    const refusal = engineRefusal(
+      { stage: "L0", error: { kind: "no-convergence", attempts: 80, residual: 12 } },
+      { tightness: { mode: "anchor", T_target: 1000 } },
+    );
+    expect(refusal).toEqual({
+      id: "cible-inatteignable",
+      message:
+        "⛔ Cible inatteignable — aucune longueur non tendue ne donne cette prétension (100,0 daN).",
+      diagnostic: false,
+    });
   });
 
   test("mode Rapport V names the ratio", () => {
@@ -299,7 +337,7 @@ describe("`[ Copier le diagnostic ]` — evidence, not UI copy", () => {
   test("it carries **no terrain**, and that is not an omission", () => {
     // `solveSpan` is terrain-free and clearance is a reducer above it, so a solve failure is fully
     // reproducible without the 200-row trace.
-    expect(payload).not.toMatch(/terrain|trace|tracé/i);
+    expect(payload).not.toMatch(/terrain|trace|tracé|profil/i);
   });
 
   test("a link that would be refused says so rather than omitting the field", () => {
@@ -312,7 +350,7 @@ describe("`[ Copier le diagnostic ]` — evidence, not UI copy", () => {
       derived: null,
       address: null,
     });
-    expect(oversize).toContain("[address]   (non partageable — tracé hors budget)");
+    expect(oversize).toContain("[address]   (non partageable — profil hors budget)");
     expect(oversize).toContain("hFloored    -169.67");
   });
 
@@ -390,7 +428,7 @@ describe("the injected chain — `vi.mock` on the collaborator, never a widened 
     expect(mapped(failure!, { tightness: draft.tightness })).toEqual({
       id: "cible-inatteignable",
       message:
-        "⛔ Cible inatteignable — aucune longueur non tendue ne donne cette flèche à vide (6,00 m).",
+        "⛔ Cible inatteignable — aucune longueur non tendue ne donne cette prétension (263,4 daN).",
       diagnostic: false,
     });
     vi.doUnmock("@/lib/sim");
@@ -414,5 +452,21 @@ describe("the injected chain — `vi.mock` on the collaborator, never a widened 
     expect(mapped(failure!, { tightness: draft.tightness })?.id).toBe("calcul-impossible");
     vi.doUnmock("@/lib/sim");
     vi.resetModules();
+  });
+});
+
+describe("the terrain register (#91)", () => {
+  test("« Tension impossible » quotes the longueur à vide, on « cette ligne »", () => {
+    const tightness = { mode: "length", L0: 100 } as const;
+    const failure = deduceValues(
+      scenario((draft) => {
+        draft.tightness = tightness;
+      }),
+      null,
+    ).failure;
+    if (failure === null) throw new Error("expected §5.4's chord bound to refuse");
+    expect(engineRefusal(failure, { tightness, unit: "daN", register: "terrain" })?.message).toBe(
+      "⛔ Tension impossible — la ligne casserait avant d'atteindre cette tension. Longueur à vide minimale pour cette ligne : 149,11 m · valeur : 100,00 m.",
+    );
   });
 });

@@ -10,7 +10,8 @@
  * - **Both directions read the same tables.** {@link scenarioToSearch} and {@link searchToScenario}
  *   sit side by side so a token, a unit or a key cannot be taught to one direction only.
  * - **The URL's daN become the state's newtons here, and nowhere else.** § 3's « SI internally,
- *   always » governs the state object; `te`, `mbf`, `ea` and `mbl` are the forces a link carries.
+ *   always » governs the state object; `te`, `tp`, `mbf`, `ea`, `mbl` and `f0` are the forces a
+ *   link carries.
  * - **A blank is `null`, never a number nobody typed.** `?fam=tx` with no `mbl`/`mu` is § 9's
  *   « vides et requis » — the correct arrival state, and two blocking errors rather than an
  *   invented rope. Hence a {@link ScenarioDraft} rather than a `Scenario` on the way in.
@@ -23,19 +24,22 @@
 
 import type { TightnessFieldId } from "@/lib/rail/fields.ts";
 import type {
+  DynamicsConstants,
+  Position,
   Scenario,
   ScenarioDraft,
+  TensioningDevice,
+  TensioningSide,
   TextileDraft,
   TightnessDraft,
 } from "@/lib/scenario/types.ts";
 import type { SteelSpec, TerminationId, TextileSpec } from "@/lib/sim";
-import type { TraceEnds } from "@/lib/terrain/trace.ts";
 
 import { tightnessDriver } from "@/lib/rail/values.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 import { clampX } from "@/lib/scenario/geometry.ts";
-import { TERMINATIONS, TEXTILE } from "@/lib/sim";
-import { traceEnds } from "@/lib/terrain/trace.ts";
+import { DYNAMICS, TERMINATIONS, TEXTILE } from "@/lib/sim";
+import { traceExtent } from "@/lib/terrain/trace.ts";
 
 import type {
   AcceptedSearch,
@@ -44,6 +48,8 @@ import type {
   RopeClassToken,
   SearchKey,
   SearchValues,
+  TensioningDeviceToken,
+  TensioningSideToken,
   TerminationToken,
   TightnessKey,
 } from "./schema.ts";
@@ -64,13 +70,30 @@ export const ROPE_CLASS_TOKEN_BY_ID = {
   polyester: "pes",
 } as const satisfies Record<TextileSpec["ropeClass"], RopeClassToken>;
 
+/** The write-side direction of `cp`. Total over the two anchors. */
+export const TENSIONING_SIDE_TOKEN_BY_ID = {
+  A: "a",
+  B: "b",
+} as const satisfies Record<TensioningSide, TensioningSideToken>;
+
+/** The write-side direction of `mt`. `pulley` is `mt` absent, so its `mou` is only ever read. */
+export const TENSIONING_DEVICE_TOKEN_BY_ID = {
+  pulley: "mou",
+  "maestro-s": "ms",
+  "maestro-l": "ml",
+} as const satisfies Record<TensioningDevice, TensioningDeviceToken>;
+
 /** The key each Tightness Driver's field travels under. Total over the drivers and the keys. */
 const DRIVER_KEY = {
   D_target: "fl",
   H_target: "te",
+  T_target: "tp",
   L0: "lo",
   vRatio: "vr",
 } as const satisfies Record<TightnessFieldId, TightnessKey>;
+
+/** The two drivers that are forces, and therefore daN on the wire. */
+const FORCE_DRIVER_KEYS: ReadonlySet<TightnessKey> = new Set<TightnessKey>(["te", "tp"]);
 
 type Values<T> = T[keyof T];
 
@@ -84,8 +107,10 @@ type Covers<Token extends string, Table> = [Token] extends [Values<Table>]
 const TOKEN_TABLES_COVER_TUPLES: [
   Covers<ConstructionToken, typeof CONSTRUCTION_TOKEN_BY_ID>,
   Covers<RopeClassToken, typeof ROPE_CLASS_TOKEN_BY_ID>,
+  Covers<TensioningSideToken, typeof TENSIONING_SIDE_TOKEN_BY_ID>,
+  Covers<TensioningDeviceToken, typeof TENSIONING_DEVICE_TOKEN_BY_ID>,
   Covers<TightnessKey, typeof DRIVER_KEY>,
-] = [true, true, true];
+] = [true, true, true, true, true];
 void TOKEN_TABLES_COVER_TUPLES;
 
 /**
@@ -106,6 +131,14 @@ export const CONSTRUCTION_ID_BY_TOKEN = invert<SteelSpec["construction"], Constr
 
 export const ROPE_CLASS_ID_BY_TOKEN = invert<TextileSpec["ropeClass"], RopeClassToken>(
   ROPE_CLASS_TOKEN_BY_ID,
+);
+
+const TENSIONING_SIDE_BY_TOKEN = invert<TensioningSide, TensioningSideToken>(
+  TENSIONING_SIDE_TOKEN_BY_ID,
+);
+
+const TENSIONING_DEVICE_BY_TOKEN = invert<TensioningDevice, TensioningDeviceToken>(
+  TENSIONING_DEVICE_TOKEN_BY_ID,
 );
 
 /** N → daN. § 7: forces serialise in daN, **fixed**, and ×10 exactly, so the step is lossless. */
@@ -173,28 +206,35 @@ export function terminationIdFromToken(
 
 type Absent<K extends SearchKey> = { readonly [P in K]?: never };
 
-/** The terrain keys of a completed bag: manual `L`/`h`, or imported `tr`/`sa`/`sb`. */
+/**
+ * The terrain keys of a completed bag: manual `L`/`h`, or the imported profil `tr` and whether it
+ * runs off the Positions, `ph`.
+ */
 type CompletedTerrain =
-  | (Pick<SearchValues, "L" | "h"> & Absent<"sa" | "sb" | "tr">)
-  | (Pick<SearchValues, "sa" | "sb" | "tr"> & Absent<"L" | "h">);
+  | (Pick<SearchValues, "L" | "h"> & Absent<"tr" | "ph">)
+  | (Pick<SearchValues, "tr"> & Partial<Pick<SearchValues, "ph">> & Absent<"L" | "h">);
 
 /** Exactly one tightness driver — two refuse the link before it is ever completed. */
 type CompletedDriver = {
   [D in TightnessKey]: Pick<SearchValues, D> & Absent<Exclude<TightnessKey, D>>;
 }[TightnessKey];
 
-/** The steel keys, Overrides optional because their absence is « non surchargée ». */
+/**
+ * The steel keys, Overrides optional because their absence is « non surchargée », and the câble's
+ * trolley `μ` because its absence is §12.2's default.
+ */
 type CompletedSteel = { readonly fam: "ac" } & Pick<SearchValues, "d" | "r0" | "cst"> &
-  Partial<Pick<SearchValues, "mbf" | "ea" | "mu">> &
-  Absent<"cls" | "mbl" | "k">;
+  Partial<Pick<SearchValues, "mbf" | "ea" | "mu" | "mur">> &
+  Absent<"cls" | "mbl" | "k" | "f0" | "kv">;
 
 /**
- * The textile keys, `mbl`/`mu` optional because a rope nobody typed is § 9's blanks, and `k`
- * because polyester ships it blank.
+ * The textile keys, `mbl`/`mu` optional because a rope nobody typed is § 9's blanks, `k`
+ * because polyester ships it blank, `d` because a diameter nobody typed is simply absent, and the
+ * corde's trolley `f0`/`kv` because their absence is the SSF fit.
  */
 type CompletedTextile = { readonly fam: "tx" } & Pick<SearchValues, "cls"> &
-  Partial<Pick<SearchValues, "mbl" | "mu" | "k">> &
-  Absent<"d" | "r0" | "cst" | "mbf" | "ea">;
+  Partial<Pick<SearchValues, "mbl" | "mu" | "k" | "d" | "f0" | "kv">> &
+  Absent<"r0" | "cst" | "mbf" | "ea" | "mur">;
 
 /**
  * A bag {@link completeFromDefaults} returned: every key the active configuration needs is present,
@@ -205,7 +245,12 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
   SearchValues,
   "v" | "u" | "use" | "za" | "zb" | "ta" | "tb" | "na" | "nb" | "mp" | "hr" | "gm" | "daf" | "x"
 > &
-  Partial<Pick<SearchValues, "reg">> &
+  Partial<
+    Pick<
+      SearchValues,
+      "reg" | "bp" | "cp" | "mt" | "ws" | "wd" | "cda" | "rho" | "lata" | "lona" | "latb" | "lonb"
+    >
+  > &
   CompletedTerrain &
   CompletedDriver &
   (CompletedSteel | CompletedTextile);
@@ -213,10 +258,29 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
 /**
  * The keys whose **absence is meaning**, never completed. `reg` absent is « — choisir — »,
  * `mbf`/`ea`/`mu` absent is « non surchargée », which differs from « equal to the formula value »,
- * and `mbl` absent — with `mu`, under `fam=tx` — is § 9's rope nobody typed.
+ * `mbl` absent — with `mu`, under `fam=tx` — is § 9's rope nobody typed, `bp` absent is one
+ * Brin porteur, `cp` absent is the Mise en tension at A, `mt` absent is the mouflage, `ws` / `wd`
+ * absent is no wind, `cda` / `f0` / `kv` / `mur` / `rho` absent is §12.2's default for the ride, the
+ * four coordinates absent are Positions unknown and `ph` absent is a profil that runs between them:
+ * completing any would rewrite, and name in the strip, every link older than the key.
  */
 const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>([
   "reg",
+  "bp",
+  "cp",
+  "mt",
+  "ws",
+  "wd",
+  "cda",
+  "f0",
+  "kv",
+  "mur",
+  "rho",
+  "lata",
+  "lona",
+  "latb",
+  "lonb",
+  "ph",
   "mbf",
   "ea",
   "mu",
@@ -233,14 +297,6 @@ const TIGHTNESS_KEY_SET: ReadonlySet<SearchKey> = new Set<SearchKey>(TIGHTNESS_K
  */
 const DEFAULT_FAMILY: FamilyToken = FIRST_RUN_SCENARIO.material.family === "steel" ? "ac" : "tx";
 
-/**
- * Where an imported link with no `sa` starts **when its `tr` cannot be decoded**: the file's own
- * origin, with the shipped span after it. A decodable `tr` completes from the Trace's own ends —
- * voir {@link importedTerrain}; this is the pre-#55 rule, kept only for the payload that never
- * yields a Trace.
- */
-const FILE_ORIGIN = 0;
-
 /** What {@link completeFromDefaults} returns — the canonical bag, and the strip's second sentence. */
 export type Completion = {
   readonly search: CompletedSearch;
@@ -254,9 +310,10 @@ export type Completion = {
  * is listed in {@link Completion.completed}, so the link strip names it: completion is the one
  * rewrite ADR-0001 admits, and only because it is never silent.
  *
- * Literally, and that is measured, not stylistic: `?L=250&h=-40` completed with `fl=6.0` lands
- * clear at garde 1,25 m with an honest 2,40 % ⚠, while a "smart" 4 %-of-span completion lands at
- * **−2,39 m — on the ground**.
+ * Literally, and that is measured, not stylistic: `?L=250&h=-40` completed with a literal 6,0 m
+ * flèche (the first-run driver before it became the tension de pose) lands clear at garde 1,25 m
+ * with an honest 2,40 % ⚠, while a "smart" 4 %-of-span completion lands at **−2,39 m — on the
+ * ground**.
  *
  * The values come from the **active family's** shipped default: `FIRST_RUN_SCENARIO` for steel,
  * and for textile the retained textile default, so `?fam=tx` completes the rope class and both ends
@@ -265,20 +322,20 @@ export type Completion = {
  *
  * Three groups are exempt, all of them § 7's meanings of absence:
  *
- * 1. {@link NEVER_COMPLETED}: `reg`, the Overrides and the textile blanks. Under `fam=tx` **no rope
- *    is invented**: § 9 ships `MBL` and `μ` « vides et requis », because one made-up `MBL` decides
- *    the verdict, and those two blocking errors are the correct arrival state. Polyester's `k`
- *    stays blank too, because §13.2 publishes none.
- * 2. The **inactive** terrain source. `tr` present ⇒ imported: `L`/`h` are derived read-outs and
- *    are dropped rather than completed; `tr` absent ⇒ manual, and `sa`/`sb` never appear.
+ * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, `cp`, `mt`, `ws`, `wd`, the ride's constants, the
+ *    Positions and `ph`, the Overrides and the textile blanks. Under `fam=tx`
+ *    **no rope is invented**: § 9 ships `MBL` and `μ` « vides et requis », because one made-up
+ *    `MBL` decides the verdict, and those two blocking errors are the correct arrival state.
+ *    Polyester's `k` stays blank too, because §13.2 publishes none.
+ * 2. The **inactive** terrain source. `tr` present ⇒ imported: `L`/`h` are derived read-outs of
+ *    the whole profil and are dropped rather than completed; `tr` absent ⇒ manual. `ph` goes
+ *    with `tr`, and only where both Positions are known: there is no line to run off otherwise.
  * 3. The **inactive** family's keys, dropped the same way.
  *
- * Some keys complete from the link rather than from a constant. An imported link's `sa` completes
- * to the Trace's first distance and its `sb` to its last — where « tracé/importé » places them, both
- * read through `traceEnds` — so a completed station never lands off the Trace. A station the link
- * gives is kept as given, off the Trace included (ADR-0001). `x` completes to
- * half the *completed* span — 125,0 m for `?L=250&h=-40` rather than the constant 75,0 — because
- * it selects a **view**, and a viewpoint off the end of the span is worse than a moved viewpoint.
+ * Some keys complete from the link rather than from a constant. `x` completes to half the
+ * *completed* span — 125,0 m for `?L=250&h=-40` rather than the constant 75,0, half the profil's
+ * extent for a `tr` — because it selects a **view**, and a viewpoint off the end of the span is
+ * worse than a moved viewpoint.
  * `na`/`nb` complete to the decoded end's own `η`, so `?ta=huit` is judged on the knot's 0,60 and
  * not on the shipped end's 0,90, and `k` completes to the decoded rope class's `TEXTILE.kDefault`.
  *
@@ -288,6 +345,7 @@ export type Completion = {
  */
 export function completeFromDefaults(search: AcceptedSearch): Completion {
   const imported = search.tr !== undefined;
+  const located = search.lata !== undefined && search.latb !== undefined;
   const family = search.fam ?? DEFAULT_FAMILY;
   const hasDriver = TIGHTNESS_KEYS.some((key) => search[key] !== undefined);
   const values = completionValues(search, family);
@@ -296,7 +354,7 @@ export function completeFromDefaults(search: AcceptedSearch): Completion {
   const completed: SearchKey[] = [];
 
   for (const key of CANONICAL_KEYS) {
-    if (!inActiveConfiguration(key, imported, family)) continue;
+    if (!inActiveConfiguration(key, imported, located, family)) continue;
 
     const present = search[key];
     if (present !== undefined) {
@@ -325,7 +383,7 @@ function completionValues(search: AcceptedSearch, family: FamilyToken): Accepted
   const terrain: CompletedTerrain =
     search.tr === undefined
       ? { L: search.L ?? firstRun.L, h: search.h ?? firstRun.h }
-      : importedTerrain(search.tr, search.sa, search.sb);
+      : { tr: search.tr };
   const lineFamily = family === "tx" ? "textile" : "steel";
   const eta = (token: TerminationToken) =>
     TERMINATIONS[terminationIdFromToken(token, lineFamily)].eta;
@@ -342,77 +400,67 @@ function completionValues(search: AcceptedSearch, family: FamilyToken): Accepted
 }
 
 /**
- * An imported link's stations. Each one the link gives is kept **as given** — ADR-0001: off the
- * Trace it still raises « Station hors du tracé », and `sb ≤ sa` is still the blocked placement
- * « Inverser A et B » repairs. Each absent one completes to the Trace's own end on its side, which
- * is where an in-app import places it, read through the same {@link traceEnds}.
- *
- * The Trace is decoded only when a station is missing. A `tr` that does not decode keeps the
- * pre-#55 rule — {@link FILE_ORIGIN}, then `sa` plus the shipped span — because how a bad payload
- * is handled is the refusal's business, not completion's. An accepted bag cannot carry one: the
- * validator walked it with the same structural check `decodeP1` runs first.
- */
-function importedTerrain(
-  tr: string,
-  sa: number | undefined,
-  sb: number | undefined,
-): CompletedTerrain {
-  if (sa !== undefined && sb !== undefined) return { tr, sa, sb };
-  const ends = decodedEnds(tr);
-  if (ends === null) {
-    const start = sa ?? FILE_ORIGIN;
-    return { tr, sa: start, sb: sb ?? start + FIRST_RUN_SCENARIO.geometry.L };
-  }
-  return { tr, sa: sa ?? ends.start, sb: sb ?? ends.end };
-}
-
-/** The ends of the Trace a `tr` encodes, or `null` when the payload does not decode. */
-function decodedEnds(tr: string): TraceEnds | null {
-  try {
-    return traceEnds(decodeP1(tr));
-  } catch (error) {
-    if (error instanceof P1Error) return null;
-    throw error;
-  }
-}
-
-/**
  * Is this key part of the **active** configuration? § 7's one governing rule: « the URL carries the
- * active configuration and never a retained alternate », so an imported link has `tr`/`sa`/`sb` and
- * no `L`/`h`, a steel link has no `cls`/`mbl`/`k`, and a textile link has no `d`/`r0`/`cst`.
+ * active configuration and never a retained alternate », so an imported link has `tr` and no
+ * `L`/`h`, a steel link has no `cls`/`mbl`/`k`, and a textile link has no `r0`/`cst`.
  *
  * Out-of-scope keys leave the canonical bag **without** a strip line: the strip's two kinds are an
  * unknown key and an unrepresentable value, and a redundant `L` beside a `tr` is neither — with a
  * trace present `L` is derived, so nothing the line needs is removed.
+ *
+ * @param located both Positions are in the bag — the salvage has already dropped a lone coordinate.
  */
-function inActiveConfiguration(key: SearchKey, imported: boolean, family: FamilyToken): boolean {
+function inActiveConfiguration(
+  key: SearchKey,
+  imported: boolean,
+  located: boolean,
+  family: FamilyToken,
+): boolean {
   switch (key) {
     case "L":
     case "h":
       return !imported;
-    case "sa":
-    case "sb":
     case "tr":
       return imported;
-    case "d":
+    case "ph":
+      return imported && located;
     case "r0":
     case "cst":
     case "mbf":
     case "ea":
+    case "mur":
       return family === "ac";
     case "cls":
     case "mbl":
     case "k":
+    case "f0":
+    case "kv":
       return family === "tx";
     default:
-      // `mu` is deliberately not scoped: it is the same physical quantity in both families.
+      // `mu` and `d` are deliberately not scoped: the same physical quantities in both families.
+      // `d` is completed for steel only — {@link SHIPPED_BY_FAMILY} ships none for textile.
       return true;
   }
 }
 
-/** The span a bag describes, m — `L` in manual mode, `sb − sa` in imported mode. */
+/** The span a bag describes, m — `L` in manual mode, the profil's whole extent in imported mode. */
 function spanOf(bag: CompletedTerrain): number {
-  return bag.tr === undefined ? bag.L : bag.sb - bag.sa;
+  return bag.tr === undefined ? bag.L : profilExtent(bag.tr);
+}
+
+/**
+ * The extent of the profil a `tr` encodes. A payload that does not decode falls back to the shipped
+ * span, because how a bad payload is handled is the refusal's business, not completion's. An
+ * accepted bag cannot carry one: the validator walked it with the same structural check `decodeP1`
+ * runs first.
+ */
+function profilExtent(tr: string): number {
+  try {
+    return traceExtent(decodeP1(tr));
+  } catch (error) {
+    if (error instanceof P1Error) return FIRST_RUN_SCENARIO.geometry.L;
+    throw error;
+  }
 }
 
 /** § 7's presence-encoded driver, back into the app's union. */
@@ -420,6 +468,7 @@ function tightness(search: CompletedDriver): TightnessDraft {
   if (search.fl !== undefined) return { mode: "sag", D_target: search.fl };
   if (search.te !== undefined) return { mode: "tension", H_target: newtonsFromDaN(search.te) };
   if (search.lo !== undefined) return { mode: "length", L0: search.lo };
+  if (search.tp !== undefined) return { mode: "anchor", T_target: newtonsFromDaN(search.tp) };
   return { mode: "ratio", ratio: search.vr };
 }
 
@@ -449,6 +498,7 @@ function textile(search: CompletedTextile): TextileDraft {
     MBL: search.mbl === undefined ? null : newtonsFromDaN(search.mbl),
     mu: search.mu ?? null,
     k: search.k ?? null,
+    ...(search.d === undefined ? {} : { d: search.d }),
   };
 }
 
@@ -471,8 +521,14 @@ export function searchToScenario(search: CompletedSearch): ScenarioDraft {
     geometry:
       search.tr === undefined
         ? { source: "manual", L: search.L, h: search.h }
-        : { source: "trace", trace: search.tr, sa: search.sa, sb: search.sb },
+        : { source: "trace", trace: search.tr, ...(search.ph === 1 ? { offPositions: true } : {}) },
     anchors: { zA: search.za, zB: search.zb },
+    // Absent **is** one member — the meaning of absence, never a completed default.
+    carryingLines: search.bp ?? 1,
+    // Absent **is** A, likewise.
+    tensioningSide: search.cp === undefined ? "A" : TENSIONING_SIDE_BY_TOKEN[search.cp],
+    // Absent **is** the mouflage, likewise — and a Maestro on a câble is kept as it arrived.
+    tensioningDevice: search.mt === undefined ? "pulley" : TENSIONING_DEVICE_BY_TOKEN[search.mt],
     tightness: tightness(search),
     material: search.fam === "tx" ? textile(search) : steel(search),
     terminations: {
@@ -486,6 +542,33 @@ export function searchToScenario(search: CompletedSearch): ScenarioDraft {
       DAF: search.daf,
       xD: clampX(search.x, spanOf(search)),
     },
+    // Absent **is** no wind, each key on its own: a link may state a direction before any speed.
+    wind: { speedKmh: search.ws ?? 0, directionDeg: search.wd ?? 0 },
+    dynamics: dynamics(search),
+    positions: {
+      A: positionOf(search.lata, search.lona),
+      B: positionOf(search.latb, search.lonb),
+    },
+  };
+}
+
+/** A Position from its two keys. The schema has dropped a lone one, so both or neither arrive. */
+function positionOf(lat: number | undefined, lon: number | undefined): Position | null {
+  return lat === undefined || lon === undefined ? null : { lat, lon };
+}
+
+/**
+ * The ride's constants (#89): each key absent **is** §12.2's default, on its own. `ρ` absent stays
+ * `null`, the derived default. The other family's trolley keys never reach a completed bag, so its
+ * law reads its defaults.
+ */
+function dynamics(search: CompletedSearch): DynamicsConstants {
+  return {
+    CdA: search.cda ?? DYNAMICS.CdA,
+    rho: search.rho ?? null,
+    F0: search.f0 === undefined ? DYNAMICS.textile.F0 : newtonsFromDaN(search.f0),
+    kv: search.kv ?? DYNAMICS.textile.kv,
+    mu: search.mur ?? DYNAMICS.steel.mu,
   };
 }
 
@@ -511,16 +594,21 @@ export function scenarioToSearch(scenario: Scenario): CompletedSearch {
   if (geometry.source === "manual") {
     out.L = geometry.L;
     out.h = geometry.h;
-  } else {
-    out.sa = geometry.sa;
-    out.sb = geometry.sb;
   }
   out.za = anchors.zA;
   out.zb = anchors.zB;
 
   const driver = tightnessDriver(scenario);
   const driverKey = DRIVER_KEY[driver.field];
-  out[driverKey] = driverKey === "te" ? daNFromNewtons(driver.value) : driver.value;
+  out[driverKey] = FORCE_DRIVER_KEYS.has(driverKey) ? daNFromNewtons(driver.value) : driver.value;
+
+  // A is `cp` **absent**, one member is `bp` **absent** and the mouflage is `mt` **absent**, so the
+  // links written before any of the keys stay string-identical.
+  if (scenario.tensioningSide === "B") out.cp = TENSIONING_SIDE_TOKEN_BY_ID.B;
+  if (scenario.carryingLines === 2) out.bp = 2;
+  if (scenario.tensioningDevice !== "pulley") {
+    out.mt = TENSIONING_DEVICE_TOKEN_BY_ID[scenario.tensioningDevice];
+  }
 
   if (material.family === "steel") {
     out.fam = "ac";
@@ -540,6 +628,7 @@ export function scenarioToSearch(scenario: Scenario): CompletedSearch {
     // *is* the emitted query string, and {@link canonicalLink} re-inserts in `CANONICAL_KEYS`
     // order — emitting `mu` last here made « Copier le lien » and the address bar disagree as
     // strings for a textile line, which is exactly the diffability § 7 buys with a canonical order.
+    if (material.d !== undefined) out.d = material.d;
     out.mu = material.mu;
     out.cls = ROPE_CLASS_TOKEN_BY_ID[material.ropeClass];
     out.mbl = daNFromNewtons(material.MBL);
@@ -555,9 +644,36 @@ export function scenarioToSearch(scenario: Scenario): CompletedSearch {
   out.hr = rider.hRider;
   out.gm = rider.hClearMin;
   out.daf = rider.DAF;
+  // Each is written only off its default, because no wind is both keys **absent**.
+  if (scenario.wind.speedKmh !== 0) out.ws = scenario.wind.speedKmh;
+  if (scenario.wind.directionDeg !== 0) out.wd = scenario.wind.directionDeg;
+  // Likewise the ride's constants: §12.2's defaults are the keys **absent**, `F₀` in daN, and only
+  // the active family's trolley travels.
+  const { CdA, rho, F0, kv, mu } = scenario.dynamics;
+  if (CdA !== DYNAMICS.CdA) out.cda = CdA;
+  if (material.family === "textile") {
+    if (F0 !== DYNAMICS.textile.F0) out.f0 = daNFromNewtons(F0);
+    if (kv !== DYNAMICS.textile.kv) out.kv = kv;
+  } else if (mu !== DYNAMICS.steel.mu) {
+    out.mur = mu;
+  }
+  if (rho !== null) out.rho = rho;
   out.x = rider.xD;
+  // Unknown is the four keys **absent**, so a link with no Position stays string-identical.
+  const { A, B } = scenario.positions;
+  if (A !== null) {
+    out.lata = A.lat;
+    out.lona = A.lon;
+  }
+  if (B !== null) {
+    out.latb = B.lat;
+    out.lonb = B.lon;
+  }
 
-  if (geometry.source === "trace") out.tr = geometry.trace;
+  if (geometry.source === "trace") {
+    if (geometry.offPositions === true) out.ph = 1;
+    out.tr = geometry.trace;
+  }
 
   return out as CompletedSearch;
 }
@@ -588,6 +704,7 @@ const SHIPPED_BY_FAMILY: Readonly<
   ac: FIRST_RUN_SEARCH,
   tx: {
     ...FIRST_RUN_SEARCH,
+    d: undefined,
     cls: ROPE_CLASS_TOKEN_BY_ID[TEXTILE_SPEC.ropeClass],
     ta: TERMINATION_TOKEN_BY_ID[TEXTILE_ENDS.A.id],
     tb: TERMINATION_TOKEN_BY_ID[TEXTILE_ENDS.B.id],
@@ -595,11 +712,13 @@ const SHIPPED_BY_FAMILY: Readonly<
 };
 
 /**
- * § 9's first-run link, which « Copier le lien » produces from the shipped defaults. The address
- * bar itself stays **bare** on first run: `/` *means* « restore the Session », so it is never
+ * § 9's first-run link onto `/`, the path every link shared before the Pages pointed at; « Copier
+ * le lien » produces the same search on the Page it is pressed on (ADR-0002). The address bar
+ * itself stays **bare** on first run: a bare Page *means* « restore the Session », so it is never
  * rewritten on load.
  *
- * **142 characters, measured against the installed router** — 137 before `gm` (2026-09-23).
+ * **146 characters, measured against the installed router** — 137 before `gm` (2026-09-23), 142
+ * with it and `fl=6`, 146 since first run drives by `tp=263.4` (four characters longer).
  * § 7, § 9 and § 11 all quote **141**,
  * counted off § 9's *printed* sketch, which spells `fl=6.0` and `x=75.0` — and that sketch is not
  * emittable. The spec keeps the router's default codecs (« no global codec override »), and
@@ -610,4 +729,4 @@ const SHIPPED_BY_FAMILY: Readonly<
  * exists to lock is unchanged: the key table, the canonical order, and the two absence meanings
  * (`reg`, `mbf`/`ea`/`mu`).
  */
-export const FIRST_RUN_LINK: string = canonicalLink(FIRST_RUN_SEARCH);
+export const FIRST_RUN_LINK: string = canonicalLink(FIRST_RUN_SEARCH, "/");

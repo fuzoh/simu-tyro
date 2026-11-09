@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import type { FieldId } from "@/lib/rail/fields.ts";
 
+import { DEFAULT_MAP_DISPLAY } from "@/lib/map/display.ts";
 import { FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 import { DEFAULT_LAYERS, SESSION_KEY, writeSession } from "@/lib/session/session.ts";
 import { scenarioToSearch } from "@/lib/url/scenario.ts";
@@ -28,10 +29,13 @@ import {
 import {
   BANNER,
   chartBlockHeight,
+  chartColumnWidth,
   COMPACT_HEIGHT_PX,
   MIN_RAIL,
+  NAV_BAR,
   PINNED_CELL,
-  RAIL_REFLOW_PX,
+  RAIL_HEADER,
+  THREE_COLUMN_PX,
   VIEW_STRIP,
 } from "./contract.ts";
 
@@ -360,106 +364,238 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
       // cells wrap to three lines at 390 px (2026-09-23), the block is 592 and the rail 72: (c)
       // pins it at rest, and 390 × 844 below is the phone that still opens whole.
       name: "A · 390×664 au repos",
-      fit: { viewportWidth: 390, viewportHeight: 664, keyboardInset: 0, columnWidth: 390 },
+      fit: {
+        viewportWidth: 390,
+        viewportHeight: 664,
+        keyboardInset: 0,
+        columnWidth: chartColumnWidth(390),
+      },
       fits: false,
     },
     {
       name: "390×844 — un téléphone courant, le bloc entier",
-      fit: { viewportWidth: 390, viewportHeight: 844, keyboardInset: 0, columnWidth: 390 },
+      fit: {
+        viewportWidth: 390,
+        viewportHeight: 844,
+        keyboardInset: 0,
+        columnWidth: chartColumnWidth(390),
+      },
       fits: true,
     },
     {
       // 664 − 336 = 328 of viewport, 208 once the rail's floor is paid: « a 540 px block cannot
       // coexist with a focused field », which is the arithmetic that forces triggers (a) and (b).
       name: "390×664, clavier logiciel de 336 px",
-      fit: { viewportWidth: 390, viewportHeight: 664, keyboardInset: 336, columnWidth: 390 },
+      fit: {
+        viewportWidth: 390,
+        viewportHeight: 664,
+        keyboardInset: 336,
+        columnWidth: chartColumnWidth(390),
+      },
       fits: false,
     },
     {
       // § 5's landscape measurement, and the reason the app needs no rotate prompt: the fit rule
       // fires on its own, above B2, with no orientation anywhere in it.
       name: "paysage · 844×390",
-      fit: { viewportWidth: 844, viewportHeight: 390, keyboardInset: 0, columnWidth: 844 - 288 },
+      fit: {
+        viewportWidth: 844,
+        viewportHeight: 390,
+        keyboardInset: 0,
+        columnWidth: chartColumnWidth(844),
+      },
       fits: false,
     },
     {
-      name: "B · 768×1024",
-      fit: { viewportWidth: 768, viewportHeight: 1024, keyboardInset: 0, columnWidth: 480 },
+      name: "768×1024 empilé",
+      fit: {
+        viewportWidth: 768,
+        viewportHeight: 1024,
+        keyboardInset: 0,
+        columnWidth: chartColumnWidth(768),
+      },
       fits: true,
     },
     {
       // Budget C sums to the viewport with 43 px of letterbox at the one-line banner; the rule
       // reserves the three-line one and still fits.
-      name: "C · 1440×900",
-      fit: { viewportWidth: 1440, viewportHeight: 900, keyboardInset: 0, columnWidth: 1152 },
+      name: "1440×900 trois colonnes",
+      fit: {
+        viewportWidth: 1440,
+        viewportHeight: 900,
+        keyboardInset: 0,
+        columnWidth: chartColumnWidth(1440),
+      },
       fits: true,
     },
     {
       // Above B2 the Rail is a column beside the block and owes it no height — but a short desktop
       // window is the same failure as landscape, and (c) catches it through the same rule.
       name: "une fenêtre de bureau écrasée · 1440×500",
-      fit: { viewportWidth: 1440, viewportHeight: 500, keyboardInset: 0, columnWidth: 1152 },
+      fit: {
+        viewportWidth: 1440,
+        viewportHeight: 500,
+        keyboardInset: 0,
+        columnWidth: chartColumnWidth(1440),
+      },
       fits: false,
+    },
+    // ─── The landscape tablets and the switch width (B2 = 1024) ──────────────────────────────────
+    // Stacked, these three owed a 782–863 px block plus MIN_RAIL under it and opened on the Pinned
+    // Safety Header alone. In three columns the block is 613–616 px and owes the Rail nothing.
+    {
+      name: "1024×768 paysage — entier, trois colonnes",
+      fit: {
+        viewportWidth: 1024,
+        viewportHeight: 768,
+        keyboardInset: 0,
+        navigationHeight: NAV_BAR,
+        columnWidth: chartColumnWidth(1024),
+      },
+      fits: true,
+    },
+    {
+      name: "1180×820 paysage — entier",
+      fit: {
+        viewportWidth: 1180,
+        viewportHeight: 820,
+        keyboardInset: 0,
+        navigationHeight: NAV_BAR,
+        columnWidth: chartColumnWidth(1180),
+      },
+      fits: true,
+    },
+    {
+      name: "1194×834 paysage — entier",
+      fit: {
+        viewportWidth: 1194,
+        viewportHeight: 834,
+        keyboardInset: 0,
+        navigationHeight: NAV_BAR,
+        columnWidth: chartColumnWidth(1194),
+      },
+      fits: true,
+    },
+    {
+      // Stacked, the block (768 px at a 1000 px column) owes MIN_RAIL and the bar: this is the
+      // narrow desktop window that opens on the Pinned Safety Header, accepted in `ui.md`.
+      name: "1000×900 empilé — épinglé, le bloc et MIN_RAIL ne tiennent pas",
+      fit: {
+        viewportWidth: 1000,
+        viewportHeight: 900,
+        keyboardInset: 0,
+        navigationHeight: NAV_BAR,
+        columnWidth: chartColumnWidth(1000),
+      },
+      fits: false,
+    },
+    {
+      name: "820×1180 portrait empilé — entier",
+      fit: {
+        viewportWidth: 820,
+        viewportHeight: 1180,
+        keyboardInset: 0,
+        navigationHeight: NAV_BAR,
+        columnWidth: chartColumnWidth(820),
+      },
+      fits: true,
     },
     {
       name: "rien de mesuré encore — le Skeleton s'ouvre entier",
       fit: { viewportWidth: 390, viewportHeight: 664, keyboardInset: 0, columnWidth: null },
       fits: true,
     },
-    // ─── Amendment F, the wide arm ────────────────────────────────────────────────────────────────
-    // The six desktops ticket 28 measured with **no chart at all**, re-asked of the capped rule. The
-    // block heights are `./contract.test.ts`'s (« amendment F »); what is asserted here is the
-    // *state* each one now opens in.
+    // ─── Amendment F, the wide arm, in Avancé's three columns ─────────────────────────────────────
+    // The desktops ticket 28 measured with **no chart at all** beside one Rail. Avancé now spends
+    // 576 px of the width on two side columns, so the chart column is narrower and its block
+    // shorter: every one of them opens whole. The block heights come from `chartColumnWidth`;
+    // what is asserted here is the *state* each one opens in.
     {
-      // Block 763,52 at a 992 px column, **unchanged by the cap** — the plot is 396,48 there, well
-      // under the 463,68 ceiling. 720 px of height is 43,52 px short, and no cap can close that: a
-      // ceiling low enough to reach a 944 px inner width also lowers budget C's 1104.
-      name: "1280×720 — toujours épinglé, et aucun plafond ne peut le sauver",
-      fit: { viewportWidth: 1280, viewportHeight: 720, keyboardInset: 0, columnWidth: 1280 - 288 },
-      fits: false,
-    },
-    {
-      name: "1280×800 — déjà entier avant l'amendement, inchangé",
-      fit: { viewportWidth: 1280, viewportHeight: 800, keyboardInset: 0, columnWidth: 1280 - 288 },
+      // Block 648,48 at a 704 px column — 71,52 px of height to spare, where beside one Rail the
+      // same window was 43,52 px short.
+      name: "1280×720 — entier, la colonne du milieu est plus basse que celle d'un seul rail",
+      fit: {
+        viewportWidth: 1280,
+        viewportHeight: 720,
+        keyboardInset: 0,
+        columnWidth: chartColumnWidth(1280),
+      },
       fits: true,
     },
     {
-      // Same shape: block 813,40 at a 1078 px column, 45,40 px over its own viewport.
-      name: "1366×768 — toujours épinglé, sous la colonne de référence",
-      fit: { viewportWidth: 1366, viewportHeight: 768, keyboardInset: 0, columnWidth: 1366 - 288 },
-      fits: false,
-    },
-    {
-      // The cap *does* bite here — 898,08 → 867,84 — and it is still 17,84 px too tall, because
-      // 850 px of viewport is 6,32 px shorter than **budget C's own block**. Preserving budget C is
-      // exactly what forbids reaching this row.
-      name: "1512×850 — le plafond mord, et manque encore : le viewport est plus court que le budget C",
-      fit: { viewportWidth: 1512, viewportHeight: 850, keyboardInset: 0, columnWidth: 1512 - 288 },
-      fits: false,
-    },
-    {
-      // 946,88 → 879,68. **The cap's own row**: a chart where there was none.
-      name: "1600×900 — entier grâce au plafond",
-      fit: { viewportWidth: 1600, viewportHeight: 900, keyboardInset: 0, columnWidth: 1600 - 288 },
+      name: "1280×800 — entier, avec de la marge",
+      fit: {
+        viewportWidth: 1280,
+        viewportHeight: 800,
+        keyboardInset: 0,
+        columnWidth: chartColumnWidth(1280),
+      },
       fits: true,
     },
     {
-      // 1081,28 → 879,68: the 1,3 px miss § 5 never wrote down, on the most ordinary desktop there is.
-      name: "1920×1080 — entier grâce au plafond, après un manque de 1,3 px",
-      fit: { viewportWidth: 1920, viewportHeight: 1080, keyboardInset: 0, columnWidth: 1920 - 288 },
+      // Block 698,36 at a 790 px column, 69,64 px under its viewport.
+      name: "1366×768 — entier",
+      fit: {
+        viewportWidth: 1366,
+        viewportHeight: 768,
+        keyboardInset: 0,
+        columnWidth: chartColumnWidth(1366),
+      },
       fits: true,
     },
     {
-      // Already whole before the amendment (1350,08 ≤ 1440); now with 560 px of letterbox instead of 90.
-      name: "2560×1440 — entier avant comme après",
-      fit: { viewportWidth: 2560, viewportHeight: 1440, keyboardInset: 0, columnWidth: 2560 - 288 },
+      // Block 783,04 at a 936 px column, uncapped: the plot's ceiling is not reached below 1152 px.
+      name: "1512×850 — entier, sous le plafond",
+      fit: {
+        viewportWidth: 1512,
+        viewportHeight: 850,
+        keyboardInset: 0,
+        columnWidth: chartColumnWidth(1512),
+      },
       fits: true,
     },
     {
-      // The ultrawide the unbounded rule lost outright (1719,68 against 1440), and the row a « keep
-      // the aspect inside the band » ceiling would still have lost: 0,35 × 3104 + 416 = 1502,4.
-      name: "3440×1440 ultra-large — entier grâce au plafond",
-      fit: { viewportWidth: 3440, viewportHeight: 1440, keyboardInset: 0, columnWidth: 3440 - 288 },
+      // Block 782,08 at a 1024 px column.
+      name: "1600×900 — entier",
+      fit: {
+        viewportWidth: 1600,
+        viewportHeight: 900,
+        keyboardInset: 0,
+        columnWidth: chartColumnWidth(1600),
+      },
+      fits: true,
+    },
+    {
+      // The shell's cap leaves the 1152 px reference column here, block 856,32 — budget C's own.
+      name: "1920×1080 — entier, sur la colonne de référence",
+      fit: {
+        viewportWidth: 1920,
+        viewportHeight: 1080,
+        keyboardInset: 0,
+        columnWidth: chartColumnWidth(1920),
+      },
+      fits: true,
+    },
+    {
+      name: "2560×1440 — entier, le bloc ne grandit plus avec l'écran",
+      fit: {
+        viewportWidth: 2560,
+        viewportHeight: 1440,
+        keyboardInset: 0,
+        columnWidth: chartColumnWidth(2560),
+      },
+      fits: true,
+    },
+    {
+      // The ultrawide the unbounded rule lost outright (1719,68 against 1440): the shell's cap holds
+      // its middle column at the reference width.
+      name: "3440×1440 ultra-large — entier, centré par le plafond du shell",
+      fit: {
+        viewportWidth: 3440,
+        viewportHeight: 1440,
+        keyboardInset: 0,
+        columnWidth: chartColumnWidth(3440),
+      },
       fits: true,
     },
   ];
@@ -473,18 +609,18 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
     // and it changes no band: it names which of § 5's two budget shapes is in force.
     const height = chartBlockHeight(700) + MIN_RAIL - 1;
     const below: ViewportFit = {
-      viewportWidth: RAIL_REFLOW_PX - 1,
+      viewportWidth: THREE_COLUMN_PX - 1,
       viewportHeight: height,
       keyboardInset: 0,
       columnWidth: 700,
     };
     expect(fitsWholeBlock(below)).toBe(false);
-    expect(fitsWholeBlock({ ...below, viewportWidth: RAIL_REFLOW_PX })).toBe(true);
+    expect(fitsWholeBlock({ ...below, viewportWidth: THREE_COLUMN_PX })).toBe(true);
   });
 
   test("amendment F ne retire pas l'asymétrie MIN_RAIL — les deux arcs paient encore ce qu'ils doivent", () => {
     // **The cap is a width rule; `MIN_RAIL` is about who the Rail sits under.** Below B2 the widest
-    // column that arm can reach is 767 px, so the ceiling never applies there at all — every narrow
+    // column that arm can reach is 1023 px, so the ceiling never applies there at all — every narrow
     // viewport is decided by exactly the term it was before, and dropping it would claim a fit with
     // a 48 px Rail: at 390 × 640 the block is 591,64 and the residual 48,36 against a floor of 120.
     const narrow: ViewportFit = {
@@ -603,6 +739,70 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
   });
 });
 
+/**
+ * ADR-0002's navigation bar stands above every app Page's shell, so the shell never has the whole
+ * viewport. Unlike § 8's strip it is never dismissed, so it is owed on **both** arms.
+ */
+describe("la barre de navigation se paie sur toute largeur", () => {
+  const desktop: ViewportFit = {
+    viewportWidth: 1440,
+    viewportHeight: 900,
+    keyboardInset: 0,
+    columnWidth: 1152,
+  };
+
+  test("elle retire sa hauteur de ce qui reste, clavier compris", () => {
+    expect(availableHeight({ viewportHeight: 664, keyboardInset: 0, navigationHeight: 36 })).toBe(
+      628,
+    );
+    expect(availableHeight({ viewportHeight: 664, keyboardInset: 336, navigationHeight: 36 })).toBe(
+      292,
+    );
+  });
+
+  test("le budget C reste entier sous elle, et ne le resterait pas sous 44 px", () => {
+    // Block 856,32 at a 1152 px column: 900 − 36 = 864 holds it, 900 − 44 = 856 does not.
+    expect(fitsWholeBlock({ ...desktop, navigationHeight: NAV_BAR })).toBe(true);
+    expect(fitsWholeBlock({ ...desktop, navigationHeight: RAIL_HEADER })).toBe(false);
+  });
+
+  test("1600×900 se replie de nouveau : le plateau de 879,68 dépasse 864", () => {
+    const wide: ViewportFit = { ...desktop, viewportWidth: 1600, columnWidth: 1600 - 288 };
+    expect(fitsWholeBlock(wide)).toBe(true);
+    expect(fitsWholeBlock({ ...wide, navigationHeight: NAV_BAR })).toBe(false);
+  });
+
+  test("sous B2 elle coûte aussi MIN_RAIL, car elle n'est pas rejetable", () => {
+    const column = 390;
+    const exact = chartBlockHeight(column) + MIN_RAIL + NAV_BAR;
+    const phone: ViewportFit = {
+      viewportWidth: column,
+      viewportHeight: exact,
+      keyboardInset: 0,
+      columnWidth: column,
+      navigationHeight: NAV_BAR,
+    };
+    expect(fitsWholeBlock(phone)).toBe(true);
+    expect(fitsWholeBlock({ ...phone, viewportHeight: exact - 1 })).toBe(false);
+    // The strip, at the same height, is still tolerated out of the Rail.
+    expect(
+      fitsWholeBlock({
+        ...phone,
+        viewportHeight: exact - NAV_BAR,
+        navigationHeight: 0,
+        chromeHeight: NAV_BAR,
+      }),
+    ).toBe(true);
+  });
+
+  test("la rangée compacte se déclenche 36 px plus tôt", () => {
+    const at = (viewportHeight: number) =>
+      compactRequired({ viewportHeight, keyboardInset: 0, navigationHeight: NAV_BAR });
+    expect(at(456)).toBe(false);
+    expect(at(455)).toBe(true);
+  });
+});
+
 describe("la rangée compacte — « `--kb > 0` ou hauteur disponible < 420 px »", () => {
   test.each([
     ["clavier ouvert, écran haut", { viewportHeight: 900, keyboardInset: 1 }, true],
@@ -672,7 +872,9 @@ describe("le repli n'est ni dans le Scénario, ni dans la Session, ni dans l'URL
       retainedMaterial: null,
       retainedManual: null,
       trace: null,
+      retainedCsv: null,
       layers: DEFAULT_LAYERS,
+      map: DEFAULT_MAP_DISPLAY,
     });
     const written = map.get(SESSION_KEY) ?? "";
     expect(written.length).toBeGreaterThan(0);

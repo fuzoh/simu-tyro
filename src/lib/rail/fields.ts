@@ -5,7 +5,7 @@
  * [amendment D](../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md).
  *
  * **Form validators own exactly tier one — what needs no physics.** That boundary is amendment D's
- * and it is not negotiable: the three gates are cross-field predicates over the derived Scenario
+ * and it is not negotiable: the five gates are cross-field predicates over the derived Scenario
  * (`./gates.ts`), and §5.4's chord bound stays in the engine, where « Tension impossible » is an
  * engine refusal the UI surfaces rather than a field error. Nothing in this module derives a
  * physical quantity, and nothing in it reads `@/lib/sim` for a formula.
@@ -41,17 +41,31 @@
 import * as v from "valibot";
 
 import type { QuantityId } from "@/lib/format/quantity.ts";
-import type { ForceUnit, TightnessDraft } from "@/lib/scenario/types.ts";
-import type { SteelSpec, TextileSpec } from "@/lib/sim";
+import type {
+  CarryingLines,
+  ForceUnit,
+  TensioningDevice,
+  TensioningSide,
+  TightnessDraft,
+  UseClass,
+} from "@/lib/scenario/types.ts";
+import type { RegimeId, SteelSpec, TextileSpec } from "@/lib/sim";
+import type { LabelId, Register } from "@/lib/vocabulary/labels.ts";
 
 import { formatQuantity, formatValue, fromDisplay, roundToDisplay } from "@/lib/format/quantity.ts";
 import { clampX } from "@/lib/scenario/geometry.ts";
+import { DYNAMICS, REGIMES } from "@/lib/sim";
+import { heading, isHiddenTerm, label } from "@/lib/vocabulary/labels.ts";
 
 /**
- * § 7's three gates. Declared here rather than in `./gates.ts` because every field names the gate
- * it belongs to, and « gates go in with the fields, not as a later pass ».
+ * § 7's three gates, then the two the passager's ride adds (#87, #89): the Vent and the ride's
+ * constants are kept as they arrive and gated like any other field (ADR-0001), each withholding
+ * only what reads it. Worst first. Declared here rather than in `./gates.ts` because every field
+ * names the gate it belongs to, and « gates go in with the fields, not as a later pass ».
  */
-export type GateId = "solve" | "clearance" | "verdict";
+export const GATE_IDS = ["solve", "clearance", "verdict", "wind", "ride"] as const;
+
+export type GateId = (typeof GATE_IDS)[number];
 
 /** Every control of the Rail's input half that a check can be attributed to. */
 export type FieldId =
@@ -61,9 +75,8 @@ export type FieldId =
   | "h"
   | "zA"
   | "zB"
-  | "sa"
-  | "sb"
   | "family"
+  | "carryingLines"
   | "d"
   | "R0"
   | "cst"
@@ -73,12 +86,16 @@ export type FieldId =
   | "cls"
   | "MBL"
   | "muTextile"
+  | "dTextile"
   | "k"
   | "ta"
   | "tb"
   | "etaA"
   | "etaB"
+  | "tensioningDevice"
+  | "tensioningSide"
   | "D_target"
+  | "T_target"
   | "H_target"
   | "L0"
   | "vRatio"
@@ -86,12 +103,22 @@ export type FieldId =
   | "hRider"
   | "hClearMin"
   | "DAF"
-  | "xD";
+  | "xD"
+  | "windSpeed"
+  | "windDirection"
+  | "CdA"
+  | "F0"
+  | "kv"
+  | "trolleyMu"
+  | "rho"
+  | "latA"
+  | "lonA"
+  | "latB"
+  | "lonB";
 
 /**
- * A field's tier-one hard rule — the whole of it. Three shapes, because § 7's message column has
- * three: a sign rule, « the number must be readable at all », and the station's in-trace bound,
- * which needs the file's extent and therefore states its own copy.
+ * A field's tier-one hard rule — the whole of it. Two shapes, because § 7's message column has
+ * two: a sign rule, and « the number must be readable at all ».
  */
 type HardRule =
   /** `> 0`. `sentence` is § 7's own wording of the rule, stated as a property of the world. */
@@ -99,9 +126,7 @@ type HardRule =
   /** `≥ 0` — « une hauteur négative n'existe pas ». */
   | { readonly kind: "non-negative"; readonly sentence: string }
   /** Finite and nothing more: the only committed-invalid state is « nombre illisible ». */
-  | { readonly kind: "finite" }
-  /** « dans le tracé » — the bound is the file's, so the message is built from the extent. */
-  | { readonly kind: "in-trace" };
+  | { readonly kind: "finite" };
 
 /** § 3's non-blocking warning band, and the copy it renders. Needs no physics and no solve. */
 type WarningRule =
@@ -127,9 +152,11 @@ export type FieldSpec = {
   readonly quantity: QuantityId | null;
   /** Tier one. `null` for a select that ships with a value and cannot be emptied. */
   readonly rule: HardRule | null;
+  /** Blank is a legitimate value — « absent », not « vide et requis » — so no empty state. */
+  readonly optional?: true;
   /** § 3's warning column — non-blocking, and never a reason to withhold a number. */
   readonly warning: WarningRule | null;
-  /** Which of § 7's three gates this field's failure breaches. `null` for `x_D`, which is in none. */
+  /** Which gate this field's failure breaches. `null` for `x_D` and the Positions, in none. */
   readonly gate: GateId | null;
 };
 
@@ -137,6 +164,35 @@ export type FieldSpec = {
 const POSITIVE_LENGTH = "une longueur strictement positive est requise";
 const POSITIVE_HEIGHT = "une hauteur strictement positive est requise";
 const POSITIVE_VALUE = "une valeur strictement positive est requise";
+
+/** « un frottement négatif n'existe pas » — the three trolley constants share it. */
+const NO_NEGATIVE_FRICTION = "un frottement négatif n'existe pas";
+
+/** A per-anchor field's label: the registry's heading, then which anchor. */
+function withEnd(id: LabelId, end: "A" | "B"): string {
+  return `${heading(id, "exact")} ${end}`;
+}
+
+/**
+ * One coordinate of an anchor's Position: optional, unranged, in no gate. Typed field by field
+ * because `NumericFieldId` and `GatedFieldId` are derived from the literal `quantity` and `gate`.
+ */
+function coordinateField<Id extends FieldId>(
+  id: Id,
+  term: "latitude" | "longitude",
+  end: "A" | "B",
+) {
+  return {
+    id,
+    label: withEnd(term, end),
+    errorLabel: withEnd(term, end),
+    quantity: "coordinate",
+    rule: { kind: "finite" },
+    optional: true,
+    warning: null,
+    gate: null,
+  } as const;
+}
 
 /**
  * § 3's field table, in **rail order** — the order the Rail renders and the order § 7's culprit
@@ -149,8 +205,8 @@ const POSITIVE_VALUE = "une valeur strictement positive est requise";
 export const FIELDS = {
   usage: {
     id: "usage",
-    label: "Type d'installation",
-    errorLabel: "Type d'installation",
+    label: heading("installation", "exact"),
+    errorLabel: heading("installation", "exact"),
     quantity: null,
     rule: null,
     warning: null,
@@ -158,8 +214,8 @@ export const FIELDS = {
   },
   regime: {
     id: "regime",
-    label: "Régime de sécurité",
-    errorLabel: "Régime de sécurité",
+    label: heading("regime", "exact"),
+    errorLabel: heading("regime", "exact"),
     quantity: null,
     // « — choisir — » **is** the absence, and absence is what the Verdict Gate refuses. It is not
     // a hard rule on a typed value, so it has no `rule`: `./gates.ts` reads `regime === null`.
@@ -169,8 +225,8 @@ export const FIELDS = {
   },
   L: {
     id: "L",
-    label: "Portée",
-    errorLabel: "Portée",
+    label: heading("span", "exact"),
+    errorLabel: heading("span", "exact"),
     quantity: "L",
     rule: { kind: "positive", sentence: POSITIVE_LENGTH },
     warning: {
@@ -183,8 +239,8 @@ export const FIELDS = {
   },
   h: {
     id: "h",
-    label: "Dénivelé",
-    errorLabel: "Dénivelé",
+    label: heading("elevationDifference", "exact"),
+    errorLabel: heading("elevationDifference", "exact"),
     quantity: "h",
     // `h < 0` **means** B below A: a downhill line has a negative dénivelé, so the only committed
     // invalid state here is text that is not a number at all.
@@ -194,8 +250,8 @@ export const FIELDS = {
   },
   zA: {
     id: "zA",
-    label: "Hauteur d'ancrage A",
-    errorLabel: "Hauteur d'ancrage A",
+    label: withEnd("anchorHeight", "A"),
+    errorLabel: withEnd("anchorHeight", "A"),
     quantity: "anchorHeight",
     rule: { kind: "non-negative", sentence: "une hauteur négative n'existe pas" },
     warning: { kind: "above", max: 30, copy: "hauteur d'ancrage supérieure à 30 m" },
@@ -203,46 +259,38 @@ export const FIELDS = {
   },
   zB: {
     id: "zB",
-    label: "Hauteur d'ancrage B",
-    errorLabel: "Hauteur d'ancrage B",
+    label: withEnd("anchorHeight", "B"),
+    errorLabel: withEnd("anchorHeight", "B"),
     quantity: "anchorHeight",
     rule: { kind: "non-negative", sentence: "une hauteur négative n'existe pas" },
     warning: { kind: "above", max: 30, copy: "hauteur d'ancrage supérieure à 30 m" },
     gate: "clearance",
   },
-  sa: {
-    id: "sa",
-    label: "Station A",
-    errorLabel: "Station A",
-    quantity: "station",
-    rule: { kind: "in-trace" },
-    warning: null,
-    // `L` and `h` are **derived** from the stations, so a station failure takes the whole span
-    // down — § 7's culprit table, row « `L` importé → Station A, Station B ».
-    gate: "solve",
-  },
-  sb: {
-    id: "sb",
-    label: "Station B",
-    errorLabel: "Station B",
-    quantity: "station",
-    rule: { kind: "in-trace" },
-    warning: null,
-    gate: "solve",
-  },
+
   family: {
     id: "family",
-    label: "Famille de ligne",
-    errorLabel: "Famille de ligne",
+    label: heading("lineFamily", "exact"),
+    errorLabel: heading("lineFamily", "exact"),
     quantity: null,
     rule: null,
     warning: null,
     gate: "solve",
   },
+  carryingLines: {
+    id: "carryingLines",
+    label: heading("carryingLines", "exact"),
+    // « nombre de Brins porteurs ignoré » — the strip prints this name, and the count agrees.
+    errorLabel: `Nombre de ${label("carryingLines", "exact")}`,
+    quantity: null,
+    rule: null,
+    warning: null,
+    // It sets the load each member is solved under.
+    gate: "solve",
+  },
   d: {
     id: "d",
-    label: "Diamètre nominal",
-    errorLabel: "Diamètre nominal",
+    label: heading("diameter", "exact"),
+    errorLabel: heading("diameter", "exact"),
     quantity: "d",
     rule: { kind: "positive", sentence: "un diamètre strictement positif est requis" },
     // `[CONVENTION]` — **ours, not §13.1's**: the attested examples sit at 6 mm, the paywalled
@@ -257,8 +305,8 @@ export const FIELDS = {
   },
   R0: {
     id: "R0",
-    label: "Grade",
-    errorLabel: "Grade",
+    label: heading("grade", "exact"),
+    errorLabel: heading("grade", "exact"),
     quantity: null,
     rule: null,
     warning: null,
@@ -266,8 +314,8 @@ export const FIELDS = {
   },
   cst: {
     id: "cst",
-    label: "Construction",
-    errorLabel: "Construction",
+    label: heading("construction", "exact"),
+    errorLabel: heading("construction", "exact"),
     quantity: null,
     rule: null,
     warning: null,
@@ -275,8 +323,8 @@ export const FIELDS = {
   },
   mbfOverride: {
     id: "mbfOverride",
-    label: "Charge de rupture",
-    errorLabel: "Charge de rupture",
+    label: heading("breakingLoad", "exact"),
+    errorLabel: heading("breakingLoad", "exact"),
     quantity: "MBF",
     rule: { kind: "positive", sentence: "une charge strictement positive est requise" },
     warning: null,
@@ -284,8 +332,8 @@ export const FIELDS = {
   },
   eaOverride: {
     id: "eaOverride",
-    label: "Raideur axiale",
-    errorLabel: "Raideur axiale",
+    label: heading("axialStiffness", "exact"),
+    errorLabel: heading("axialStiffness", "exact"),
     quantity: "EA",
     rule: { kind: "positive", sentence: POSITIVE_VALUE },
     warning: null,
@@ -293,8 +341,8 @@ export const FIELDS = {
   },
   muOverride: {
     id: "muOverride",
-    label: "Masse linéique",
-    errorLabel: "Masse linéique",
+    label: heading("linearMass", "exact"),
+    errorLabel: heading("linearMass", "exact"),
     quantity: "mu",
     rule: { kind: "positive", sentence: POSITIVE_VALUE },
     warning: null,
@@ -302,8 +350,8 @@ export const FIELDS = {
   },
   cls: {
     id: "cls",
-    label: "Classe de corde",
-    errorLabel: "Classe de corde",
+    label: heading("ropeClass", "exact"),
+    errorLabel: heading("ropeClass", "exact"),
     quantity: null,
     rule: null,
     warning: null,
@@ -311,8 +359,8 @@ export const FIELDS = {
   },
   MBL: {
     id: "MBL",
-    label: "Charge de rupture",
-    errorLabel: "Charge de rupture",
+    label: heading("breakingLoad", "exact"),
+    errorLabel: heading("breakingLoad", "exact"),
     quantity: "MBL",
     rule: { kind: "positive", sentence: "une charge strictement positive est requise" },
     warning: null,
@@ -320,16 +368,28 @@ export const FIELDS = {
   },
   muTextile: {
     id: "muTextile",
-    label: "Masse linéique",
-    errorLabel: "Masse linéique",
+    label: heading("linearMass", "exact"),
+    errorLabel: heading("linearMass", "exact"),
     quantity: "mu",
     rule: { kind: "positive", sentence: POSITIVE_VALUE },
     warning: null,
     gate: "solve",
   },
+  dTextile: {
+    id: "dTextile",
+    label: heading("diameter", "exact"),
+    errorLabel: heading("diameter", "exact"),
+    quantity: "d",
+    rule: { kind: "positive", sentence: "un diamètre strictement positif est requis" },
+    optional: true,
+    warning: null,
+    // Solve although no formula reads `d`: a zero or negative diameter from a link is a malformed
+    // spec, and the link carries `d` onward for the tensioning use.
+    gate: "solve",
+  },
   k: {
     id: "k",
-    label: "Raideur relative EA/MBL",
+    label: heading("relativeStiffness", "exact"),
     errorLabel: "Raideur relative k",
     quantity: "k",
     rule: { kind: "positive", sentence: POSITIVE_VALUE },
@@ -341,8 +401,8 @@ export const FIELDS = {
   },
   ta: {
     id: "ta",
-    label: "Terminaison A",
-    errorLabel: "Terminaison A",
+    label: withEnd("termination", "A"),
+    errorLabel: withEnd("termination", "A"),
     quantity: null,
     // No tier-one rule: the picker disables what the line cannot use, and an end that arrives
     // anyway is a scenario-level Verdict error in `./gates.ts` (ADR-0001).
@@ -352,8 +412,8 @@ export const FIELDS = {
   },
   tb: {
     id: "tb",
-    label: "Terminaison B",
-    errorLabel: "Terminaison B",
+    label: withEnd("termination", "B"),
+    errorLabel: withEnd("termination", "B"),
     quantity: null,
     rule: null,
     warning: null,
@@ -361,8 +421,8 @@ export const FIELDS = {
   },
   etaA: {
     id: "etaA",
-    label: "Rendement η",
-    errorLabel: "Rendement de terminaison A",
+    label: `${heading("efficiency", "exact")} η`,
+    errorLabel: `${heading("efficiency", "exact")} de ${label("termination", "exact")} A`,
     quantity: "eta",
     rule: { kind: "positive", sentence: POSITIVE_VALUE },
     warning: null,
@@ -370,26 +430,55 @@ export const FIELDS = {
   },
   etaB: {
     id: "etaB",
-    label: "Rendement η",
-    errorLabel: "Rendement de terminaison B",
+    label: `${heading("efficiency", "exact")} η`,
+    errorLabel: `${heading("efficiency", "exact")} de ${label("termination", "exact")} B`,
     quantity: "eta",
     rule: { kind: "positive", sentence: POSITIVE_VALUE },
     warning: null,
     gate: "verdict",
   },
+  tensioningDevice: {
+    id: "tensioningDevice",
+    label: heading("tensioningDevice", "exact"),
+    errorLabel: heading("tensioningDevice", "exact"),
+    quantity: null,
+    rule: null,
+    warning: null,
+    // Descriptive: it crosses none of the five gates — see {@link TensioningDevice}.
+    gate: null,
+  },
+  tensioningSide: {
+    id: "tensioningSide",
+    label: heading("tensioningSide", "exact"),
+    errorLabel: heading("tensioningSide", "exact"),
+    quantity: null,
+    rule: null,
+    warning: null,
+    // It is where a prétension is read, so it moves `L₀` whenever the prétension drives.
+    gate: "solve",
+  },
   D_target: {
     id: "D_target",
-    label: "Flèche à vide cible",
-    errorLabel: "Flèche à vide cible",
+    label: heading("sag", "exact"),
+    errorLabel: heading("sag", "exact"),
     quantity: "D_target",
     rule: { kind: "positive", sentence: "une flèche strictement positive est requise" },
     warning: null,
     gate: "solve",
   },
+  T_target: {
+    id: "T_target",
+    label: heading("pretension", "exact"),
+    errorLabel: heading("pretension", "exact"),
+    quantity: "T_target",
+    rule: { kind: "positive", sentence: "une tension strictement positive est requise" },
+    warning: null,
+    gate: "solve",
+  },
   H_target: {
     id: "H_target",
-    label: "Prétension cible",
-    errorLabel: "Prétension cible",
+    label: heading("horizontalTension", "exact"),
+    errorLabel: heading("horizontalTension", "exact"),
     quantity: "H_target",
     rule: { kind: "positive", sentence: "une tension strictement positive est requise" },
     warning: null,
@@ -397,8 +486,8 @@ export const FIELDS = {
   },
   L0: {
     id: "L0",
-    label: "Longueur non tendue",
-    errorLabel: "Longueur non tendue",
+    label: heading("unstretchedLength", "exact"),
+    errorLabel: heading("unstretchedLength", "exact"),
     quantity: "L0",
     rule: { kind: "positive", sentence: POSITIVE_LENGTH },
     warning: null,
@@ -406,8 +495,8 @@ export const FIELDS = {
   },
   vRatio: {
     id: "vRatio",
-    label: "Rapport V cible",
-    errorLabel: "Rapport V cible",
+    label: heading("vRatio", "exact"),
+    errorLabel: heading("vRatio", "exact"),
     quantity: "vRatio",
     rule: { kind: "positive", sentence: "un rapport P / H strictement positif est requis" },
     warning: null,
@@ -416,7 +505,7 @@ export const FIELDS = {
   mp: {
     id: "mp",
     label: "Masse",
-    errorLabel: "Masse du passager",
+    errorLabel: heading("passengerMass", "exact"),
     quantity: "m_p",
     rule: { kind: "positive", sentence: "une masse strictement positive est requise" },
     warning: null,
@@ -425,8 +514,8 @@ export const FIELDS = {
   },
   hRider: {
     id: "hRider",
-    label: "Enveloppe passager",
-    errorLabel: "Enveloppe passager",
+    label: heading("riderEnvelope", "exact"),
+    errorLabel: heading("riderEnvelope", "exact"),
     quantity: "h_rider",
     rule: { kind: "positive", sentence: POSITIVE_HEIGHT },
     warning: null,
@@ -435,8 +524,8 @@ export const FIELDS = {
   },
   hClearMin: {
     id: "hClearMin",
-    label: "Garde min. admise",
-    errorLabel: "Garde min. admise",
+    label: heading("requiredClearance", "exact"),
+    errorLabel: heading("requiredClearance", "exact"),
     quantity: "h_clear_min",
     // `0` is « aucun seuil », a legitimate value; only a negative garde is nonsense.
     rule: { kind: "non-negative", sentence: "une garde négative n'existe pas" },
@@ -446,8 +535,8 @@ export const FIELDS = {
   },
   DAF: {
     id: "DAF",
-    label: "Coefficient dynamique",
-    errorLabel: "Coefficient dynamique",
+    label: heading("startMultiplier", "exact"),
+    errorLabel: heading("startMultiplier", "exact"),
     quantity: "DAF",
     rule: { kind: "positive", sentence: POSITIVE_VALUE },
     warning: null,
@@ -456,8 +545,8 @@ export const FIELDS = {
   },
   xD: {
     id: "xD",
-    label: "Position du passager",
-    errorLabel: "Position du passager",
+    label: heading("riderPosition", "exact"),
+    errorLabel: heading("riderPosition", "exact"),
     quantity: "x_D",
     // **It clamps on every path** — typed input, a geometry change, a link arrival — and says so
     // with a transient note. A clamp produces no error state, so `x_D` sits in **no gate**.
@@ -465,7 +554,162 @@ export const FIELDS = {
     warning: null,
     gate: null,
   },
+  // The Wind Gate: only the ride (#89), the Banane and the rose read the Vent, so a bad one withholds
+  // them and never takes the statics or the Verdict down.
+  windSpeed: {
+    id: "windSpeed",
+    label: heading("windSpeed", "exact"),
+    errorLabel: heading("windSpeed", "exact"),
+    quantity: "windSpeed",
+    rule: { kind: "non-negative", sentence: "une vitesse négative n'existe pas" },
+    warning: null,
+    gate: "wind",
+  },
+  windDirection: {
+    id: "windDirection",
+    label: heading("windDirection", "exact"),
+    errorLabel: heading("windDirection", "exact"),
+    quantity: "windDirection",
+    rule: { kind: "finite" },
+    warning: null,
+    gate: "wind",
+  },
+  // The ride's constants (#89, #104): §12.2's, every one editable and labelled. The Ride Gate: only
+  // the passager's ride reads them, so a bad one withholds it and nothing else.
+  CdA: {
+    id: "CdA",
+    label: heading("dragArea", "exact"),
+    errorLabel: heading("dragArea", "exact"),
+    quantity: "CdA",
+    rule: { kind: "non-negative", sentence: "une surface négative n'existe pas" },
+    warning: {
+      kind: "band",
+      min: DYNAMICS.CdABand.min,
+      max: DYNAMICS.CdABand.max,
+      copy: `surface hors de la plage du champ (${formatValue("CdA", DYNAMICS.CdABand.min)} – ${formatValue("CdA", DYNAMICS.CdABand.max)} m²) [CONVENTION]`,
+    },
+    gate: "ride",
+  },
+  F0: {
+    id: "F0",
+    label: heading("trolleyConstantFriction", "exact"),
+    errorLabel: heading("trolleyConstantFriction", "exact"),
+    quantity: "F0",
+    rule: { kind: "non-negative", sentence: NO_NEGATIVE_FRICTION },
+    warning: null,
+    gate: "ride",
+  },
+  kv: {
+    id: "kv",
+    label: heading("trolleySpeedFriction", "exact"),
+    errorLabel: heading("trolleySpeedFriction", "exact"),
+    quantity: "kv",
+    rule: { kind: "non-negative", sentence: NO_NEGATIVE_FRICTION },
+    warning: null,
+    gate: "ride",
+  },
+  trolleyMu: {
+    id: "trolleyMu",
+    label: heading("trolleyFrictionRatio", "exact"),
+    errorLabel: heading("trolleyFrictionRatio", "exact"),
+    quantity: "trolleyMu",
+    rule: { kind: "non-negative", sentence: NO_NEGATIVE_FRICTION },
+    warning: null,
+    gate: "ride",
+  },
+  // Blank is §12.2's « lu » half: the ISA density at the profil's mean altitude, or 1,225.
+  rho: {
+    id: "rho",
+    label: heading("airDensity", "exact"),
+    errorLabel: heading("airDensity", "exact"),
+    quantity: "rho",
+    rule: { kind: "non-negative", sentence: "une masse volumique négative n'existe pas" },
+    optional: true,
+    warning: null,
+    gate: "ride",
+  },
+  // The two Positions (#90). Both sit in no gate — their one reader is the Vent's bearing, and
+  // without it the Vent is not applied rather than refused (`windBearing`) — and a blank pair is
+  // « inconnue », not « vide et requis », so none is required.
+  latA: coordinateField("latA", "latitude", "A"),
+  lonA: coordinateField("lonA", "longitude", "A"),
+  latB: coordinateField("latB", "latitude", "B"),
+  lonB: coordinateField("lonB", "longitude", "B"),
 } as const satisfies Record<FieldId, FieldSpec>;
+
+/**
+ * The fields a simplified Page names in the terrain register (#61), by the vocabulary id each is
+ * spelled from. A field whose term is `hiddenOnTerrain` is set on Avancé alone, so a terrain
+ * message names it {@link AVANCE_SETTING} rather than print the word the Page must not show. Every
+ * other field reads the same on every Page.
+ */
+const TERRAIN_TERM = {
+  regime: "regime",
+  d: "diameter",
+  dTextile: "diameter",
+  T_target: "pretension",
+  D_target: "sag",
+  L0: "unstretchedLength",
+  R0: "grade",
+  cst: "construction",
+  cls: "ropeClass",
+  eaOverride: "axialStiffness",
+  muOverride: "linearMass",
+  muTextile: "linearMass",
+  k: "relativeStiffness",
+  ta: "termination",
+  tb: "termination",
+  etaA: "efficiency",
+  etaB: "efficiency",
+  H_target: "horizontalTension",
+  vRatio: "vRatio",
+  DAF: "startMultiplier",
+  CdA: "dragArea",
+  F0: "trolleyConstantFriction",
+  kv: "trolleySpeedFriction",
+  trolleyMu: "trolleyFrictionRatio",
+  rho: "airDensity",
+} as const satisfies Partial<Record<FieldId, LabelId>>;
+
+/** How a terrain message names a field only Avancé shows. */
+export const AVANCE_SETTING = "Réglage de la Page Avancé";
+
+function terrainTerm(id: FieldId): LabelId | undefined {
+  return (TERRAIN_TERM as Partial<Record<FieldId, LabelId>>)[id];
+}
+
+/** Is this field set on Avancé alone — absent from a simplified Page and unnamed there? */
+export function isHiddenOnTerrain(id: FieldId): boolean {
+  const term = terrainTerm(id);
+  return term !== undefined && isHiddenTerm(term);
+}
+
+/** What the control is labelled on a Page of this register. */
+export function fieldLabel(id: FieldId, register: Register = "exact"): string {
+  return register === "terrain" ? terrainName(id, FIELDS[id].label) : FIELDS[id].label;
+}
+
+/** The name a message prints for this field on a Page of this register. */
+export function fieldErrorLabel(id: FieldId, register: Register = "exact"): string {
+  return register === "terrain" ? terrainName(id, FIELDS[id].errorLabel) : FIELDS[id].errorLabel;
+}
+
+function terrainName(id: FieldId, exact: string): string {
+  const term = terrainTerm(id);
+  if (term === undefined) return exact;
+  return isHiddenTerm(term) ? AVANCE_SETTING : heading(term, "terrain");
+}
+
+/**
+ * The fields whose blank is « absent »: the textile diameter, the air density read rather than
+ * typed, and the four coordinates.
+ */
+export type OptionalFieldId = "dTextile" | "rho" | "latA" | "lonA" | "latB" | "lonB";
+
+/** Whether a blank is « absent » for this field (read off {@link FieldSpec.optional}). */
+export function isOptionalField(id: FieldId): id is OptionalFieldId {
+  return (FIELDS[id] as FieldSpec).optional === true;
+}
 
 /** Rail order — what « the first culpable field in table order » means. */
 export const FIELD_ORDER = Object.keys(FIELDS) as readonly FieldId[];
@@ -476,6 +720,7 @@ export const FIELD_ORDER = Object.keys(FIELDS) as readonly FieldId[];
  */
 export const TIGHTNESS_FIELD = {
   sag: "D_target",
+  anchor: "T_target",
   tension: "H_target",
   length: "L0",
   ratio: "vRatio",
@@ -490,7 +735,7 @@ export type TightnessFieldId = (typeof TIGHTNESS_FIELD)[TightnessDraft["mode"]];
  * grouped the gate by rail section would silently undo § 7's central finding.
  */
 export function gateOf(id: FieldId, mode: "manual" | "trace"): GateId | null {
-  // In imported mode `h = (z(d_B) + hauteur_B) − (z(d_A) + hauteur_A)`, so the anchor heights are
+  // In imported mode `h = (z_last + hauteur_B) − (z_first + hauteur_A)`, so the anchor heights are
   // a **Solve** input there — § 7's culprit table, row « `h` importé ». In manual mode they feed
   // the Terrain only and never `solveSpan`, which is the Clearance Gate's own row.
   if (mode === "trace" && (id === "zA" || id === "zB")) return "solve";
@@ -519,10 +764,11 @@ export type FieldContext = {
   readonly unit?: ForceUnit;
   /** `Classe de corde`, for the one empty message that carries a reason instead of a hole. */
   readonly ropeClass?: TextileSpec["ropeClass"];
-  /** The imported profile's `Distance` extent, m, in file coordinates — the stations' bound. */
-  readonly extent?: { readonly min: number; readonly max: number };
+
   /** `Portée`, m — the only warning that reads a second field (`|h| > L`). */
   readonly L?: number;
+  /** The Page's vocabulary, which names the field in a message. `exact` when absent. */
+  readonly register?: Register;
 };
 
 /**
@@ -604,25 +850,84 @@ export const ROPE_CLASS_LABEL = {
   polyester: "Polyester semi-statique",
 } as const satisfies Record<TextileSpec["ropeClass"], string>;
 
-/** `Construction`'s core, which is all the link strip names; the Rail's picker prefixes the lay. */
+/** `Construction`'s two entries: « 6×19 » and « 6×19 métallique », with no âme and no gaine. */
 export const CONSTRUCTION_LABEL = {
-  "fibre-core": "âme textile",
-  iwrc: "âme métallique",
+  "fibre-core": label("constructionFibreCore", "exact"),
+  iwrc: label("constructionIwrc", "exact"),
 } as const satisfies Record<SteelSpec["construction"], string>;
+
+/** `Côté de la Mise en tension`'s two entries: the two anchors, as the Rail names them. */
+export const TENSIONING_SIDE_LABEL = {
+  A: `${heading("anchor", "exact")} A`,
+  B: `${heading("anchor", "exact")} B`,
+} as const satisfies Record<TensioningSide, string>;
+
+/** `Mise en tension`'s three entries: the mouflage and the two Maestro. */
+export const TENSIONING_DEVICE_LABEL = {
+  pulley: heading("pulleySystem", "exact"),
+  "maestro-s": `${heading("maestro", "exact")} S`,
+  "maestro-l": `${heading("maestro", "exact")} L`,
+} as const satisfies Record<TensioningDevice, string>;
 
 /** One picker entry. */
 export type PickerOption<Id extends string> = { readonly value: Id; readonly label: string };
 
+/**
+ * A picker's two conventions: the empty entry a value nobody chose shows, and the suffix that says
+ * an entry is unavailable — the row's note says why.
+ */
+export const PICKER_COPY = { empty: "— choisir —", unavailable: "indisponible" } as const;
+
+/** A stale Override's badge, before the formula's value, and the action that restores it. */
+export const OVERRIDE_COPY = { stale: "la formule donne", recalculate: "Recalculer" } as const;
+
+/** The line's two families — « câble » and « corde » on every Page, Avancé included. */
+export const FAMILY_LABEL = {
+  steel: heading("cable", "terrain"),
+  textile: heading("rope", "terrain"),
+} as const satisfies Record<"steel" | "textile", string>;
+
+/** `Installation`'s two entries, in a Page's vocabulary. */
+export function usageOptions(register: Register): readonly PickerOption<UseClass>[] {
+  return [
+    { value: "PERMANENTE", label: heading("permanentInstallation", register) },
+    { value: "TEMPORAIRE", label: heading("temporaryInstallation", register) },
+  ];
+}
+
+/**
+ * The régime picker's value as the Scenario holds it: `null` for the empty entry, or a régime the
+ * engine knows — a value off the DOM is a string, and only one of these is a `RegimeId`.
+ */
+export function regimeChoice(value: string): RegimeId | null {
+  return Object.values(REGIMES).find((regime) => regime.id === value)?.id ?? null;
+}
+
+/**
+ * `Brins porteurs`'s two entries, in the glossary's words: one member is a « ligne », two are the
+ * « ligne du haut » and the « ligne du bas ». Keyed by the count as text, which a radio holds.
+ */
+export const CARRYING_LINES_OPTIONS = [
+  { value: "1", label: `1 ${label("line", "exact")}` },
+  {
+    value: "2",
+    label: `2 ${label("line", "exact")}s (${label("upperLine", "exact")}, ${label("lowerLine", "exact")})`,
+  },
+] as const satisfies readonly PickerOption<`${CarryingLines}`>[];
+
+export const TENSIONING_SIDE_OPTIONS = pickerOptions(TENSIONING_SIDE_LABEL);
+
+export const TENSIONING_DEVICE_OPTIONS = pickerOptions(TENSIONING_DEVICE_LABEL);
+
 export const ROPE_CLASS_OPTIONS = pickerOptions(ROPE_CLASS_LABEL);
 
-export const CONSTRUCTION_OPTIONS = pickerOptions(CONSTRUCTION_LABEL, "6×19 ");
+export const CONSTRUCTION_OPTIONS = pickerOptions(CONSTRUCTION_LABEL);
 
 /** A label table as a picker's entries, in the table's order. */
 function pickerOptions<Id extends string>(
   labels: Readonly<Record<Id, string>>,
-  prefix = "",
 ): readonly PickerOption<Id>[] {
-  return (Object.keys(labels) as Id[]).map((value) => ({ value, label: prefix + labels[value] }));
+  return (Object.keys(labels) as Id[]).map((value) => ({ value, label: labels[value] }));
 }
 
 /**
@@ -638,22 +943,21 @@ export function emptyMessage(id: FieldId, context: FieldContext = {}): string {
 }
 
 /** § 7's fixed template: `⛔ <Champ> — <la règle, énoncée>. Valeur : <v>.` */
-function blocking(id: FieldId, rule: string, value: string): string {
-  return `⛔ ${FIELDS[id].errorLabel} — ${rule}. Valeur : ${value}.`;
+function blocking(id: FieldId, rule: string, value: string, register?: Register): string {
+  return `⛔ ${fieldErrorLabel(id, register)} — ${rule}. Valeur : ${value}.`;
 }
 
 /**
  * « nombre illisible », and it **quotes the raw text back** — what the user typed is the evidence,
  * and the state exists at all because § 3 elected `inputMode="decimal"` over `type="number"`.
  */
-export function unreadableMessage(id: FieldId, raw: string): string {
-  return `⛔ ${FIELDS[id].errorLabel} — nombre illisible. Saisie : « ${raw.trim()} ».`;
+export function unreadableMessage(id: FieldId, raw: string, register?: Register): string {
+  return `⛔ ${fieldErrorLabel(id, register)} — nombre illisible. Saisie : « ${raw.trim()} ».`;
 }
 
 /**
  * Tier one on one field's raw text. **This is the whole of what a form validator may decide**:
- * emptiness, readability, a sign rule, and the station's in-trace bound, which is the file's own
- * extent and no physics at all.
+ * emptiness, readability and a sign rule — no physics at all.
  *
  * @returns the standing issue, or `null` when the text is a value tier one accepts. An
  *   out-of-range-but-representable value is **valid here** and lights up as a warning or as an
@@ -664,16 +968,21 @@ export function checkField(
   raw: string,
   context: FieldContext = {},
 ): FieldIssue | null {
-  const spec = FIELDS[id];
+  const spec: FieldSpec = FIELDS[id];
   if (spec.rule === null) return null;
 
   if (raw.trim() === "") {
+    if (spec.optional === true) return null;
     return { field: id, kind: "empty", message: emptyMessage(id, context) };
   }
 
   const shown = parseDecimal(raw);
   if (shown === null) {
-    return { field: id, kind: "unreadable", message: unreadableMessage(id, raw) };
+    return {
+      field: id,
+      kind: "unreadable",
+      message: unreadableMessage(id, raw, context.register),
+    };
   }
 
   const unit = context.unit ?? "daN";
@@ -685,28 +994,15 @@ export function checkField(
       return {
         field: id,
         kind: "invalid",
-        message: blocking(id, spec.rule.sentence, echo(id, shown, unit)),
+        message: blocking(id, spec.rule.sentence, echo(id, shown, unit), context.register),
       };
     case "non-negative":
       if (shown >= 0) return null;
       return {
         field: id,
         kind: "invalid",
-        message: blocking(id, spec.rule.sentence, echo(id, shown, unit)),
+        message: blocking(id, spec.rule.sentence, echo(id, shown, unit), context.register),
       };
-    case "in-trace": {
-      const extent = context.extent;
-      if (extent === undefined || (shown >= extent.min && shown <= extent.max)) return null;
-      const from = formatValue("station", extent.min);
-      const to = formatValue("station", extent.max);
-      return {
-        field: id,
-        kind: "invalid",
-        // This row's message names the bound instead of the field, because the bound is the file's
-        // and two stations share one rule — § 7 writes it once, for « Station A / B ».
-        message: `⛔ Station hors du tracé (${from} – ${to} m). Valeur : ${echo(id, shown, unit)}.`,
-      };
-    }
   }
 }
 

@@ -1,6 +1,7 @@
 /**
  * **What a standing breach removes from the screen** — « v1 build spec » § 7 (*Les trois grilles de
- * validation*, *« Aucun résultat » — une cause, trois échos*, *L'exception géométrique*).
+ * validation*, *« Aucun résultat » — une cause, trois échos*, *L'exception géométrique*). The spec
+ * knew three gates; the Wind and Ride gates came after it (#87, #89 and the ride-gates fix).
  *
  * § 7's gate table has a third column — « ce que l'échec supprime » — and until A11 nothing read
  * it: the scene and the results were derived from the **store**, which holds numbers, while the
@@ -18,11 +19,17 @@
  * | **Solve Gate** | tout l'aval : ni `SpanState`, ni câble, ni read-out |
  * | **Clearance Gate** | la garde au sol et la courbe de garde **seules** — le câble se dessine |
  * | **Verdict Gate** | le bandeau et la grille critères × extrémités **seuls** |
+ * | **Wind Gate** | la Banane, le vent de la rose et sa lecture — et toute estimation, qui lit le vent |
+ * | **Ride Gate** | toute estimation **seule** : points d'arrêt, vitesse d'arrivée, durée, courbes, `v/c` |
  * | **L'exception géométrique** | les deux tracés, sans graduations et sans piste de pointeur |
+ *
+ * The two gates of the ride remove no part of the picture this module draws: they are said where
+ * the value would be read — `./banner.ts`'s `windCause` and `rideCause` — and the rides are read
+ * through `./surfaces.ts`'s `gatedRides`, which reads none while a cause stands.
  *
  * Rules this module exists to keep:
  *
- * - **The geometric exception is scoped to `L` / `h` / station failures** and written down *as* an
+ * - **The geometric exception is scoped to `L` / `h` failures** and written down *as* an
  *   exception: without the scope somebody applies « collapse both plots » to every failure alike
  *   and computes a scale over a NaN domain.
  * - **A refusal suppresses like a Solve breach.** « Tension impossible » leaves no `SpanState`, so
@@ -38,11 +45,12 @@ import type { FieldId } from "@/lib/rail/fields.ts";
 import type { GateReport } from "@/lib/rail/gates.ts";
 
 /**
- * The four fields whose failure leaves **no shared x domain at all** — it is defined as span + 5 %,
+ * The two fields whose failure leaves **no shared x domain at all** — it is defined as span + 5 %,
  * so `x_D`, defined on `[0, L]`, has no interval to live in and the clamp has nothing to clamp
- * into. § 7 scopes the exception to exactly these and no others.
+ * into. § 7 scopes the exception to exactly these and no others; an imported profil has no field
+ * that can take its span away.
  */
-const GEOMETRY_FIELDS: ReadonlySet<FieldId> = new Set<FieldId>(["L", "h", "sa", "sb"]);
+const GEOMETRY_FIELDS: ReadonlySet<FieldId> = new Set<FieldId>(["L", "h"]);
 
 /** How much picture survives. Each flag is « suppressed », so `false` everywhere is a clean line. */
 export type Suppression = {

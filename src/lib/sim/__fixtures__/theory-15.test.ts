@@ -3,7 +3,18 @@ import { describe, expect, test } from "vitest";
 import type { Fixture } from "./theory-15.ts";
 
 import * as fixtures from "./theory-15.ts";
-import { F1, TOLERANCE, Z1, Z2, Z3, Z4, Z5, Z6, scannedPositionTolerance } from "./theory-15.ts";
+import {
+  F1,
+  TOLERANCE,
+  Z1,
+  Z2,
+  Z3,
+  Z4,
+  Z5,
+  Z6,
+  Z8,
+  scannedPositionTolerance,
+} from "./theory-15.ts";
 
 /**
  * These cases check the **transcription**, not the engine — no module under `src/lib/sim/` is
@@ -21,6 +32,7 @@ const CASES: [string, Fixture][] = [
   ["Z4", Z4],
   ["Z5", Z5],
   ["Z6", Z6],
+  ["Z8", Z8],
 ];
 
 /** Relative disagreement, to be read against the `solvedScalar` tier's bar. */
@@ -33,9 +45,8 @@ describe("provenance", () => {
     expect(fixture.source).toBe(`simulation-theory.md §15 ${key}`);
   });
 
-  test("Z7 (thermal, §9) and Z8 (dynamics, §12) are absent on purpose", () => {
+  test("Z7 (thermal, §9) is absent on purpose", () => {
     expect(Object.keys(fixtures)).not.toContain("Z7");
-    expect(Object.keys(fixtures)).not.toContain("Z8");
   });
 
   test("the two provenance classes stay distinguishable by prefix", () => {
@@ -175,5 +186,28 @@ describe("Z6 — the inverse problem", () => {
 
   test("the forward re-solve returns the target", () => {
     expect(relativeError(Z6.out.H, Z6.in.HTarget)).toBeLessThan(TOLERANCE.solvedScalar);
+  });
+});
+
+describe("Z8 — the terminal velocity is the stated quadratic's root", () => {
+  const { thetaDeg, m, g, rho, CdA, F0, kv } = Z8.in;
+
+  test("the drive is m·g·sin θ, to §15's 6 s.f.", () => {
+    const drive = m * g * Math.sin((thetaDeg * Math.PI) / 180);
+    expect(relativeError(drive, Z8.out.drive)).toBeLessThan(TOLERANCE.solvedScalar);
+  });
+
+  test("½·ρ·C_dA is the 0,275625 the quadratic prints", () => {
+    expect(0.5 * rho * CdA).toBeCloseTo(0.275625, 12);
+  });
+
+  test("v_t balances the drive against F₀ + k_v·v + ½·ρ·C_dA·v²", () => {
+    const { vt } = Z8.out;
+    const resistance = F0 + kv * vt + 0.5 * rho * CdA * vt * vt;
+    expect(relativeError(resistance, Z8.out.drive)).toBeLessThan(TOLERANCE.solvedScalar);
+  });
+
+  test("the km/h figure is the same speed", () => {
+    expect(Z8.out.vt * 3.6).toBeCloseTo(Z8.out.vtKmh, 2);
   });
 });

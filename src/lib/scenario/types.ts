@@ -29,6 +29,7 @@
  */
 
 import type {
+  AnchorSide,
   MaterialSpec,
   RegimeId,
   SteelSpec,
@@ -45,9 +46,9 @@ export type UseClass = "PERMANENTE" | "TEMPORAIRE";
 
 /**
  * § 7's one governing rule made a union: « the URL carries the active configuration and never a
- * retained alternate », so an imported line has `tr`/`sa`/`sb` and **no** `L`/`h`, and a manual
- * line has `L`/`h` and **no** `tr`. In imported mode `L` and `h` are *derived read-outs*, which
- * is why they are absent from that arm rather than optional in one flat shape.
+ * retained alternate », so an imported line has `tr` and **no** `L`/`h`, and a manual line has
+ * `L`/`h` and **no** `tr`. In imported mode `L` and `h` are *derived read-outs* of the whole profil,
+ * which is why they are absent from that arm rather than optional in one flat shape.
  *
  * **`source` is read across the app — around 28 sites in eleven modules, not the four ticket 38
  * item 4 counted — and that census is the reason it stays inline.** The sites fall in two kinds
@@ -69,11 +70,16 @@ export type Geometry =
   /** Manual geometry: the ground is the straight line between the two anchor bases. */
   | { source: "manual"; L: number; h: number }
   /**
-   * An imported profile. `trace` is § 7's `tr` value **verbatim** (`p1.<base64url>`) — decoding
-   * is a memoised client derivation, never part of the state object; `sa` / `sb` are the anchor
-   * stations in file coordinates, and `L = sb − sa`.
+   * An imported profile, taken whole: anchor A over its first sample, B over its last (#88).
+   * `trace` is § 7's `tr` value **verbatim** (`p1.<base64url>`) — decoding is a memoised client
+   * derivation, never part of the state object.
+   *
+   * `offPositions` is `ph` in a link: the profil does **not** run between the two Positions, both
+   * known — one was typed off it, or beside a profil with no coordinates. The payload carries no
+   * coordinates, so a recipient puts a received profil's ends on the link's Positions unless this
+   * says otherwise. Absent, it runs between them, or they are not both known.
    */
-  | { source: "trace"; trace: string; sa: number; sb: number };
+  | { source: "trace"; trace: string; offPositions?: true };
 
 /** § 7's `za` / `zb` — each anchor's height above its own base, m. */
 export type AnchorHeights = { zA: number; zB: number };
@@ -109,14 +115,102 @@ export type Rider = {
 };
 
 /**
- * The Tightness Driver **as the app holds it**: the engine's three modes plus « Rapport V », the
- * ratio `P / H` of the passenger's design load to the horizontal pretension (decision of
- * 2026-09-23). A higher ratio is a deeper V under the rider. It is a parameterisation of the
- * tension mode, not a fourth inversion: `engineTightness` in `./tightness.ts` maps it to
+ * The Tightness Driver **as the app holds it** — five drivers: the engine's four modes plus
+ * « Rapport V », the ratio `P / H` of the passenger's design load to the tension horizontale
+ * (decision of 2026-09-23). A higher ratio is a deeper V under the rider. It is a parameterisation
+ * of the tension mode, not another inversion: `engineTightness` in `./tightness.ts` maps it to
  * `{ mode: "tension", H_target: m_p·g / ratio }` before anything reaches `resolveL0`, which is why
  * `src/lib/sim/**` does not know it exists.
+ *
+ * The prétension (`anchor`, #85) holds its target only: the anchor it is read at is the Scenario's
+ * {@link Scenario.tensioningSide}, which a read-out needs whatever drives, so it is not repeated
+ * here.
  */
-export type TightnessDraft = TightnessSpec | { mode: "ratio"; ratio: number };
+export type TightnessDraft =
+  | Exclude<TightnessSpec, { mode: "anchor" }>
+  | { mode: "anchor"; T_target: number }
+  | { mode: "ratio"; ratio: number };
+
+/**
+ * **Brins porteurs** — how many load-bearing members the Span carries (decision of #4). Two are
+ * strictly identical: same unloaded tension, the passager shared 50/50, each member carrying its
+ * own weight. The gap between them is constant and enters no computation.
+ */
+export type CarryingLines = 1 | 2;
+
+/**
+ * The anchor that carries the **Mise en tension** (#85) — where the prétension is read, per
+ * member: what a dynamometer between that anchor and the Maestro shows.
+ */
+export type TensioningSide = AnchorSide;
+
+/**
+ * The **Mise en tension** device (#86): the mouflage, or one of the two Maestro. Descriptive only —
+ * no solve, sweep or verdict reads it; it selects the tension limit the prétension is judged
+ * against. A Maestro is a rope device, so on a câble it is kept as given (ADR-0001) and warned.
+ */
+export type TensioningDevice = "pulley" | "maestro-s" | "maestro-l";
+
+/**
+ * The **Vent** (#87): how fast, and from where — `direction` is the azimuth the wind comes **from**,
+ * degrees clockwise from north (0 a north wind, 90 from the east, 270 from the west), the direction a
+ * forecast gives. It is projected on the line through the bearing A → B the {@link Positions} give,
+ * so moving an anchor turns the line under it and leaves it as it is; without both Positions it is
+ * kept as given and not applied (`windBearing`). `ws` / `wd` in a link, **both absent for no wind**.
+ * Only the passager's ride and the Banane read it (#89, #96): statics and the Verdict are unchanged.
+ */
+export type Wind = {
+  /** Wind speed, km/h (≥ 0). */
+  speedKmh: number;
+  /** The azimuth the wind comes from, degrees clockwise from north. */
+  directionDeg: number;
+};
+
+/**
+ * Where an anchor stands on the earth (#90): WGS84 latitude and longitude, degrees. Typed to six
+ * decimals, about 0,1 m. Both or neither: a Position with one coordinate is no Position.
+ */
+export type Position = {
+  /** Degrees north. */
+  lat: number;
+  /** Degrees east. */
+  lon: number;
+};
+
+/**
+ * The two anchors' {@link Position}s, `null` where unknown (manual geometry, or a CSV with no
+ * coordinates). In a link the four numbers are `lata` / `lona` / `latb` / `lonb`, **all absent for
+ * unknown**. They place the anchors on the map and in the Vue 3D and give Mesure its distances; the
+ * `ph` link key (`offPositions`) says whether the profil runs between them; « Charger le profil
+ * geo.admin » (#103) reads them, only when pressed; and their bearing A → B is what the Vent is
+ * projected on. Statics and the Verdict never read them.
+ */
+export type Positions = { A: Position | null; B: Position | null };
+
+/**
+ * The constants of the passager's ride (#89) — §12.2's, every one editable and each **absent from a
+ * link at its default**: `cda`, `rho`, `f0`, `kv` and `mur`. Only the ride reads them: statics and
+ * the Verdict are unchanged.
+ *
+ * Both trolley laws are held, and the family picks one: the SSF fit on a corde, a constant `μ` on a
+ * câble. A family flip therefore cannot pair a law with the wrong material, and a link carries only
+ * the active family's keys.
+ */
+export type DynamicsConstants = {
+  /** `C_dA`, m². */
+  CdA: number;
+  /**
+   * `ρ`, kg/m³. `null` **is** the default, which is derived rather than shipped: §12.2's ISA
+   * density at the profil's mean altitude, 1,225 without a profil.
+   */
+  rho: number | null;
+  /** The corde's trolley: the SSF fit's constant term `F₀`, N. */
+  F0: number;
+  /** The corde's trolley: the SSF fit's speed term `k_v`, kg/s. */
+  kv: number;
+  /** The câble's trolley: §12.2's constant friction ratio `μ`, `F = μ·N`. */
+  mu: number;
+};
 
 /** § 7's Scenario: everything a link transports, and nothing the Session keeps on the side. */
 export type Scenario = {
@@ -126,15 +220,24 @@ export type Scenario = {
   regime: RegimeId | null;
   geometry: Geometry;
   anchors: AnchorHeights;
+  /** `bp` in a link, and **absent there for one member** — so links older than the key read 1. */
+  carryingLines: CarryingLines;
+  /** `cp` in a link, and **absent there for A** — so links older than the key read A. */
+  tensioningSide: TensioningSide;
+  /** `mt` in a link, and **absent there for the mouflage** — so links older than the key read it. */
+  tensioningDevice: TensioningDevice;
   /**
-   * §7's presence-encoded Tightness Driver — exactly one of flèche / prétension / `L₀` / rapport V.
-   * The fourth is the app's, not the engine's: {@link TightnessDraft}.
+   * §7's presence-encoded Tightness Driver — exactly one of flèche / prétension / tension
+   * horizontale / `L₀` / rapport V. The last is the app's, not the engine's: {@link TightnessDraft}.
    */
   tightness: TightnessDraft;
   /** The **active** family's spec. The retained one is the Session's — see {@link TextileDraft}. */
   material: MaterialSpec;
   terminations: { A: EndTermination; B: EndTermination };
   rider: Rider;
+  wind: Wind;
+  dynamics: DynamicsConstants;
+  positions: Positions;
 };
 
 /**
@@ -156,6 +259,8 @@ export type TextileDraft = {
   mu: number | null;
   /** `EA = k·MBL`. Shipped for HMPE (`[DATASHEET]` 22); **absent, not zero**, for polyester. */
   k: number | null;
+  /** Nominal diameter, mm — optional, so **absent** rather than blank-and-required. */
+  d?: number;
 };
 
 /**

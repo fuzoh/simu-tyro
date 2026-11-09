@@ -20,13 +20,13 @@ import { useAppState } from "./store.tsx";
 
 export function useUnloaded(): Unloaded {
   const state = useAppState();
-  const { geometry, anchors, material, tightness, mp, trace } = unloadedInputs(
+  const { geometry, anchors, material, tightness, tensioningSide, mp, trace } = unloadedInputs(
     state.scenario,
     state.trace,
   );
   const placed = useMemo(() => placeSpan({ geometry, anchors }, trace), [geometry, anchors, trace]);
   return useMemo(
-    () => unloadedOn(placed, { material, tightness, mp }),
-    [placed, material, tightness, mp],
+    () => unloadedOn(placed, { material, tightness, tensioningSide, mp }),
+    [placed, material, tightness, tensioningSide, mp],
   );
 }

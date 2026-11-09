@@ -31,12 +31,14 @@ import type { FieldId, FieldIssue } from "@/lib/rail/fields.ts";
 import type { GateReport } from "@/lib/rail/gates.ts";
 import type { RailValues } from "@/lib/rail/values.ts";
 import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
+import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { checkField } from "@/lib/rail/fields.ts";
 import { evaluateGates, isFieldActive } from "@/lib/rail/gates.ts";
 import {
   fieldContext,
   GATED_FIELDS,
+  isPositionTwin,
   NUMERIC_FIELDS,
   railValues,
   sameGatedText,
@@ -61,16 +63,21 @@ export type RailFormState = {
   readonly setFocused: (id: FieldId | null) => void;
   /** Tier one's standing failures in the gated fields: text a Scenario of numbers cannot hold. */
   readonly issues: readonly FieldIssue[];
-  /** The three gates over the Scenario **and** that text — the one report every surface reads. */
+  /** The five gates over the Scenario **and** that text — the one report every surface reads. */
   readonly report: GateReport;
 };
 
 /**
  * @param traverse `useTraverse`'s Scenario without `x_D`: the gates read nothing else, so a scrub
  *   leaves the report identical.
+ * @param register the Page's vocabulary, which names the fields in every message the report holds.
  */
-export function useRailForm(deduced: Deduced, traverse: TraverseScenario): RailFormState {
-  const { scenario, trace } = useAppState();
+export function useRailForm(
+  deduced: Deduced,
+  traverse: TraverseScenario,
+  register: Register = "exact",
+): RailFormState {
+  const { scenario } = useAppState();
 
   const [focused, setFocused] = useState<FieldId | null>(null);
   const values = useMemo(() => railValues(scenario, deduced), [scenario, deduced]);
@@ -85,11 +92,13 @@ export function useRailForm(deduced: Deduced, traverse: TraverseScenario): RailF
   // « −5 » stay on screen with its ⛔: the Scenario cannot hold it, so `values.L` never changes, so
   // nothing here overwrites it. Comparing against the text would erase the evidence on blur, which
   // is the one thing § 7's committed-invalid state may not do. The field under the caret is skipped
-  // regardless — a prefill has no business landing mid-word.
+  // regardless — a prefill has no business landing mid-word — and so is its Position twin: emptying
+  // one coordinate unsets the Position, which reads both as blank, and the other's digits stay.
   const synced = useRef(values);
   useEffect(() => {
     for (const id of NUMERIC_FIELDS) {
-      if (values[id] === synced.current[id] || id === focused) continue;
+      if (values[id] === synced.current[id] || id === focused || isPositionTwin(id, focused))
+        continue;
       form.setFieldValue(id, values[id]);
     }
     synced.current = values;
@@ -98,18 +107,18 @@ export function useRailForm(deduced: Deduced, traverse: TraverseScenario): RailF
   // Tier one, over the text the form currently holds. The gates take it beside the Scenario,
   // because an emptied field and « 12,3,4 » are states a Scenario of numbers cannot represent.
   const issues = useMemo(() => {
-    const context = fieldContext(traverse, trace);
+    const context = fieldContext(traverse, register);
     return GATED_FIELDS.filter((id) => isFieldActive(id, traverse)).flatMap(
       (id) => checkField(id, gatedText[id] ?? "", context) ?? [],
     );
-  }, [gatedText, traverse, trace]);
+  }, [gatedText, traverse, register]);
 
   // Memoised because A11 made the report a **memo key**: the results, the scene's suppression and
   // the banner all hang off it, and a fresh object per render would re-run `evaluateVerdict` over
   // 260 steps on every keystroke and every scrub frame — the one measured cost in the app.
   const report = useMemo(
-    () => evaluateGates({ scenario: traverse, trace, issues }),
-    [traverse, trace, issues],
+    () => evaluateGates({ scenario: traverse, issues, register }),
+    [traverse, issues, register],
   );
 
   return { form, text, focused, setFocused, issues, report };

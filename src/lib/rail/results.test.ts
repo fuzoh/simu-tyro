@@ -5,9 +5,10 @@ import type { RegimeId, SweepStep, VerdictInput } from "@/lib/sim";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
-import { sweepRider } from "@/lib/scenario/traverse.ts";
+import { sweepRider, sweepRiderOf } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { evaluateVerdict } from "@/lib/sim";
+import { exactTermsIn, label, proscribedIn } from "@/lib/vocabulary/labels.ts";
 
 import type { ResultRowId, Results, SolvedTraverse } from "./results.ts";
 
@@ -15,7 +16,9 @@ import {
   clearanceBreached,
   deriveResults,
   NO_REGIME_ASIDE,
+  PER_LINE_SCOPE,
   REGIME_PROMPT,
+  refusalReason,
   TRAVERSE_SCOPE,
   verdictSentence,
 } from "./results.ts";
@@ -33,7 +36,7 @@ import {
  * - **The gate: « Résultats sans régime » makes five things absent, not dashed.** The four
  *   `k`-dependent rows *and* the criteria × ends grid, because one gate suppresses both. No string
  *   this module emits ever contains « — »: that glyph is `Indéterminé`'s alone.
- * - **The headline `T max` is the amplified envelope**, 927,9 daN and not 817,1 — the quantity
+ * - **The headline `T max` is the amplified envelope**, 928,0 daN and not 817,2 — the quantity
  *   `FS effectif` divides by. The static envelope is a detail row with its amplification beside it.
  * - **The app's own envelope agrees with `evaluateVerdict`'s**, which is the check that earns
  *   `amplifiedTension` its place in the barrel: the reduced row set prints `T max` in a state where
@@ -54,16 +57,16 @@ const SHIPPED = firstRunDefaults();
 function solvedTraverseOf(scenario: ScenarioDraft): SolvedTraverse {
   const unloaded = deriveUnloaded(unloadedInputs(scenario, null));
   if (!unloaded.ok) throw new Error("the shipped scenario solves");
-  const swept = sweepRider(unloaded, scenario.rider);
+  const swept = sweepRider(unloaded, sweepRiderOf(scenario));
   if (swept === null) throw new Error("the shipped traverse solves");
   const { span, state, material } = unloaded;
-  const { traverse, clearance } = swept;
-  return { L: span.L, h: span.h, unloaded: state, material, traverse, clearance };
+  const { P, traverse, clearance, soleCarrier } = swept;
+  return { L: span.L, h: span.h, unloaded: state, material, P, traverse, clearance, soleCarrier };
 }
 
 function resultsOf(patch: Partial<ScenarioDraft> = {}): Results {
   const scenario: ScenarioDraft = { ...SHIPPED, ...patch };
-  const results = deriveResults({ scenario, trace: null, base: solvedTraverseOf(scenario) });
+  const results = deriveResults({ scenario, base: solvedTraverseOf(scenario) });
   if (results === null) throw new Error("expected the shipped line to report results");
   return results;
 }
@@ -125,7 +128,7 @@ describe("« Résultats sans régime » — the reduced row set", () => {
     // Garde min is geometric fact — no `k` appears anywhere in §11 — and the tension envelope is
     // physics. All a régime adds is a divisor.
     expect(valueOf(results, "clearance")).toBe("2,42 m");
-    expect(valueOf(results, "Tmax")).toBe("927,9 daN");
+    expect(valueOf(results, "Tmax")).toBe("928,0 daN");
   });
 });
 
@@ -155,14 +158,14 @@ describe("the thirteen reported values, on the shipped line under EN 15567-1", (
   test("§ 9's canonical sketch, row by row", () => {
     expect(valueOf(results, "verdict")).toBe("Dans les limites — EN 15567-1 (k = 3,0)");
     expect(valueOf(results, "FS")).toBe("8,80");
-    expect(valueOf(results, "Tmax")).toBe("927,9 daN");
+    expect(valueOf(results, "Tmax")).toBe("928,0 daN");
     expect(valueOf(results, "clearance")).toBe("2,42 m");
     expect(valueOf(results, "reserve")).toBe("+1794 daN");
     expect(valueOf(results, "TadmA")).toBe("2722 daN");
     expect(valueOf(results, "TadmB")).toBe("2722 daN");
-    expect(valueOf(results, "TmaxA")).toBe("927,9 daN");
-    expect(valueOf(results, "TmaxB")).toBe("901,5 daN");
-    expect(valueOf(results, "Tstatic")).toBe("817,1 daN");
+    expect(valueOf(results, "TmaxA")).toBe("928,0 daN");
+    expect(valueOf(results, "TmaxB")).toBe("901,6 daN");
+    expect(valueOf(results, "Tstatic")).toBe("817,2 daN");
     expect(valueOf(results, "amplification")).toBe("+110,8 daN");
     expect(valueOf(results, "loadedSag")).toBe("7,48 m");
     // `résolus / grid.length`, and the denominator is **260**: 240 uniform steps plus 10
@@ -171,13 +174,17 @@ describe("the thirteen reported values, on the shipped line under EN 15567-1", (
   });
 
   test("the headline is the amplified envelope, and the static one is a detail row", () => {
-    // A headline of 817,1 lets a reader compute 0,9·9074/817 = 10,00 against a printed 8,80 — a
+    // A headline of 817,2 lets a reader compute 0,9·9074/817 = 10,00 against a printed 8,80 — a
     // reconciliation failure invisible in exactly the state that ships.
     expect(valueOf(results, "Tmax")).not.toBe(valueOf(results, "Tstatic"));
     const headline = results.rows.find((row) => row.id === "Tmax");
     expect(headline?.rank).toBe("headline");
     expect(results.rows.find((row) => row.id === "Tstatic")?.rank).toBe("detail");
     expect(results.rows.find((row) => row.id === "amplification")?.indent).toBe(true);
+    expect(results.rows.find((row) => row.id === "amplification")?.label).toBe(
+      "↳ majoration au départ",
+    );
+    expect(results.rows.find((row) => row.id === "amplification")?.qualifier).toBe("(× 1,2)");
   });
 
   test("the margin is a safety factor against the required k, never a percentage", () => {
@@ -196,6 +203,9 @@ describe("the thirteen reported values, on the shipped line under EN 15567-1", (
     const thin = resultsOf({
       regime: "wsqld",
       material: { family: "steel", d: 6, R0: 1770, construction: "iwrc" },
+      // The grid quoted here was measured with the 6 m flèche holding; under the tension de pose
+      // first run now drives, a lighter cable hangs a different line.
+      tightness: { mode: "sag", D_target: 6 },
     });
     expect(thin.verdict?.governing?.criterion).toBe("charge-suspendue");
     const fs = thin.rows.find((row) => row.id === "FS");
@@ -251,7 +261,7 @@ describe("the thirteen reported values, on the shipped line under EN 15567-1", (
 
   test("the force selector moves every force row and touches no other", () => {
     const kN = resultsOf({ regime: "en15567", unit: "kN" });
-    expect(valueOf(kN, "Tmax")).toBe("9,279 kN");
+    expect(valueOf(kN, "Tmax")).toBe("9,280 kN");
     expect(valueOf(kN, "TadmA")).toBe("27,22 kN");
     // Lengths, percentages and the dimensionless `FS` are not forces.
     expect(valueOf(kN, "clearance")).toBe("2,42 m");
@@ -287,10 +297,10 @@ describe("the app's envelope against the engine's", () => {
     // At `DAF ≤ 0` the amplified ordering inverts — `T_DAF,A` −290,3 against `T_DAF,B` −286,1 — so
     // an envelope headline chosen on `Tdaf` would make the **one tension number left on screen**
     // report the lesser anchor under the other one's name: 793,5 daN « ancrage B » where the true
-    // static envelope is 817,1 at A, as every other state prints it.
+    // static envelope is 817,2 at A, as every other state prints it.
     const results = resultsOf({ rider: { ...SHIPPED.rider, DAF: -1 } });
     const Tstatic = results.rows.find((row) => row.id === "Tstatic");
-    expect(Tstatic?.value).toBe("817,1 daN");
+    expect(Tstatic?.value).toBe("817,2 daN");
     expect(Tstatic?.qualifier).toBe("ancrage A");
   });
 });
@@ -414,7 +424,7 @@ describe("the five verdict states and their grammar", () => {
     );
   });
 
-  test("Refusé — a prohibition survives an ample margin, and names no régime", () => {
+  test("Interdit — a prohibition survives an ample margin, and names no régime", () => {
     const verdict = verdictOf({
       steps: [step(3000, 2900)],
       terminations: { A: "serre-cables-etrier", B: "cosse-oeil-flamand" },
@@ -425,8 +435,17 @@ describe("the five verdict states and their grammar", () => {
     // what is wrong.
     expect(verdict.ends.A.FS).toBeGreaterThan(3);
     expect(verdictSentence(verdict)).toBe(
-      "Refusé — serre-câbles sur une ligne portant des personnes",
+      "Interdit — serre-câbles sur une ligne portant des passagers",
     );
+  });
+
+  test("no printed row, qualifier or banner says a word the interface never says", () => {
+    const results = resultsOf({ regime: "en15567" });
+    const printed = [
+      ...results.rows.flatMap((row) => [row.label, row.value, row.qualifier ?? ""]),
+      results.banner?.text ?? "",
+    ];
+    expect(printed.flatMap((text) => proscribedIn(text))).toEqual([]);
   });
 
   test("Indéterminé — the verdict is suppressed, and the count is against 260", () => {
@@ -436,6 +455,41 @@ describe("the five verdict states and their grammar", () => {
     expect(verdictSentence(evaluateVerdict({ ...synthetic(209, 260) }))).toBe(
       "Indéterminé — 209 des 260 pas résolus",
     );
+  });
+
+  test("on a terrain Page, « Marge faible » spells out the facteur de sécurité (#91)", () => {
+    const verdict = verdictOf({ steps: [step(22735, 22000)] });
+    expect(verdictSentence(verdict, "terrain")).toMatch(
+      /^Marge faible — EN 15567-1 : facteur de sécurité \d,\d\d pour k = 3,0$/,
+    );
+  });
+
+  test("refusalReason gives « Interdit »'s prohibition, and nothing for any other state", () => {
+    const refused = verdictOf({
+      steps: [step(3000, 2900)],
+      terminations: { A: "serre-cables-etrier", B: "cosse-oeil-flamand" },
+    });
+    expect(refusalReason(refused, "terrain")).toBe(
+      "serre-câbles sur une ligne portant des passagers",
+    );
+    expect(refusalReason(verdictOf({ steps: [step(3000, 2900)] }), "terrain")).toBeNull();
+  });
+
+  test("a terrain Page words the banner in its register; the state and the rows are Avancé's", () => {
+    const results = resultsOf({ regime: "en15567" });
+    const terrain = deriveResults({
+      scenario: { ...SHIPPED, regime: "en15567" },
+      base: solvedTraverseOf({ ...SHIPPED, regime: "en15567" }),
+      register: "terrain",
+    });
+    const state = results.banner?.state ?? "indetermine";
+    const text = terrain?.banner?.text ?? "";
+    expect(text.startsWith(`${label(state, "terrain")} — `)).toBe(true);
+    expect(exactTermsIn(text)).toEqual([]);
+    expect(proscribedIn(text)).toEqual([]);
+    // The `Résultats` verdict row is Avancé's own, so it stays in the exact register.
+    expect(terrain?.banner?.state).toBe(state);
+    expect(terrain?.rows).toEqual(results.rows);
   });
 
   test("the grammar never says « conforme » nor « non conforme »", () => {
@@ -467,7 +521,7 @@ describe("the five verdict states and their grammar", () => {
   }
 });
 
-describe("what suppresses what — three gates, three different consequences", () => {
+describe("what suppresses what — Solve, Clearance, Verdict: three consequences", () => {
   test("a Solve Gate breach is « Aucun résultat »: no rows at all, and no dashes", () => {
     // A textile draft with § 9's two blanks. The cause line that replaces the block is A11's, and
     // it is a sentence — never a set of dashed rows.
@@ -477,7 +531,6 @@ describe("what suppresses what — three gates, three different consequences", (
         usage: "TEMPORAIRE",
         material: { family: "textile", ropeClass: "hmpe", MBL: null, mu: null, k: 22 },
       },
-      trace: null,
       base: null,
     });
     expect(results).toBeNull();
@@ -491,7 +544,7 @@ describe("what suppresses what — three gates, three different consequences", (
   });
 
   test("a Verdict Gate breach removes the banner and the grid together", () => {
-    // « Secours textile — 10:1 » presupposes family B: unavailable on steel, and the régime row
+    // « Secours sur corde — 10:1 » presupposes family B: unavailable on steel, and the régime row
     // breaches the Verdict Gate rather than the solve.
     const results = resultsOf({ regime: "secours10" });
     expect(results.banner).toBeNull();
@@ -517,7 +570,95 @@ describe("what suppresses what — three gates, three different consequences", (
   });
 });
 
-describe("« Garde min. admise » — the clearance row judges itself (2026-09-23)", () => {
+describe("two Brins porteurs — values per line, the pair, and the « cas défavorable » (#84)", () => {
+  const PAIR: Partial<ScenarioDraft> = { regime: "en15567", carryingLines: 2 };
+  const single = resultsOf({ regime: "en15567" });
+  const pair = resultsOf(PAIR);
+
+  test("the header says once that every row is one line's", () => {
+    expect(pair.scope).toBe(PER_LINE_SCOPE);
+    expect(pair.scope).toBe("sur toute la traversée, par ligne");
+    // One line is the shipped screen, and it does not move.
+    expect(single.scope).toBe(TRAVERSE_SCOPE);
+  });
+
+  test("three detail rows join the thirteen, and only with two lines", () => {
+    expect(rowIds(pair)).toEqual([
+      "verdict",
+      "FS",
+      "Tmax",
+      "clearance",
+      "reserve",
+      "TadmA",
+      "TadmB",
+      "TmaxA",
+      "TmaxB",
+      "memberLoad",
+      "pairTotal",
+      "soleCarrier",
+      "Tstatic",
+      "amplification",
+      "loadedSag",
+      "coverage",
+    ]);
+    for (const id of ["memberLoad", "pairTotal", "soleCarrier"] as const) {
+      expect(rowIds(single)).not.toContain(id);
+    }
+  });
+
+  test("each line carries half the passager: 120 kg · 9,81 / 2 = 588,6 N", () => {
+    expect(valueOf(pair, "memberLoad")).toBe("58,9 daN");
+  });
+
+  test("the tensions printed are one line's under P/2, below the single line's", () => {
+    const perLine = pair.verdict?.headline.Tdaf ?? Number.NaN;
+    const whole = single.verdict?.headline.Tdaf ?? Number.NaN;
+    expect(perLine).toBeLessThan(whole);
+    expect(valueOf(pair, "Tmax")).toBe(formatQuantity("Tdaf", perLine));
+  });
+
+  test("the pair total is both lines at the anchor: twice the envelope the verdict judges", () => {
+    const headline = pair.verdict?.headline;
+    if (headline === undefined) throw new Error("a régime is chosen");
+    expect(valueOf(pair, "pairTotal")).toBe(formatQuantity("Tdaf", 2 * headline.Tdaf));
+  });
+
+  test("the « cas défavorable » is one line carrying P whole — the single line's own T max", () => {
+    const row = pair.rows.find((candidate) => candidate.id === "soleCarrier");
+    expect(row?.label).toBe("Cas défavorable : une seule ligne porte tout");
+    expect(row?.qualifier).toBe("ancrage A, hors verdict");
+    // Same pose, the whole passager on one member: exactly the line a single member is.
+    expect(row?.value).toBe(valueOf(single, "Tmax"));
+    expect(row?.value).toBe("928,0 daN");
+  });
+
+  test("the « cas défavorable » changes neither the Verdict's state nor its cells", () => {
+    const base = solvedTraverseOf({ ...SHIPPED, ...PAIR });
+    const scenario: ScenarioDraft = { ...SHIPPED, ...PAIR };
+    const without = deriveResults({ scenario, base: { ...base, soleCarrier: null } });
+    expect(pair.verdict).toEqual(without?.verdict);
+    expect(pair.grid).toEqual(without?.grid);
+    expect(pair.banner).toEqual(without?.banner);
+    // And the verdict is the per-line one: a line under P/2 has more margin than one under P.
+    const FS = (results: Results) => results.verdict?.ends.A.FS ?? Number.NaN;
+    expect(FS(pair)).toBeGreaterThan(FS(single));
+  });
+
+  test("a refused DAF takes the pair total and the « cas défavorable » with T max", () => {
+    const refused = resultsOf({ ...PAIR, rider: { ...SHIPPED.rider, DAF: -1 } });
+    expect(rowIds(refused)).toContain("memberLoad");
+    for (const id of ["Tmax", "pairTotal", "soleCarrier"] as const) {
+      expect(rowIds(refused)).not.toContain(id);
+    }
+  });
+
+  test("no new row says a word the interface never says", () => {
+    const printed = pair.rows.flatMap((row) => [row.label, row.value, row.qualifier ?? ""]);
+    expect(printed.flatMap((text) => proscribedIn(text))).toEqual([]);
+  });
+});
+
+describe("« Garde exigée » — the clearance row judges itself (2026-09-23)", () => {
   test("clearanceBreached: under the threshold only, and a threshold of 0 disables the check", () => {
     expect(clearanceBreached(2.42, 1)).toBe(false);
     expect(clearanceBreached(0.8, 1)).toBe(true);
@@ -532,7 +673,8 @@ describe("a scrub re-derives nothing — `vi.mock` on the engine barrel", () => 
   /**
    * React's `useMemo`, as far as the app root goes: recompute when any key moved under
    * `Object.is`. Vitest renders no hook, so the chain `useTraverse` → `useRailForm`'s report →
-   * `useResults` is rebuilt here from the same calls and the same keys.
+   * the results `useErrorSurfaces` memoises is rebuilt here from the same calls. That memo's other
+   * keys — the failure, the caret, the frame, the register — stand still through a scrub.
    */
   function memo<T>(): (compute: () => T, keys: readonly unknown[]) => T {
     let held: { keys: readonly unknown[]; value: T } | null = null;
@@ -565,12 +707,9 @@ describe("a scrub re-derives nothing — `vi.mock` on the engine barrel", () => 
     const render = () => {
       const inputs = traverseInputs(scenario);
       const traverse = traverseMemo(() => traverseScenario(inputs), Object.values(inputs));
-      const report = reportMemo(
-        () => evaluateGates({ scenario: traverse, trace: null }),
-        [traverse, null],
-      );
+      const report = reportMemo(() => evaluateGates({ scenario: traverse }), [traverse, null]);
       return resultsMemo(
-        () => derive({ scenario: traverse, trace: null, base, report }),
+        () => derive({ scenario: traverse, base, report }),
         [traverse, null, base, report],
       );
     };

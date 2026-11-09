@@ -4,7 +4,7 @@ import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { clampX } from "@/lib/scenario/geometry.ts";
-import { sweepRider } from "@/lib/scenario/traverse.ts";
+import { sweepRider, sweepRiderOf } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import {
   evaluateClearance,
@@ -16,7 +16,7 @@ import {
 
 import type { PlacedRider } from "./cells.ts";
 
-import { readOutCells } from "./cells.ts";
+import { cellsOf, readOutCells } from "./cells.ts";
 
 /** The chart's drawn-cable resolution — `CABLE_SAMPLES`, which `belowUnloaded` is read off. */
 const CABLE_SAMPLES = 240;
@@ -41,7 +41,7 @@ function riderOf(patch: (draft: ScenarioDraft) => void = () => {}): PlacedRider 
   patch(draft);
   const unloaded = deriveUnloaded(unloadedInputs(draft, null));
   if (!unloaded.ok) throw new Error("expected the line to solve");
-  const swept = sweepRider(unloaded, draft.rider);
+  const swept = sweepRider(unloaded, sweepRiderOf(draft));
   if (swept === null) throw new Error("expected the traverse to solve");
   const { input, state, span } = unloaded;
   const { L, h, terrain } = span;
@@ -71,11 +71,11 @@ describe("`readOutCells` — every cell by id, as the chart block printed it", (
     // Read off the running app at `/` with an empty Session, before the move.
     expect(readOutCells(riderOf(), { clearance: true, hClearMin: 1, unit: "daN" })).toEqual({
       clearance: { label: "Garde min. ligne", value: "2,42 m", note: false, breach: false },
-      TA: { label: "T anc. A", value: "817,1 daN", note: false, breach: false },
-      TB: { label: "T anc. B", value: "793,5 daN", note: false, breach: false },
+      TA: { label: "T anc. A", value: "817,2 daN", note: false, breach: false },
+      TB: { label: "T anc. B", value: "793,6 daN", note: false, breach: false },
       slope: { label: "Pente", value: "-19,4 %", note: false, breach: false },
-      sag: { label: "Flèche", value: "7,48 m", note: false, breach: false },
-      underRider: { label: "Garde passager", value: "2,42 m", note: false, breach: false },
+      sag: { label: "Flèche chargée", value: "7,48 m", note: false, breach: false },
+      underRider: { label: "Garde au sol", value: "2,42 m", note: false, breach: false },
       belowUnloaded: { label: "Écart à vide", value: "1,48 m", note: false, breach: false },
     });
   });
@@ -93,7 +93,7 @@ describe("`readOutCells` — every cell by id, as the chart block printed it", (
     expect(cells.underRider.value).toBe("6,68 m");
   });
 
-  test("a garde under « Garde min. admise » is the one breach, and only on that cell", () => {
+  test("a garde under « Garde exigée » is the one breach, and only on that cell", () => {
     // 2,42 m against a 3 m threshold.
     const cells = readOutCells(riderOf(), { clearance: true, hClearMin: 3, unit: "daN" });
     expect(Object.entries(cells).filter(([, cell]) => cell.breach)).toEqual([
@@ -105,14 +105,34 @@ describe("`readOutCells` — every cell by id, as the chart block printed it", (
     const cells = readOutCells(riderOf(), { clearance: false, hClearMin: 3, unit: "daN" });
     const refused = { value: "garde au sol indisponible", note: true, breach: false };
     expect(cells.clearance).toEqual({ label: "Garde min. ligne", ...refused });
-    expect(cells.underRider).toEqual({ label: "Garde passager", ...refused });
-    expect(cells.TA.value).toBe("817,1 daN");
+    expect(cells.underRider).toEqual({ label: "Garde au sol", ...refused });
+    expect(cells.TA.value).toBe("817,2 daN");
     expect(cells.belowUnloaded.value).toBe("1,48 m");
   });
 
   test("the tension cells follow the force selector", () => {
-    // 817,1 daN = 8,171 kN.
+    // 817,2 daN = 8,172 kN.
     const cells = readOutCells(riderOf(), { clearance: true, hClearMin: 1, unit: "kN" });
-    expect(cells.TA.value).toBe("8,171 kN");
+    expect(cells.TA.value).toBe("8,172 kN");
+  });
+});
+
+describe("the terrain register's cells (#91)", () => {
+  test("drop « Garde min. ligne », Avancé's alone, and name the rest in terrain words", () => {
+    expect(cellsOf("terrain")).toEqual(["TA", "TB", "slope", "sag", "underRider", "belowUnloaded"]);
+    const cells = readOutCells(riderOf(), {
+      clearance: true,
+      hClearMin: 2,
+      unit: "daN",
+      register: "terrain",
+    });
+    expect(cellsOf("terrain").map((id) => cells[id].label)).toEqual([
+      "T anc. A",
+      "T anc. B",
+      "Pente",
+      "Flèche chargée",
+      "Garde au sol",
+      "Écart à vide",
+    ]);
   });
 });

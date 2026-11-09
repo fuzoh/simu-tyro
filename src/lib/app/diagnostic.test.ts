@@ -17,6 +17,7 @@ function payloadFor(scenario: ScenarioDraft): string | null {
     at: "2026-11-07T00:00:00.000Z",
     build: "test",
     origin: "https://example.test",
+    page: "/avance",
   });
 }
 

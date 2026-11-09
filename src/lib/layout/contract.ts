@@ -111,11 +111,32 @@ export const PINNED_CELL = 44;
  */
 export const CELL_WRAP_PX = 624;
 
-/** B2 — « an aspect-legal profile cannot coexist with the rail », in **viewport** width. */
-export const RAIL_REFLOW_PX = 768;
+/**
+ * B2 — the **viewport** width from which Avancé stands on three columns, and below which they
+ * stack into one (the Chart Block first, then the Rail's sections in their own order).
+ *
+ * **1024, because that is the narrowest width a landscape tablet has**, and a stacked block is
+ * sized from the *whole* viewport width while owing {@link MIN_RAIL} under it. At 1024 × 768 the
+ * three columns leave a 448 px middle column and a 616 px block against 732 px of height, so the
+ * profile stays; stacked, the same screen would owe a 782 px block plus the Rail's floor, and open
+ * on the Pinned Safety Header alone. A 1280 switch did exactly that to 1180 × 820 and 1194 × 834
+ * too. **What it costs**: the middle column is 448 px at the switch — a three-line banner and the
+ * short View Strip labels (under B1 and under 768) — and it clears B1 (624) only from 1200.
+ * The three columns need `3 × 288 = 864` at the least. It replaced the 768 px at which the Rail
+ * alone stood beside the block.
+ */
+export const THREE_COLUMN_PX = 1024;
 
-/** The Rail Header's height, and the height of the app bar `__root.tsx` therefore cannot afford. */
+/** The Rail Header's height. */
 export const RAIL_HEADER = 44;
+
+/**
+ * The navigation bar above every app Page (ADR-0002): one row of the app's 28 px controls inside
+ * `py-1`, the same 36 px as a Rail row. **Not 44 like the Rail Header**: budget C's letterbox is
+ * 43,68 px, so a 44 px bar would pin the Chart Block on § 5's own reference desktop. It is paid at
+ * every width and never dismissed — voir `ViewportFit.navigationHeight` in `./collapse.ts`.
+ */
+export const NAV_BAR = 36;
 
 /** The floor the resting rail must clear. Measured slack at 390×664 is 124 px, which is not this. */
 export const MIN_RAIL = 120;
@@ -128,13 +149,50 @@ export const MIN_RAIL = 120;
  */
 export const COMPACT_HEIGHT_PX = 420;
 
-/** `w-72`, and it is **288 px, not 280** — every narrow-screen symptom is downstream of it. */
+/**
+ * The left column — `Paramètres` under the Rail Header. `w-72`, and it is **288 px, not 280** —
+ * every narrow-screen symptom is downstream of it.
+ */
 export const RAIL_WIDTH = 288;
+
+/** The right column — `Valeurs déduites`, `Résultats`, `Provenance`, `Ce que cet outil ne calcule pas`. */
+export const RIGHT_COLUMN_WIDTH = 288;
+
+/**
+ * The shell's cap, px: past it the three columns stay centred rather than stretching the x scale
+ * edge to edge. `1728 − 288 − 288 = 1152` is {@link REFERENCE_COLUMN_PX}, so the middle column
+ * never outgrows the plot's own ceiling.
+ */
+export const SHELL_MAX_PX = 1728;
+
+/**
+ * Does Avancé stand on three columns at this viewport width? The `min-[1024px]:` classes decide the
+ * layout; this is the same threshold for what the CSS cannot decide — whether to **start** an
+ * occupant only the middle column shows, the vue de dessus (#104), rather than leave it running in
+ * a `display: none` box. It sizes nothing.
+ */
+export function threeColumns(viewportWidth: number): boolean {
+  return viewportWidth >= THREE_COLUMN_PX;
+}
+
+/**
+ * **The chart column's inline size at a viewport width** — the middle column from
+ * {@link THREE_COLUMN_PX}, the whole shell below it. The shell measures its own column with a
+ * `ResizeObserver`; this is the same number from the contract's constants, for the budgets and
+ * tests that have no DOM. It ignores the two hairline pixels of the shell's border past the cap,
+ * and the middle column's scrollbar gutter, which is the platform's (0 where scrollbars overlay).
+ */
+export function chartColumnWidth(viewportWidth: number): number {
+  const shell = Math.min(viewportWidth, SHELL_MAX_PX);
+  return threeColumns(viewportWidth) ? shell - RAIL_WIDTH - RIGHT_COLUMN_WIDTH : shell;
+}
 
 /**
  * § 5's **reference desktop** — the viewport budget C is written for, and now also the width at
  * which the plot stops growing (**amendment F**, `../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md`).
  * It is a width and never a height: what budget C contributes here is its *column*, not its 900 px.
+ * With one column beside the chart that column is reached at 1440; with Avancé's two, at
+ * {@link SHELL_MAX_PX}.
  */
 export const REFERENCE_DESKTOP_PX = 1440;
 
@@ -176,10 +234,16 @@ export const PROFILE_PLOT_MAX: number = PROFILE_ASPECT * innerWidth(REFERENCE_CO
 export const BANNER = { oneLine: 44, twoLines: 60, threeLines: 76 } as const;
 
 /**
+ * The chart column under which the banner's sentence takes three lines rather than two. It is where
+ * the text wraps, not where the layout does: it was `768 − 288`, the column the old Rail reflow
+ * produced, and the number stayed when B2 moved.
+ */
+export const BANNER_TWO_LINES_PX = 480;
+
+/**
  * **The banner slot's height as a function of width, like every other band** — § 5's budget table
  * read down its own column: 76 px at a 390 px column, 60 px at 480, 44 px at 1152. The two
- * thresholds are constants this module already has: B1, and the column width B2 itself produces
- * (`768 − 288`). No new breakpoint, and no line-counting.
+ * thresholds are B1 and {@link BANNER_TWO_LINES_PX}. No line-counting.
  *
  * It exists because {@link chartBlockHeight} needs a *budget* for the slot and the two ways of
  * getting one are both worse. Measuring the rendered occupant would make the collapse a function of
@@ -191,7 +255,7 @@ export const BANNER = { oneLine: 44, twoLines: 60, threeLines: 76 } as const;
  */
 export function bannerBudget(columnWidth: number): number {
   if (columnWidth >= CELL_WRAP_PX) return BANNER.oneLine;
-  return columnWidth >= RAIL_REFLOW_PX - RAIL_WIDTH ? BANNER.twoLines : BANNER.threeLines;
+  return columnWidth >= BANNER_TWO_LINES_PX ? BANNER.twoLines : BANNER.threeLines;
 }
 
 /** The chart column's inner width — the one input every band height is a function of. */
@@ -299,47 +363,9 @@ export function chartBlockHeight(
   );
 }
 
-/**
- * § 5's anchor target — « each with a **44 × 48 px** hit target spanning the lane plus the label
- * band ». The 48 is **derived**, {@link PROFILE_CHROME}'s `handleLane + xLabels`: the target *is*
- * those two rows, so it cannot drift from them, and 44 is the coarse-pointer minimum the rider's
- * grab circle already meets.
- */
-export const ANCHOR_TARGET = {
-  width: 44,
-  height: PROFILE_CHROME.handleLane + PROFILE_CHROME.xLabels,
-} as const;
-
-/** An anchor's hit target in the Handle Lane, in the profile SVG's own user coordinates. */
-export type AnchorTarget = {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-};
-
-/**
- * One anchor's target, placed. **Entirely below the plot area**, which is the whole point: the
- * anchors are pinned at the domain edges, so at 390 px a 44 px target covers the first and last
- * 12 % of the span and the rider glyph overlaps it whenever `x_D` comes within ~46 m of an anchor.
- * You cannot size your way out of two targets that are always at `x = 0` and `x = L` — putting them
- * in their own lane makes confusing one with the rider geometrically impossible.
- *
- * @param centreX the anchor's x in SVG user units — `SharedX.x(0)` or `SharedX.x(L)`.
- * @param laneTop the Handle Lane's top edge, i.e. the **bottom of the plot area**.
- */
-export function anchorTarget(centreX: number, laneTop: number): AnchorTarget {
-  return {
-    x: centreX - ANCHOR_TARGET.width / 2,
-    y: laneTop,
-    width: ANCHOR_TARGET.width,
-    height: ANCHOR_TARGET.height,
-  };
-}
-
 // ─── § 5 — One shared x scale object, one `GUTTER`, one inverse ────────────────────────────────
 
-/** The span margin each side of the x domain: `[d_A − 0,05 L, d_B + 0,05 L]`, i.e. `1,1 L` wide. */
+/** The span margin each side of the x domain: `[−0,05 L, 1,05 L]`, i.e. `1,1 L` wide. */
 export const X_MARGIN = 0.05;
 
 /**
@@ -374,18 +400,16 @@ export type SharedX = {
 };
 
 /**
- * § 4's shared x domain: **`[d_A − 0,05 L, d_B + 0,05 L]`, clamped to the trace extent** — so a
- * whole-trace import makes the domain exactly the trace.
+ * § 4's shared x domain: **`[−0,05 L, 1,05 L]`, clamped to the trace extent** — an imported profil
+ * runs anchor to anchor, so there the domain is exactly the span.
  *
  * It is a function of `(L, terrain source)` alone and **not of the box**, which is why the drawn
- * ground polyline can be built from it before any width is measured. The margin is not decoration:
- * with a domain of exactly `[0, L]`, dragging anchor A inward rescales the chart under the cursor
- * *and* makes the terrain you just excluded vanish. The clearance curve stays undefined outside
- * `[0, L]`, which marks the span's boundaries for free.
+ * ground polyline can be built from it before any width is measured. The clearance curve stays
+ * undefined outside `[0, L]`, which marks the span's boundaries for free.
  *
- * @param L the span, m. Must be finite and positive: `L ≤ 0` is § 4's degenerate placement, which
- *   the form blocks with « L doit être > 0 » and `[ Inverser A et B ]`, so reaching the scale with
- *   it is a caller bug of `sampleCable`'s class rather than a state to render.
+ * @param L the span, m. Must be finite and positive: a geometry with no span is § 8's geometric
+ *   exception, which never reaches the scale, so reaching it with one is a caller bug of
+ *   `sampleCable`'s class rather than a state to render.
  * @param extent the terrain's own horizontal extent in the **span frame** (metres from anchor A),
  *   or `null` in manual mode, where the ground is the straight line between the two anchor bases.
  * @throws RangeError when `L` is not finite and positive.
@@ -469,7 +493,7 @@ export type VeBadgeState =
   /** The ×1 clamp is in force and everything still fits — peek **disabled, already in force**. */
   | "true-scale"
   /**
-   * The clamp is in force and the sag leaves the frame — « · câble hors cadre ». The peek is disabled
+   * The clamp is in force and the sag leaves the frame — « · ligne hors cadre ». The peek is disabled
    * where the **data** put the cable out of frame and **enabled** where the cap did, which is one bit
    * this three-row state cannot carry: voir {@link ClipCause} and {@link peekMode}.
    */
@@ -677,17 +701,17 @@ export function createZScale({
 }
 
 /**
- * The badge's text — « Éch. verticale ×4,7 », « … ×1 — vraie échelle », « … · câble hors cadre ».
+ * The badge's text — « Éch. verticale ×4,7 », « … ×1 — vraie échelle », « … · ligne hors cadre ».
  *
  * The clamped rows read « ×1 » and never « ×1,0 »: the floor is exact, and a decimal on it would
  * suggest a measurement where there is a rule.
  */
-export function veBadgeLabel(exaggerationValue: Exaggeration): string {
+export function veBadgeLabel(exaggerationValue: Pick<Exaggeration, "state" | "ve">): string {
   if (exaggerationValue.state === "auto") {
     return `Éch. verticale ×${exaggerationValue.ve.toFixed(1).replace(".", ",")}`;
   }
   const base = "Éch. verticale ×1 — vraie échelle";
-  return exaggerationValue.state === "true-scale-clipped" ? `${base} · câble hors cadre` : base;
+  return exaggerationValue.state === "true-scale-clipped" ? `${base} · ligne hors cadre` : base;
 }
 
 /**
@@ -700,7 +724,7 @@ export function veBadgeLabel(exaggerationValue: Exaggeration): string {
  * - `"fit"` — the user's **decision 4** hold, which draws the whole cable at {@link
  *   Exaggeration.autofit} and is therefore **below true scale**. That is the one drawing in the app
  *   that compresses, so the badge names both halves of it: the factor, « sous la vraie échelle », and
- *   « câble entier » where the resting row read « câble hors cadre ». It is reachable only under the
+ *   « ligne entière » where the resting row read « ligne hors cadre ». It is reachable only under the
  *   control — **held** on a fine pointer, **latched until the next press** from the keyboard and on a
  *   coarse pointer — and the printed « Garde min » — § 5's non-positional signal — is unaffected by
  *   any of it.
@@ -709,10 +733,10 @@ export function veBadgeLabel(exaggerationValue: Exaggeration): string {
  * requires the same line to be whole at {@link PROFILE_ASPECT}, i.e. `k ≥ 1 / (1,24 × 0,42)` = 1,92,
  * and the cap holds `plotAspect` above 0,1 at any column a browser can produce.
  */
-export function peekBadgeLabel(exaggerationValue: Exaggeration): string {
+export function peekBadgeLabel(exaggerationValue: Pick<Exaggeration, "peek" | "autofit">): string {
   if (exaggerationValue.peek !== "fit") return "Éch. verticale ×1 — vraie échelle";
   const factor = exaggerationValue.autofit.toFixed(1).replace(".", ",");
-  return `Éch. verticale ×${factor} — sous la vraie échelle · câble entier`;
+  return `Éch. verticale ×${factor} — sous la vraie échelle · ligne entière`;
 }
 
 // ─── The clearance strip's vertical domain — quantised, with a reserved negative band ──────────
@@ -854,3 +878,12 @@ export function clearanceTickLabel(tick: number, withUnit: boolean): string {
     : rounded.toFixed((rounded * 10) % 1 === 0 ? 1 : 2);
   return `${text.replace(".", ",").replace("-", "−")}${withUnit ? " m" : ""}`;
 }
+
+/**
+ * How far the **Banane** bows, per m/s of the wind's cross component: a fraction of the drawn
+ * line's length. `[CONVENTION]` — a drawing choice that makes more wind read as more bow, never an
+ * engine output, never a length in metres: no lateral scale, no `Cd` stands behind it (decision of
+ * #6, amendment of 2026-11-08; research #9 gives the shape and no coefficient). Changing it changes
+ * how a bow looks, not what the app computes.
+ */
+export const BANANE_FACTOR = 0.01;

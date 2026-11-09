@@ -5,6 +5,7 @@ import { formatQuantity } from "@/lib/format/quantity.ts";
 import type { FieldId } from "./fields.ts";
 
 import {
+  AVANCE_SETTING,
   checkField,
   commitField,
   CONSTRUCTION_OPTIONS,
@@ -12,12 +13,17 @@ import {
   emptyMessage,
   FIELD_ORDER,
   FIELDS,
+  fieldErrorLabel,
+  fieldLabel,
   fieldSchema,
+  isHiddenOnTerrain,
   gateOf,
   parseDecimal,
+  regimeChoice,
   riderPositionEntry,
   REQUIRED_MESSAGE,
   ROPE_CLASS_OPTIONS,
+  usageOptions,
   warningFor,
 } from "./fields.ts";
 
@@ -75,6 +81,14 @@ describe("§ 7's message table — the empty state, neutral and lowercase", () =
   });
 });
 
+describe("the optional textile diameter", () => {
+  test("blank is absent, not « valeur requise »; a non-positive value is still refused", () => {
+    expect(checkField("dTextile", "")).toBeNull();
+    expect(checkField("dTextile", "11")).toBeNull();
+    expect(checkField("dTextile", "0")?.kind).toBe("invalid");
+  });
+});
+
 describe("§ 7's message table — committed invalid, ⛔ and blocking", () => {
   /** `⛔ <Champ> — <la règle, énoncée>. Valeur : <v>.` — the template is fixed. */
   const ROWS: readonly [FieldId, string, string][] = [
@@ -84,12 +98,17 @@ describe("§ 7's message table — committed invalid, ⛔ and blocking", () => {
     [
       "D_target",
       "0",
-      "⛔ Flèche à vide cible — une flèche strictement positive est requise. Valeur : 0,00 m.",
+      "⛔ Flèche à vide — une flèche strictement positive est requise. Valeur : 0,00 m.",
+    ],
+    [
+      "T_target",
+      "0",
+      "⛔ Prétension — une tension strictement positive est requise. Valeur : 0,0 daN.",
     ],
     [
       "H_target",
       "0",
-      "⛔ Prétension cible — une tension strictement positive est requise. Valeur : 0,0 daN.",
+      "⛔ Tension horizontale — une tension strictement positive est requise. Valeur : 0,0 daN.",
     ],
     [
       "L0",
@@ -104,12 +123,12 @@ describe("§ 7's message table — committed invalid, ⛔ and blocking", () => {
     [
       "hRider",
       "0",
-      "⛔ Enveloppe passager — une hauteur strictement positive est requise. Valeur : 0,0 m.",
+      "⛔ Gabarit du passager — une hauteur strictement positive est requise. Valeur : 0,0 m.",
     ],
     [
       "DAF",
       "0",
-      "⛔ Coefficient dynamique — une valeur strictement positive est requise. Valeur : 0,0.",
+      "⛔ Majoration au départ — une valeur strictement positive est requise. Valeur : 0,0.",
     ],
     [
       "d",
@@ -129,7 +148,12 @@ describe("§ 7's message table — committed invalid, ⛔ and blocking", () => {
     [
       "k",
       "0",
-      "⛔ Raideur relative k — une valeur strictement positive est requise. Valeur : 0,0.",
+      "⛔ Raideur relative k — une valeur strictement positive est requise. Valeur : 0,00.",
+    ],
+    [
+      "windSpeed",
+      "-5",
+      "⛔ Vitesse du vent — une vitesse négative n'existe pas. Valeur : −5 km/h.",
     ],
   ];
 
@@ -162,22 +186,56 @@ describe("§ 7's message table — committed invalid, ⛔ and blocking", () => {
     expect(checkField("h", "0")).toBeNull();
   });
 
-  test("a station names the file's bound rather than the field, because two stations share it", () => {
-    const extent = { min: 0, max: 224 };
-    expect(checkField("sa", "260", { extent })).toEqual({
-      field: "sa",
-      kind: "invalid",
-      message: "⛔ Station hors du tracé (0,0 – 224,0 m). Valeur : 260,0 m.",
-    });
-    expect(checkField("sb", "224", { extent })).toBeNull();
-  });
-
   test("an out-of-range but representable value is **valid** here", () => {
     // The URL is a typing boundary and so is the form's tier one: `L = 3000` lights up a warning
     // and solves, and `L₀` below §5.4's floor is the **engine's** refusal, never a field error.
     expect(checkField("L", "3000")).toBeNull();
     expect(checkField("L0", "1")).toBeNull();
     expect(checkField("d", "60")).toBeNull();
+  });
+});
+
+describe("the ride's constants (#104) — §12.2's, in the Ride Gate", () => {
+  test("they breach the Ride Gate: only the passager's ride reads them, in either mode", () => {
+    for (const id of ["CdA", "F0", "kv", "trolleyMu", "rho"] as const) {
+      expect(gateOf(id, "manual")).toBe("ride");
+      expect(gateOf(id, "trace")).toBe("ride");
+    }
+  });
+
+  test("zero is a value, a negative one is refused, and ρ alone may be blank", () => {
+    expect(checkField("CdA", "0")).toBeNull();
+    expect(checkField("CdA", "-0,1")?.message).toBe(
+      // § 7's template, as the anchor heights' rows above read it.
+      "⛔ Surface de traînée C_dA — une surface négative n'existe pas. Valeur : −0,10 m².",
+    );
+    expect(checkField("F0", "-1")?.kind).toBe("invalid");
+    expect(checkField("kv", "-1")?.kind).toBe("invalid");
+    expect(checkField("trolleyMu", "-1")?.kind).toBe("invalid");
+    expect(checkField("rho", "-1")?.kind).toBe("invalid");
+    expect(checkField("rho", "")).toBeNull();
+    expect(checkField("CdA", "")?.kind).toBe("empty");
+  });
+
+  test("`C_dA` outside 0,30 – 0,60 m² is warned: the band is the field's own, a convention", () => {
+    expect(warningFor("CdA", 0.45)).toBeNull();
+    expect(warningFor("CdA", 0.3)).toBeNull();
+    expect(warningFor("CdA", 0.6)).toBeNull();
+    expect(warningFor("CdA", 0.2)).toBe(
+      "surface hors de la plage du champ (0,30 – 0,60 m²) [CONVENTION]",
+    );
+    expect(warningFor("CdA", 0.8)).toContain("[CONVENTION]");
+  });
+
+  test("their labels are the registry's, and a terrain Page never names them", () => {
+    expect(FIELDS.CdA.label).toBe("Surface de traînée C_dA");
+    expect(FIELDS.F0.label).toBe("Frottement constant de la poulie F₀");
+    expect(FIELDS.kv.label).toBe("Frottement de la poulie proportionnel à la vitesse k_v");
+    expect(FIELDS.trolleyMu.label).toBe("Frottement de la poulie μ");
+    expect(FIELDS.rho.label).toBe("Masse volumique de l'air ρ");
+    for (const id of ["CdA", "F0", "kv", "trolleyMu", "rho"] as const) {
+      expect(fieldLabel(id, "terrain")).toBe(AVANCE_SETTING);
+    }
   });
 });
 
@@ -264,10 +322,24 @@ describe("the gate each field belongs to — wired with the field, not as a late
   });
 
   test("the anchor heights move to the Solve Gate in imported mode, because `h` derives there", () => {
-    // § 7's culprit table: « `h` importé → Station A, Station B, Hauteur A, Hauteur B ».
+    // § 7's culprit table, less the stations #88 retired: « `h` importé → Hauteur A, Hauteur B ».
     expect(gateOf("zA", "manual")).toBe("clearance");
     expect(gateOf("zA", "trace")).toBe("solve");
     expect(gateOf("zB", "trace")).toBe("solve");
+  });
+
+  test("the Vent fields breach the Wind Gate, never the statics or the Verdict (#87)", () => {
+    for (const mode of ["manual", "trace"] as const) {
+      expect(gateOf("windSpeed", mode)).toBe("wind");
+      expect(gateOf("windDirection", mode)).toBe("wind");
+    }
+  });
+
+  test("no wind is a valid value, and any direction is — it is read modulo 360°", () => {
+    expect(checkField("windSpeed", "0")).toBeNull();
+    expect(checkField("windDirection", "-90")).toBeNull();
+    expect(checkField("windDirection", "450")).toBeNull();
+    expect(checkField("windDirection", "abc")?.kind).toBe("unreadable");
   });
 
   test("« régime choisi » is in the Verdict Gate and nowhere else", () => {
@@ -342,8 +414,94 @@ describe("the option labels the Rail and the link strip share", () => {
       { value: "polyester", label: "Polyester semi-statique" },
     ]);
     expect(CONSTRUCTION_OPTIONS).toEqual([
-      { value: "fibre-core", label: "6×19 âme textile" },
-      { value: "iwrc", label: "6×19 âme métallique" },
+      { value: "fibre-core", label: "6×19" },
+      { value: "iwrc", label: "6×19 métallique" },
+    ]);
+  });
+});
+
+describe("the Rail labels its fields in the exact register", () => {
+  const LABELS_BY_FIELD: readonly (readonly [FieldId, string])[] = [
+    ["usage", "Installation"],
+    ["regime", "Régime de sécurité"],
+
+    ["D_target", "Flèche à vide"],
+    ["tensioningSide", "Côté de la Mise en tension"],
+    // #85: the prétension is read at the tensioning anchor; `H` keeps its own exact name.
+    ["T_target", "Prétension"],
+    ["H_target", "Tension horizontale"],
+    ["L0", "Longueur non tendue"],
+    ["vRatio", "Rapport V"],
+    ["hRider", "Gabarit du passager"],
+    ["hClearMin", "Garde exigée"],
+    ["DAF", "Majoration au départ"],
+    ["windSpeed", "Vitesse du vent"],
+    ["windDirection", "Direction du vent"],
+    ["cst", "Construction"],
+    ["ta", "Terminaison A"],
+    ["etaA", "Rendement η"],
+  ];
+
+  test.each(LABELS_BY_FIELD)("%s reads « %s »", (id, expected) => {
+    expect(FIELDS[id].label).toBe(expected);
+  });
+
+  test("the passenger's mass is named a passager's in a message, never a charge", () => {
+    expect(FIELDS.mp.errorLabel).toBe("Masse du passager");
+  });
+});
+
+describe("the terrain register — a simplified Page's names for the fields (#61, #91)", () => {
+  test("a renamed quantity is labelled in terrain words there, and in exact ones on Avancé", () => {
+    expect(fieldLabel("T_target", "terrain")).toBe("Tension de pose");
+    expect(fieldLabel("T_target")).toBe("Prétension");
+    expect(fieldLabel("regime", "terrain")).toBe("Marge exigée");
+    expect(fieldLabel("d", "terrain")).toBe("Diamètre");
+    expect(fieldLabel("mp", "terrain")).toBe(FIELDS.mp.label);
+  });
+
+  test("tier one's message names the field the way the Page labels it", () => {
+    expect(checkField("T_target", "abc", { register: "terrain" })?.message).toBe(
+      "⛔ Tension de pose — nombre illisible. Saisie : « abc ».",
+    );
+  });
+
+  test("a field only Avancé shows is never named by its exact term on a terrain Page", () => {
+    const hidden: readonly FieldId[] = [
+      "DAF",
+      "etaA",
+      "etaB",
+      "ta",
+      "tb",
+      "k",
+      "muTextile",
+      "vRatio",
+    ];
+    for (const id of hidden) {
+      expect(isHiddenOnTerrain(id)).toBe(true);
+      expect(fieldLabel(id, "terrain")).toBe(AVANCE_SETTING);
+      expect(fieldErrorLabel(id, "terrain")).toBe(AVANCE_SETTING);
+      expect(fieldErrorLabel(id)).toBe(FIELDS[id].errorLabel);
+    }
+    for (const id of ["T_target", "regime", "mp", "L"] as const) {
+      expect(isHiddenOnTerrain(id)).toBe(false);
+    }
+  });
+});
+
+describe("the shared choice rows' values", () => {
+  test("the régime picker yields no régime for its empty entry or an id the engine does not know", () => {
+    expect(regimeChoice("")).toBeNull();
+    expect(regimeChoice("en15567")).toBe("en15567");
+    expect(regimeChoice("zz")).toBeNull();
+    expect(regimeChoice("toString")).toBeNull();
+  });
+
+  test("the installation reads the same on both registers", () => {
+    expect(usageOptions("terrain")).toEqual(usageOptions("exact"));
+    expect(usageOptions("terrain").map((option) => option.label)).toEqual([
+      "Installation permanente",
+      "Installation temporaire",
     ]);
   });
 });

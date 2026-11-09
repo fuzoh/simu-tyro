@@ -23,12 +23,12 @@
  * - **The km hint belongs here, not to the parse failures.** That file *was* accepted and the hint
  *   qualifies terrain now in use — a blocking failure has no scenario to disclose.
  * - **The copy is the spec's, verbatim.** Only the numbers are computed, and they carry the app's
- *   one decimal mark.
+ *   one decimal mark. A profil geo.admin (#103) is named as one, with swisstopo's attribution.
  */
 
 import { DECIMAL_MARK } from "@/lib/format/quantity.ts";
 
-import type { Trace } from "./trace.ts";
+import type { Trace, TraceOrigin } from "./trace.ts";
 
 import { maxSpacing, traceExtent } from "./trace.ts";
 
@@ -49,6 +49,53 @@ export type DisclosureLine = {
 export type TerrainSource =
   | { readonly kind: "manual" }
   | { readonly kind: "trace"; readonly trace: Trace };
+
+/**
+ * The terrain *this run* uses — the active Trace, or manual ground. A cached Trace under manual
+ * geometry is not a source: every Page that discloses the terrain asks here, so they cannot differ.
+ */
+export function terrainSource(
+  geometrySource: "manual" | "trace",
+  trace: Trace | null,
+): TerrainSource {
+  return geometrySource === "trace" && trace !== null
+    ? { kind: "trace", trace }
+    : { kind: "manual" };
+}
+
+/**
+ * How the Rail names a profil: a CSV by its file, the two others by where they came from (#103).
+ * A link carries no filename, so a profil it brought is only ever « reçu par lien ».
+ */
+export function traceName(origin: TraceOrigin): string {
+  switch (origin.kind) {
+    case "csv":
+      return origin.fileName;
+    case "geoadmin":
+      return "profil geo.admin";
+    case "lien":
+      return "profil reçu par lien";
+  }
+}
+
+/**
+ * § 4's import controls and their file-identity line, worded once for every Page that takes a
+ * profil — the label tables of the simplified Pages read it from here.
+ */
+export const PROFILE_IMPORT_COPY = {
+  choose: "Importer un profil…",
+  remove: "Retirer le profil",
+  reuse: "Réutiliser ce profil",
+  reuseCsv: "Réutiliser le CSV",
+  chooseAnother: "Choisir un autre fichier",
+  none: "(aucun profil)",
+  unused: "(non utilisé)",
+  cachedCsv: "Profil en mémoire :",
+  retainedCsv: "CSV en mémoire :",
+} as const;
+
+/** The source mention a profil geo.admin carries wherever it is shown (#103). */
+export const SWISSTOPO_ATTRIBUTION = "Altitudes © swisstopo, service de profil de geo.admin.ch.";
 
 /** § 4's warning threshold on the measured max spacing, m. Crossed at a span of ≈995 m. */
 export const COARSE_SPACING_M = 5;
@@ -87,9 +134,9 @@ export function terrainDisclosure(source: TerrainSource): readonly DisclosureLin
         tier: "info",
         text: "Terrain — ligne droite entre les pieds d'ancrage (aucun profil importé)",
         detail:
-          "Sur un sol plan, garde ≈ lerp(hauteurs d'ancrage) − flèche chargée − enveloppe " +
-          "passager : le dénivelé ne gagne aucune garde. Mesuré, à L, flèche et hauteurs " +
-          "constantes : garde min 2,43 / 2,42 / 2,34 / 2,22 m pour h = 0 / −18 / −40 / −60 m. " +
+          "Sur un sol plan, garde au sol ≈ hauteurs d'ancrage interpolées − flèche chargée − gabarit " +
+          "du passager : le dénivelé ne gagne aucune garde. Mesuré, à L, flèche et hauteurs " +
+          "constantes : garde au sol minimale 2,43 / 2,42 / 2,34 / 2,22 m pour h = 0 / −18 / −40 / −60 m. " +
           "Une traversée de gorge modélisée à la main lit donc un échec qui n'existe pas — " +
           "mesuré −62,8 m sur une ligne de 1109 m. Importez un profil pour le relief réel.",
       },
@@ -99,11 +146,12 @@ export function terrainDisclosure(source: TerrainSource): readonly DisclosureLin
   const { trace } = source;
   const spacing = maxSpacing(trace);
   const extent = traceExtent(trace);
+  const sampling = `${trace.d.length} points · pas max ${fr(spacing, 1)} m`;
   const lines: DisclosureLine[] = [
-    {
-      tier: "plain",
-      text: `Profil importé · ${trace.d.length} points · pas max ${fr(spacing, 1)} m`,
-    },
+    trace.origin.kind === "geoadmin"
+      ? // swisstopo's terms of use ask for the source beside data drawn from its services.
+        { tier: "plain", text: `Profil geo.admin · ${sampling}`, detail: SWISSTOPO_ATTRIBUTION }
+      : { tier: "plain", text: `Profil importé · ${sampling}` },
   ];
 
   if (spacing > COARSE_SPACING_M) {
@@ -133,12 +181,12 @@ function straightnessLine(dev: number | null, extent: number): DisclosureLine {
     return { tier: "info", text: "Rectitude non vérifiable (coordonnées absentes)." };
   }
   if (isStraight(dev, extent)) {
-    return { tier: "ok", text: `Tracé rectiligne (écart max ${fr(dev, 2)} m)` };
+    return { tier: "ok", text: `Profil rectiligne (écart max ${fr(dev, 2)} m)` };
   }
   return {
     tier: "warn",
-    text: `Tracé non rectiligne (écart max ${fr(dev, 2)} m sur ${fr(extent, 1)} m).`,
-    detail: "La portée L est mesurée le long du tracé, pas en ligne droite — elle est surestimée.",
+    text: `Profil non rectiligne (écart max ${fr(dev, 2)} m sur ${fr(extent, 1)} m).`,
+    detail: "La portée L est mesurée le long du profil, pas en ligne droite — elle est surestimée.",
   };
 }
 

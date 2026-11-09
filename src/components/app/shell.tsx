@@ -52,14 +52,19 @@ import {
   STRIP,
   VIEW_STRIP,
 } from "@/lib/layout/contract.ts";
+import { SECTION } from "@/lib/statique/copy.ts";
 import { cn } from "@/lib/utils.ts";
 
-/** The Rail Header's static text. `__root.tsx` carries no app bar — this is the app's only name. */
+/** The Rail Header's static text — the navigation bar names Pages, not the app. */
 export const APP_NAME = "Scoutech";
 
-/** § 9's five Rail sections, in order. The Skeleton reproduces the headings and nothing under them. */
-export const RAIL_SECTIONS = [
-  "Paramètres",
+/**
+ * § 9's five Rail sections, in order, split by the column that holds them from B2 up — `Paramètres`
+ * on the left, the four that report on the right. Stacked, the Rail reads them as one run in this
+ * order. The Skeleton reproduces the headings and nothing under them.
+ */
+export const LEFT_SECTIONS = ["Paramètres"] as const;
+export const RIGHT_SECTIONS = [
   "Valeurs déduites",
   "Résultats",
   "Provenance",
@@ -67,7 +72,7 @@ export const RAIL_SECTIONS = [
 ] as const;
 
 /**
- * The read-out cells — § 5's five, plus « Garde passager » and « Écart à vide » (2026-09-23). **All
+ * The read-out cells — § 5's five, plus « Garde au sol » and « Écart à vide » (2026-09-23). **All
  * of them at every width, no subset and no horizontal scroll** — a subset would delete the printed
  * number that justified drawing a sub-pixel rider envelope at 1500 m in the first place, and
  * horizontal scroll would hide « Garde min » behind a gesture that competes with the scrub.
@@ -107,9 +112,10 @@ export const NOSCRIPT_LINE = "Ce simulateur nécessite JavaScript pour fonctionn
 /**
  * The layout contract as CSS custom properties. `100cqi` is the **chart column's** inline size —
  * the column is the query container, so `--w-inner` is exactly § 5's `W_inner = col − 48`, and
- * every band below is a function of it and of nothing else.
+ * every band below is a function of it and of nothing else. Exported for the other Pages that
+ * stand the Chart Block in a column of their own — Statique — so its bands read the same contract.
  */
-const LAYOUT_VARS = {
+export const LAYOUT_VARS = {
   "--gutter": `${GUTTER}px`,
   "--w-inner": `calc(100cqi - ${2 * GUTTER}px)`,
   "--profile-badge": `${PROFILE_CHROME.badge}px`,
@@ -148,13 +154,16 @@ const LAYOUT_VARS = {
 // the value is simply absent until a keyboard is up.
 
 /**
- * The shell: a fixed-height box with internal scrollers, never a document scroll. **A document
+ * The shell: a fixed-height box with internal scrollers, never a document scroll — the height
+ * `PageFrame` leaves under the navigation bar (`@/components/app/navigation-bar.tsx`). **A document
  * scroll was rejected** because the Chart Block's collapse trigger would then have to read
  * `window.scrollY` *and* survive iOS's document-scroll-under-keyboard behaviour, where a fixed
  * shell plus `interactive-widget=resizes-content` gives the same result with one known scroller.
  *
- * B2 lives on the one `md:` here — below 768 px of viewport the row becomes a column and the Rail
- * goes `order-last`, in flow, pushing rather than covering. No bottom sheet: Base UI 1.6.0 ships a
+ * B2 is `THREE_COLUMN_PX`, spelled `min-[1024px]:` below — from it the row is **three columns**: the
+ * Rail's `Paramètres` on the left, the Chart Block in the middle, the Rail's reports on the right.
+ * Under it the row becomes a column and both Rail halves go `order-last` inside one scroller, in
+ * flow, pushing rather than covering. No bottom sheet: Base UI 1.6.0 ships a
  * Drawer, and it was declined on **occlusion** — a portalled fixed popup covers the bottom of the
  * viewport at every snap point, which is exactly where the read-out cells and the strip's zero
  * crossing live.
@@ -172,8 +181,11 @@ const LAYOUT_VARS = {
  * height there, and the Rail is the chart column's sibling.
  *
  * **Which of the two absorbs the residual flips at B2, and that is § 5's budget A, not styling.**
- * In a row the Rail is the fixed 288 px (`md:w-72 md:flex-none`) and the chart column takes the
- * rest of the *width* (`md:flex-1`). In a column the Chart Block keeps its **budgeted height**
+ * In a row the two Rail columns are the fixed 288 px each (`min-[1024px]:w-72`) and the chart
+ * column takes the rest of the *width* (`min-[1024px]:flex-1`). **The scroller wrapper is
+ * `display: contents` there**, so the two columns are the chart's own flex siblings and each scrolls
+ * itself, while below B2 the same wrapper is the one Rail scroller the collapse reads. A focus or
+ * blur inside either column still bubbles to it. In a column the Chart Block keeps its **budgeted height**
  * (`flex-none`, so the band stack measures itself) and the **Rail** is the residual scroller
  * (`flex-1 min-h-0 overflow-y-auto`) — budget A reads « bloc 540 · reste : rail en flux 124 », and
  * `MIN_RAIL = 120` is a floor on the Rail, never on the block. The other way round the Rail's ~60
@@ -189,11 +201,13 @@ export function Shell({
   collapse = "whole",
   onRailFocus,
   onRailScroll,
-  rail,
+  left,
+  right,
   chart,
   chartRef,
   strip,
   tight = false,
+  views,
 }: {
   /** The Skeleton sets it. No `aria-live` region and no spinner — see {@link Skeleton}. */
   busy?: boolean;
@@ -216,14 +230,24 @@ export function Shell({
   /**
    * **Is the reduction forced by the height rather than asked for?** § 5's (c) and its `compact`
    * row, as one flag, published as `data-fit` — `src/styles.css` gates the same bands on it that
-   * `max-md:` gates on B2, because a block that does not fit does not fit at any width. **This is
-   * the whole of the landscape case**: an 844 × 390 phone is *above* B2, so without it the profile
-   * would stand at full height inside an `overflow-hidden` shell 390 px tall and clip the View
-   * Strip and « Garde min » out of the viewport. The Skeleton passes nothing.
+   * its `width < 1024px` arm gates on B2, because a block that does not fit does not fit at any
+   * width. **This is the whole of the short-desktop case**: three columns at 1440 × 500 are *above*
+   * B2, so without it the profile would stand at full height inside an `overflow-hidden` shell
+   * 500 px tall and clip the View Strip and « Garde min » out of the viewport. The Skeleton passes
+   * nothing.
    */
   tight?: boolean;
-  rail: ReactNode;
+  /** The left column: the Rail Header, then `Paramètres`. */
+  left: ReactNode;
+  /** The right column: the Rail's four reporting sections. Empty for a surface that has none. */
+  right?: ReactNode;
   chart: ReactNode;
+  /**
+   * The middle column's views under the Chart Block, three columns only (#104): Statique's vue de
+   * dessus, never one of Avancé's own. Below B2 there is no middle column — the block stands over
+   * the Rail — and the box is `display: none`. The Skeleton passes the empty frame.
+   */
+  views?: ReactNode;
   /**
    * § 8's « clé ignorée » strip — **full width, above rail and charts**, and never the banner slot:
    * it is about the link and not the line. The Skeleton passes nothing, which is correct: it is
@@ -241,7 +265,7 @@ export function Shell({
   return (
     <div
       aria-busy={busy || undefined}
-      className="bg-background text-foreground flex h-dvh flex-col overflow-hidden"
+      className="bg-background text-foreground flex h-full flex-col overflow-hidden"
       data-collapse={collapse}
       data-fit={tight ? "tight" : "roomy"}
       // The clearance § 7's jump primitive reserves, in the shell's own inline properties so it
@@ -255,19 +279,21 @@ export function Shell({
       }
     >
       {strip}
-      {/* Capped and centred past 1728 px — the 288 px Rail plus a 1440 px chart column, already
-          288 px more chart than `REFERENCE_COLUMN_PX` buys a 1500 m span. Uncapped, a 2560 px
-          desktop stretched the x scale edge-to-edge and scattered the five read-out cells 460 px
-          apart, with the banner's sentence a screen away from its own action. The hairline borders
-          paint only once the cap engages, so no viewport below it gains an edge it never had. */}
-      <div className="border-border mx-auto flex min-h-0 w-full max-w-[1728px] flex-1 flex-col min-[1730px]:border-x md:flex-row">
+      {/* Capped and centred past 1728 px (`SHELL_MAX_PX`) — the two 288 px columns plus a 1152 px
+          chart column, which is `REFERENCE_COLUMN_PX`: the widest the plot's own ceiling still
+          grows with. Uncapped, a 2560 px desktop stretched the x scale edge-to-edge and scattered
+          the read-out cells apart, with the banner's sentence a screen away from its own action.
+          The hairline borders paint only once the cap engages, so no viewport below it gains an
+          edge it never had. */}
+      <div className="border-border mx-auto flex min-h-0 w-full max-w-[1728px] flex-1 flex-col min-[1024px]:flex-row min-[1730px]:border-x">
         {/* The Rail is not becoming interactive: `focusin`, `focusout` and `scroll` are **observed**
-            here, on the one element that is both the collapse's scroller and the ancestor of every
-            field it watches. None of the three adds an affordance, a role or a keyboard contract —
-            which is what the rule is about — and the alternative is seventeen per-field handlers
-            plus a second copy of the Rail's focus. */}
-        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
-        <aside
+            here, on the one element that is both the collapse's scroller (below B2) and the ancestor
+            of every field it watches. None of the three adds an affordance, a role or a keyboard
+            contract — which is what the rule is about — and the alternative is seventeen per-field
+            handlers plus a second copy of the Rail's focus. From B2 up this element is
+            `display: contents` and each column scrolls itself; the collapse has no consumer there,
+            so the missing `scroll` (it does not bubble) costs nothing. */}
+        <div
           // `pb-[var(--kb,0px)]` is § 5's keyboard-safe bottom space, and it is **unconditional**
           // and self-neutralising: where `interactive-widget=resizes-content` is honoured the layout
           // viewport already shrank, `--kb` is absent and the fallback resolves to `0px`; on older
@@ -284,8 +310,9 @@ export function Shell({
           // keyboard; with the scroll padding the same focus lands the field at **y 193,5 – 221,5**.
           // Nothing else changes: it is `0px` with no keyboard up, it leaves piece 2's padding and
           // piece 3's `{ block: 'center' }` / `behavior: auto` exactly as § 5 writes them, and § 7's
-          // jump primitive — the same {@link CENTRE_IN_RAIL} object — inherits the correction.
-          className="border-border order-last flex min-h-0 w-full min-w-0 flex-1 scroll-pb-[var(--kb,0px)] flex-col overflow-y-auto pb-[var(--kb,0px)] md:order-first md:w-72 md:flex-none md:border-r"
+          // jump primitive — the same {@link CENTRE_IN_RAIL} object — inherits the correction. The
+          // two columns spend the same pair on their own scroller from B2 up.
+          className="order-last flex min-h-0 w-full min-w-0 flex-1 scroll-pb-[var(--kb,0px)] flex-col overflow-y-auto pb-[var(--kb,0px)] min-[1024px]:contents"
           // React's `onBlur` is `focusout`, so it bubbles and `relatedTarget` is where focus is
           // *going*. Reporting `null` only when that lands outside the Rail is what makes a move
           // from one field to the next a single continuous focus rather than a gap.
@@ -323,15 +350,37 @@ export function Shell({
               : (event) => onRailScroll(event.currentTarget.scrollTop === 0)
           }
         >
-          {rail}
-        </aside>
+          <aside
+            aria-label="Paramètres"
+            className="border-border flex w-full shrink-0 flex-col min-[1024px]:order-first min-[1024px]:min-h-0 min-[1024px]:w-72 min-[1024px]:scroll-pb-[var(--kb,0px)] min-[1024px]:overflow-y-auto min-[1024px]:border-r min-[1024px]:pb-[var(--kb,0px)]"
+          >
+            {left}
+          </aside>
+          {/* Below B2 this column continues the left one — same scroller, no rule between them but the
+              first section's own — so the Rail reads as the one run it was. Its first section drops
+              the top hairline from B2 up, where nothing stands above it to be separated from. */}
+          {right !== undefined && (
+            <aside
+              aria-label="Valeurs déduites et résultats"
+              className="border-border flex w-full shrink-0 flex-col min-[1024px]:order-last min-[1024px]:min-h-0 min-[1024px]:w-72 min-[1024px]:scroll-pb-[var(--kb,0px)] min-[1024px]:overflow-y-auto min-[1024px]:border-l min-[1024px]:pb-[var(--kb,0px)] min-[1024px]:[&>section:first-child]:border-t-0"
+            >
+              {right}
+            </aside>
+          )}
+        </div>
         {/* No horizontal padding here: `GUTTER` lives **inside** the two SVGs, as the x scale's own
             range `[gutter, width − gutter]`, so that one object aligns both charts. Padding the
             column instead would inset the SVGs *and* the scale, spending 48 px a side — and it
             would inset the read-out cells, which § 5 spans across the **full column width**
-            because aligning them to the plot would imply a correspondence that does not exist. */}
+            because aligning them to the plot would imply a correspondence that does not exist.
+
+            **From B2 up the column scrolls**, the block first and the views under it (#104), the
+            way Statique's right column does: a block held still over a residual scroller would
+            leave the map 116 px at 1024 × 768. The gutter is reserved so a scrollbar that comes
+            and goes cannot move the width every band is a function of. It spends the `--kb` pair
+            like the two side columns. */}
         <div
-          className="@container min-w-0 flex-none overflow-hidden md:min-h-0 md:flex-1"
+          className="@container min-w-0 flex-none overflow-hidden min-[1024px]:min-h-0 min-[1024px]:flex-1 min-[1024px]:scroll-pb-[var(--kb,0px)] min-[1024px]:[scrollbar-gutter:stable] min-[1024px]:overflow-y-auto min-[1024px]:pb-[var(--kb,0px)]"
           ref={chartRef}
         >
           {/* § 5's `compact` row, and the **one** place the band stack stops being a stack: under a
@@ -342,13 +391,21 @@ export function Shell({
           <div className="compact:h-[var(--pinned-cell)] compact:flex-row compact:items-center flex flex-col">
             {chart}
           </div>
+          {views !== undefined && (
+            <section
+              aria-label={SECTION.topView}
+              className="border-border hidden border-t px-3 py-3 min-[1024px]:block"
+            >
+              {views}
+            </section>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-/** The Rail Header — the app's name plus the controls `__root.tsx` has no app bar for. */
+/** The Rail Header — the app's name plus the Rail's own controls. */
 export function RailHeader({ children }: { children?: ReactNode }) {
   return (
     <header className="flex h-[var(--rail-header)] shrink-0 items-center gap-2 px-3">
@@ -410,8 +467,8 @@ export function RailSection({
  *   column's inner width ». A slot sized by its own text is a height that changes on a keystroke.
  *
  * It stays a `min-height`, so an occupant longer than its width's row still grows rather than
- * clipping, and the two thresholds are `CELL_WRAP_PX` (B1, 624) and `RAIL_REFLOW_PX − RAIL_WIDTH`
- * (the column B2 itself produces, 480) — `bannerBudget()`'s own two, **no new breakpoint**.
+ * clipping, and the two thresholds are `CELL_WRAP_PX` (B1, 624) and `BANNER_TWO_LINES_PX` (480) —
+ * `bannerBudget()`'s own two, **no new breakpoint**.
  */
 export function BannerSlot({ children }: { children?: ReactNode }) {
   return (

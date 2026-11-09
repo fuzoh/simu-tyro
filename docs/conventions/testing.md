@@ -13,6 +13,14 @@ The `test` block lives in `vite.config.ts`.
 - The two seams that once wanted a DOM are **parameters** instead: the dropped-keys reporter takes the
   **raw query string** as an argument, and `readSession` / `writeSession` take the **storage object**.
   Pure functions test fine in `node`, and they are the better seam.
+- **One test builds the app**: `src/components/map/load-vue-3d.test.ts` runs Vite's production
+  client build in memory (`build.write: false`) and reads its chunks — the Vue 3D's CesiumJS behind
+  a dynamic import, the size of what `/` downloads (#95). A chunk graph is the only place that
+  contract is observable, and it is still `node`, no DOM.
+- **One test reads the whole app's copy**: `src/lib/vocabulary/labels.test.ts` walks every `.ts` and
+  `.tsx` under `src/` for the words the interface never says, and checks the glossary names the
+  wordings it prints (#102). A scan of every string is observable nowhere else; it is the one
+  suite spanning several modules, and it is still `node`, no DOM.
 
 ## What deserves a test
 
@@ -33,15 +41,15 @@ Decided in the wayfinder ticket _Engine API, execution model and module layout_.
 - **Colocated.** `solve.test.ts` sits beside `solve.ts` in `src/lib/sim/`. Keeps each
   assertion in eyeshot of the `docs/simulation-theory.md` § citation it verifies.
 - **One test file per source file**, same basename. **No `tests/` directory, and no suite file
-  spanning several modules.** This survives every app layer unchanged — `first-run.test.ts` beside
-  `first-run.ts`, `p1.test.ts` beside `p1.ts`; no exception was needed to keep it.
-- **Physics fixtures live in one place**: `src/lib/sim/__fixtures__/theory-15.ts`, exporting `F1`
-  and `Z1`–`Z6` from `docs/simulation-theory.md` §15 as typed consts. Every fixture carries
+  spanning several modules** (bar the two exceptions above). This survives every app layer
+  unchanged — `first-run.test.ts` beside `first-run.ts`, `p1.test.ts` beside `p1.ts`.
+- **Physics fixtures live in one place**: `src/lib/sim/__fixtures__/theory-15.ts`, exporting `F1`,
+  `Z1`–`Z6` and `Z8` from `docs/simulation-theory.md` §15 as typed consts. Every fixture carries
   a `source` field naming its § (e.g. `"simulation-theory.md §15 Z4"`). The golden canonical
   links of the URL codec live in `src/lib/url/__fixtures__/canonical-links.ts`, tagged
   `[MEASURED]`.
-- **`Z7` (thermal) and `Z8` (dynamics) are deliberately absent** — their physics is out of
-  scope for v1. Add them with the feature, not before.
+- **`Z7` (thermal) is deliberately absent** — its physics is out of scope for v1. Add it with the
+  feature, not before, as `Z8` arrived with the passager's ride (#89).
 - Benches are `*.bench.ts`, colocated too — see [Benches](#benches).
 
 ## Fixture rules
@@ -57,6 +65,9 @@ Decided in the wayfinder ticket _Engine API, execution model and module layout_.
     assert at the loosest tier below.
 
   Treating the two alike invites someone to tighten the wrong one and to trust the wrong one.
+
+  A datasheet figure takes `[DATASHEET]` (`simulation-theory.md` §0.2); arithmetic done on one
+  keeps that tag and says so in `source` (`src/lib/rail/__fixtures__/courant-bandit.ts`).
 
 - **The prototype's `check.ts` is a coverage checklist, not a value source.** Four assertions it
   never made are new work, so a green `check.ts` is not coverage: `F1`'s three partials with
@@ -151,7 +162,7 @@ the real app in a real browser instead
 **A state nobody scripts there is a state nobody checks** — that is the deliberate trade.
 
 - **Four DOM-shape states**: the Skeleton's content (five Rail headings, both chart frames, no
-  control / no value / no « — »), the refusal rendered on the _index_ route at 200 — as ordinary
+  control / no value / no « — »), the refusal rendered on an app Page at 200 — as ordinary
   validated state, **not** as a thrown `errorComponent`, [voir amendement E](../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md) —
   « Saisie en cours », and « Aucun résultat ».
 - **Five measurements a layout engine has to make**: the three pixel budgets (390×664 · 768×1024 ·

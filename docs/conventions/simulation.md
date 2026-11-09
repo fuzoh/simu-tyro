@@ -37,3 +37,13 @@ unchanged and `rg` still works.
   and the numbered section it came from.
 - Termination efficiency, MBR and safety coefficients are regulatory values, not
   tunables. If a value is not in the references, ask — don't pick one.
+- **The Vent's direction is geographic; the engine takes angles, never Positions.** `wd` is the
+  azimuth the wind comes **from**, degrees clockwise from north (0 du nord, 90 d'est, 270 d'ouest).
+  `windComponents(speed, from, bearing)` (`src/lib/sim/wind.ts`) takes that azimuth and the line's
+  bearing A → B, and projects on `from − bearing`: 0° head wind, 90° from the right. The bearing is
+  read off the Positions outside `src/lib/sim/` — `lineBearing` (`src/lib/scenario/geometry.ts`), the
+  rhumb line the north-up map draws — and reaches every reader through the gates' `windBearing`
+  (`src/lib/rail/gates.ts`), the one check behind « the Vent needs Positions ». Without a bearing
+  nothing is projected: the ride and the Banane run without wind, the wind fields are disabled, and
+  a carried Vent is kept as given with a notice — never a Blocking Error. Moving an anchor changes
+  the components and never `wd`.

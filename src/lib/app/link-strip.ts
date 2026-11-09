@@ -36,16 +36,31 @@ import type { QuantityId } from "@/lib/format/quantity.ts";
 import type { FieldId } from "@/lib/rail/fields.ts";
 import type { ForceUnit } from "@/lib/scenario/types.ts";
 import type { DroppedKey, SearchKey, TerminationToken, ValidatedSearch } from "@/lib/url/schema.ts";
+import type { LabelId, Register } from "@/lib/vocabulary/labels.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
-import { CONSTRUCTION_LABEL, FIELDS, lowerFirst, ROPE_CLASS_LABEL } from "@/lib/rail/fields.ts";
+import {
+  AVANCE_SETTING,
+  CONSTRUCTION_LABEL,
+  fieldErrorLabel,
+  FIELDS,
+  isHiddenOnTerrain,
+  lowerFirst,
+  ROPE_CLASS_LABEL,
+  TENSIONING_DEVICE_LABEL,
+  TENSIONING_SIDE_LABEL,
+} from "@/lib/rail/fields.ts";
 import { TERMINATIONS } from "@/lib/sim";
 import {
   CONSTRUCTION_TOKEN_BY_ID,
   newtonsFromDaN,
   ROPE_CLASS_TOKEN_BY_ID,
+  TENSIONING_DEVICE_TOKEN_BY_ID,
+  TENSIONING_SIDE_TOKEN_BY_ID,
   terminationIdFromToken,
 } from "@/lib/url/scenario.ts";
+import { POSITION_KEY_PAIRS } from "@/lib/url/schema.ts";
+import { heading, isHiddenTerm, label } from "@/lib/vocabulary/labels.ts";
 
 /** The three sentences, each `null` when this arrival has nothing to say with it. */
 export type LinkStrip = {
@@ -56,6 +71,9 @@ export type LinkStrip = {
   /** « L'adresse a été corrigée pour indiquer les valeurs utilisées. » */
   readonly rewritten: string | null;
 };
+
+/** The strip's dismiss control. Labelled by its **effect**, like every other action in the app. */
+export const DISMISS_LABEL = "Masquer ce message";
 
 /** § 8's third sentence, fixed. It states the rewrite; it never asserts an act of the user's. */
 const REWRITTEN = "L'adresse a été corrigée pour indiquer les valeurs utilisées.";
@@ -70,6 +88,11 @@ const REWRITTEN = "L'adresse a été corrigée pour indiquer les valeurs utilis�
  */
 type KeyRow = {
   readonly label: string;
+  /**
+   * The field the row names, or the vocabulary entry for a key with no field — what a simplified
+   * Page renames, or leaves unnamed when only Avancé shows it (#61, #91).
+   */
+  readonly source: { readonly field: FieldId } | { readonly term: LabelId } | null;
   readonly genre: "m" | "f";
   /** § 3's display-precision row, or `null` for a token-valued key. */
   readonly quantity: QuantityId | null;
@@ -80,28 +103,48 @@ type KeyRow = {
 /** A row borrowed from § 3's field table — one label, one precision row, no second copy. */
 function fromField(id: FieldId, genre: "m" | "f", daN?: true): KeyRow {
   const { errorLabel, quantity } = FIELDS[id];
+  const source = { field: id };
   return daN === undefined
-    ? { label: errorLabel, genre, quantity }
-    : { label: errorLabel, genre, quantity, daN };
+    ? { label: errorLabel, source, genre, quantity }
+    : { label: errorLabel, source, genre, quantity, daN };
+}
+
+/** Does a Page of this register leave the key's quantity unnamed — set on Avancé alone? */
+function hiddenOn(row: KeyRow, register: Register): boolean {
+  if (register === "exact" || row.source === null) return false;
+  return "field" in row.source
+    ? isHiddenOnTerrain(row.source.field)
+    : isHiddenTerm(row.source.term);
+}
+
+/** The row's name and agreement on a Page of this register. */
+function named(row: KeyRow, register: Register): { label: string; genre: "m" | "f" } {
+  if (register === "exact" || row.source === null) return row;
+  if (hiddenOn(row, register)) return { label: AVANCE_SETTING, genre: "m" };
+  if ("field" in row.source)
+    return { label: fieldErrorLabel(row.source.field, register), genre: row.genre };
+  return { label: heading(row.source.term, register), genre: row.genre };
 }
 
 /** Every key but `v`, so a new search key does not compile until the strip can name it. */
 type StripKey = Exclude<SearchKey, "v">;
 
 const KEYS: Record<StripKey, KeyRow> = {
-  u: { label: "Unité de force", genre: "f", quantity: null },
-  use: fromField("usage", "m"),
+  u: { label: "Unité de force", source: null, genre: "f", quantity: null },
+  use: fromField("usage", "f"),
   reg: fromField("regime", "m"),
   L: fromField("L", "f"),
   h: fromField("h", "m"),
-  sa: fromField("sa", "f"),
-  sb: fromField("sb", "f"),
   za: fromField("zA", "f"),
   zb: fromField("zB", "f"),
   fl: fromField("D_target", "f"),
   te: fromField("H_target", "f", true),
   lo: fromField("L0", "f"),
   vr: fromField("vRatio", "m"),
+  tp: fromField("T_target", "f", true),
+  cp: fromField("tensioningSide", "m"),
+  bp: fromField("carryingLines", "m"),
+  mt: fromField("tensioningDevice", "f"),
   fam: fromField("family", "f"),
   d: fromField("d", "m"),
   r0: fromField("R0", "m"),
@@ -117,11 +160,23 @@ const KEYS: Record<StripKey, KeyRow> = {
   na: fromField("etaA", "m"),
   nb: fromField("etaB", "m"),
   mp: fromField("mp", "f"),
-  hr: fromField("hRider", "f"),
+  hr: fromField("hRider", "m"),
   gm: fromField("hClearMin", "f"),
-  daf: fromField("DAF", "m"),
+  daf: fromField("DAF", "f"),
+  ws: fromField("windSpeed", "f"),
+  wd: fromField("windDirection", "f"),
+  cda: fromField("CdA", "f"),
+  f0: fromField("F0", "m", true),
+  kv: fromField("kv", "m"),
+  mur: fromField("trolleyMu", "m"),
+  rho: fromField("rho", "f"),
   x: fromField("xD", "f"),
-  tr: { label: "Tracé", genre: "m", quantity: null },
+  lata: fromField("latA", "f"),
+  lona: fromField("lonA", "f"),
+  latb: fromField("latB", "f"),
+  lonb: fromField("lonB", "f"),
+  ph: { label: "Profil hors des Positions", source: null, genre: "m", quantity: null },
+  tr: { label: "Profil", source: { term: "profile" }, genre: "m", quantity: null },
   // `v` is deliberately absent: it is the schema version, not a champ of the scenario, and naming
   // « version de schéma 1 » among the completed fields buries the numbers the sentence exists for.
   // An unrecognised `v` refuses the link whole, so it never reaches the first sentence either.
@@ -155,15 +210,17 @@ const TOKENS: Record<StripKey, Readonly<Record<string, string>> | null> = {
   reg: null,
   L: null,
   h: null,
-  sa: null,
-  sb: null,
   za: null,
   zb: null,
   fl: null,
   te: null,
   lo: null,
   vr: null,
-  fam: { ac: "acier", tx: "textile" },
+  tp: null,
+  cp: labelsByToken(TENSIONING_SIDE_TOKEN_BY_ID, TENSIONING_SIDE_LABEL),
+  bp: null,
+  mt: labelsByToken(TENSIONING_DEVICE_TOKEN_BY_ID, TENSIONING_DEVICE_LABEL),
+  fam: { ac: label("cable", "terrain"), tx: label("rope", "terrain") },
   d: null,
   r0: null,
   cst: labelsByToken(CONSTRUCTION_TOKEN_BY_ID, CONSTRUCTION_LABEL),
@@ -181,7 +238,19 @@ const TOKENS: Record<StripKey, Readonly<Record<string, string>> | null> = {
   hr: null,
   gm: null,
   daf: null,
+  ws: null,
+  wd: null,
+  cda: null,
+  f0: null,
+  kv: null,
+  mur: null,
+  rho: null,
   x: null,
+  lata: null,
+  lona: null,
+  latb: null,
+  lonb: null,
+  ph: null,
   tr: null,
 };
 
@@ -195,9 +264,13 @@ const TOKENS: Record<StripKey, Readonly<Record<string, string>> | null> = {
  * @returns the three sentences, or `null` when the link had nothing to report: a bare `/`, a
  *   Session restore, or a link that arrived complete and untouched.
  */
-export function linkStrip(link: LinkArrival, unit: ForceUnit = "daN"): LinkStrip | null {
-  const ignored = ignoredSentence(link.dropped);
-  const completed = completedSentence(link.completed, link.rewrite, unit);
+export function linkStrip(
+  link: LinkArrival,
+  unit: ForceUnit = "daN",
+  register: Register = "exact",
+): LinkStrip | null {
+  const ignored = ignoredSentence(link.dropped, register);
+  const completed = completedSentence(link.completed, link.rewrite, unit, register);
   if (ignored === null && completed === null) return null;
   return { ignored, completed, rewritten: link.rewrite === null ? null : REWRITTEN };
 }
@@ -210,13 +283,14 @@ export function linkStrip(link: LinkArrival, unit: ForceUnit = "daN"): LinkStrip
  * its list in canonical-key order because the *rewrite* needs that; the sentence is presentation,
  * and it is this module's.
  */
-function ignoredSentence(dropped: readonly DroppedKey[]): string | null {
+function ignoredSentence(dropped: readonly DroppedKey[], register: Register): string | null {
   if (dropped.length === 0) return null;
   const ordered = [
     ...dropped.filter((key) => key.reason === "clé-inconnue"),
     ...dropped.filter((key) => key.reason !== "clé-inconnue"),
   ];
-  return `Une partie du lien a été ignorée : ${ordered.map(clause).join(" ; ")}.`;
+  const clauses = ordered.map((key) => clause(key, register));
+  return `Une partie du lien a été ignorée : ${clauses.join(" ; ")}.`;
 }
 
 /**
@@ -224,38 +298,52 @@ function ignoredSentence(dropped: readonly DroppedKey[]): string | null {
  * is the sender's typo and nothing of ours was displaced, while an unreadable value **did** displace
  * a field, so the clause names it.
  */
-function clause({ key, reason }: DroppedKey): string {
+function clause({ key, reason }: DroppedKey, register: Register): string {
   if (reason === "clé-inconnue") return `clé inconnue « ${key} »`;
   if (!isStripKey(key)) return `« ${key} » n'était pas une valeur exploitable`;
   const row = KEYS[key];
-  const label = lowerFirst(row.label);
+  const { label: name, genre } = named(row, register);
+  const label = lowerFirst(name);
+  if (reason === "coordonnée-isolée") {
+    return `« ${key} » sans « ${twinOf(key)} » (${label} ignorée)`;
+  }
   // « n'était pas un nombre » is § 8's own wording and is true of every numeric key; a token-valued
   // key is not a number at all, and saying so of `?fam=zz` would be a lie in the one sentence whose
   // job is to tell the sender's typo apart from a value we could not read.
   const fault = row.quantity === null ? "n'était pas une valeur reconnue" : "n'était pas un nombre";
-  return `« ${key} » ${fault} (${label} ignoré${row.genre === "f" ? "e" : ""})`;
+  return `« ${key} » ${fault} (${label} ignoré${genre === "f" ? "e" : ""})`;
+}
+
+/** The other coordinate of a Position: a lone one is dropped, and the clause names what it lacked. */
+function twinOf(key: StripKey): string {
+  const pair = POSITION_KEY_PAIRS.find((keys) => (keys as readonly string[]).includes(key));
+  return pair === undefined ? key : pair[pair[0] === key ? 1 : 0];
 }
 
 /**
  * « Champs absents du lien, complétés depuis le scénario par défaut : masse du passager 120 kg · … »
  *
  * The values come from the **canonical bag** — the one the rewrite puts in the address bar — so the
- * sentence and the URL cannot disagree about the numbers the recipient got.
+ * sentence and the URL cannot disagree about the numbers the recipient got. A simplified Page lists
+ * the fields it shows: the others were completed as well, and Avancé names them.
  */
 function completedSentence(
   completed: readonly SearchKey[],
   rewrite: ValidatedSearch | null,
   unit: ForceUnit,
+  register: Register,
 ): string | null {
   if (completed.length === 0 || rewrite === null) return null;
-  const named = completed.flatMap((key) => {
+  const values = completed.flatMap((key) => {
     const value = rewrite[key];
     if (!isStripKey(key) || value === undefined) return [];
     const row = KEYS[key];
-    return [`${lowerFirst(row.label)} ${render(key, row, value, rewrite, unit)}`];
+    if (hiddenOn(row, register)) return [];
+    const label = lowerFirst(named(row, register).label);
+    return [`${label} ${render(key, row, value, rewrite, unit)}`];
   });
-  if (named.length === 0) return null;
-  return `Champs absents du lien, complétés depuis le scénario par défaut : ${named.join(" · ")}.`;
+  if (values.length === 0) return null;
+  return `Champs absents du lien, complétés depuis le scénario par défaut : ${values.join(" · ")}.`;
 }
 
 /** One completed value, at § 3's display precision for a number and in French for a token. */

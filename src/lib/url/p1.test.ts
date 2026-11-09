@@ -50,11 +50,11 @@ function readReference(n: 1 | 2 | 3): Trace {
 
 /**
  * The readable half of an imported-mode link, in § 8's canonical key order — the first-run URL
- * (141 characters, measured) with `L`/`h` replaced by the stations an import carries. `tr` is the
- * key table's last row, so the payload closes the query.
+ * (141 characters, measured) less `L`/`h`, which an imported profil derives. `tr` is the key
+ * table's last row, so the payload closes the query.
  */
 const READABLE_KEYS =
-  "/?v=1&u=daN&use=perm&sa=62.0&sb=245.0&za=12&zb=12&fl=6.0&fam=ac&d=12&r0=1770" +
+  "/?v=1&u=daN&use=perm&za=12&zb=12&fl=6.0&fam=ac&d=12&r0=1770" +
   "&cst=iwrc&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&daf=1.2&x=91.5&tr=";
 
 /** A deterministic LCG — the synthetic spans must cost the same characters on every machine. */
@@ -93,7 +93,7 @@ function syntheticTrace(span: number): Trace {
     z[i] = Math.round(relief * 100) / 100;
   }
 
-  return { d, z, dev: 0.42, fileName: null };
+  return { d, z, dev: 0.42, origin: { kind: "lien" } };
 }
 
 /** A hand-authored trace at an arbitrary pitch — the only way to exceed the budget. */
@@ -104,7 +104,7 @@ function denseTrace(points: number): Trace {
     d[i] = Math.round(i * 24.7) / 100;
     z[i] = Math.round(54000 + 300 * Math.sin(i / 40)) / 100;
   }
-  return { d, z, dev: null, fileName: "profil-dense.csv" };
+  return { d, z, dev: null, origin: { kind: "csv", fileName: "profil-dense.csv" } };
 }
 
 describe("URL cost — the measurement the embed decision rests on", () => {
@@ -164,7 +164,7 @@ describe("round-trip — the three real traces", () => {
     expect(decoded.z).toHaveLength(200);
     expect(trace.d).toHaveLength(200);
 
-    // `d` is bit-for-bit — stations ride as full-precision scalars and `L = sb − sa`.
+    // `d` is bit-for-bit, because `L` is the profil's own `d_last − d_first`.
     expect(Array.from(decoded.d)).toEqual(Array.from(trace.d));
 
     for (let i = 0; i < trace.z.length; i++) {
@@ -193,7 +193,7 @@ describe("the ceiling rule is never nearest", () => {
       d: Float64Array.from([0, 1, 2, 3]),
       z: Float64Array.from([540.401, 540.409, 540.4, -0.001]),
       dev: 0,
-      fileName: null,
+      origin: { kind: "lien" },
     };
     const { z } = decodeP1(encodeP1(trace));
     // 540,401 and 540,409 both land on 540,41 — nearest would have given 540,40 to the first.
@@ -221,7 +221,7 @@ describe("the ceiling rule is never nearest", () => {
       d: Float64Array.from([0, 1]),
       z: Float64Array.from([-12.34, 0.07]),
       dev: null,
-      fileName: null,
+      origin: { kind: "lien" },
     };
     expect(Array.from(decodeP1(encodeP1(trace)).z)).toEqual([-12.34, 0.07]);
   });

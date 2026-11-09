@@ -2,7 +2,15 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 
 import type { SolveError, SpanInput } from "./types.ts";
 
-import { CHORD_BOUND, CLEARANCE_VS_FLECHE, TOLERANCE, Z3, Z6 } from "./__fixtures__/theory-15.ts";
+import {
+  CHORD_BOUND,
+  CLEARANCE_VS_FLECHE,
+  TOLERANCE,
+  Z1,
+  Z2,
+  Z3,
+  Z6,
+} from "./__fixtures__/theory-15.ts";
 import { sampleCable } from "./catenary.ts";
 import {
   PARAMETERISE,
@@ -228,6 +236,143 @@ describe("monotonicity across the bracket — what makes the bisection safe", ()
     const floor = tightnessFloor(Z6_SPAN);
     expect(floor).toBeLessThan(Math.hypot(Z6_SPAN.L, Z6_SPAN.h));
     expect(floor).toBe(chordBoundFloor(Z6_SPAN, Z6_SPAN.strength));
+  });
+});
+
+describe("an anchor target — §7 mode 2's « or anchor `T_target` » (#85)", () => {
+  /** §15's unloaded rows state no material either; the floor only has to sit below their `L₀`. */
+  const spanOf = (fixture: typeof Z1 | typeof Z2 | typeof Z3) => ({
+    L: fixture.in.L,
+    h: fixture.in.h,
+    w: fixture.in.w,
+    EA: fixture.in.EA,
+    strength: Z6_STANDIN_STRENGTH,
+  });
+  const read = (side: "A" | "B") => (state: { TA: number; TB: number }) =>
+    side === "A" ? state.TA : state.TB;
+
+  test.each([
+    // A level span pulls equally on both anchors, so `Z1`'s `T_max` is its `T_A` (§4.1).
+    ["Z1 at A — level, T_A = T_max", Z1, "A", Z1.out.Tmax],
+    ["Z2 at A", Z2, "A", Z2.out.TA],
+    ["Z2 at B", Z2, "B", Z2.out.TB],
+    ["Z3 at A — the upper anchor", Z3, "A", Z3.out.TA],
+    ["Z3 at B — the lower anchor", Z3, "B", Z3.out.TB],
+  ] as const)(
+    "%s: the known tension gives back §15's L₀, and the Solve gives it back",
+    (_label, fixture, side, T_target) => {
+      const span = spanOf(fixture);
+      const L0 = resolvedL0(resolveL0({ mode: "anchor", side, T_target }, span));
+      expect(relativeError(L0, fixture.in.L0)).toBeLessThan(TOLERANCE.solvedScalar);
+      // The round trip: the direct Solve at that length reads the target back at the same anchor.
+      expect(relativeError(read(side)(solvedAt(span, L0)), T_target)).toBeLessThan(
+        TOLERANCE.solvedScalar,
+      );
+    },
+  );
+
+  test("the side is part of the target: Z3's T_B asked at A is a slacker line", () => {
+    // The upper anchor reads more on any one line (§2), so the same number there needs more length.
+    const span = spanOf(Z3);
+    const atA = resolvedL0(resolveL0({ mode: "anchor", side: "A", T_target: Z3.out.TB }, span));
+    expect(atA).toBeGreaterThan(Z3.in.L0);
+  });
+
+  test.each([
+    ["Z6's level span at A", Z6_SPAN, "A"],
+    ["Z3's inclined span at A", spanOf(Z3), "A"],
+    ["Z3's inclined span at B", spanOf(Z3), "B"],
+  ] as const)("%s: the tension falls strictly across the bracket", (_label, span, side) => {
+    const bracket = tightnessBracket({ mode: "anchor", side, T_target: 2451 }, span);
+    expect(bracket.ok).toBe(true);
+    if (!bracket.ok) return;
+    const { lower, upper } = bracket.value;
+    let previous = read(side)(solvedAt(span, lower));
+    expect(previous).toBeGreaterThan(2451);
+    for (let step = 1; step <= 40; step++) {
+      const value = read(side)(solvedAt(span, lower + ((upper - lower) * step) / 40));
+      expect(value).toBeLessThan(previous);
+      previous = value;
+    }
+    expect(previous).toBeLessThanOrEqual(2451);
+  });
+
+  describe("the taut branch — an anchor tension turns past a minimum on a very slack line", () => {
+    const span = spanOf(Z2);
+    const chord = Math.hypot(span.L, span.h);
+    /** The anchor tension scanned out to twice the chord: where it bottoms out, and how low. */
+    const scanned = (() => {
+      let least = { L0: Number.NaN, TA: Number.POSITIVE_INFINITY };
+      for (let step = 0; step <= 2000; step++) {
+        const L0 = chord * (1.001 + step / 2000);
+        const { TA } = solvedAt(span, L0);
+        if (TA < least.TA) least = { L0, TA };
+      }
+      return least;
+    })();
+
+    test("the minimum is real: the tension rises again past it, more length notwithstanding", () => {
+      expect(scanned.L0).toBeGreaterThan(chord * 1.01);
+      expect(scanned.L0).toBeLessThan(chord * 1.99);
+      expect(solvedAt(span, chord * 2).TA).toBeGreaterThan(scanned.TA);
+    });
+
+    test.each([
+      // 1 % over: the growth lands on a length that already reads under the target.
+      ["1 %", 1.01],
+      // 0,1 % over: the growth steps past the minimum first, and the search has to come back.
+      ["0,1 %", 1.001],
+    ])(
+      "a target %s over the minimum resolves on the taut side, never the slack one",
+      (_label, over) => {
+        // Two lengths read this tension, one either side of the minimum: the bracket is the taut
+        // branch, so the answer is the shorter one, where adding length still lowers the tension.
+        const T_target = scanned.TA * over;
+        const L0 = resolvedL0(resolveL0({ mode: "anchor", side: "A", T_target }, span));
+        expect(L0).toBeLessThan(scanned.L0);
+        expect(relativeError(solvedAt(span, L0).TA, T_target)).toBeLessThan(TOLERANCE.solvedScalar);
+        expect(solvedAt(span, L0 * (1 + 1e-4)).TA).toBeLessThan(solvedAt(span, L0).TA);
+      },
+    );
+
+    test("a target under the minimum is « Cible inatteignable », with no bound", () => {
+      const error = refusalOf(
+        resolveL0({ mode: "anchor", side: "A", T_target: scanned.TA * 0.99 }, span),
+      );
+      expect(error.kind).toBe("no-convergence");
+      expect(surfaceOf(error)).toBe("Cible inatteignable");
+      expect(error).not.toHaveProperty("bound");
+    });
+
+    test("the same holds at B on an inclined span", () => {
+      const inclined = spanOf(Z3);
+      let least = Number.POSITIVE_INFINITY;
+      for (let step = 0; step <= 2000; step++) {
+        const L0 = Math.hypot(inclined.L, inclined.h) * (1.001 + step / 2000);
+        least = Math.min(least, solvedAt(inclined, L0).TB);
+      }
+      const reachable = resolveL0({ mode: "anchor", side: "B", T_target: least * 1.01 }, inclined);
+      expect(reachable.ok).toBe(true);
+      const unreachable = refusalOf(
+        resolveL0({ mode: "anchor", side: "B", T_target: least * 0.99 }, inclined),
+      );
+      expect(surfaceOf(unreachable)).toBe("Cible inatteignable");
+    });
+  });
+
+  test("past the breaking load it is « Tension impossible », quoting the floor's own anchor tension", () => {
+    const { w, EA, MBF } = CHORD_BOUND.in;
+    const span200 = { L: 200, h: -40, w, EA, strength: MBF };
+    for (const side of ["A", "B"] as const) {
+      const error = refusalOf(resolveL0({ mode: "anchor", side, T_target: 1e6 }, span200));
+      expect(error.kind).toBe("invalid-input");
+      if (error.kind !== "invalid-input") continue;
+      expect(error.field).toBe("T_target");
+      expect(error.boundKind).toBe("max");
+      expect(surfaceOf(error)).toBe("Tension impossible");
+      const atFloor = solvedAt(span200, tightnessFloor(span200));
+      expect(relativeError(error.bound, read(side)(atFloor))).toBeLessThan(TOLERANCE.solvedScalar);
+    }
   });
 });
 
@@ -483,6 +628,7 @@ describe("tier one on the span passes through — it is not a statement about th
   ])("%s", (field, broken) => {
     for (const spec of [
       { mode: "tension", H_target: 2500 } as const,
+      { mode: "anchor", side: "A", T_target: 2500 } as const,
       { mode: "sag", D_target: 6 } as const,
       { mode: "length", L0: 200.5 } as const,
     ]) {
@@ -497,6 +643,7 @@ describe("tier one on the span passes through — it is not a statement about th
   test("a target that is not a number is refused in the driving field, not in the span", () => {
     for (const [field, spec] of [
       ["H_target", { mode: "tension", H_target: Number.NaN } as const],
+      ["T_target", { mode: "anchor", side: "B", T_target: 0 } as const],
       ["D_target", { mode: "sag", D_target: -2 } as const],
     ] as const) {
       const error = refusalOf(resolveL0(spec, span));

@@ -356,7 +356,7 @@ describe("tier-one refusals — non-finite or non-positive L₀, w, EA, L", () =
   });
 
   test("a zero-length span reaches the solver and points back at L", () => {
-    // « station B = station A » yields `L = 0`, which is a field the user can act on.
+    // A typed `Portée` of 0 yields `L = 0`, which is a field the user can act on.
     const result = solveSpan(spanOf({ ...base, L: 0 }));
     expect(result.ok).toBe(false);
     if (result.ok) return;

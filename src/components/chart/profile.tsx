@@ -9,9 +9,10 @@
  *
  * Layer rules this file keeps:
  *
- * - **Always on**: terrain, the loaded cable, both anchors, the rider with its `h_rider` envelope,
- *   the clearance dimension line, the VE badge, and the danger bands *whenever a violation exists*.
- *   The bands **self-hide**, so they are never chrome.
+ * - **Always on**: terrain, the loaded cable — twice, a few pixels apart, with two Brins porteurs —
+ *   both anchors, the rider with its `h_rider` envelope, the clearance dimension line, the VE
+ *   badge, and the danger bands *whenever a violation exists*. The bands **self-hide**, so they
+ *   are never chrome.
  * - **Two clearance dimensions, and the second one self-hides too.** The governing dimension is
  *   drawn at §11's minimum wherever it sits; the passenger's own garde is drawn at `x_D`, and **only
  *   while `relabel` says the two are further apart than `max(1 m, 1 % de la portée)`** (ticket 41).
@@ -33,13 +34,20 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { area, line } from "d3-shape";
 
 import type { ChartScene, Polyline, SceneFrame, SceneRider } from "@/lib/chart/scene.ts";
+import type { PixelLine } from "@/lib/chart/tip-placement.ts";
 import type { SharedX, ZScale } from "@/lib/layout/contract.ts";
 import type { LayerToggles } from "@/lib/session/session.ts";
+import type { Register } from "@/lib/vocabulary/labels.ts";
 
+import { coupeLines, coupeReading, RIDER_REACH_PX } from "@/lib/chart/hover.ts";
 import { polylineAt } from "@/lib/chart/scene.ts";
+import { placeTip, tipRows } from "@/lib/chart/tip-placement.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
-import { anchorTarget } from "@/lib/layout/contract.ts";
 import { cn } from "@/lib/utils.ts";
+import { label } from "@/lib/vocabulary/labels.ts";
+
+import { HoverRule, HoverTip } from "./hover.tsx";
+import { metresOn, useHover } from "./use-hover.ts";
 
 /** A path through a `(xs, zs)` polyline, in SVG user units. `null` for an empty polyline. */
 function pathOf(points: Polyline, x: SharedX, z: ZScale): string | null {
@@ -50,7 +58,7 @@ function pathOf(points: Polyline, x: SharedX, z: ZScale): string | null {
 }
 
 /** Five ticks at most, and three below B1 — the labels have 24 px and no room to collide. */
-function xTicks(L: number, wide: boolean): number[] {
+export function xTicks(L: number, wide: boolean): number[] {
   return wide ? [0, 0.25, 0.5, 0.75, 1].map((t) => t * L) : [0, 0.5, 1].map((t) => t * L);
 }
 
@@ -64,9 +72,9 @@ export function Profile({
   bandHeight,
   badge,
   layers,
+  register,
   wide,
   onScrub,
-  onStation,
 }: {
   /**
    * May the clearance layers be drawn? A Clearance Gate breach removes **the garde and its curve
@@ -93,19 +101,15 @@ export function Profile({
   /** What the VE badge says about **what is drawn** — the peek included. */
   badge: { label: string; emphasised: boolean };
   layers: LayerToggles;
+  /** The Page's vocabulary: what the hover calls what it reads. */
+  register: Register;
   /** Chart-column width ≥ B1 — the same threshold the read-out row wraps at, no new breakpoint. */
   wide: boolean;
-  /** A pointer landed at this many metres; the caller snaps it to a sweep step. */
-  onScrub: (metres: number) => void;
   /**
-   * § 4's **two draggable Station handles**, in the Handle Lane. `undefined` is manual mode, where
-   * the same bracket is the non-interactive span marker — that is the one thing that makes these two
-   * targets inert, and it is why the callback rather than a `mode` flag is the switch.
-   *
-   * The position is in the **span frame**, like `onScrub`'s: the caller holds `s_A` and is the one
-   * that can turn it into a station, snap it to a terrain sample and clamp it to the trace.
+   * A pointer landed at this many metres; the caller snaps it to a sweep step. Absent on the Page
+   * Terrain (#101), where the passager stays where the link put it: the coupe is read, not moved.
    */
-  onStation?: (anchor: "A" | "B", metres: number) => void;
+  onScrub?: (metres: number) => void;
 }) {
   const { ground, L, h } = frame;
   const rider = scene?.rider ?? null;
@@ -127,18 +131,38 @@ export function Profile({
     // edge, and a grab circle's bounding box is not the chart.
     const rect = event.currentTarget.ownerSVGElement?.getBoundingClientRect();
     if (rect === undefined) return;
-    onScrub(x.toMetres(event.clientX, rect.left));
+    onScrub?.(x.toMetres(event.clientX, rect.left));
   }
 
-  const drag = {
-    onPointerDown(event: ReactPointerEvent<SVGElement>) {
-      event.currentTarget.setPointerCapture(event.pointerId);
-      scrub(event);
-    },
-    onPointerMove(event: ReactPointerEvent<SVGElement>) {
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) scrub(event);
-    },
-  };
+  // A mouse reads the coupe wherever it is; a finger, once held still. A press still moves the rider.
+  const { at: hovered, bind } = useHover<number>();
+  const reading =
+    hovered === null
+      ? null
+      : coupeReading({
+          frame,
+          cable: rider?.cable ?? null,
+          rider,
+          metres: hovered,
+          reach: RIDER_REACH_PX / x.pxPerM,
+          clearance,
+        });
+  const hover = bind(metresOn(x));
+  const drag =
+    onScrub === undefined
+      ? hover
+      : {
+          ...hover,
+          onPointerDown(event: ReactPointerEvent<SVGElement>) {
+            event.currentTarget.setPointerCapture(event.pointerId);
+            scrub(event);
+            hover.onPointerDown(event);
+          },
+          onPointerMove(event: ReactPointerEvent<SVGElement>) {
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) scrub(event);
+            hover.onPointerMove(event);
+          },
+        };
 
   /**
    * One clearance dimension's endpoints — « **from the drawn ground at `atX`, up by the value** ».
@@ -168,39 +192,16 @@ export function Profile({
     return { x1: at, x2: at, y1: z.y(base), y2: z.y(base + hClear) };
   }
 
-  /**
-   * One Station handle's drag. **The press only takes the pointer** — unlike the rider's, which
-   * moves on `pointerdown`: a 44 px target is up to 22 px wide of the anchor it holds, which is 26 m
-   * at a 1500 m span, so a tap that jumped the station there would move an anchor nobody dragged.
-   */
-  function dragStation(anchor: "A" | "B") {
-    function move(event: ReactPointerEvent<SVGElement>) {
-      // The SVG's own box, for the same reason `scrub` reads it: the inverse is defined against the
-      // chart's left edge, and a 44 px target's box is not the chart.
-      const rect = event.currentTarget.ownerSVGElement?.getBoundingClientRect();
-      if (rect === undefined) return;
-      onStation?.(anchor, x.toMetres(event.clientX, rect.left));
-    }
-    return {
-      onPointerDown(event: ReactPointerEvent<SVGElement>) {
-        event.currentTarget.setPointerCapture(event.pointerId);
-      },
-      onPointerMove(event: ReactPointerEvent<SVGElement>) {
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) move(event);
-      },
-    };
-  }
-
   return (
     <svg
-      aria-label="Profil du terrain et du câble"
+      aria-label="Profil du terrain et de la ligne"
       className="block h-full w-full touch-pan-y select-none"
       height={bandHeight}
       role="img"
       width={x.width}
     >
       <defs>
-        {/* Everything drawn in metres is clipped to the plot area — the ×1 clamp's « câble hors
+        {/* Everything drawn in metres is clipped to the plot area — the ×1 clamp's « ligne hors
             cadre » is a *visible* cut, and the badge is what names it. */}
         <clipPath id="scoutech-plot">
           <rect height={plot.height} width={x.width} x={0} y={plot.top} />
@@ -270,13 +271,16 @@ export function Profile({
             the five layers that go, and they are exactly these. */}
         {scene !== null && rider !== null && (
           <>
-            {layers.unloadedLine && (
-              <path
-                className="stroke-muted-foreground/70 fill-none"
-                d={pathOf(scene.unloadedCable, x, z) ?? undefined}
-                strokeDasharray="5 3"
-              />
-            )}
+            {layers.unloadedLine &&
+              scene.members.map((member) => (
+                <path
+                  className="stroke-muted-foreground/70 fill-none"
+                  d={pathOf(scene.unloadedCable, x, z) ?? undefined}
+                  key={member.line}
+                  strokeDasharray="5 3"
+                  transform={`translate(0 ${member.offsetPx})`}
+                />
+              ))}
 
             {/* « Trajectoire » — the load's own path over the whole traverse, **dotted** so it can
                 never be read as a cable: the loaded line touches it at exactly one point, the
@@ -294,13 +298,19 @@ export function Profile({
                 />
               ))}
 
-            <path
-              className={cn(
-                "fill-none stroke-2",
-                inViolation ? "stroke-destructive" : "stroke-foreground",
-              )}
-              d={pathOf(rider.cable, x, z) ?? undefined}
-            />
+            {/* One path per Brin porteur: both are the same solve, so two are told apart by a
+                pixel shift alone — the gap is not a parameter and measures nothing (#4). */}
+            {scene.members.map((member) => (
+              <path
+                className={cn(
+                  "fill-none stroke-2",
+                  inViolation ? "stroke-destructive" : "stroke-foreground",
+                )}
+                d={pathOf(rider.cable, x, z) ?? undefined}
+                key={member.line}
+                transform={`translate(0 ${member.offsetPx})`}
+              />
+            ))}
 
             {/* The dimension line is drawn **wherever the minimum actually sits**, so it visibly
                 steps sideways onto a bump the rider has already passed. A negative garde draws
@@ -377,18 +387,46 @@ export function Profile({
             />
           </>
         )}
+
+        {reading !== null && (
+          <HoverRule at={x.x(reading.distance)} bottom={plotBottom} top={plot.top} />
+        )}
       </g>
 
       {/* « distances » — outside the clip, so a rider near the frame's top keeps its numbers. */}
       {layers.riderTip && rider !== null && (
         <RiderTip
+          cable={{ xs: rider.cable.xs.map((m) => x.x(m)), ys: rider.cable.zs.map((m) => z.y(m)) }}
           clearance={clearance}
+          ground={{ xs: ground.xs.map((m) => x.x(m)), ys: ground.zs.map((m) => z.y(m)) }}
+          others={[
+            ...(layers.chordAB ? [{ xs: [x.x(0), x.x(L)], ys: [z.y(0), z.y(h)] }] : []),
+            ...(layers.unloadedLine && scene !== null
+              ? [
+                  {
+                    xs: scene.unloadedCable.xs.map((m) => x.x(m)),
+                    ys: scene.unloadedCable.zs.map((m) => z.y(m)),
+                  },
+                ]
+              : []),
+          ]}
+          offsets={scene?.members.map((member) => member.offsetPx)}
           plot={plot}
           rider={rider}
           wide={wide}
           width={x.width}
           x={x.x(rider.step.xD)}
           y={z.y(rider.step.zD)}
+        />
+      )}
+
+      {reading !== null && (
+        <HoverTip
+          at={x.x(reading.distance)}
+          bottom={plotBottom}
+          lines={coupeLines(reading, register)}
+          top={plot.top}
+          width={x.width}
         />
       )}
 
@@ -408,8 +446,8 @@ export function Profile({
       ))}
 
       {/* The Handle Lane — 24 px reserved in **both** modes, so the profile's height never changes
-          on import. In manual mode it draws the span bracket, non-interactive, with ticks at 0 and
-          L; on import the same bracket's ends become the draggable Station handles. */}
+          on import. It draws the span bracket, non-interactive, with ticks at 0 and L: the anchors
+          are the profil's two ends and are not moved along it (#88). */}
       <g className="stroke-muted-foreground fill-muted-foreground">
         <line x1={x.x(0)} x2={x.x(L)} y1={laneTop + 12} y2={laneTop + 12} />
         {[0, L].map((at) => (
@@ -423,37 +461,6 @@ export function Profile({
         </text>
       </g>
 
-      {/* § 5's anchor targets — **44 × 48, spanning the lane plus the label band, entirely below the
-          plot area**. The collision they retire is structural rather than a sizing accident: the
-          anchors are pinned at the domain edges, so at 390 px a 44 px target covers the first and
-          last 12 % of the span and the rider glyph overlaps one whenever `x_D` comes within ~46 m of
-          an anchor at `L = 1000`. You cannot size your way out of two targets that are always at
-          `x = 0` and `x = L` — putting them in a lane of their own makes confusing one with the
-          rider *geometrically* impossible.
-
-          They are `pointer-events-none` **in manual mode only**, because there § 5's bracket is the
-          non-interactive span marker. In imported mode they are § 4's « deux poignées », which the
-          section states in the same breath as the four fields and which it explicitly rejects doing
-          without: pointer input snaps to a terrain sample, a typed station stays exact. */}
-      {[0, L].map((at) => {
-        const anchor = at === 0 ? "A" : "B";
-        return (
-          <rect
-            className={cn(
-              "fill-transparent",
-              onStation === undefined ? "pointer-events-none" : "cursor-grab",
-            )}
-            data-anchor={anchor}
-            key={at}
-            {...(onStation === undefined ? {} : dragStation(anchor))}
-            {...anchorTarget(x.x(at), laneTop)}
-          />
-        );
-      })}
-
-      {/* The tick labels are furniture, and two of them sit **inside** the anchor targets' 48 px —
-          the lane's 24 px plus this band's. Left hit-testable they would punch a hole in a target
-          § 5 sized on purpose. */}
       <g className="fill-muted-foreground pointer-events-none text-[10px]">
         {xTicks(L, wide).map((tick, index, all) => (
           <text
@@ -468,8 +475,7 @@ export function Profile({
       </g>
 
       {/* The plot area is the pointer surface — a drag in x moves the rider, and a drag in y
-          scrolls the page (`pan-y`) rather than doing nothing. The **handle lane is excluded**,
-          because its two anchor targets are the Stations', not the rider's. */}
+          scrolls the page (`pan-y`) rather than doing nothing. */}
       <rect
         className="fill-transparent"
         {...drag}
@@ -482,7 +488,7 @@ export function Profile({
       {/* The rider's own grab target, on top: `r = 11` with a transparent **stroke**, 36 px on a
           fine pointer and 44 px under `@media (pointer: coarse)`. Stroke width rather than the
           SVG2 geometry property `r`, whose CSS support is uneven — one media query, no JS branch. */}
-      {rider !== null && (
+      {rider !== null && onScrub !== undefined && (
         <circle
           className="chart-grab cursor-grab"
           {...drag}
@@ -500,16 +506,21 @@ const TIP_WIDTH = { wide: 150, narrow: 96 } as const;
 
 /**
  * « distances » — the two numbers **beside the handle**, moving with it: the passenger's garde (the
- * « Garde passager » cell) and the load's gap to the unloaded line (« Écart à vide »). Labels in the
+ * « Garde au sol » cell) and the load's gap to the unloaded line (« Écart à vide »). Labels in the
  * app's sans and values in mono, the call-site rule the read-out cells keep.
  *
- * Right of the handle and above it, flipped left near the right edge and below near the frame's
- * top, so the tip never covers the handle it annotates. The garde line goes with the Clearance
+ * Right of the handle and above it by default; `placeTip` moves it to the quadrant the loaded line,
+ * the ground and the frame's edges leave free, so the tip never covers the handle it annotates nor
+ * the line through it. The garde line goes with the Clearance
  * Gate, exactly as the cell does: it is computed from the anchor heights and envelope the gate
  * refused. `pointer-events-none`, so the tip is never a hole in the scrub surface.
  */
 function RiderTip({
   rider,
+  cable,
+  ground,
+  others,
+  offsets,
   clearance,
   x,
   y,
@@ -518,6 +529,11 @@ function RiderTip({
   wide,
 }: {
   rider: SceneRider;
+  /** The loaded line and the ground, in SVG user units, and the Brins' pixel shifts. */
+  cable: PixelLine;
+  ground: PixelLine;
+  others: readonly PixelLine[];
+  offsets: readonly number[] | undefined;
   clearance: boolean;
   /** The handle's centre, SVG user units. */
   x: number;
@@ -527,14 +543,11 @@ function RiderTip({
   plot: { top: number; height: number };
   wide: boolean;
 }) {
-  const left = x + 14 + (wide ? TIP_WIDTH.wide : TIP_WIDTH.narrow) > width;
-  const below = y - 30 < plot.top;
-  const tx = left ? x - 14 : x + 14;
   const lines = [
     ...(clearance
       ? [
           {
-            label: wide ? "garde passager" : "garde",
+            label: wide ? label("groundClearance", "terrain") : "garde",
             value: formatQuantity("clearance", rider.underRider),
           },
         ]
@@ -544,7 +557,20 @@ function RiderTip({
       value: formatQuantity("unloadedGap", rider.belowUnloaded),
     },
   ];
-  const first = below ? y + 20 : y - 8 - 13 * (lines.length - 1);
+  const { left, below } = placeTip({
+    x,
+    y,
+    width,
+    plot,
+    lines: lines.length,
+    tipWidth: wide ? TIP_WIDTH.wide : TIP_WIDTH.narrow,
+    cable,
+    ground,
+    others,
+    offsets,
+  });
+  const tx = left ? x - 14 : x + 14;
+  const { first } = tipRows(y, lines.length, below);
   return (
     <text
       className="fill-foreground stroke-background pointer-events-none text-[11px]"

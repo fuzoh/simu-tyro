@@ -14,10 +14,10 @@
  *   decoding it asynchronously downstream, would put terrain behind a boundary the whole app then
  *   has to model, when the engine is synchronous by contract. Deflate also buys little on 200
  *   monotone integers: that shape is what delta coding is *for*.
- * - **The trace is embedded, never omitted.** `L` and `h` are **derived** from anchor placements
- *   on the Trace, so a link without terrain does not describe a coarser span — it describes **no
- *   span at all**, and falling back to the straight anchor-base ground line would fabricate a
- *   manual scenario the sender never entered.
+ * - **The trace is embedded, never omitted.** `L` and `h` are **derived** from the Trace, whose
+ *   ends are the two anchors, so a link without terrain does not describe a coarser span — it
+ *   describes **no span at all**, and falling back to the straight anchor-base ground line would
+ *   fabricate a manual scenario the sender never entered.
  * - **Altitude is quantised by ceiling, never nearest.** That is the assertion that matters most
  *   here: it makes the one lossy step provably **safe-side** — shared terrain is never *lower*
  *   than the original — at a magnitude (≤ 0,010 m) already ruled beneath notice by the ≈5 mm
@@ -31,8 +31,9 @@
  *   scalar every shared trace would degrade to « rectitude non vérifiable » and the recipient
  *   would lose a disclosure the sender had. Varint `0` **is** that unverifiable state; a measured
  *   deviation rides as `cm + 1`, so a perfectly straight trace is not the sentinel.
- * - **Quantisation never touches `L`.** Stations ride as the full-precision scalars `sa`/`sb`, and
- *   `L = sb − sa`. The centimetre grid is a property of the *profile*, not of the span.
+ * - **`L` rides on `d`.** The span is the profil's own extent, which is why `d` goes onto the
+ *   centimetre grid to the nearest centimetre — a re-read of what the geoportal writes — and only
+ *   `z` takes the lossy ceiling.
  * - **{@link validateP1} is structural only, allocates no arrays, and returns the string
  *   verbatim.** Arrays in the validated search would be stringified back into the address bar —
  *   200 points of JSON against a 2000-character budget. It also runs 3× per document request, on
@@ -49,7 +50,7 @@
  *   character `JSON.parse` throws on, forever.
  * - **The filename does not travel** and neither does the import date: the filename is the only
  *   weakly identifying string in the payload and it reproduces nothing. The receiving side reads
- *   « tracé reçu par lien » — hence {@link TracePayload}, which is a Trace *minus* `fileName`.
+ *   « tracé reçu par lien » — hence {@link TracePayload}, which is a Trace *minus* `origin`.
  */
 
 /** The sentinel. One character `JSON.parse` throws on, and the format's version marker. */
@@ -106,7 +107,7 @@ export class P1Error extends Error {
 }
 
 /**
- * What a link carries of a Trace. Structurally a `Trace` minus `fileName` — a `Trace` is
+ * What a link carries of a Trace. Structurally a `Trace` minus `origin` — a `Trace` is
  * assignable to it, and what comes back out becomes « tracé reçu par lien ».
  */
 export type TracePayload = {
@@ -140,7 +141,7 @@ export function fitsLinkBudget(href: string): boolean {
  * thousands of points over any shareable span, so the budget refuses such a file at « Copier le
  * lien » long before the grid could collapse it. § 8's structural check list is the whole list.
  *
- * @param trace the imported profile, in file coordinates. `fileName` is ignored — it does not
+ * @param trace the imported profile, in file coordinates. `origin` is ignored — it does not
  *   travel.
  * @returns the `tr` value, ready to be written into the query string unescaped.
  * @throws RangeError when the columns disagree, a sample is not finite, there are fewer than two
@@ -236,7 +237,7 @@ function walkWhole(raw: string, enforceBudget: boolean): string {
  * implementation, so nothing can decode that `validateSearch` would have refused.
  *
  * @param raw the `tr` value.
- * @returns the profile in file coordinates. **No `fileName`**: the receiving side reads « tracé
+ * @returns the profile in file coordinates. **No `origin`**: the receiving side reads « tracé
  *   reçu par lien ».
  * @throws P1Error exactly as {@link validateP1} does.
  */

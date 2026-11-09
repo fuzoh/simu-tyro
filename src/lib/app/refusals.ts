@@ -10,7 +10,7 @@
  *
  * | Engine | Surface |
  * | --- | --- |
- * | `invalid-input{field: "L0" \| "D_target" \| "H_target"}` | **Tension impossible**, with the attainable bound and **no Fix Action** |
+ * | `invalid-input{field: "L0" \| "D_target" \| "H_target" \| "T_target"}` | **Tension impossible**, with the attainable bound and **no Fix Action** |
  * | `resolveL0`'s bracket failure — `no-convergence` at stage `L0` | **Cible inatteignable**, naming the *target* |
  * | `solveSpan`'s `no-convergence` **or** `slack-limit` | **Calcul impossible**, with `[ Copier le diagnostic ]` |
  *
@@ -20,7 +20,7 @@
  *   bound *is* the breaking load, so no unambiguous repair exists. You cannot tension a rope past
  *   its breaking load, and a rupture verdict would report a line that cannot exist.
  * - **The bound is quoted in the driving field's own quantity and unit, and never twice.** In
- *   tension mode the copy states the prétension and *not* « soit L₀ ≥ 197,40 m »: a second
+ *   a tension mode the copy states that tension and *not* « soit L₀ ≥ 197,40 m »: a second
  *   equivalent invites the user to type a length into a tension field. That is why the two
  *   mode-specific messages depend on `resolveL0` re-emitting the floor in the driving quantity —
  *   without it the state degrades to quoting an `L₀` floor at a user editing a tension.
@@ -40,12 +40,14 @@ import type { TightnessFieldId } from "@/lib/rail/fields.ts";
 import type { ForceUnit, ScenarioDraft, TightnessDraft } from "@/lib/scenario/types.ts";
 import type { EngineFailure } from "@/lib/scenario/unloaded.ts";
 import type { SolveError, SolveNote } from "@/lib/sim";
+import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
-import { FIELDS } from "@/lib/rail/fields.ts";
+import { FIELDS, lowerFirst } from "@/lib/rail/fields.ts";
 import { tightnessDriver } from "@/lib/rail/values.ts";
 import { SOLVER } from "@/lib/sim";
 import { CONSTRUCTION_TOKEN_BY_ID } from "@/lib/url/scenario.ts";
+import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 /** The three surfaces § 7 names. Three, not two: `no-convergence` has two origins. */
 export type RefusalId = "tension-impossible" | "cible-inatteignable" | "calcul-impossible";
@@ -70,21 +72,20 @@ type EngineError = Extract<EngineFailure, { readonly error: SolveError }>;
 export const DIAGNOSTIC_ACTION = "Copier le diagnostic";
 
 /** Both mode-specific messages open on this sentence — the physics, stated once. */
-const TENSION_LEAD = "⛔ Tension impossible — la ligne casserait avant d'atteindre cette tension.";
+const TENSION_LEAD = `⛔ ${label("tension-impossible", "exact")} — la ligne casserait avant d'atteindre cette tension.`;
 
 /** One surface, two kinds, same user action. It is thin on purpose: no residual, no note. */
 const CALCUL_IMPOSSIBLE: EngineRefusal = {
   id: "calcul-impossible",
-  message:
-    "⛔ Calcul impossible pour cette configuration. Le solveur n'a pas convergé — ce cas n'est pas censé se produire. Modifiez légèrement la tension ou la géométrie.",
+  message: `⛔ ${label("calcul-impossible", "exact")} pour cette configuration. Le solveur n'a pas convergé — ce cas n'est pas censé se produire. Modifiez légèrement la tension ou la géométrie.`,
   diagnostic: true,
 };
 
 /** The short clause « Aucun résultat » echoes — voir `./banner.ts`, which writes that sentence. */
 export const REFUSAL_CAUSE: Record<RefusalId, string> = {
-  "tension-impossible": "tension impossible",
-  "cible-inatteignable": "cible inatteignable",
-  "calcul-impossible": "calcul impossible",
+  "tension-impossible": lowerFirst(label("tension-impossible", "exact")),
+  "cible-inatteignable": lowerFirst(label("cible-inatteignable", "exact")),
+  "calcul-impossible": lowerFirst(label("calcul-impossible", "exact")),
 };
 
 /**
@@ -94,12 +95,16 @@ export const REFUSAL_CAUSE: Record<RefusalId, string> = {
  *   the user is editing reads in, which is the whole of « in the driving field's own quantity ».
  * @returns `null` when the failure is **not** one of the three refusals: stages `geometry` and
  *   `material` are « nothing to solve yet », and `invalid-input` on `L`, `h`, `w`, `EA` or
- *   `strength` is a statement about the span — the three gates own both as a blocking error on an
+ *   `strength` is a statement about the span — the five gates own both as a blocking error on an
  *   editable field. A refusal never doubles a field message.
  */
 export function engineRefusal(
   failure: EngineFailure,
-  { tightness, unit = "daN" }: { tightness: TightnessDraft; unit?: ForceUnit },
+  {
+    tightness,
+    unit = "daN",
+    register = "exact",
+  }: { tightness: TightnessDraft; unit?: ForceUnit; register?: Register },
 ): EngineRefusal | null {
   if (failure.error === null) return null;
   const { stage, error } = failure;
@@ -113,18 +118,32 @@ export function engineRefusal(
           // The one row that echoes the offending value: `L₀` is a field the user typed, and what
           // was typed is the evidence. The two inverted modes quote the bound **alone** — a second
           // number beside an attainable maximum reads as a second target.
-          message: `${TENSION_LEAD} Longueur non tendue minimale pour ce câble : ${formatQuantity(
-            "L0",
+          message: `${TENSION_LEAD} ${heading("unstretchedLength", register)} minimale pour ${
+            register === "exact" ? "ce câble" : "cette ligne"
+          } : ${formatQuantity("L0", error.bound)} · valeur : ${formatQuantity("L0", error.value)}.`,
+          diagnostic: false,
+        };
+      case "T_target":
+        return {
+          id: "tension-impossible",
+          message: `${TENSION_LEAD} ${heading("pretension", register)} maximale atteignable : ${formatQuantity(
+            "T_target",
             error.bound,
-          )} · valeur : ${formatQuantity("L0", error.value)}.`,
+            unit,
+          )}.`,
           diagnostic: false,
         };
       case "H_target":
+        // A simplified Page shows no tension horizontale, so it quotes no bound in one: the
+        // physics sentence stands alone there, and the bound is Avancé's to state.
+        if (register === "terrain") {
+          return { id: "tension-impossible", message: TENSION_LEAD, diagnostic: false };
+        }
         return {
           id: "tension-impossible",
           // In « Rapport V » the engine still speaks of `H_target` — the ratio resolved to one —
           // so the bound is named in the quantity the user can act on.
-          message: `${TENSION_LEAD} Prétension maximale atteignable : ${formatQuantity(
+          message: `${TENSION_LEAD} ${heading("horizontalTension", "exact")} maximale atteignable : ${formatQuantity(
             "H_target",
             error.bound,
             unit,
@@ -151,10 +170,10 @@ export function engineRefusal(
   if (error.kind === "no-convergence" && stage === "L0" && tightness.mode !== "length") {
     return {
       id: "cible-inatteignable",
-      message: `⛔ Cible inatteignable — aucune longueur non tendue ne donne ${target(
-        tightness,
-        unit,
-      )}.`,
+      message: `⛔ ${label("cible-inatteignable", register)} — aucune ${label(
+        "unstretchedLength",
+        register,
+      )} ne donne ${target(tightness, unit, register)}.`,
       diagnostic: false,
     };
   }
@@ -162,18 +181,33 @@ export function engineRefusal(
   return CALCUL_IMPOSSIBLE;
 }
 
-/** How « Cible inatteignable » names each driver's target — the refusal's own wording. */
-const TARGET_NOUN: Record<TightnessFieldId, string> = {
-  D_target: "cette flèche à vide",
-  H_target: "cette prétension",
-  L0: "cette longueur non tendue",
-  vRatio: "ce rapport V",
+/**
+ * How « Cible inatteignable » names each driver's target — the refusal's own wording. A simplified
+ * Page names the two drivers only Avancé offers as the tension they ask for.
+ */
+const TARGET_NOUN: Record<Register, Record<TightnessFieldId, string>> = {
+  exact: {
+    D_target: "cette flèche à vide",
+    T_target: "cette prétension",
+    H_target: "cette tension horizontale",
+    L0: "cette longueur non tendue",
+    vRatio: "ce rapport V",
+  },
+  terrain: {
+    D_target: `cette ${label("sag", "terrain")}`,
+    T_target: `cette ${label("pretension", "terrain")}`,
+    H_target: "cette tension",
+    L0: `cette ${label("unstretchedLength", "terrain")}`,
+    vRatio: "cette tension",
+  },
 };
 
 /** « cette flèche à vide (6,00 m) » / « cette prétension (9074,0 daN) » — the target, named. */
-function target(tightness: TightnessDraft, unit: ForceUnit): string {
+function target(tightness: TightnessDraft, unit: ForceUnit, register: Register): string {
   const { field, value } = tightnessDriver({ tightness });
-  return `${TARGET_NOUN[field]} (${formatQuantity(FIELDS[field].quantity, value, unit)})`;
+  // A ratio quoted after « cette tension » would read as a tension.
+  if (register === "terrain" && field === "vRatio") return TARGET_NOUN.terrain.vRatio;
+  return `${TARGET_NOUN[register][field]} (${formatQuantity(FIELDS[field].quantity, value, unit)})`;
 }
 
 /**
@@ -237,7 +271,7 @@ export function diagnosticPayload(input: DiagnosticInput): string {
   }
 
   lines.push(tag("material", materialLine(scenario.material, derived?.strength ?? null)));
-  lines.push(tag("address", address ?? "(non partageable — tracé hors budget)"));
+  lines.push(tag("address", address ?? "(non partageable — profil hors budget)"));
   return lines.join("\n");
 }
 

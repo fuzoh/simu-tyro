@@ -19,6 +19,7 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { exaggeration, PLOT_ASPECT_BAND, PROFILE_ASPECT, VE_BAND } from "@/lib/layout/contract.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
+import { sweepRiderOf } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { CLEARANCE, evaluateClearance } from "@/lib/sim";
 
@@ -47,7 +48,7 @@ function frameOf(scenario: ScenarioDraft, trace: Trace | null = null) {
 /** The scenario's half, composed as the app root composes it: unloaded line, frame, traverse. */
 function baseOf(scenario: ScenarioDraft, trace: Trace | null = null) {
   const unloaded = deriveUnloaded(unloadedInputs(scenario, trace));
-  return buildSceneBase(buildSceneFrame(unloaded.span), unloaded, scenario.rider);
+  return buildSceneBase(buildSceneFrame(unloaded.span), unloaded, sweepRiderOf(scenario));
 }
 
 /** The scene's auto-fit at the elected plot aspect — `VE = 0,42 × (x span / z span)`. */
@@ -471,50 +472,46 @@ describe("the imported profile — one terrain joint, one domain", () => {
     d: Float64Array.from([0, 50, 100, 150, 200, 250, 300, 350, 400]),
     z: Float64Array.from([500, 502, 498, 494, 486, 480, 478, 476, 470]),
     dev: 1.2,
-    fileName: "profil.csv",
+    origin: { kind: "csv", fileName: "profil.csv" },
   };
 
-  const imported = (sa: number, sb: number): ScenarioDraft => ({
+  const imported: ScenarioDraft = {
     ...firstRunDefaults(),
-    geometry: { source: "trace", trace: "p1.stub", sa, sb },
-  });
+    geometry: { source: "trace", trace: "p1.stub" },
+  };
 
-  it("derives L and h from the stations, and the ground from the file's own samples", () => {
-    const built = scene(imported(100, 300), trace);
-    expect(built.L).toBe(200);
-    // h = (z_B + hauteur_B) − (z_A + hauteur_A), both anchors 12 m: the altitude difference.
-    expect(built.h).toBeCloseTo(478 - 498, 9);
+  it("takes L and h from the whole profil, and the ground from the file's own samples", () => {
+    const built = scene(imported, trace);
+    expect(built.L).toBe(400);
+    // h = (z_last + hauteur_B) − (z_first + hauteur_A), both anchors 12 m: the altitude difference.
+    expect(built.h).toBeCloseTo(470 - 500, 9);
     expect(built.terrain.kind).toBe("profile");
     // Anchor A's top is the datum, so the ground under it is exactly −hauteur_A.
-    expect(built.ground.zs[built.ground.xs.indexOf(0)]).toBeCloseTo(-12, 9);
+    expect(built.ground.zs[built.ground.xs.indexOf(0)]).toBe(-12);
   });
 
-  it("clamps the 5 % margin to the trace extent — a whole-trace import is the domain", () => {
-    // Stations at the two ends: the margin has nowhere to go, and the domain is the trace.
-    const whole = scene(imported(0, 400), trace);
+  it("the profil is the domain — the 5 % margin has nowhere to go past its two ends", () => {
+    const whole = scene(imported, trace);
     expect(whole.extent).toEqual({ min: 0, max: 400 });
     expect(whole.domain).toEqual([0, 400]);
-    // Stations well inside: the margin stands, and the drawn ground covers it. Everything is in
-    // the **span** frame — metres from anchor A — which is the frame the x axis reads in.
-    const inside = scene(imported(100, 300), trace);
-    expect(inside.extent).toEqual({ min: -100, max: 300 });
-    expect(inside.domain).toEqual([-10, 210]);
-    expect(inside.ground.xs[0]).toBe(-10);
-    expect(inside.ground.xs[inside.ground.xs.length - 1]).toBe(210);
   });
 
-  it("never resamples: every file sample inside the domain is drawn, and no other", () => {
+  it("never resamples: every file sample is drawn, and no other", () => {
     // Resampling was killed for making a coarse import indistinguishable from a fine one, and that
-    // rule does not stop at the engine's edge. The file's 100…300 land at 0…200 in the span frame.
-    const built = scene(imported(100, 300), trace);
-    expect([...built.ground.xs]).toEqual([-10, 0, 50, 100, 150, 200, 210]);
+    // rule does not stop at the engine's edge.
+    expect([...scene(imported, trace).ground.xs]).toEqual([...trace.d]);
   });
 
-  it("a degenerate placement has no picture — « L doit être > 0 »", () => {
-    expect(buildScene({ scenario: imported(300, 300), trace })).toBeNull();
-    expect(buildScene({ scenario: imported(300, 100), trace })).toBeNull();
-    // A trace-mode scenario with no cached Trace is the same: nothing to draw, and no throw.
-    expect(buildScene({ scenario: imported(100, 300), trace: null })).toBeNull();
+  it("the frame carries the ground altitude under each anchor, and a manual line none", () => {
+    expect(frameOf(imported, trace)?.bases).toEqual({ zBaseA: 500, zBaseB: 470 });
+    expect(frameOf(firstRunDefaults())?.bases).toBeNull();
+  });
+
+  it("a profil with no span has no picture, and no throw", () => {
+    const lone: Trace = { ...trace, d: Float64Array.of(0), z: Float64Array.of(500) };
+    expect(buildScene({ scenario: imported, trace: lone })).toBeNull();
+    // A trace-mode scenario with no cached Trace is the same: nothing to draw.
+    expect(buildScene({ scenario: imported, trace: null })).toBeNull();
   });
 });
 
@@ -545,12 +542,12 @@ describe("« Aucun résultat » — the null arm", () => {
 });
 
 describe("the frame outlives the solve — § 8's « les entrées se dessinent toujours »", () => {
-  /** The same synthetic trace the imported-profile block uses, for the station cases. */
+  /** A coarser cut of the imported-profile block's synthetic trace. */
   const trace: Trace = {
     d: Float64Array.from([0, 100, 200, 300, 400]),
     z: Float64Array.from([500, 498, 486, 478, 470]),
     dev: 1.2,
-    fileName: "profil.csv",
+    origin: { kind: "csv", fileName: "profil.csv" },
   };
 
   it("a textile draft with a blank MBL still has a frame, and no solved half", () => {
@@ -585,7 +582,7 @@ describe("the frame outlives the solve — § 8's « les entrées se dessinent t
     expect(frameOf(draft)).not.toBeNull();
   });
 
-  it("only l'exception géométrique loses the frame — L, h, and the stations", () => {
+  it("only l'exception géométrique loses the frame — L and h", () => {
     // The one state § 8 wrote down *as* an exception: no shared x domain, so no scale, no ticks
     // and no pointer path.
     for (const geometry of [
@@ -600,15 +597,15 @@ describe("the frame outlives the solve — § 8's « les entrées se dessinent t
     }
   });
 
-  it("`station B ≤ station A` yields no frame, and neither does a missing Trace", () => {
-    const imported = (sa: number, sb: number): ScenarioDraft => ({
+  it("a missing Trace yields no frame, and neither does a one-sample one", () => {
+    const imported: ScenarioDraft = {
       ...firstRunDefaults(),
-      geometry: { source: "trace", trace: "p1.stub", sa, sb },
-    });
-    expect(frameOf(imported(300, 300), trace)).toBeNull();
-    expect(frameOf(imported(300, 100), trace)).toBeNull();
-    expect(frameOf(imported(100, 300), null)).toBeNull();
-    expect(frameOf(imported(100, 300), trace)).not.toBeNull();
+      geometry: { source: "trace", trace: "p1.stub" },
+    };
+    const lone: Trace = { ...trace, d: Float64Array.of(0), z: Float64Array.of(500) };
+    expect(frameOf(imported, null)).toBeNull();
+    expect(frameOf(imported, lone)).toBeNull();
+    expect(frameOf(imported, trace)).not.toBeNull();
   });
 
   it("draws the frame on the unloaded line's placement: one terrain derivation", async () => {
@@ -624,7 +621,7 @@ describe("the frame outlives the solve — § 8's « les entrées se dessinent t
 
     const draft: ScenarioDraft = {
       ...firstRunDefaults(),
-      geometry: { source: "trace", trace: "p1.stub", sa: 100, sb: 300 },
+      geometry: { source: "trace", trace: "p1.stub" },
     };
     sceneModule.buildScene({ scenario: draft, trace });
     expect(spies.deriveTerrain).toHaveBeenCalledTimes(1);
@@ -636,7 +633,7 @@ describe("the frame outlives the solve — § 8's « les entrées se dessinent t
     const unloaded = deriveUnloaded(unloadedInputs(firstRunDefaults(), null));
     const frame = buildSceneFrame(unloaded.span);
     if (frame === null) throw new Error("expected a frame");
-    const base = buildSceneBase(frame, unloaded, firstRunDefaults().rider);
+    const base = buildSceneBase(frame, unloaded, sweepRiderOf(firstRunDefaults()));
     if (base === null) throw new Error("expected a drawable base");
 
     // Same frame, field for field — the frame is not rebuilt with different numbers downstream.
@@ -686,7 +683,7 @@ describe("the split at x_D — § 7's « memo on the solve inputs »", () => {
     const base = sceneModule.buildSceneBase(
       sceneModule.buildSceneFrame(unloaded.span),
       unloaded,
-      draft.rider,
+      sweepRiderOf(draft),
     );
     expect(base).not.toBeNull();
     expect(spies.resolveL0).toHaveBeenCalledTimes(1);
@@ -792,6 +789,45 @@ describe("the load against the unloaded line, and its trajectory — the 2026-09
   });
 });
 
+describe("Brins porteurs on the profile — one line, or two drawn apart (#84)", () => {
+  const single = first;
+  const pair = scene({ ...firstRunDefaults(), carryingLines: 2 });
+
+  it("one member is one line, drawn where it solved", () => {
+    expect(single.members).toEqual([{ line: "line", offsetPx: 0 }]);
+  });
+
+  it("two members are two offset lines: the ligne du haut above the ligne du bas", () => {
+    expect(pair.members.map((member) => member.line)).toEqual(["upperLine", "lowerLine"]);
+    const [upper, lower] = pair.members;
+    // SVG's y grows downward, so « du haut » is the smaller offset.
+    expect(upper.offsetPx).toBeLessThan(lower.offsetPx);
+    // The cable is `stroke-2`: centres 2 px apart would touch. Two more px are air between them.
+    expect(lower.offsetPx - upper.offsetPx).toBeGreaterThanOrEqual(2 + 2);
+    // Centred on the solved line, so the drawing moves the pair and not the node the rider is on.
+    expect(upper.offsetPx + lower.offsetPx).toBe(0);
+  });
+
+  it("the gap is pixels, not metres: a longer span draws the same offsets", () => {
+    const longer = scene({
+      ...firstRunDefaults(),
+      carryingLines: 2,
+      geometry: { source: "manual", L: 600, h: -18 },
+    });
+    expect(longer.members).toEqual(pair.members);
+  });
+
+  it("both lines are one member's solve under P/2 — higher and slacker than a single line", () => {
+    // 120 kg · 9,81 m/s² / 2 = 588,6 N on each member.
+    expect(pair.P).toBeCloseTo(588.6, 9);
+    expect(single.P).toBeCloseTo(1177.2, 9);
+    expect(pair.rider.step.zD).toBeGreaterThan(single.rider.step.zD);
+    expect(pair.rider.step.TA).toBeLessThan(single.rider.step.TA);
+    // The unloaded line is the same: both members are posed at the same tension.
+    expect(pair.unloaded).toEqual(single.unloaded);
+  });
+});
+
 describe("the two pointer helpers", () => {
   it("snapToStep lands on a solved step, which is what skips Indéterminé's gaps", () => {
     const target = snapToStep(first.traverse, 40);
@@ -826,5 +862,8 @@ function riderContact(): Scenario {
     ...firstRunDefaults(),
     geometry: { source: "manual", L: 200, h: -25 },
     anchors: { zA: 12, zB: 6 },
+    // Measured at flèche 6,0 — the first-run line now holds a tension de pose instead, which on
+    // this span would hang a different sag.
+    tightness: { mode: "sag", D_target: 6 },
   };
 }

@@ -1,5 +1,5 @@
 /**
- * **The three gates** — « v1 build spec » § 7 (*Les trois grilles de validation*, *Le résumé
+ * **The gates** — « v1 build spec » § 7 (*Les trois grilles de validation*, *Le résumé
  * bloquant nomme la pire grille franchie*, *« Saisie en cours »*, *La table des champs
  * responsables*) and § 3 (*The three validation gates*, *Champ responsable*), under
  * [amendment D](../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md).
@@ -26,14 +26,30 @@
  *   cannot pre-empt the rank-4 neutral prompt and the picker carries no field message. The
  *   régime × famille/usage clash is a different thing: that one **is** a blocking error with its
  *   `[ Choisir un autre régime ]`, and § 8's message table has a row for it.
- * - **`x_D` sits in no gate.** It clamps on every path, and a clamp produces no error state.
+ * - **`x_D` and the Positions sit in no gate.** `x_D` clamps on every path, and a clamp produces no
+ *   error state. The one thing a computation reads of the Positions is the line's bearing, which
+ *   the Vent is projected on — and its absence is not a breach either: see the next rule.
+ * - **The Vent needs Positions, and their absence is not an error.** The Vent's direction is
+ *   geographic, so without A and B on the map the line has no bearing to project it on. Then the
+ *   wind fields are disabled with {@link WIND_UNPLACED}'s reason, the ride and the Banane run without
+ *   wind, and a Vent that arrived in a link or a Session is **kept as given** (ADR-0001) with a
+ *   notice where the results would have read it. {@link windBearing} is the one check: the fields,
+ *   the rose, the rides and the notice all read it, so a link, a Session and a click cannot
+ *   disagree. Like an absent régime it is a flag on the report, never an entry on the blocking
+ *   list: it hides no result.
+ * - **The passager's ride has two gates of its own**, past the three: the Wind Gate (the Vent, #87)
+ *   and the Ride Gate (§12.2's constants, #89 and the ride-gates fix). Their fields reach no
+ *   statics number, but ADR-0001 keeps them as they arrive **and** gates them, so a negative wind
+ *   speed withholds the Banane, the rose's reading and the ride rather than blowing the other way,
+ *   and a negative `C_dA` withholds the ride rather than speeding it up. A Wind breach removes the
+ *   ride too, since it reads the Vent.
  * - **§5.4's chord bound is not here.** `L₀ > chord/(1 + T_break/EA)` needs `EA` and `MBF`, so
  *   evaluating it would re-derive physics in the UI. It stays in the engine and surfaces as
  *   « Tension impossible », an engine refusal — never a field error and never a gate.
  * - **Attribution, never inference.** No hard check renders only on a read-out: every check is
  *   declared on a **quantity** and attributed to an editable field by {@link culprits}, the static
- *   table keyed by (grandeur × mode). Without it `station B = station A` yields `L = 0`, reaches
- *   `solveSpan` and returns `invalid-input{field:"L"}` pointing at a field the user cannot edit.
+ *   table keyed by (grandeur × mode) — otherwise a check on a derived read-out, such as an imported
+ *   `h`, would point at a field the user cannot edit.
  * - **The Scenario holds numbers; the form holds text.** A cleared field cannot be a number, so
  *   emptiness arrives here as a {@link FieldIssue} from the form while the Scenario keeps the last
  *   committed value — which is exactly what « Saisie en cours » freezes on screen. The two
@@ -48,15 +64,27 @@
 import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { RegimeId, RegimeMismatch, TerminationId, TextileSpec } from "@/lib/sim";
-import type { Trace } from "@/lib/terrain/trace.ts";
+import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
+import { lineBearing } from "@/lib/scenario/geometry.ts";
 import { isFamilyAllowed, REGIMES, regimeMismatch, TERMINATIONS } from "@/lib/sim";
+import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 import type { Deduced } from "./deduced.ts";
 import type { FieldId, FieldIssue, FieldIssueKind, GateId } from "./fields.ts";
 
-import { checkField, displayField, emptyMessage, FIELD_ORDER, FIELDS, gateOf } from "./fields.ts";
+import {
+  checkField,
+  displayField,
+  emptyMessage,
+  FIELD_ORDER,
+  FIELDS,
+  fieldLabel,
+  GATE_IDS,
+  gateOf,
+  isOptionalField,
+} from "./fields.ts";
 import {
   FIELD_ACCESS,
   fieldContext,
@@ -80,10 +108,33 @@ export const GATE_CONSEQUENCE: Record<GateId, string> = {
   solve: "aucun résultat",
   clearance: "garde au sol indisponible",
   verdict: "aucun verdict",
+  wind: "vent indisponible",
+  // Every value the ride gives is an « estimation » (#6), and it is all the Ride Gate removes.
+  ride: "aucune estimation",
 };
 
-/** Worst first. A Solve breach subsumes the other two, which is why it names the summary. */
-const GATE_RANK: Record<GateId, number> = { solve: 0, clearance: 1, verdict: 2 };
+/**
+ * Worst first, as {@link GATE_IDS} lists them. A Solve breach subsumes the others, which is why it
+ * names the summary; a Wind breach subsumes the Ride Gate's.
+ */
+const GATE_RANK = (gate: GateId): number => GATE_IDS.indexOf(gate);
+
+/**
+ * Which gates pass, read off the blocking list: a gate with a breach on it fails, and an absent
+ * régime fails the Verdict Gate without being on the list ({@link GateReport.noRegime}).
+ */
+export function passedGates(
+  errors: readonly Pick<BlockingError, "gate">[],
+  noRegime: boolean,
+): Record<GateId, boolean> {
+  const passed = Object.fromEntries(GATE_IDS.map((gate) => [gate, true])) as Record<
+    GateId,
+    boolean
+  >;
+  for (const error of errors) passed[error.gate] = false;
+  if (noRegime) passed.verdict = false;
+  return passed;
+}
 
 /**
  * § 7's four Fix Actions, and the fifth ADR-0001 admits for an end the line cannot use. **Their
@@ -92,8 +143,7 @@ const GATE_RANK: Record<GateId, number> = { solve: 0, clearance: 1, verdict: 2 }
  * the first frame of a link.
  */
 export type FixActionId =
-  | "inverser-a-b"
-  | "passer-a-l-acier"
+  | "passer-au-cable"
   | "passer-en-usage-temporaire"
   | "choisir-un-autre-regime"
   | "passer-a-la-terminaison-de-depart";
@@ -102,14 +152,22 @@ export type FixAction = { readonly id: FixActionId; readonly label: string };
 
 /** The fifth names the end it sets, which depends on the family, so it is built at the gate. */
 const FIX: Record<Exclude<FixActionId, "passer-a-la-terminaison-de-depart">, FixAction> = {
-  "inverser-a-b": { id: "inverser-a-b", label: "Inverser A et B" },
-  "passer-a-l-acier": { id: "passer-a-l-acier", label: "Passer à l'acier" },
+  "passer-au-cable": { id: "passer-au-cable", label: `Passer au ${label("cable", "terrain")}` },
   "passer-en-usage-temporaire": {
     id: "passer-en-usage-temporaire",
-    label: "Passer en usage temporaire",
+    label: `Passer à l'${label("temporaryInstallation", "exact")}`,
   },
   // A **focus** action, not a value-setting one: no single correct régime exists.
   "choisir-un-autre-regime": { id: "choisir-un-autre-regime", label: "Choisir un autre régime" },
+};
+
+/** The régime's Fix Action and its message's subject on a simplified Page, which says marge exigée. */
+const REGIME_WORDING: Record<Register, { readonly fix: string; readonly subject: string }> = {
+  exact: { fix: FIX["choisir-un-autre-regime"].label, subject: "Régime" },
+  terrain: {
+    fix: `Choisir une autre ${label("regime", "terrain")}`,
+    subject: heading("regime", "terrain"),
+  },
 };
 
 /** One breach: which gate, which field is to blame, what it says, and what repairs it. */
@@ -129,7 +187,7 @@ export type BlockingError = {
   readonly fixes: readonly FixAction[];
 };
 
-/** What the three gates decided, in one object. */
+/** What the gates decided, in one object. */
 export type GateReport = {
   /** Worst gate first, then rail order. The banner's jump link targets `errors[0]`. */
   readonly errors: readonly BlockingError[];
@@ -146,19 +204,65 @@ export type GateReport = {
    * rank 4, so an error here would make the neutral no-regime prompt structurally unreachable.
    */
   readonly noRegime: boolean;
+  /**
+   * The line has no bearing — A or B is not on the map — so the Vent can be neither set nor
+   * applied: {@link windBearing} is `null`. **Not an error and not a gate breach**: the rides run
+   * without wind and every result stays, while the wind fields are disabled with
+   * {@link WIND_UNPLACED}'s reason and {@link windNotice} says a carried Vent is not applied.
+   */
+  readonly windNeedsPositions: boolean;
 };
 
-/** What the gates read. Everything else in the app is downstream of these three. */
+/**
+ * What the app says when the Vent has no line to be projected on: why its fields and the rose's
+ * handle are disabled, and what stands where a result would have read it.
+ */
+export const WIND_UNPLACED = {
+  reason: "Placez A et B sur la carte pour saisir le vent.",
+  notice: "Vent saisi non appliqué : sans A et B sur la carte, la ligne n'a pas d'orientation.",
+} as const;
+
+/**
+ * The bearing of A → B the Vent is projected on, degrees from north, or `null` when the line has
+ * none — **the one check** behind « the Vent needs Positions »: the report's
+ * {@link GateReport.windNeedsPositions}, the disabled wind fields, the rose's handle, the rides and
+ * the Banane all read it, whichever path the Scenario came by.
+ */
+export function windBearing({ positions }: Pick<ScenarioDraft, "positions">): number | null {
+  return lineBearing(positions);
+}
+
+/** Why a field cannot be typed into, or `null` when it can: the Vent's two, without Positions. */
+export function fieldUnavailable(
+  id: FieldId,
+  report: Pick<GateReport, "windNeedsPositions">,
+): string | null {
+  if (id !== "windSpeed" && id !== "windDirection") return null;
+  return report.windNeedsPositions ? WIND_UNPLACED.reason : null;
+}
+
+/**
+ * The notice a result read with the Vent carries when the Vent is not applied — a wind that arrived
+ * without Positions, kept as given — or `null`. A Vent of zero speed has nothing to apply.
+ */
+export function windNotice(
+  report: Pick<GateReport, "windNeedsPositions">,
+  wind: Pick<ScenarioDraft["wind"], "speedKmh">,
+): string | null {
+  return report.windNeedsPositions && wind.speedKmh !== 0 ? WIND_UNPLACED.notice : null;
+}
+
+/** What the gates read. Everything else in the app is downstream of them. */
 export type GateInput = {
   readonly scenario: TraverseScenario;
-  /** The active profile, or `null` in manual mode — the stations' bound comes from it. */
-  readonly trace: Trace | null;
   /**
    * Tier one's standing failures, from the form. Text the Scenario cannot hold: an emptied field,
    * or « 12,3,4 ». Omitted, the gates judge the Scenario alone — which is what a link arrival, a
    * Session restore and every `node` test do.
    */
   readonly issues?: readonly FieldIssue[];
+  /** The Page's vocabulary, which names the fields in the messages. `exact` when absent. */
+  readonly register?: Register;
 };
 
 /**
@@ -183,29 +287,31 @@ export type CulpritMode =
   | "importé"
   | "mode Longueur"
   | "mode Flèche"
-  | "mode Tension"
+  | "mode Prétension"
+  | "mode Tension horizontale"
   | "mode Rapport V"
-  | "acier"
-  | "acier surchargé"
-  | "textile";
+  | "câble"
+  | "câble surchargé"
+  | "corde";
 
 const CULPRITS: Partial<Record<`${Grandeur}/${CulpritMode}`, readonly FieldId[]>> = {
   "L/manuel": ["L"],
-  "L/importé": ["sa", "sb"],
   "h/manuel": ["h"],
-  "h/importé": ["sa", "sb", "zA", "zB"],
+  // An imported `L` is the profil's own extent: no field moves it, so it has no row.
+  "h/importé": ["zA", "zB"],
   "L0/mode Longueur": ["L0"],
   "L0/mode Flèche": ["D_target"],
-  "L0/mode Tension": ["H_target"],
+  "L0/mode Prétension": ["T_target"],
+  "L0/mode Tension horizontale": ["H_target"],
   "L0/mode Rapport V": ["vRatio"],
-  "MBF/acier": ["d", "R0", "cst"],
-  "MBF/acier surchargé": ["mbfOverride"],
-  "EA/acier": ["d"],
-  "EA/acier surchargé": ["eaOverride"],
-  "EA/textile": ["k", "MBL"],
-  "mu/acier": ["d"],
-  "mu/acier surchargé": ["muOverride"],
-  "mu/textile": ["muTextile"],
+  "MBF/câble": ["d", "R0", "cst"],
+  "MBF/câble surchargé": ["mbfOverride"],
+  "EA/câble": ["d"],
+  "EA/câble surchargé": ["eaOverride"],
+  "EA/corde": ["k", "MBL"],
+  "mu/câble": ["d"],
+  "mu/câble surchargé": ["muOverride"],
+  "mu/corde": ["muTextile"],
 };
 
 /**
@@ -229,20 +335,31 @@ export function culprits(grandeur: Grandeur, mode: CulpritMode): readonly FieldI
  */
 function unavailabilityCause(mismatch: RegimeMismatch, family: "steel" | "textile"): string {
   const causes: string[] = [];
-  if (mismatch.family)
-    causes.push(family === "steel" ? "avec un câble acier" : "avec une corde textile");
+  if (mismatch.family) causes.push(`avec ${FAMILY_REQUIRED[family]}`);
   if (mismatch.usage) causes.push("en installation permanente");
   return causes.join(" et ");
 }
 
+/** How the select note names the entry it explains, per register. */
+const THIS_REGIME: Record<Register, string> = {
+  exact: "ce régime",
+  terrain: `cette ${label("regime", "terrain")}`,
+};
+
 /** What a régime's `requires` asks for, as the noun the select note needs. */
-const FAMILY_REQUIRED = { steel: "un câble acier", textile: "une corde textile" } as const;
+const FAMILY_REQUIRED = {
+  steel: `un ${label("cable", "terrain")}`,
+  textile: `une ${label("rope", "terrain")}`,
+} as const;
 const USAGE_REQUIRED = {
-  PERMANENTE: "un usage permanent",
-  TEMPORAIRE: "un usage temporaire",
+  PERMANENTE: `une ${label("permanentInstallation", "exact")}`,
+  TEMPORAIRE: `une ${label("temporaryInstallation", "exact")}`,
 } as const;
 /** And what is currently selected, for the clause that names it. */
-const FAMILY_ACTIVE = { steel: "l'acier", textile: "le textile" } as const;
+const FAMILY_ACTIVE = {
+  steel: `le ${label("cable", "terrain")}`,
+  textile: `la ${label("rope", "terrain")}`,
+} as const;
 
 /**
  * § 10.1 — « une entrée indisponible **montre sa raison** »: the régime select's note, `null` where
@@ -256,22 +373,24 @@ export function regimeUnavailableNote(
   regime: RegimeId,
   family: "steel" | "textile",
   usage: "PERMANENTE" | "TEMPORAIRE",
+  register: Register = "exact",
 ): string | null {
   const mismatch = regimeMismatch(regime, family, usage);
   const { requires } = REGIMES[regime];
   if (mismatch === null || requires === null) return null;
+  const subject = THIS_REGIME[register];
   if (mismatch.family && mismatch.usage) {
-    return `Indisponible — ce régime suppose ${FAMILY_REQUIRED[requires.family]} et ${USAGE_REQUIRED[requires.usage]}.`;
+    return `Indisponible — ${subject} suppose ${FAMILY_REQUIRED[requires.family]} et ${USAGE_REQUIRED[requires.usage]}.`;
   }
   if (mismatch.family) {
-    return `Indisponible — ce régime suppose ${FAMILY_REQUIRED[requires.family]} ; la famille active est ${FAMILY_ACTIVE[family]}.`;
+    return `Indisponible — ${subject} suppose ${FAMILY_REQUIRED[requires.family]} ; la famille active est ${FAMILY_ACTIVE[family]}.`;
   }
-  return `Indisponible — ce régime ne couvre pas ${USAGE_REQUIRED[usage]}.`;
+  return `Indisponible — ${subject} ne couvre pas ${USAGE_REQUIRED[usage]}.`;
 }
 
-/** §10.4, stated where `Corde textile` is disabled — the rule is a fact worth teaching. */
+/** §10.4, stated where `Corde` is disabled — the rule is a fact worth teaching. */
 export const TEXTILE_UNAVAILABLE_REASON =
-  "§10.4 : fluage, UV/abrasion et fusion par friction (HMPE ~144–152 °C) ⇒ acier seul en installation permanente.";
+  "§10.4 : fluage, UV/abrasion et fusion par friction (HMPE ~144–152 °C) ⇒ câble seul en installation permanente.";
 
 /** §10.3, likewise: not forbidden — there is simply no efficiency to multiply by. */
 const KNOT_ON_HMPE_REASON =
@@ -333,8 +452,8 @@ function terminationFaultMessage(fault: TerminationFault, family: Family): strin
     return "⛔ Nœud impossible sur HMPE — il y glisse, sans rendement défendable (§10.3).";
   }
   return family === "steel"
-    ? "⛔ Terminaison de corde textile impossible sur un câble acier (§10.2)."
-    : "⛔ Terminaison de câble acier impossible sur une corde textile (§10.3).";
+    ? "⛔ Terminaison de corde impossible sur un câble (§10.2)."
+    : "⛔ Terminaison de câble impossible sur une corde (§10.3).";
 }
 
 /** Manual or imported geometry — the mode half of every (grandeur × mode) row. */
@@ -359,12 +478,16 @@ export function isFieldActive(id: FieldId, scenario: TraverseScenario): boolean 
 }
 
 /**
- * The three gates over one Scenario.
+ * The gates over one Scenario.
  *
- * @returns every standing breach, worst gate first then rail order, with the three pass flags §
- *   7's table hangs its three different suppressions off.
+ * @returns every standing breach, worst gate first then rail order, with the pass flag per gate
+ *   that `@/lib/app/suppression.ts` hangs each gate's own suppression off.
  */
-export function evaluateGates({ scenario, trace, issues = [] }: GateInput): GateReport {
+export function evaluateGates({
+  scenario,
+  issues = [],
+  register = "exact",
+}: GateInput): GateReport {
   const mode = geometryMode(scenario);
   const errors: BlockingError[] = [];
   /** One breach per field: a scenario-level check never doubles a standing form issue. */
@@ -402,8 +525,8 @@ export function evaluateGates({ scenario, trace, issues = [] }: GateInput): Gate
       kind: "invalid",
       field: "family",
       alsoOutlined: ["usage"],
-      message: "⛔ Corde textile impossible en installation permanente (§10.4).",
-      fixes: [FIX["passer-a-l-acier"], FIX["passer-en-usage-temporaire"]],
+      message: "⛔ Corde impossible en installation permanente (§10.4).",
+      fixes: [FIX["passer-au-cable"], FIX["passer-en-usage-temporaire"]],
     });
   }
 
@@ -424,11 +547,11 @@ export function evaluateGates({ scenario, trace, issues = [] }: GateInput): Gate
       kind: "invalid",
       field: "regime",
       alsoOutlined: [],
-      message: `⛔ Régime « ${REGIMES[scenario.regime].label} » indisponible ${unavailabilityCause(
+      message: `⛔ ${REGIME_WORDING[register].subject} « ${REGIMES[scenario.regime].label} » indisponible ${unavailabilityCause(
         mismatch,
         scenario.material.family,
       )}.`,
-      fixes: [FIX["choisir-un-autre-regime"]],
+      fixes: [{ id: "choisir-un-autre-regime", label: REGIME_WORDING[register].fix }],
     });
   }
 
@@ -463,7 +586,7 @@ export function evaluateGates({ scenario, trace, issues = [] }: GateInput): Gate
   // ── Every number the Scenario holds, as a link can carry it ────────────────────────────────
   // `?L=-5` restores state faithfully, including invalid state, and must light up here on the first
   // frame even though nobody has typed into the field yet.
-  const context = fieldContext(scenario, trace);
+  const context = fieldContext(scenario, register);
   for (const field of GATED_FIELDS) {
     const value = FIELD_ACCESS[field].read(scenario);
     if (value === undefined) continue;
@@ -471,11 +594,12 @@ export function evaluateGates({ scenario, trace, issues = [] }: GateInput): Gate
       // An unset Override is « non surchargée »: it shows the formula and judges nothing. The other
       // blanks are the textile ones the *state* can hold. **No rope ships**: one invented `MBL`
       // decides the verdict (100 kN ⇒ FS 11,94 « dans les limites »; 60 kN ⇒ 7,63 « hors limites »
-      // on the same line). Flipping to `Corde textile` under `TEMPORAIRE` therefore lands on two
+      // on the same line). Flipping to `Corde` under `TEMPORAIRE` therefore lands on two
       // blank required fields — which is **not** « Saisie en cours »: a field the user never
       // filled is not mid-edit, so it blocks and keeps no stale picture. Polyester adds a third,
       // and its message carries the reason rather than the hole.
-      if (!isOverrideField(field)) {
+      // An optional field's blank is « absent » (the textile diameter) and judges nothing either.
+      if (!isOverrideField(field) && !isOptionalField(field)) {
         push({
           gate: "solve",
           kind: "empty",
@@ -496,36 +620,19 @@ export function evaluateGates({ scenario, trace, issues = [] }: GateInput): Gate
     push({ gate, kind: issue.kind, field, alsoOutlined: [], message: issue.message, fixes: [] });
   }
 
-  // `L = d_B − d_A` is a **read-out** in imported mode, so `L > 0` is attributed back to the
-  // stations. Not a silent auto-swap: normalising to `A = min(station)` would **flip the sign of
-  // `h`**, the silent model reinterpretation the §10.4 family gate already ruled out.
-  if (scenario.geometry.source === "trace" && !(scenario.geometry.sb > scenario.geometry.sa)) {
-    const [first, ...rest] = culprits("L", "importé");
-    push({
-      gate: "solve",
-      kind: "invalid",
-      field: first,
-      alsoOutlined: rest,
-      message: "⛔ Portée nulle ou négative — l'ancrage B est avant l'ancrage A.",
-      fixes: [FIX["inverser-a-b"]],
-    });
-  }
-
   errors.sort(
     (a, b) =>
-      GATE_RANK[a.gate] - GATE_RANK[b.gate] ||
+      GATE_RANK(a.gate) - GATE_RANK(b.gate) ||
       FIELD_ORDER.indexOf(a.field) - FIELD_ORDER.indexOf(b.field),
   );
 
-  const passed: Record<GateId, boolean> = { solve: true, clearance: true, verdict: true };
-  for (const error of errors) passed[error.gate] = false;
   // The one gate breach that is not an error: an absent régime suppresses the verdict and the grid
   // without entering the blocking list, so `worst` and `blockingSummary` stay derived from
   // `errors` alone and the first screen carries **no** « ⛔ 1 erreur bloquante ».
-  if (noRegime) passed.verdict = false;
+  const passed = passedGates(errors, noRegime);
   const worst = errors.length === 0 ? null : errors[0].gate;
 
-  return { errors, passed, worst, noRegime };
+  return { errors, passed, worst, noRegime, windNeedsPositions: windBearing(scenario) === null };
 }
 
 /**
@@ -552,7 +659,7 @@ export function blockingSummary(report: GateReport, refused = false): string | n
 /** What « Saisie en cours » says, and the value it attributes every number on screen to. */
 export type SaisieEnCours = {
   readonly field: FieldId;
-  /** « Saisie en cours — ces valeurs correspondent à Flèche à vide cible 6,00 m. » */
+  /** « Saisie en cours — ces valeurs correspondent à Flèche à vide 6,00 m. » */
   readonly message: string;
 };
 
@@ -578,6 +685,7 @@ export function saisieEnCours(
   report: GateReport,
   focused: FieldId | null,
   lastCommitted: string | null,
+  register: Register = "exact",
 ): SaisieEnCours | null {
   if (focused === null) return null;
   const breach = report.errors.find((error) => error.field === focused);
@@ -585,7 +693,7 @@ export function saisieEnCours(
   const value = lastCommitted === null ? "" : ` ${lastCommitted}`;
   return {
     field: focused,
-    message: `Saisie en cours — ces valeurs correspondent à ${FIELDS[focused].label}${value}.`,
+    message: `${label("saisie-en-cours", register)} — ces valeurs correspondent à ${fieldLabel(focused, register)}${value}.`,
   };
 }
 

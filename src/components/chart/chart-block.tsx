@@ -33,6 +33,7 @@ import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 
 import type { ChartScene, SceneBase, SceneFrame } from "@/lib/chart/scene.ts";
+import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import {
   BannerSlot,
@@ -45,6 +46,7 @@ import {
   ViewStripSlot,
 } from "@/components/app/shell.tsx";
 import { useAppDispatch, useAppState } from "@/components/app/store.tsx";
+import { NO_SPAN_LINE } from "@/lib/chart/copy.ts";
 import { placeRider, snapToStep } from "@/lib/chart/scene.ts";
 import { roundToDisplay } from "@/lib/format/quantity.ts";
 import {
@@ -61,23 +63,14 @@ import {
   stripOuterHeight,
   veBadgeLabel,
 } from "@/lib/layout/contract.ts";
-import { CELL_IDS, CELL_LABEL, readOutCells } from "@/lib/rail/cells.ts";
+import { cellLabel, cellsOf, READ_OUT_SCOPE, readOutCells } from "@/lib/rail/cells.ts";
 import { CELL_HELP } from "@/lib/rail/help.ts";
-import { applyField } from "@/lib/rail/values.ts";
 import { clampX } from "@/lib/scenario/geometry.ts";
-import { snapStation } from "@/lib/terrain/trace.ts";
 import { cn } from "@/lib/utils.ts";
 
 import { Profile } from "./profile.tsx";
 import { ClearanceStrip } from "./strip.tsx";
 import { ViewStrip } from "./view-strip.tsx";
-
-/**
- * § 8's own line for *l'exception géométrique*, centred in **both** empty plots — the one state
- * where there is no shared x domain, so nothing can be drawn against it and nothing can be pointed
- * at. Every other failure keeps its frame.
- */
-const NO_SPAN_LINE = "Portée invalide — aucun tracé possible.";
 
 /**
  * `Indéterminé`'s one legal glyph — *tenté, indisponible*. It is **not** the empty state and it is
@@ -94,6 +87,8 @@ export function ChartBlock({
   inert = false,
   onPositionFocus,
   onReveal,
+  readOnly = false,
+  register = "exact",
   revealGrantable = true,
   solved,
   width,
@@ -114,7 +109,7 @@ export function ChartBlock({
   /**
    * May the garde au sol be shown? A Clearance Gate breach removes **the garde and its curve
    * alone** — the cable, the unloaded line, both tensions and the slope all stand, which is the
-   * whole reason § 7's three gates are three. The strip keeps its axes and stays a scrub track:
+   * whole reason Clearance is a gate of its own. The strip keeps its axes and stays a scrub track:
    * `x` maps to rider position whether or not clearance data exists.
    */
   clearance?: boolean;
@@ -135,6 +130,16 @@ export function ChartBlock({
   onPositionFocus: (focused: boolean) => void;
   /** « Afficher le profil » — the pinned header's one control. */
   onReveal: () => void;
+  /**
+   * The Page Terrain (#101): the passager stays where the link put it — no scrub on either plot,
+   * and its position is read in the View Strip rather than typed.
+   */
+  readOnly?: boolean;
+  /**
+   * The Page's vocabulary (#61): which read-out cells the row carries and what they are called. A
+   * simplified Page prints the terrain set, without help — the help is Avancé's exact prose.
+   */
+  register?: Register;
   /**
    * May the policy **grant** that request here? `false` under § 5's two height constraints, where
    * the chevron would otherwise be a press that changes nothing — voir `revealGrantable` in
@@ -172,7 +177,14 @@ export function ChartBlock({
   // Not measured yet: the bands keep their heights and hold their labels, which is the Skeleton's
   // own content. Nothing about the scenario is being said here.
   if (width === null) {
-    return <EmptyBands banner={banner} onReveal={onReveal} revealGrantable={revealGrantable} />;
+    return (
+      <EmptyBands
+        banner={banner}
+        onReveal={onReveal}
+        register={register}
+        revealGrantable={revealGrantable}
+      />
+    );
   }
   // § 8's *exception géométrique*, and **only** it: no shared x domain, so both plots are empty
   // frames with no axis ticks, they carry the cause line, and pointer input is inert. The read-out
@@ -185,6 +197,7 @@ export function ChartBlock({
         cause={NO_SPAN_LINE}
         cells={cause ?? null}
         onReveal={onReveal}
+        register={register}
         revealGrantable={revealGrantable}
       />
     );
@@ -270,31 +283,6 @@ export function ChartBlock({
     if (snapped !== null) moveRider(roundToDisplay("x_D", snapped));
   }
 
-  /**
-   * § 4's two Station handles. **The snap is the pointer path's whole rule** — `snapStation` takes
-   * the file's own nearest sample and clamps to the trace, so a drag cannot reach « Station hors du
-   * tracé » while a typed station still blocks. The metres arrive in the span frame, so `s_A` is what
-   * turns them into a station: at `x = 0` the pointer is on anchor A, whatever the file numbers it.
-   *
-   * `applyField` is the write, rather than a geometry patch built here, because it is the one path
-   * that brings `x_D`'s clamp along with a new span — « no route into a new span can forget it ».
-   */
-  function dragStation(anchor: "A" | "B", metres: number) {
-    const { geometry } = state.scenario;
-    if (inert || geometry.source !== "trace" || state.trace === null) return;
-    const next = applyField(
-      state.scenario,
-      anchor === "A" ? "sa" : "sb",
-      snapStation(state.trace, geometry.sa + metres),
-    );
-    // Two keys rather than the whole draft: the store's shallow merge is what keeps
-    // `unloadedInputs` stable for everything this drag does not touch.
-    dispatch({
-      type: "scénario/modifié",
-      patch: { geometry: next.geometry, rider: next.rider },
-    });
-  }
-
   /** A typed position is exact, clamped into `[0, L]` because `x_D` selects a view. */
   function moveRider(metres: number) {
     if (frame === null || inert) return;
@@ -315,7 +303,7 @@ export function ChartBlock({
   const values =
     rider === null
       ? null
-      : readOutCells(rider, { clearance, hClearMin: riderInput.hClearMin, unit });
+      : readOutCells(rider, { clearance, hClearMin: riderInput.hClearMin, unit, register });
 
   return (
     <>
@@ -334,15 +322,9 @@ export function ChartBlock({
           clearance={clearance}
           frame={frame}
           layers={state.layers}
-          onScrub={scrub}
-          // Manual mode passes nothing, and that **is** § 5's « bracket, non-interactive »: with no
-          // trace to snap to there is no station to place, and the same two rectangles stay inert.
-          onStation={
-            state.scenario.geometry.source === "trace" && state.trace !== null
-              ? dragStation
-              : undefined
-          }
+          onScrub={readOnly ? undefined : scrub}
           plot={{ top: PROFILE_CHROME.badge, height: plotHeight }}
+          register={register}
           scene={scene}
           wide={wide}
           x={x}
@@ -354,7 +336,7 @@ export function ChartBlock({
           clearance={clearance}
           frame={frame}
           height={stripOuterHeight(wInner)}
-          onScrub={scrub}
+          onScrub={readOnly ? undefined : scrub}
           scene={scene}
           wide={wide}
           x={x}
@@ -367,21 +349,23 @@ export function ChartBlock({
           onLayers={(layers) => dispatch({ type: "calques/basculés", layers })}
           onPeek={setPeeking}
           onPositionFocus={onPositionFocus}
-          onX={moveRider}
+          onX={readOnly ? undefined : moveRider}
           peek={ve.peek}
           peeking={held}
           xD={rider === null ? clampX(riderInput.xD, frame.L) : rider.step.xD}
         />
       </ViewStripSlot>
-      <ReadOutCells scope="à la position du passager">
-        {CELL_IDS.map((id) => (
+      <ReadOutCells scope={READ_OUT_SCOPE}>
+        {cellsOf(register).map((id) => (
           <ReadOutCell
             className={cn(READ_OUT_CELLS[id].basis, READ_OUT_CELLS[id].pinned)}
-            help={CELL_HELP[id]}
+            help={register === "exact" ? CELL_HELP[id] : undefined}
             key={id}
             // No label under the cause line: the row is **replaced** by it, and the box stays only
             // to hold the row's height — voir `ReadOutCell`'s own `label`.
-            label={replaced ? undefined : values === null ? CELL_LABEL[id] : values[id].label}
+            label={
+              replaced ? undefined : values === null ? cellLabel(id, register) : values[id].label
+            }
           >
             {values !== null &&
               (values[id].note ? (
@@ -426,10 +410,12 @@ function EmptyBands({
   cause,
   cells = null,
   onReveal,
+  register,
   revealGrantable = true,
 }: {
   banner?: ReactNode;
   cause?: string;
+  register: Register;
   /**
    * The pinned header's chevron. It is here too, because both of these states can be reached
    * *while* the block is pinned — a link with an invalid span arrives on a phone — and a collapse
@@ -464,14 +450,14 @@ function EmptyBands({
       )}
       <ViewStripSlot />
       <ReadOutCells>
-        {CELL_IDS.map((id) => (
+        {cellsOf(register).map((id) => (
           <ReadOutCell
             className={cn(READ_OUT_CELLS[id].basis, READ_OUT_CELLS[id].pinned)}
             key={id}
             // The pre-measurement frame keeps its five labels — nothing was attempted, and that *is*
             // the Skeleton's own content. Under the geometric exception the cause line occupies the
             // row instead, so the labels go with it (ticket 31, **D2**).
-            label={cells === null ? CELL_LABEL[id] : undefined}
+            label={cells === null ? cellLabel(id, register) : undefined}
           />
         ))}
         {cells !== null && (

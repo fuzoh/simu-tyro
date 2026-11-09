@@ -85,7 +85,7 @@ export { CLEARANCE, evaluateClearance } from "./clearance.ts";
 // —— parameterise.ts — §7's inverse modes, resolved above the solver ————————————————————————
 // `unloadedSag` is the app's, not only `resolveL0`'s: § 6 displays « flèche à vide » and §8.2's
 // sag-ratio warnings are scored on it through `lineWarnings`, and nothing else can compute it.
-export type { Result, SpanGeometry, TightnessSpec } from "./parameterise.ts";
+export type { AnchorSide, Result, SpanGeometry, TightnessSpec } from "./parameterise.ts";
 export { resolveL0, unloadedSag } from "./parameterise.ts";
 
 // —— verdict.ts — §10's regimes, `T_allow = η_t·MBF/k` and the §10.4 use-class gate ——————————
@@ -151,3 +151,20 @@ export type { SteelSpec, SteelValues } from "./materials/steel.ts";
 export { STEEL, deriveSteel, resolveSteelValues, steelFormula } from "./materials/steel.ts";
 export type { TextileSpec } from "./materials/textile.ts";
 export { TEXTILE, deriveTextile } from "./materials/textile.ts";
+
+// —— wind.ts — the wind projected on the line, per #6 and the speed-model research (#8) ——————
+export type { WindComponents } from "./wind.ts";
+export { kmhToMs, msToKmh, windComponents } from "./wind.ts";
+
+// —— dynamics.ts — §12.2's point mass along the frozen trajectory, §12.1's validity (#89) ——————
+// `DYNAMICS` because the app ships its defaults and labels them, and §12.1's threshold is its.
+export type {
+  QuasiStatic,
+  Ride,
+  RideEnd,
+  RideInput,
+  RidePath,
+  RideSample,
+  TrolleyFriction,
+} from "./dynamics.ts";
+export { airDensity, DYNAMICS, quasiStaticRatio, ride, ridePath } from "./dynamics.ts";

@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
+import { DEFAULT_MAP_DISPLAY } from "@/lib/map/display.ts";
 import {
   FIRST_RUN_RETAINED_TEXTILE,
   FIRST_RUN_SCENARIO,
@@ -36,6 +37,8 @@ import {
 import { initialAppState } from "./state.ts";
 
 const ORIGIN = "https://scoutech.example";
+/** The Page « Copier le lien » sits on. */
+const PAGE = "/avance";
 
 /** The app's state around a Scenario — every field a link never carries, at its shipped value. */
 function appState(scenario: ScenarioDraft, trace: Trace | null = null): AppState {
@@ -44,7 +47,9 @@ function appState(scenario: ScenarioDraft, trace: Trace | null = null): AppState
     retainedMaterial: FIRST_RUN_RETAINED_TEXTILE,
     retainedManual: null,
     trace,
+    retainedCsv: null,
     layers: DEFAULT_LAYERS,
+    map: DEFAULT_MAP_DISPLAY,
     link: { refused: null, dropped: [], completed: [], xClamped: false, rewrite: null },
   };
 }
@@ -57,8 +62,14 @@ function blankTextile(): ScenarioDraft {
 describe("what the app publishes", () => {
   it("is § 7's canonical bag, and § 9's own link on the shipped scenario", () => {
     expect(publishedSearch(firstRunDefaults())).toEqual(scenarioToSearch(FIRST_RUN_SCENARIO));
-    const copied = copyLink({ scenario: firstRunDefaults(), trace: null, origin: ORIGIN });
-    expect(copied).toEqual({ ok: true, href: `${ORIGIN}${FIRST_RUN_LINK}` });
+    const copied = copyLink({
+      scenario: firstRunDefaults(),
+      trace: null,
+      origin: ORIGIN,
+      page: PAGE,
+    });
+    const query = FIRST_RUN_LINK.slice(FIRST_RUN_LINK.indexOf("?"));
+    expect(copied).toEqual({ ok: true, href: `${ORIGIN}/avance${query}` });
   });
 
   it("suspends both writes while a textile draft still has blanks", () => {
@@ -67,10 +78,12 @@ describe("what the app publishes", () => {
     expect(completeScenario(blankTextile())).toBeNull();
     expect(publishedSearch(blankTextile())).toBeNull();
     expect(sessionOf(appState(blankTextile()))).toBeNull();
-    expect(copyLink({ scenario: blankTextile(), trace: null, origin: ORIGIN })).toEqual({
-      ok: false,
-      message: "Complétez les champs vides pour partager ce lien.",
-    });
+    expect(copyLink({ scenario: blankTextile(), trace: null, origin: ORIGIN, page: PAGE })).toEqual(
+      {
+        ok: false,
+        message: "Complétez les champs vides pour partager ce lien.",
+      },
+    );
   });
 
   it("completes a filled textile draft into a Scenario the engine's own types accept", () => {
@@ -96,7 +109,7 @@ describe("the Session is strictly larger than the link", () => {
       d: Float64Array.from([0, 100]),
       z: Float64Array.from([500, 490]),
       dev: 0,
-      fileName: "profil.csv",
+      origin: { kind: "csv", fileName: "profil.csv" },
     };
     const state: AppState = {
       ...appState(firstRunDefaults(), trace),
@@ -130,21 +143,21 @@ describe("oversize refuses at « Copier le lien » — it never degrades", () =>
       // Alternating altitudes so the delta coding cannot compress the payload away.
       z[i] = 500 + (i % 7) * 0.13;
     }
-    return { d, z, dev: 0, fileName: "releve-a-la-main.csv" };
+    return { d, z, dev: 0, origin: { kind: "csv", fileName: "releve-a-la-main.csv" } };
   }
 
   it("names the point count and sends the user to the file", () => {
     const trace = bigTrace(4812);
     const scenario: ScenarioDraft = {
       ...firstRunDefaults(),
-      geometry: { source: "trace", trace: encodeP1(trace), sa: 0, sb: trace.d[4811] },
+      geometry: { source: "trace", trace: encodeP1(trace) },
     };
-    const result = copyLink({ scenario, trace, origin: ORIGIN });
+    const result = copyLink({ scenario, trace, origin: ORIGIN, page: PAGE });
     expect(result.ok).toBe(false);
     // « 4 812 » with a narrow no-break space, so the count cannot wrap into two numbers.
     expect(result).toEqual({
       ok: false,
-      message: "Tracé trop volumineux pour un lien (4 812 points). Partagez le fichier CSV.",
+      message: "Profil trop volumineux pour un lien (4 812 points). Partagez le fichier CSV.",
     });
   });
 
@@ -154,9 +167,9 @@ describe("oversize refuses at « Copier le lien » — it never degrades", () =>
     const trace = bigTrace(200);
     const scenario: ScenarioDraft = {
       ...firstRunDefaults(),
-      geometry: { source: "trace", trace: encodeP1(trace), sa: 0, sb: trace.d[199] },
+      geometry: { source: "trace", trace: encodeP1(trace) },
     };
-    const result = copyLink({ scenario, trace, origin: ORIGIN });
+    const result = copyLink({ scenario, trace, origin: ORIGIN, page: PAGE });
     expect(result.ok).toBe(true);
     expect((result.ok ? result.href : "").length).toBeLessThanOrEqual(URL_BUDGET_CHARS);
     expect((result.ok ? result.href : "").length).toBeGreaterThan(0);
@@ -174,14 +187,14 @@ describe("one gate for both writers — an oversize import never reaches the add
       d[i] = i * 0.5;
       z[i] = 500 + Math.round((seed / 2 ** 31) * 4000) / 100;
     }
-    return { d, z, dev: 0, fileName: "releve.csv" };
+    return { d, z, dev: 0, origin: { kind: "csv", fileName: "releve.csv" } };
   }
 
   function imported(points: number) {
     const trace = ruggedTrace(points);
     const scenario: ScenarioDraft = {
       ...firstRunDefaults(),
-      geometry: { source: "trace", trace: encodeP1(trace), sa: 0, sb: trace.d[points - 1] },
+      geometry: { source: "trace", trace: encodeP1(trace) },
     };
     return { trace, scenario };
   }
@@ -197,7 +210,7 @@ describe("one gate for both writers — an oversize import never reaches the add
 
   it("calls a 600-point import oversize, and the Session restores it with no refusal", () => {
     const { trace, scenario } = imported(600);
-    expect(publishable(scenario, ORIGIN)).toEqual({ ok: false, reason: "oversize" });
+    expect(publishable(scenario, ORIGIN, PAGE)).toEqual({ ok: false, reason: "oversize" });
 
     const session = sessionOf(appState(scenario, trace));
     expect(session).not.toBeNull();
@@ -213,7 +226,7 @@ describe("one gate for both writers — an oversize import never reaches the add
     const session = sessionOf(state);
     expect(session).not.toBeNull();
     // The order is the point (#57): `/` means « restore the Session », so the Session goes first.
-    expect(addressBarWrites(state, ORIGIN)).toEqual([
+    expect(addressBarWrites(state, ORIGIN, PAGE)).toEqual([
       { to: "session", session },
       { to: "address-bar", search: {} },
     ]);
@@ -227,22 +240,22 @@ describe("one gate for both writers — an oversize import never reaches the add
   });
 
   it("leaves the address bar untouched while a textile draft has blanks", () => {
-    expect(publishable(blankTextile(), ORIGIN)).toEqual({ ok: false, reason: "incomplete" });
-    expect(addressBarWrites(appState(blankTextile()), ORIGIN)).toEqual([]);
+    expect(publishable(blankTextile(), ORIGIN, PAGE)).toEqual({ ok: false, reason: "incomplete" });
+    expect(addressBarWrites(appState(blankTextile()), ORIGIN, PAGE)).toEqual([]);
     expect(sessionWrites(appState(blankTextile()))).toEqual([]);
   });
 
   it("publishes a fitting draft as the canonical bag and href copy uses", () => {
     const { scenario } = imported(200);
-    const result = publishable(scenario, ORIGIN);
+    const result = publishable(scenario, ORIGIN, PAGE);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.search).toEqual(publishedSearch(scenario));
     // The address bar alone: an in-budget Session keeps its own, slower timer.
-    expect(addressBarWrites(appState(scenario), ORIGIN)).toEqual([
+    expect(addressBarWrites(appState(scenario), ORIGIN, PAGE)).toEqual([
       { to: "address-bar", search: result.search },
     ]);
-    expect(copyLink({ scenario, trace: null, origin: ORIGIN })).toEqual({
+    expect(copyLink({ scenario, trace: null, origin: ORIGIN, page: PAGE })).toEqual({
       ok: true,
       href: result.href,
     });
@@ -250,9 +263,19 @@ describe("one gate for both writers — an oversize import never reaches the add
 
   it("measures the whole href, origin included", () => {
     const { scenario } = imported(200);
-    const fits = publishable(scenario, ORIGIN);
+    const fits = publishable(scenario, ORIGIN, PAGE);
     expect(fits.ok).toBe(true);
     const long = `https://${"a".repeat(URL_BUDGET_CHARS)}.example`;
-    expect(publishable(scenario, long)).toEqual({ ok: false, reason: "oversize" });
+    expect(publishable(scenario, long, PAGE)).toEqual({ ok: false, reason: "oversize" });
+  });
+
+  it("measures the Page's path too, so the address bar and the copy agree on every Page", () => {
+    const { scenario } = imported(200);
+    const atRoot = publishable(scenario, ORIGIN, "/");
+    if (!atRoot.ok) throw new Error("a 200-point import fits the budget");
+    // An origin that leaves the link onto `/` exactly at the budget: « avance » is what overflows.
+    const origin = ORIGIN + "a".repeat(URL_BUDGET_CHARS - atRoot.href.length);
+    expect(publishable(scenario, origin, "/").ok).toBe(true);
+    expect(publishable(scenario, origin, PAGE)).toEqual({ ok: false, reason: "oversize" });
   });
 });

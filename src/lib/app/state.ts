@@ -37,7 +37,8 @@
  *   app-level guarantee rather than a router one.
  */
 
-import type { ScenarioDraft } from "@/lib/scenario/types.ts";
+import type { MapDisplay } from "@/lib/map/display.ts";
+import type { Geometry, Positions, ScenarioDraft } from "@/lib/scenario/types.ts";
 import type {
   LayerToggles,
   RetainedManualGeometry,
@@ -47,6 +48,7 @@ import type {
 import type { Trace } from "@/lib/terrain/trace.ts";
 import type { DroppedKey, LinkRefusal, SearchKey, ValidatedSearch } from "@/lib/url/schema.ts";
 
+import { DEFAULT_MAP_DISPLAY } from "@/lib/map/display.ts";
 import {
   FIRST_RUN_RETAINED_TEXTILE,
   FIRST_RUN_SCENARIO,
@@ -54,7 +56,7 @@ import {
 } from "@/lib/scenario/first-run.ts";
 import { clampX, spanOfGeometry } from "@/lib/scenario/geometry.ts";
 import { DEFAULT_LAYERS } from "@/lib/session/session.ts";
-import { traceEnds } from "@/lib/terrain/trace.ts";
+import { profilRunsBetween } from "@/lib/terrain/trace.ts";
 import { decodeP1 } from "@/lib/url/p1.ts";
 import { completeFromDefaults, searchToScenario } from "@/lib/url/scenario.ts";
 import { hasScenarioKey, parseLinkSearch, salvageSearch } from "@/lib/url/schema.ts";
@@ -77,7 +79,7 @@ export type LinkArrival = {
   /** § 7's one elected clamp fired: `x` arrived outside `[0, L]` and the note says so. */
   readonly xClamped: boolean;
   /**
-   * The bag to `navigate({ to: "/", search: <this>, replace: true })` — a **plain object**, never
+   * The bag to `navigate({ to: ".", search: <this>, replace: true })` — a **plain object**, never
    * a function and never a spread of `useSearch()`, because `applyNext` hands a non-function
    * updater to the location verbatim and the incoming bag never enters. `null` when the address
    * bar already holds exactly the state the app holds.
@@ -112,12 +114,19 @@ export type AppState = {
   readonly retainedManual: RetainedManualGeometry | null;
   /**
    * The cached profile — cached even while inactive, and **the decoded arriving `tr` when a link
-   * carried one**: `geometry.source === "trace"` with no Trace beside it is a screen with stations,
-   * no span and no ground — voir {@link linkTrace}.
+   * carried one**: `geometry.source === "trace"` with no Trace beside it is a screen with no span
+   * and no ground — voir {@link linkTrace}.
    */
   readonly trace: Trace | null;
+  /** The CSV a profil geo.admin displaced (#103), kept so the file is not lost to a fetch. */
+  readonly retainedCsv: Trace | null;
   /** § 5's two toggles: Session-only, never in the URL. */
   readonly layers: LayerToggles;
+  /**
+   * The vue de dessus's Fond de carte and Couche pentes (#93), 2D or 3D (#95): Session-only, never
+   * in the URL.
+   */
+  readonly map: MapDisplay;
   /** What this page load's link did. Fixed at first render. */
   readonly link: LinkArrival;
 };
@@ -135,6 +144,8 @@ export type AppAction =
   | { readonly type: "scénario/modifié"; readonly patch: Partial<ScenarioDraft> }
   /** § 5's two toggles — Session-only display preferences. */
   | { readonly type: "calques/basculés"; readonly layers: LayerToggles }
+  /** The Fond de carte, the Couche pentes (#93) or the Vue 3D (#95) — a display preference. */
+  | { readonly type: "carte/affichée"; readonly map: MapDisplay }
   /**
    * § 9's « Réinitialiser le scénario ». It returns the **active configuration** to the shipped
    * defaults, **terrain source included**, while the cached Trace, the retained inactive Material
@@ -148,13 +159,14 @@ export type AppAction =
    */
   | { readonly type: "matériau/famille"; readonly family: "steel" | "textile" }
   /**
-   * § 4's import. **Anchor A goes to the first station and B to the last** — the trace *is* the
-   * intended span — and the displaced manual `L`/`h` are retained for « Retirer le tracé ».
+   * A new profil: § 4's CSV import, or « Charger le profil geo.admin » (#103). **The profil is
+   * taken whole** — anchor A over its first sample, B over its last (#88) — and the displaced
+   * manual `L`/`h` are retained for « Retirer le tracé ».
    */
   | { readonly type: "tracé/importé"; readonly trace: Trace; readonly tr: string }
-  /** « Retirer le tracé »: the stations go, **the Trace stays cached**, manual `L`/`h` come back. */
+  /** « Retirer le tracé »: the import goes, **the Trace stays cached**, manual `L`/`h` come back. */
   | { readonly type: "tracé/retiré" }
-  /** « Réutiliser ce tracé » — the fourth state's re-add path, placing A and B as an import does. */
+  /** « Réutiliser ce tracé » — the fourth state's re-add path, taking the profil whole again. */
   | { readonly type: "tracé/réutilisé"; readonly tr: string };
 
 /** One reducer over one object. Pure, exhaustive, and no branch reads anything but its arguments. */
@@ -163,9 +175,14 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     case "scénario/remplacé":
       return { ...state, scenario: action.scenario };
     case "scénario/modifié":
-      return { ...state, scenario: { ...state.scenario, ...action.patch } };
+      return {
+        ...state,
+        scenario: relateProfil({ ...state.scenario, ...action.patch }, state.trace),
+      };
     case "calques/basculés":
       return { ...state, layers: action.layers };
+    case "carte/affichée":
+      return { ...state, map: action.map };
 
     case "scénario/réinitialisé":
       return {
@@ -204,21 +221,20 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       const trace = action.type === "tracé/importé" ? action.trace : state.trace;
       if (trace === null) return state;
       const { geometry } = state.scenario;
-      // The same ends a link missing its stations completes to — `traceEnds` is their one source.
-      const { start, end } = traceEnds(trace);
       return {
         ...state,
         trace,
+        retainedCsv: csvBehind(state, trace),
         // Manual `L`/`h` stay in state untouched and are restored exactly on removal: discarding a
         // user's parallel input is worth a blocking error, let alone a silent loss.
         retainedManual:
           geometry.source === "manual" ? { L: geometry.L, h: geometry.h } : state.retainedManual,
-        scenario: withViewpoint(state.scenario, {
-          source: "trace",
-          trace: action.tr,
-          sa: start,
-          sb: end,
-        }),
+        scenario: {
+          ...withViewpoint(state.scenario, { source: "trace", trace: action.tr }, trace),
+          // Unlike `L`/`h`, typed Positions are not retained: a profil fixes them end to end
+          // (#90), so the file's Positions replace them, and a file with no coordinates leaves them empty.
+          positions: positionsOf(trace),
+        },
       };
     }
 
@@ -228,11 +244,21 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         L: FIRST_RUN_SCENARIO.geometry.L,
         h: FIRST_RUN_SCENARIO.geometry.h,
       };
-      // **Removal discards the stations, not the Trace**: the profile stays cached in the Session,
+      // **Removal discards the import, not the Trace**: the profile stays cached in the Session,
       // and the file-identity line's fourth state is what can put it back.
+      const { positions } = state.scenario;
       return {
         ...state,
-        scenario: withViewpoint(state.scenario, { source: "manual", ...manual }),
+        scenario: {
+          ...withViewpoint(state.scenario, { source: "manual", ...manual }, null),
+          // The Positions the profil gave go with it, which keeps them for « Réutiliser ce tracé ».
+          // Positions it does not run between were typed, beside a file with none or off its ends:
+          // they are the user's own.
+          positions:
+            state.trace?.ends !== undefined && profilRunsBetween(positions, state.trace)
+              ? NO_POSITIONS
+              : positions,
+        },
       };
     }
   }
@@ -248,6 +274,45 @@ function shippedRetained(family: "steel" | "textile"): RetainedMaterial {
   return { spec: shipped.material, terminations: shipped.terminations };
 }
 
+const NO_POSITIONS: Positions = { A: null, B: null };
+
+/**
+ * The Scenario saying whether its profil runs between its Positions — `offPositions`, read off the
+ * profil's own ends. The relation lives in the profil, but a link carries only the Scenario: this is
+ * what keeps a Position typed off the profil off it on the recipient's screen.
+ *
+ * @returns the argument itself when the Scenario already says so, so no memo keyed on the geometry
+ *   is spent on a patch that moved nothing.
+ */
+function relateProfil(scenario: ScenarioDraft, trace: Trace | null): ScenarioDraft {
+  const { geometry } = scenario;
+  if (geometry.source !== "trace") return scenario;
+  const off = !profilRunsBetween(scenario.positions, trace);
+  if (off === (geometry.offPositions === true)) return scenario;
+  const { offPositions: _, ...profil } = geometry;
+  return { ...scenario, geometry: off ? { ...profil, offPositions: true } : profil };
+}
+
+/**
+ * The CSV kept behind the profil `next` (#103). A profil geo.admin can be fetched again from the
+ * Positions and a file cannot, so loading one over a CSV keeps the CSV, while a CSV — new, or the
+ * kept one put back — needs nothing kept behind it.
+ */
+function csvBehind(state: AppState, next: Trace): Trace | null {
+  if (next.origin.kind === "csv") return null;
+  return state.trace?.origin.kind === "csv" ? state.trace : state.retainedCsv;
+}
+
+/**
+ * The Positions a Trace puts under the anchors: its two ends' coordinates, or none when the file
+ * had none. A profil fixes the Positions end to end (#90), so a typed one does not outlive it.
+ */
+function positionsOf(trace: Trace): Positions {
+  return trace.ends === undefined
+    ? NO_POSITIONS
+    : { A: { ...trace.ends.A }, B: { ...trace.ends.B } };
+}
+
 /**
  * A terrain source change, with `x_D` brought along. **The clamp is on every path** (§ 3), and the
  * three trace actions are paths: a 183,4 m import removed back onto a 150,0 m manual span would
@@ -257,8 +322,9 @@ function shippedRetained(family: "steel" | "textile"): RetainedMaterial {
 function withViewpoint(
   scenario: ScenarioDraft,
   geometry: ScenarioDraft["geometry"],
+  trace: Trace | null,
 ): ScenarioDraft {
-  const L = spanOfGeometry(geometry);
+  const L = spanOfGeometry(geometry, trace);
   return {
     ...scenario,
     geometry,
@@ -314,13 +380,15 @@ export function initialAppState(input: MountInput): AppState {
 
   return {
     ...base,
-    // Wholesale: the link's Scenario, and the Session's own extras — the retained alternate and the
-    // layer toggles are things a link never carries.
+    // Wholesale: the link's Scenario, and the Session's own extras — the retained alternate, the
+    // layer toggles and the Fond de carte are things a link never carries.
     scenario,
     // The one Session extra a link *can* speak for: `tr` **is** a profile, so an arriving one is
     // decoded here rather than left to the Session to happen to have.
     trace:
-      completedSearch.tr === undefined ? base.trace : linkTrace(completedSearch.tr, input.session),
+      scenario.geometry.source === "trace"
+        ? linkTrace(scenario.geometry, input.session, scenario.positions)
+        : base.trace,
     link: {
       refused: null,
       dropped,
@@ -334,7 +402,7 @@ export function initialAppState(input: MountInput): AppState {
 /**
  * The Trace an arriving `tr` names. **Without this the link is half-applied**: `searchToScenario`
  * reads `tr` into `geometry.source === "trace"`, so a recipient with no Session of their own would
- * hold two stations, no profile to place them on and therefore no span at all — no `Portée`, no
+ * hold an imported geometry with no profile and therefore no span at all — no `Portée`, no
  * `Dénivelé`, no ground and the identity line reading « (aucun tracé) ».
  *
  * **The Session's own copy wins when it is the same profile**, which is § 8's « The Session keeps
@@ -343,16 +411,38 @@ export function initialAppState(input: MountInput): AppState {
  * Session stores beside its active imported geometry — the same string the address bar carries, held
  * verbatim, so this compares two spellings of one profile and never re-encodes one to find out.
  *
- * @param tr the validated `p1.` payload. `decodeP1` cannot fail on it: `salvageSearch` has already
- *   walked it structurally, and an undecodable or oversize one is a **refusal** that returns above.
- * @returns the Session's Trace when the payload is its own, otherwise the decoded profile with
- *   **no `fileName`** — which *is* § 4's third identity state, « tracé reçu par lien ».
+ * **Whether the profil runs between the Positions is the link's word**, `ph`, because the payload
+ * carries no coordinates. Without `ph` its ends are the link's two Positions, the cached copy's
+ * included: a link always wins over a Session. With `ph` they are not: the cached copy keeps the
+ * ends it came with unless they are those Positions, and a decoded profil has none. So the profil
+ * runs between the Positions on the recipient's screen exactly where it did on the sender's,
+ * whatever Session the recipient holds. With a Position unknown the link says nothing of where the
+ * profil lies, and the cached copy keeps its ends.
+ *
+ * @param geometry the link's imported geometry. `decodeP1` cannot fail on its payload:
+ *   `salvageSearch` has already walked it structurally, and an undecodable or oversize one is a
+ *   **refusal** that returns above.
+ * @param positions the link's Positions.
+ * @returns the Session's Trace when the payload is its own, otherwise the decoded profile, whose
+ *   origin is `lien` — § 4's third identity state, « tracé reçu par lien ».
  */
-function linkTrace(tr: string, session: Session | null): Trace {
+function linkTrace(
+  geometry: Extract<Geometry, { source: "trace" }>,
+  session: Session | null,
+  positions: Positions,
+): Trace {
   const cached = session?.trace ?? null;
   const stored = session?.scenario.geometry;
-  if (cached !== null && stored?.source === "trace" && stored.trace === tr) return cached;
-  return { ...decodeP1(tr), fileName: null };
+  const profil: Trace =
+    cached !== null && stored?.source === "trace" && stored.trace === geometry.trace
+      ? cached
+      : { ...decodeP1(geometry.trace), origin: { kind: "lien" } };
+  const off = geometry.offPositions === true;
+  // Already where the link says — the cached Trace itself, so its identity keeps memos warm.
+  if (profilRunsBetween(positions, profil) !== off) return profil;
+  const { A, B } = positions;
+  const { ends: _, ...unplaced } = profil;
+  return off || A === null || B === null ? unplaced : { ...unplaced, ends: { A, B } };
 }
 
 /** The Session, or § 9's shipped opening state. `firstRunDefaults()` is the one source of both. */
@@ -363,7 +453,9 @@ function sessionState(session: Session | null): Omit<AppState, "link"> {
       retainedMaterial: session.retainedMaterial,
       retainedManual: session.retainedManual,
       trace: session.trace,
+      retainedCsv: session.retainedCsv,
       layers: session.layers,
+      map: session.map,
     };
   }
   return {
@@ -372,7 +464,9 @@ function sessionState(session: Session | null): Omit<AppState, "link"> {
     retainedMaterial: FIRST_RUN_RETAINED_TEXTILE,
     retainedManual: null,
     trace: null,
+    retainedCsv: null,
     layers: DEFAULT_LAYERS,
+    map: DEFAULT_MAP_DISPLAY,
   };
 }
 

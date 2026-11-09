@@ -24,7 +24,7 @@
  *   `validateSearch` answers **HTTP 500** under `ssr: false`, where the tree § 8 measured answered
  *   200, and § 8's refusal copy (« nothing failed to load and the status line agrees ») rests on
  *   the 200. So nothing here throws: a refused link comes back as `{ refused }`
- *   ({@link LinkRefusal}) and the index route renders the refusal surface as an ordinary
+ *   ({@link LinkRefusal}) and each app Page renders the refusal surface as an ordinary
  *   component. The refusal is still **whole-link** — checked on the **raw** bag before any per-key
  *   salvage, and it **suppresses** the rest of the bag rather than merging with it.
  * - **`refused` is not a URL key, and keeping it out of the URL takes a middleware.** It is not in
@@ -33,8 +33,8 @@
  *   returns `{ ...incoming, ...validated }`, `stringifySearch` writes **every** key of that merge,
  *   and `loadServerRoute` 307-redirects whenever the rebuilt href differs from the incoming one.
  *   A bare `/?v=3` therefore lands on `/?v=3&refused=%7B%22kind%22…` unless something removes the
- *   marker from the merge. {@link keepRefusalOutOfTheAddressBar} is that something, and the index
- *   route installing it is **not optional**.
+ *   marker from the merge. {@link keepRefusalOutOfTheAddressBar} is that something, and the app
+ *   Pages' layout route installing it is **not optional**.
  * - **No `transform`, anywhere.** `v.pipe(v.string(), v.transform(Number))` *is* the coercion the
  *   307 measurement forbids — returning `String(1)` for `bad=1` produced `307 → ?bad=%221%22`.
  *   Whatever the validator returns is what `stringifySearch` writes back, so every schema here
@@ -49,16 +49,21 @@
  * - **`tr` is validated structurally and kept verbatim.** {@link validateP1} allocates no arrays;
  *   the real decode is a memoised derivation inside the client-only subtree and never enters the
  *   validated search object, because arrays in it would be stringified back into the address bar.
- * - **The tightness driver is encoded by which key is *present*** — `fl` / `te` / `lo` / `vr`. Two
+ * - **The tightness driver is encoded by which key is *present*** — `fl` / `te` / `lo` / `vr` / `tp`. Two
  *   present keys « are not a bad value but two contradictory models of the same line », so presence
  *   is counted on the **raw** bag, before per-key validation, and the link refuses whole.
  * - **Forces are daN in the URL, always**, whatever `u` says. `u` is display-only, so hand-editing
  *   `u=daN` → `u=kN` must not make the line 100× tighter. The engine holds newtons; `./scenario.ts`
  *   is the one place the ÷10 happens, in both directions.
- * - **Absence carries exactly three meanings and never a fourth.** `reg` absent is « — choisir — »,
- *   `mbf`/`ea`/`mu` absent is « non surchargée », and a family- or terrain-scoped key absent means
- *   that configuration is not the active one. So `stripSearchParams` is rejected, every key with a
- *   value is stated even at its default, and `./scenario.ts`'s completion exempts the first two.
+ * - **Absence carries exactly ten meanings and never an eleventh.** `reg` absent is « — choisir — »,
+ *   `mbf`/`ea`/`mu` absent is « non surchargée », `bp` absent is one Brin porteur, `cp` absent is
+ *   the Mise en tension at A, `mt` absent is the mouflage, `ws`/`wd` absent is no wind (speed 0,
+ *   direction 0), `cda`/`f0`/`kv`/`mur`/`rho` absent is §12.2's default for the passager's ride (#89)
+ *   — `ρ`'s being derived from the profil —, `lata`/`lona`/`latb`/`lonb` absent is an unknown Position
+ *   (#90), `ph` absent is a profil that runs between the Positions, and a family- or terrain-scoped
+ *   key absent means that configuration is not the active one. So `stripSearchParams` is rejected,
+ *   every other key with a value is stated even at its default, and `./scenario.ts`'s completion
+ *   exempts the first nine.
  * - **The dropped-keys reporter takes the raw query string as a parameter**
  *   ({@link reportDroppedKeys}), never reading `window.location` — amendment A removed the jsdom
  *   environment that would otherwise be needed, and as a pure function this is a plain unit test.
@@ -69,6 +74,7 @@ import type { SearchMiddleware } from "@tanstack/react-router";
 import { defaultParseSearch, defaultStringifySearch } from "@tanstack/react-router";
 import * as v from "valibot";
 
+import type { CarryingLines } from "@/lib/scenario/types.ts";
 import type { RegimeId } from "@/lib/sim";
 
 import { P1Error, validateP1 } from "./p1.ts";
@@ -90,14 +96,16 @@ export const CANONICAL_KEYS = [
   "reg",
   "L",
   "h",
-  "sa",
-  "sb",
   "za",
   "zb",
   "fl",
   "te",
   "lo",
   "vr",
+  "tp",
+  "cp",
+  "bp",
+  "mt",
   "fam",
   "d",
   "r0",
@@ -116,7 +124,19 @@ export const CANONICAL_KEYS = [
   "hr",
   "gm",
   "daf",
+  "ws",
+  "wd",
+  "cda",
+  "f0",
+  "kv",
+  "mur",
+  "rho",
   "x",
+  "lata",
+  "lona",
+  "latb",
+  "lonb",
+  "ph",
   "tr",
 ] as const;
 
@@ -140,6 +160,24 @@ export const REGIME_TOKENS = [
   "ansi5",
   "secours10",
 ] as const satisfies readonly RegimeId[];
+
+/** `bp` — one or two Brins porteurs (#4). A third is unrepresentable, not out of range. */
+export const CARRYING_LINES = [1, 2] as const satisfies readonly CarryingLines[];
+
+/** `cp` tokens — the anchor carrying the Mise en tension (#85), spelled like `za` / `zb`. */
+export const TENSIONING_SIDE_TOKENS = ["a", "b"] as const;
+
+/** A `cp` token. */
+export type TensioningSideToken = (typeof TENSIONING_SIDE_TOKENS)[number];
+
+/**
+ * `mt` tokens — the Mise en tension device (#86). `mou` is the mouflage, the meaning of `mt`
+ * **absent**: it is read, and never written.
+ */
+export const TENSIONING_DEVICE_TOKENS = ["mou", "ms", "ml"] as const;
+
+/** An `mt` token. */
+export type TensioningDeviceToken = (typeof TENSIONING_DEVICE_TOKENS)[number];
 
 /** § 7's `fam` tokens — `ac` acier, `tx` textile. */
 export const FAMILY_TOKENS = ["ac", "tx"] as const;
@@ -184,10 +222,11 @@ export type TerminationToken = (typeof TERMINATION_TOKENS)[number];
 export const GRADES = [1770, 1960] as const;
 
 /**
- * § 7's tightness drivers — three, plus `vr` (« Rapport V », `P / H`, added 2026-09-23). **Exactly
- * one** may be present; two is a refusal.
+ * § 7's tightness drivers — three, plus `vr` (« Rapport V », `P / H`, added 2026-09-23) and `tp`
+ * (the prétension read at the tensioning anchor, #85). **Exactly one** may be present; two is a
+ * refusal.
  */
-export const TIGHTNESS_KEYS = ["fl", "te", "lo", "vr"] as const;
+export const TIGHTNESS_KEYS = ["fl", "te", "lo", "vr", "tp"] as const;
 
 /** One of § 7's tightness-driver keys. */
 export type TightnessKey = (typeof TIGHTNESS_KEYS)[number];
@@ -239,17 +278,24 @@ const KEY_SCHEMAS = {
   reg: v.picklist(REGIME_TOKENS),
   L: FINITE, // Portée, m — manual geometry only.
   h: FINITE, // Dénivelé, m — manual geometry only.
-  sa: FINITE, // Station A, m in file coordinates — imported geometry only.
-  sb: FINITE, // Station B, m in file coordinates — imported geometry only. `L = sb − sa`.
+
   za: FINITE, // Hauteur d'ancrage A, m.
   zb: FINITE, // Hauteur d'ancrage B, m.
   fl: FINITE, // Flèche à vide cible, m.
-  te: FINITE, // Prétension cible, **daN**.
+  te: FINITE, // Tension horizontale `H`, **daN**.
   lo: FINITE, // Longueur non tendue, m.
   // « Rapport V » `P / H`, dimensionless. Presence selects the driver, like the three above.
   vr: FINITE,
+  // Prétension at the tensioning anchor, per member, **daN** — the fifth driver (#85).
+  tp: FINITE,
+  // The anchor carrying the Mise en tension. Absent **is** A, so a link older than the key reads A.
+  cp: v.picklist(TENSIONING_SIDE_TOKENS),
+  // Brins porteurs. Absent **is** one member, so a link older than the key reads as it always did.
+  bp: v.picklist(CARRYING_LINES),
+  // The Mise en tension device. Absent **is** the mouflage, so a link older than the key reads it.
+  mt: v.picklist(TENSIONING_DEVICE_TOKENS),
   fam: v.picklist(FAMILY_TOKENS),
-  d: FINITE, // Diamètre nominal, mm — acier.
+  d: FINITE, // Diamètre nominal, mm — acier (requis) *or* textile (optionnel); `fam` fixes which.
   r0: v.picklist(GRADES),
   cst: v.picklist(CONSTRUCTION_TOKENS),
   mbf: FINITE, // `MBF` surchargée, **daN** — acier. Absent = non surchargée.
@@ -266,7 +312,25 @@ const KEY_SCHEMAS = {
   hr: FINITE, // Enveloppe passager, m.
   gm: FINITE, // Garde min. admise, m (2026-09-23).
   daf: FINITE, // Coefficient dynamique.
+  // The Vent (#87). Absent **is** no wind, so a link older than the keys reads none.
+  ws: FINITE, // Vitesse du vent, km/h.
+  wd: FINITE, // Direction du vent, degrés — d'où il vient, depuis le nord, sens horaire.
+  // The passager's ride (#89). Absent **is** §12.2's default, so a link older than the keys reads it.
+  cda: FINITE, // `C_dA` du passager, m².
+  f0: FINITE, // Frottement constant de la poulie `F₀`, **daN** — corde.
+  kv: FINITE, // Frottement de la poulie proportionnel à la vitesse `k_v`, kg/s — corde.
+  mur: FINITE, // Frottement de la poulie `μ`, sans unité — câble.
+  rho: FINITE, // Masse volumique de l'air `ρ`, kg/m³. Absent = déduite du profil, 1,225 sans profil.
   x: FINITE, // Position du passager, m — clamped to the span by `searchToScenario`, **never here**.
+  // The anchors' Positions (#90), WGS84 degrees. Absent **is** unknown, and a lone coordinate is
+  // dropped by {@link salvageSearch}: a Position needs both of its own.
+  lata: FINITE, // Latitude de l'ancrage A.
+  lona: FINITE, // Longitude de l'ancrage A.
+  latb: FINITE, // Latitude de l'ancrage B.
+  lonb: FINITE, // Longitude de l'ancrage B.
+  // The profil does not run between the two Positions (`offPositions`). Absent **is** it runs
+  // between them, so a link older than the key reads as it always did.
+  ph: v.literal(1),
   // `tr` is validated **structurally** by the codec, not by valibot: sentinel, base64url alphabet,
   // varint walk, declared `n` against bytes consumed, character budget. A structural failure is a
   // refusal, not a salvage, so it is handled in {@link refuse} rather than here.
@@ -290,8 +354,8 @@ const SCENARIO_KEY_SET: ReadonlySet<string> = new Set<string>(
  * - `version-inconnue` — « version de schéma inconnue (v = 3) »
  * - `tracé-illisible` — « tracé illisible »
  * - `tracé-hors-budget` — « tracé trop volumineux pour cette adresse »
- * - `deux-directeurs` — « flèche à vide cible, prétension cible, longueur non tendue et rapport V
- *   cible : deux valeurs de tension dans le même lien »
+ * - `deux-directeurs` — « flèche à vide, prétension, tension horizontale, longueur non tendue et
+ *   rapport V : deux valeurs de tension dans le même lien »
  */
 export const REFUSAL_KINDS = [
   "version-inconnue",
@@ -349,8 +413,20 @@ export function isLinkRefusal(value: unknown): value is LinkRefusal {
   );
 }
 
-/** § 8's two salvageable kinds, and there is no third — the strip says **which** it was. */
-export type DropReason = "clé-inconnue" | "valeur-non-représentable";
+/**
+ * The coordinate keys of each anchor's Position (#90), latitude first. A Position is both or
+ * neither, so one without the other is not a value the link can state.
+ */
+export const POSITION_KEY_PAIRS = [
+  ["lata", "lona"],
+  ["latb", "lonb"],
+] as const satisfies readonly (readonly [SearchKey, SearchKey])[];
+
+/**
+ * § 8's salvageable kinds — the strip says **which** it was. The third is a coordinate that
+ * arrived without its pair (#90): a number in itself, but half a {@link POSITION_KEY_PAIRS} Position.
+ */
+export type DropReason = "clé-inconnue" | "valeur-non-représentable" | "coordonnée-isolée";
 
 /** One dropped key, named with its reason: « ignoré » alone cannot distinguish typo from fault. */
 export type DroppedKey = { readonly key: string; readonly reason: DropReason };
@@ -420,7 +496,7 @@ function refuse(raw: Record<string, unknown>): LinkRefusal | undefined {
 
   // Presence, not value: « two present keys are not a bad value but two contradictory models of
   // the same line ». Composed with completion-from-defaults, dropping both would silently supply
-  // our own Flèche 6,0 m in the one quantity that scales every tension in the criteria grid.
+  // our own tension de pose in the one quantity that scales every tension in the criteria grid.
   const drivers = TIGHTNESS_KEYS.filter((key) => key in raw);
   if (drivers.length > 1) {
     return {
@@ -461,6 +537,13 @@ export function salvageSearch(raw: Record<string, unknown>): Salvage {
     else dropped.push({ key, reason: "valeur-non-représentable" });
   }
 
+  for (const [lat, lon] of POSITION_KEY_PAIRS) {
+    if (lat in search === lon in search) continue;
+    const lone = lat in search ? lat : lon;
+    delete search[lone];
+    dropped.push({ key: lone, reason: "coordonnée-isolée" });
+  }
+
   for (const key of Object.keys(raw)) {
     if (!KEY_SET.has(key)) dropped.push({ key, reason: "clé-inconnue" });
   }
@@ -471,15 +554,16 @@ export function salvageSearch(raw: Record<string, unknown>): Salvage {
 }
 
 /**
- * The index route's `validateSearch`. Pure, synchronous, allocation-light and side-effect-free,
- * because it runs **3× per document request** — on the server, where module state is shared across
- * requests, inside a `try {…} catch {}` that swallows throws at one of the three call sites.
+ * The app Pages' `validateSearch`, declared once on their pathless layout (ADR-0002). Pure,
+ * synchronous, allocation-light and side-effect-free, because it runs **3× per document request**
+ * — on the server, where module state is shared across requests, inside a `try {…} catch {}` that
+ * swallows throws at one of the three call sites.
  *
  * It returns the bag and **nothing else**: the dropped-keys report may not ride here, because the
  * router stringifies the validated object straight back into the address bar.
  *
  * **It never throws** (amendment E). § 8's three refusal classes — unknown `v`, `tr` undecodable or
- * oversize, two tightness drivers present — come back as `search.refused`, which the index route
+ * oversize, two tightness drivers present — come back as `search.refused`, which every app Page
  * renders as an ordinary component at **HTTP 200**. On the pinned tree a throw would answer 500,
  * and « nothing failed to load and the status line agrees » is copy the app has to keep true.
  *
@@ -491,8 +575,9 @@ export function validateSearch(raw: Record<string, unknown>): ValidatedSearch {
 }
 
 /**
- * The index route's one `search.middlewares` entry, and **installing it is not optional**: it is
- * the only thing standing between amendment E's marker and the address bar.
+ * The app Pages' one `search.middlewares` entry, beside {@link validateSearch} on their layout,
+ * and **installing it is not optional**: it is the only thing standing between amendment E's
+ * marker and the address bar.
  *
  * Amendment E's marker is a key {@link validateSearch} *synthesises* — the raw bag never carries
  * it — and on the pinned tree (`@tanstack/react-router` 1.170.27) a synthesised key is a **307**.
@@ -560,8 +645,10 @@ export function hasScenarioKey(search: ValidatedSearch): boolean {
 }
 
 /**
- * A canonical bag as the link the address bar holds — `/` plus the router's own
- * `defaultStringifySearch`, so the string asserted in a test is the string the router emits.
+ * A canonical bag as the link the address bar holds on one Page — the Page's router path plus the
+ * router's own `defaultStringifySearch`, so the string asserted in a test is the string the router
+ * emits. Every Page reads the same keys (ADR-0002), so only the path differs between two Pages'
+ * links to one Scenario.
  *
  * Keys are re-inserted in canonical order first: a bag built by hand, or by spreading a partial
  * one, would otherwise emit in *its* insertion order and two links to the same Scenario would stop
@@ -574,11 +661,11 @@ export function hasScenarioKey(search: ValidatedSearch): boolean {
  * keepRefusalOutOfTheAddressBar} covers that path, and a refused link is never rewritten anyway:
  * it never reaches completion.
  */
-export function canonicalLink(search: ValidatedSearch): string {
+export function canonicalLink(search: ValidatedSearch, page: string): string {
   const ordered: Record<string, unknown> = {};
   for (const key of CANONICAL_KEYS) {
     const value = search[key];
     if (value !== undefined) ordered[key] = value;
   }
-  return `/${defaultStringifySearch(ordered)}`;
+  return `${page}${defaultStringifySearch(ordered)}`;
 }

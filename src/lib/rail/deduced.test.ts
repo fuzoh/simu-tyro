@@ -26,7 +26,7 @@ const TRACE: Trace = {
   d: Float64Array.from([0, 112, 224]),
   z: Float64Array.from([540, 520, 500]),
   dev: 0,
-  fileName: "profil-2.csv",
+  origin: { kind: "csv", fileName: "profil-2.csv" },
 };
 
 function scenario(patch: (draft: ScenarioDraft) => void = () => {}): ScenarioDraft {
@@ -46,28 +46,29 @@ describe("§ 9's opening `VALEURS DÉDUITES`, from the shipped defaults", () => 
     expect(formatQuantity("w", material.w ?? NaN)).toBe("0,536 daN/m");
   });
 
-  test("« Corde 151,08 m » — the row §5.4's bound compares `L₀` against", () => {
+  test("« Ligne A–B 151,08 m » — the row §5.4's bound compares `L₀` against", () => {
     expect(formatQuantity("chord", span?.chord ?? NaN)).toBe("151,08 m");
   });
 
-  test("the solved rows: 151,64 m · 253,5 daN · 6,00 m (à x 74,8 m) · 4,00 % · 2,90 %", () => {
+  test("the solved rows: 151,64 m · 253,6 daN · 6,00 m (à x 74,8 m) · 4,00 % · 2,90 %", () => {
     expect(solve).not.toBeNull();
     expect(formatQuantity("L0", solve?.L0 ?? NaN)).toBe("151,64 m");
-    expect(formatQuantity("H_target", solve?.H ?? NaN)).toBe("253,5 daN");
+    expect(formatQuantity("H_target", solve?.H ?? NaN)).toBe("253,6 daN");
     expect(formatQuantity("sag", solve?.sag ?? NaN)).toBe("6,00 m");
     expect(formatQuantity("extremumX", solve?.sagAtX ?? NaN)).toBe("74,8 m");
     expect(formatQuantity("sagRatio", solve?.sagRatio ?? NaN)).toBe("4,00 %");
     expect(formatQuantity("standingTension", solve?.standingTension ?? NaN)).toBe("2,90 %");
   });
 
-  test("`flèche à vide` is exact at display precision — why `Flèche` ships as the segment", () => {
-    // A direct-`L₀` default would ship a rounded 151,64 m and cost 0,21 m of flèche and 0,20 m of
-    // garde: 8 % of the shipped margin. 6,0 m costs nothing.
+  test("the tension de pose drives, and the flèche it holds reads 6,0 m at display precision", () => {
+    // The simplified Pages drive the tension de pose, so that is the segment first run ships. A
+    // direct-`L₀` default would ship a rounded 151,64 m and cost 0,21 m of flèche and 0,20 m of
+    // garde: 8 % of the shipped margin. 263,4 daN costs nothing: the line it asks for is the one
+    // the 6,0 m flèche used to ask for, read at the grain a mode switch prefills at.
     const draft = scenario();
-    if (draft.tightness.mode !== "sag") throw new Error("expected the flèche segment");
-    // At display precision, which is the grain a mode switch prefills at — not at float equality,
-    // which would be an assertion about §5.3's solver tolerance and not about the shipped screen.
-    expect(roundToDisplay("D_target", solve?.sag ?? NaN)).toBe(draft.tightness.D_target);
+    if (draft.tightness.mode !== "anchor") throw new Error("expected the tension de pose segment");
+    expect(roundToDisplay("T_target", draft.tightness.T_target)).toBe(draft.tightness.T_target);
+    expect(roundToDisplay("sag", solve?.sag ?? NaN)).toBe(6);
   });
 
   test("nothing is overridden on first run, so nothing is stale", () => {
@@ -302,9 +303,9 @@ describe("a formatter, not a second chain — `vi.mock` on the engine barrel", (
 });
 
 describe("imported mode — `L` and `h` become read-outs of their own", () => {
-  test("`L = d_B − d_A` and `h` measured anchor top to anchor top", () => {
+  test("`L` is the whole profil and `h` is measured anchor top to anchor top", () => {
     const imported = scenario((draft) => {
-      draft.geometry = { source: "trace", trace: "p1.x", sa: 0, sb: 224 };
+      draft.geometry = { source: "trace", trace: "p1.x" };
       draft.anchors = { zA: 4, zB: 2.5 };
     });
     const { span } = deduceValues(imported, TRACE);
@@ -318,27 +319,28 @@ describe("imported mode — `L` and `h` become read-outs of their own", () => {
     // altitudes: the two `hauteur d'ancrage` fields are already accounted for in `h` and may not be
     // added again here.
     const imported = scenario((draft) => {
-      draft.geometry = { source: "trace", trace: "p1.x", sa: 56, sb: 224 };
+      draft.geometry = { source: "trace", trace: "p1.x" };
       draft.anchors = { zA: 4, zB: 2.5 };
     });
-    // Station 56 sits between samples 0 and 112: 540 − 20·(56/112) = 530.
-    expect(deduceValues(imported, TRACE).span?.bases).toEqual({ zBaseA: 530, zBaseB: 500 });
+    // The profil's first and last samples: A stands on the one, B on the other.
+    expect(deduceValues(imported, TRACE).span?.bases).toEqual({ zBaseA: 540, zBaseB: 500 });
   });
 
   test("manual mode has no base altitudes — a straight ground line has no altitude to print", () => {
     expect(deduceValues(scenario(), null).span?.bases).toBeNull();
   });
 
-  test("a degenerate placement has no span at all, and therefore no `corde`", () => {
-    const degenerate = scenario((draft) => {
-      draft.geometry = { source: "trace", trace: "p1.x", sa: 120, sb: 120 };
+  test("a one-sample profil has no span at all, and therefore no `corde`", () => {
+    const lone = scenario((draft) => {
+      draft.geometry = { source: "trace", trace: "p1.x" };
     });
-    expect(deduceValues(degenerate, TRACE).span).toBeNull();
+    const point: Trace = { ...TRACE, d: Float64Array.of(0), z: Float64Array.of(540) };
+    expect(deduceValues(lone, point).span).toBeNull();
   });
 
   test("a trace-sourced geometry with no trace loaded has no span either", () => {
     const orphan = scenario((draft) => {
-      draft.geometry = { source: "trace", trace: "p1.x", sa: 0, sb: 224 };
+      draft.geometry = { source: "trace", trace: "p1.x" };
     });
     expect(deduceValues(orphan, null).span).toBeNull();
   });
@@ -380,18 +382,23 @@ describe("`deducedRows` — the rows the Rail prints, decided outside the compon
   const shown = (rows: ReturnType<typeof deducedRows>) =>
     rows.map(({ label, value, warning }) => [label, value, warning]);
 
-  test("the opening screen's six read-only rows, as the Rail printed them before the move", () => {
-    // Read off the running app at `/` with an empty Session. `Flèche` drives, so its read-out is
-    // the field and not a row; the three steel Override rows are fields of their own.
+  test("the opening screen's eight read-only rows", () => {
+    // Read off the running app at `/` with an empty Session. The prétension drives, so its
+    // read-out is the field and not a row; the three steel Override rows are fields of their own.
+    // Since #85 the prétension is read at A, where the Mise en tension ships, and `H` sits beside
+    // the field. Re-pinned when first run moved from the flèche to the tension de pose: `H` reads
+    // 253,6 against 253,5 (263,4 daN is the displayed value, not the exact one) and the flèche is a row.
     const opening = scenario();
     const rows = deducedRows(opening, deduceValues(opening, null), null);
     expect(shown(rows)).toEqual([
       ["Poids linéique", "0,536 daN/m", null],
-      ["Corde", "151,08 m", null],
+      ["Ligne A–B", "151,08 m", null],
       ["Longueur non tendue", "151,64 m", null],
-      ["Prétension", "253,5 daN", null],
+      ["Tension horizontale", "253,6 daN", null],
+      ["Flèche à vide", "6,00 m (à x 74,8 m)", null],
+      ["Rapport V", "0,46", null],
       ["Flèche / portée", "4,00 %", null],
-      ["Tension permanente", "2,90 % MBF", null],
+      ["Tension à vide", "2,90 % MBF", null],
     ]);
     expect(rows.every((row) => row.group === "line")).toBe(true);
   });
@@ -406,52 +413,136 @@ describe("`deducedRows` — the rows the Rail prints, decided outside the compon
       ["Charge de rupture", "2200 daN", null],
       ["Raideur axiale", "0,03 MN", null],
       ["Poids linéique", "0,069 daN/m", null],
-      ["Corde", "151,08 m", null],
+      ["Ligne A–B", "151,08 m", null],
       ["Longueur non tendue", "140,23 m", null],
+      ["Prétension", "255,9 daN", null],
       ["Flèche à vide", "0,71 m (à x 75,0 m)", null],
+      ["Rapport V", "0,46", null],
       [
         "Flèche / portée",
         "0,47 %",
         "flèche / portée sous 3 % — la ligne se raidit et le modèle rapporte mal la réponse dynamique (§8.2).",
       ],
-      ["Tension permanente", "11,63 % MBL", null],
+      ["Tension à vide", "11,63 % MBL", null],
     ]);
   });
 
-  test("a length-driven line hides « Longueur non tendue » and shows the other two drivers", () => {
-    // Read off the running app at `?lo=151` before the move.
+  test("a length-driven line hides « Longueur non tendue » and shows the other four drivers", () => {
+    // `H` read off the running app at `?lo=151` before the move; the prétension is #85's.
     const { scenario: byLength } = initialAppState({ query: "?lo=151", session: null });
     const rows = shown(deducedRows(byLength, deduceValues(byLength, null), null));
     expect(rows.map(([label]) => label)).not.toContain("Longueur non tendue");
-    expect(rows).toContainEqual(["Prétension", "707,6 daN", null]);
+    expect(rows).toContainEqual(["Prétension", "718,7 daN", null]);
+    expect(rows).toContainEqual(["Tension horizontale", "707,6 daN", null]);
     expect(rows).toContainEqual(["Flèche à vide", "2,14 m (à x 74,9 m)", null]);
+    expect(rows).toContainEqual(["Rapport V", "0,17", null]);
   });
 
-  test("under a cause the five solve rows go, and `w` and `corde` stay", () => {
+  test("under a cause the five solve rows go, and `w` and `ligne A–B` stay", () => {
     const opening = scenario();
     const rows = deducedRows(
       opening,
       deduceValues(opening, null),
       "Aucun résultat — portée invalide.",
     );
-    expect(rows.map((row) => row.label)).toEqual(["Poids linéique", "Corde"]);
+    expect(rows.map((row) => row.label)).toEqual(["Poids linéique", "Ligne A–B"]);
   });
 
   test("an imported profile puts `Portée`, `Dénivelé` and both base altitudes first", () => {
     const imported = scenario((draft) => {
-      draft.geometry = { source: "trace", trace: "p1.x", sa: 56, sb: 224 };
+      draft.geometry = { source: "trace", trace: "p1.x" };
       draft.anchors = { zA: 4, zB: 2.5 };
     });
     const rows = deducedRows(imported, deduceValues(imported, TRACE), null);
-    // L = 224 − 56 = 168; z(56) = 530, so h = (500 + 2,5) − (530 + 4) = −31,5;
-    // corde = √(168² + 31,5²) = √29 216,25 = 170,928.
+    // L = 224; h = (500 + 2,5) − (540 + 4) = −41,5; corde = √(224² + 41,5²) = √51 898,25 = 227,812.
     expect(shown(rows.filter((row) => row.group === "placement"))).toEqual([
-      ["Portée", "168,0 m", null],
-      ["Dénivelé", "-31,5 m", null],
-      ["Alt. base A", "530,0 m", null],
+      ["Portée", "224,0 m", null],
+      ["Dénivelé", "-41,5 m", null],
+      ["Alt. base A", "540,0 m", null],
       ["Alt. base B", "500,0 m", null],
     ]);
     expect(rows.slice(0, 4).every((row) => row.group === "placement")).toBe(true);
-    expect(rows.find((row) => row.label === "Corde")?.value).toBe("170,93 m");
+    expect(rows.find((row) => row.label === "Ligne A–B")?.value).toBe("227,81 m");
+  });
+});
+
+describe("#85 — the prétension is read at the tensioning anchor, `H` beside it", () => {
+  const rowsOf = (draft: ScenarioDraft) => deducedRows(draft, deduceValues(draft, null), null);
+  const valueOf = (draft: ScenarioDraft, label: string) =>
+    rowsOf(draft).find((row) => row.label === label)?.value;
+
+  test("driven by the prétension: its field replaces its row, and the four others are read", () => {
+    const driven = scenario((draft) => {
+      draft.tightness = { mode: "anchor", T_target: 2634 };
+    });
+    const labels = rowsOf(driven).map((row) => row.label);
+    expect(labels).not.toContain("Prétension");
+    expect(labels).toEqual(
+      expect.arrayContaining(["Tension horizontale", "Longueur non tendue", "Flèche à vide"]),
+    );
+    expect(labels).toContain("Rapport V");
+  });
+
+  test.each([
+    ["flèche", { mode: "sag", D_target: 6 }],
+    ["longueur", { mode: "length", L0: 151 }],
+    ["rapport V", { mode: "ratio", ratio: 0.46 }],
+  ] as const)("driven by the %s, `H` is read right beside the prétension", (_label, tightness) => {
+    const labels = rowsOf(scenario((draft) => (draft.tightness = tightness))).map((r) => r.label);
+    expect(labels).toContain("Prétension");
+    expect(labels.indexOf("Tension horizontale")).toBe(labels.indexOf("Prétension") + 1);
+  });
+
+  test("a `te=` link still drives `H`, and the prétension is the read-out beside it", () => {
+    const { scenario: byH } = initialAppState({ query: "?te=253.5", session: null });
+    expect(byH.tightness).toEqual({ mode: "tension", H_target: 2535 });
+    const labels = rowsOf(byH).map((row) => row.label);
+    expect(labels).not.toContain("Tension horizontale");
+    expect(valueOf(byH, "Prétension")).toBe("263,3 daN");
+  });
+
+  test("A ↔ B moves the prétension read on the inclined first-run span, and nothing else", () => {
+    // `h = −18`: A is the higher anchor, where §2 puts the unloaded line's greater tension.
+    // Driven by the flèche, so the prétension is a row to read rather than the field itself.
+    const atA = scenario((draft) => {
+      draft.tightness = { mode: "sag", D_target: 6 };
+    });
+    const atB = scenario((draft) => {
+      draft.tightness = { mode: "sag", D_target: 6 };
+      draft.tensioningSide = "B";
+    });
+    expect(valueOf(atA, "Prétension")).toBe("263,4 daN");
+    expect(valueOf(atB, "Prétension")).toBe("253,7 daN");
+    const others = (draft: ScenarioDraft) =>
+      rowsOf(draft).filter((row) => row.label !== "Prétension");
+    expect(others(atB)).toEqual(others(atA));
+  });
+
+  test("on a level span the two sides read the same prétension", () => {
+    const level = (side: "A" | "B") =>
+      scenario((draft) => {
+        draft.geometry = { source: "manual", L: 150, h: 0 };
+        draft.tensioningSide = side;
+      });
+    expect(valueOf(level("B"), "Prétension")).toBe(valueOf(level("A"), "Prétension"));
+  });
+
+  test("driven by the prétension, A ↔ B moves the line: the same reading at B is a tighter line", () => {
+    const at = (side: "A" | "B") =>
+      deduceValues(
+        scenario((draft) => {
+          draft.tensioningSide = side;
+          draft.tightness = { mode: "anchor", T_target: 2634 };
+        }),
+        null,
+      ).solve;
+    const solvedA = at("A");
+    const solvedB = at("B");
+    // The resolved line reads the target back at its own anchor, at the solved-scalar tier.
+    expect(Math.abs((solvedA?.Tvide.TA ?? NaN) - 2634) / 2634).toBeLessThan(4e-6);
+    expect(Math.abs((solvedB?.Tvide.TB ?? NaN) - 2634) / 2634).toBeLessThan(4e-6);
+    // B is the lower anchor, so it reads less on any one line: asking it for the same number
+    // takes less length.
+    expect(solvedB?.L0 ?? NaN).toBeLessThan(solvedA?.L0 ?? NaN);
   });
 });

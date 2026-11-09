@@ -96,7 +96,7 @@ function RewriteOnLoad({ rewrite }: { rewrite: AppState["link"]["rewrite"] }) {
 
   useEffect(() => {
     if (rewrite === null) return;
-    void navigate({ replace: true, search: rewrite, to: "/" });
+    void navigate({ replace: true, search: rewrite, to: "." });
     // Load-time, once. The URL is read once at load and is write-only afterwards, so re-running
     // this on a later render would be the app arguing with its own address bar.
     // eslint-disable-next-line react-hooks/exhaustive-deps

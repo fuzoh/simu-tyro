@@ -25,18 +25,55 @@
  *   oversize draft stores the Session with it.
  * - **Nothing here reads the address bar**, and « Copier le lien » does not go through it either
  *   (`@/lib/app/persist.ts`). That is why the debounce grain is a performance question rather than
- *   a correctness one.
+ *   a correctness one — **except across a Page switch**: each Page mounts its own store, which reads
+ *   the URL first, so a link pressed inside the debounce would carry the Scenario from before the
+ *   last edit. The hook therefore registers a flush in {@link PendingWrites}, and the links that
+ *   leave the Page (`PageLink`) perform it before navigating.
  */
 
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useEffectEvent, useRef } from "react";
+import { createContext, use, useEffect, useEffectEvent, useRef } from "react";
 
 import type { AppState } from "@/lib/app/state.ts";
-import type { WriteEffects } from "@/lib/app/write-side.ts";
+import type { Pending, WriteEffects } from "@/lib/app/write-side.ts";
 import type { SessionStorage } from "@/lib/session/session.ts";
+import type { ValidatedSearch } from "@/lib/url/schema.ts";
 
 import { siteOrigin } from "@/lib/app/site.ts";
-import { armAddressBarWrite, armSessionWrite } from "@/lib/app/write-side.ts";
+import { armAddressBarWrite, armSessionWrite, writtenSearch } from "@/lib/app/write-side.ts";
+
+/**
+ * Performs the live Page's pending writes now. Returns the search the address bar was just given —
+ * the one a link leaving the Page must carry — or `null` when the address bar already holds it.
+ */
+export type FlushWrites = () => ValidatedSearch | null;
+
+/** One frame's slot for the live Page's {@link FlushWrites}. */
+export type PendingWritesSlot = {
+  /** Fills the slot; the returned function empties it, unless a newer Page has filled it since. */
+  readonly register: (flush: FlushWrites) => () => void;
+  /** The registered flush, run — `null` when no Page is registered or nothing was pending. */
+  readonly flush: FlushWrites;
+};
+
+export function pendingWritesSlot(): PendingWritesSlot {
+  let registered: FlushWrites | null = null;
+  return {
+    register(flush) {
+      registered = flush;
+      return () => {
+        if (registered === flush) registered = null;
+      };
+    },
+    flush: () => registered?.() ?? null,
+  };
+}
+
+/**
+ * Where the live Page registers its {@link FlushWrites}: one slot per frame, provided by
+ * `PageFrame`, which also renders the links that leave the Page.
+ */
+export const PendingWrites = createContext<PendingWritesSlot | null>(null);
 
 /**
  * `localStorage`, or `null` where the origin refuses it outright — Safari private mode and a
@@ -52,9 +89,12 @@ export function browserStorage(): SessionStorage | null {
 
 export function usePersist({
   state,
+  page,
   suspended = false,
 }: {
   state: AppState;
+  /** The current Page's router path — the address bar is written onto it, and budgeted with it. */
+  page: string;
   /**
    * « Saisie en cours » — a required field is empty and holds focus. Both writes stop, together,
    * for as long as it lasts. A11 wires it; until then the app is never in that state.
@@ -62,7 +102,10 @@ export function usePersist({
   suspended?: boolean;
 }) {
   const navigate = useNavigate();
+  const slot = use(PendingWrites);
   const { scenario } = state;
+  const addressBar = useRef<Pending | undefined>(undefined);
+  const session = useRef<Pending | undefined>(undefined);
 
   // The load-time seed is `RewriteOnLoad`'s, and a bare `/` is never rewritten: this hook publishes
   // **changes**, so it never writes the Scenario it was mounted with. The guard remembers that
@@ -78,23 +121,46 @@ export function usePersist({
   useEffect(() => {
     if (seed.current === null) seed.current = scenario;
     if (seed.current === scenario) return;
-    return armAddressBarWrite({ read, suspended, effects: browserEffects(navigate) });
-  }, [scenario, suspended, navigate]);
+    const pending = armAddressBarWrite({
+      read,
+      suspended,
+      effects: browserEffects(navigate, page),
+    });
+    addressBar.current = pending;
+    return () => pending?.cancel();
+  }, [scenario, suspended, navigate, page]);
 
+  useEffect(() => {
+    const pending = armSessionWrite({ state, suspended, effects: browserEffects(navigate, page) });
+    session.current = pending;
+    return () => pending?.cancel();
+  }, [state, suspended, navigate, page]);
+
+  // A cancelled or performed write flushes to nothing, so the slot only ever performs what is still
+  // due — and nothing at all under « Saisie en cours », where no write is armed.
   useEffect(
-    () => armSessionWrite({ state, suspended, effects: browserEffects(navigate) }),
-    [state, suspended, navigate],
+    () =>
+      slot?.register(() =>
+        writtenSearch([
+          ...(session.current?.flush() ?? []),
+          ...(addressBar.current?.flush() ?? []),
+        ]),
+      ),
+    [slot],
   );
 }
 
-/** The write side's three effects, against the real browser and router. */
-function browserEffects(navigate: ReturnType<typeof useNavigate>): WriteEffects {
+/** The write side's four effects, against the real browser and router. */
+function browserEffects(navigate: ReturnType<typeof useNavigate>, page: string): WriteEffects {
   return {
     origin: siteOrigin,
+    page: () => page,
     storage: browserStorage,
     // `replace: true`, never `push` — see the header. The search is a **plain object**, never a
     // function and never a spread of `useSearch()`: `applyNext` hands a non-function updater to the
-    // location verbatim, so this bag replaces the whole search.
-    navigate: (search) => void navigate({ replace: true, search, to: "/" }),
+    // location verbatim, so this bag replaces the whole search. `to: "."` stays on the current Page.
+    // `resetScroll: false`: the router's default would jump the reader to the top on every edit —
+    // between the two clicks that place A then B on the map, too.
+    navigate: (search) => void navigate({ replace: true, resetScroll: false, search, to: "." }),
   };
 }

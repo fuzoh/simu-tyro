@@ -38,8 +38,9 @@ import { useAppState } from "./store.tsx";
 export type Scene = {
   /**
    * The input half — terrain, both anchors, the span markers, the 5 % margin. `null` **only** for
-   * § 8's *exception géométrique*: an invalid `L` / `h` / station, where there is no shared x
-   * domain at all and both plots collapse to an empty frame with an inert scrub track.
+   * § 8's *exception géométrique*: an invalid `L` / `h`, or an import with no profil, where there
+   * is no shared x domain at all and both plots collapse to an empty frame with an inert scrub
+   * track.
    */
   readonly frame: SceneFrame | null;
   /**
@@ -66,7 +67,8 @@ export type Scene = {
  *   `useDeduced`, so the `L₀` bisection does not run twice per edit.
  */
 export function useScene(unloaded: Unloaded): Scene {
-  const { mp, hRider } = useAppState().scenario.rider;
+  const { rider, carryingLines } = useAppState().scenario;
+  const { mp, hRider } = rider;
 
   // Every dependency survives a scrub untouched: `scénario/modifié` merges its patch shallowly, so
   // a rider patch leaves the placement and the unloaded line identical.
@@ -74,8 +76,8 @@ export function useScene(unloaded: Unloaded): Scene {
   const frame = useMemo(() => buildSceneFrame(placed), [placed]);
 
   const solved = useMemo(
-    () => buildSceneBase(frame, unloaded, { mp, hRider }),
-    [frame, unloaded, mp, hRider],
+    () => buildSceneBase(frame, unloaded, { mp, hRider, carryingLines }),
+    [frame, unloaded, mp, hRider, carryingLines],
   );
 
   return { frame, solved };

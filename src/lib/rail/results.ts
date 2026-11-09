@@ -63,10 +63,11 @@ import type {
   VerdictResult,
   VerdictState,
 } from "@/lib/sim";
-import type { Trace } from "@/lib/terrain/trace.ts";
+import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { formatAtX, formatQuantity, formatValue } from "@/lib/format/quantity.ts";
 import { amplifiedTension, evaluateVerdict, REGIMES, scanTensionEnvelope } from "@/lib/sim";
+import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 import type { GateReport } from "./gates.ts";
 
@@ -87,7 +88,12 @@ export type ResultRowId =
   | "Tstatic"
   | "amplification"
   | "loadedSag"
-  | "coverage";
+  | "coverage"
+  // Two Brins porteurs only (#84): the share each member carries, the pair at the anchor, and the
+  // one-line case the 50/50 split does not cover.
+  | "memberLoad"
+  | "pairTotal"
+  | "soleCarrier";
 
 /**
  * One reported value. **A row that cannot be reported is absent from the list** — there is no
@@ -102,7 +108,7 @@ export type ResultRow = {
   readonly qualifier: string | null;
   /** § 6's « quatre en tête, aucun accordéon »: a larger body at the top of the same block. */
   readonly rank: "headline" | "detail";
-  /** « ↳ majoration dynamique » hangs under « T max statique ». */
+  /** « ↳ majoration au départ » hangs under « T max statique ». */
   readonly indent: boolean;
   /**
    * « hors-limites » on the one row that carries its own threshold — « Garde min (traversée) »
@@ -168,10 +174,22 @@ export type Results = {
   readonly banner: VerdictBanner | null;
   /** The engine's own verdict, for a caller that needs more than the rendered rows. */
   readonly verdict: VerdictResult | null;
+  /**
+   * « T max ancrage A/B » as numbers, N per member — the amplified envelope the rows above print,
+   * for a reader that compares it with something (the limite de tension). `null` where those rows
+   * are absent: a `DAF` the Verdict Gate refused is never multiplied into a figure.
+   */
+  readonly anchorTmax: Readonly<Record<"A" | "B", number>> | null;
 };
 
 /** Channel one of the scope discipline: the block header, above every row. */
 export const TRAVERSE_SCOPE = "sur toute la traversée";
+
+/** With two Brins porteurs every row is one member's, and the header says so once (#4). */
+export const PER_LINE_SCOPE = `${TRAVERSE_SCOPE}, par ${label("line", "exact")}`;
+
+/** « une seule ligne porte tout » — #69's label, verbatim: what the row is, not a verdict. */
+export const SOLE_CARRIER_LABEL = `Cas défavorable : une seule ${label("line", "exact")} porte tout`;
 
 /** Channel two, on the header, so the reduction and the scope read in one glance. */
 export const NO_REGIME_ASIDE = "aucun régime choisi";
@@ -195,6 +213,12 @@ export const REGIME_PROMPT: RegimePrompt = {
  */
 export const NO_REGIME_BANNER = "Choisissez un régime de sécurité pour obtenir un verdict.";
 
+/** The same strip on each register's Pages: a simplified Page asks for a marge exigée (#61). */
+export const NO_REGIME_BANNER_BY_REGISTER: Record<Register, string> = {
+  exact: NO_REGIME_BANNER,
+  terrain: `Choisissez une ${label("regime", "terrain")} pour obtenir un verdict.`,
+};
+
 /**
  * The solved traverse {@link deriveResults} reports — the fields of the chart's `SceneBase` it
  * reads, typed here so `lib/rail` does not depend on `lib/chart`.
@@ -205,15 +229,18 @@ export type SolvedTraverse = {
   /** The unloaded line — `T_vide` at both ends. */
   readonly unloaded: SpanState;
   readonly material: DerivedMaterial;
+  /** The load one member carries, N. */
+  readonly P: number;
+  /** One member's traverse — what every row and the verdict report. */
   readonly traverse: SweepResult;
   readonly clearance: ClearanceResult;
+  /** One member under the whole load, with two Brins porteurs; `null` with one. Judges nothing. */
+  readonly soleCarrier: SweepResult | null;
 };
 
 /** What {@link deriveResults} reads. The scene is already solved: this module never solves. */
 export type ResultsInput = {
   readonly scenario: TraverseScenario;
-  /** The active profile, or `null` in manual mode — the Solve Gate's stations read it. */
-  readonly trace: Trace | null;
   /**
    * The scenario's half of the scene — the sweep, the unloaded solve and §11, computed **once**
    * behind the `useSweep` seam and shared with the Chart Block. `null` is « Aucun résultat ».
@@ -230,6 +257,8 @@ export type ResultsInput = {
    * verdict under a banner that says there is none.
    */
   readonly report?: GateReport;
+  /** The Page's vocabulary, which words the verdict sentence. `exact` when absent. */
+  readonly register?: Register;
 };
 
 /**
@@ -238,8 +267,13 @@ export type ResultsInput = {
  * @returns `null` for « Aucun résultat » — no scene, or a Solve Gate breach. The cause line that
  *   replaces the block in that state is A11's, and it is a *sentence*, never a set of dashes.
  */
-export function deriveResults({ scenario, trace, base, report }: ResultsInput): Results | null {
-  const gates = report ?? evaluateGates({ scenario, trace });
+export function deriveResults({
+  scenario,
+  base,
+  report,
+  register = "exact",
+}: ResultsInput): Results | null {
+  const gates = report ?? evaluateGates({ scenario });
   if (base === null || !gates.passed.solve) return null;
 
   const { unit } = scenario;
@@ -252,7 +286,7 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
   // « T max statique » stays, because that row needs no `DAF` at all.
   const amplify = Number.isFinite(DAF) && DAF > 0;
 
-  const envelope = envelopes(base, DAF);
+  const envelope = envelopes(base.traverse, base.unloaded, DAF);
   const headlineEnd = envelope.headline;
   const rows: ResultRow[] = [];
   const verdict =
@@ -271,11 +305,14 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
         })
       : null;
 
-  const banner = verdict === null ? null : { state: verdict.state, text: verdictSentence(verdict) };
+  const banner =
+    verdict === null ? null : { state: verdict.state, text: verdictSentence(verdict, register) };
 
   // ── The four headline rows ────────────────────────────────────────────────────────────────
-  if (banner !== null && verdict !== null) {
-    rows.push(row("verdict", "Verdict", banner.text, null, "headline"));
+  if (verdict !== null) {
+    // The `Résultats` rows are Avancé's whatever the Page: only the banner speaks its register.
+    const sentence = verdictSentence(verdict, "exact");
+    rows.push(row("verdict", label("verdict", "exact"), sentence, null, "headline"));
     const required = requiredDivisor(verdict);
     rows.push(
       row(
@@ -294,26 +331,29 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
         "Tmax",
         "T max (traversée)",
         formatQuantity("Tdaf", envelope[headlineEnd].Tdaf, unit),
-        qualify(`ancrage ${headlineEnd}`, riderAt(base, envelope[headlineEnd].atStepIndex)),
+        qualify(
+          `ancrage ${headlineEnd}`,
+          riderAt(base.traverse, envelope[headlineEnd].atStepIndex),
+        ),
         "headline",
       ),
     );
   }
 
   // A Clearance Gate breach removes the garde **and its curve alone** — the cable still draws and
-  // every tension row stands. That is the whole reason the three gates are three.
+  // every tension row stands. That is the whole reason Clearance is a gate of its own.
   if (gates.passed.clearance) {
     const breach = clearanceBreached(base.clearance.hMin, scenario.rider.hClearMin);
     rows.push({
       ...row(
         "clearance",
-        "Garde min (traversée)",
+        heading("traverseClearance", "exact"),
         formatQuantity("clearance", base.clearance.hMin),
         qualify(
           breach
-            ? `sous la garde admise ${formatQuantity("h_clear_min", scenario.rider.hClearMin)}`
+            ? `sous la garde exigée ${formatQuantity("h_clear_min", scenario.rider.hClearMin)}`
             : null,
-          riderAt(base, base.clearance.atStepIndex),
+          riderAt(base.traverse, base.clearance.atStepIndex),
         ),
         "headline",
       ),
@@ -364,6 +404,44 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
     }
   }
 
+  // ── Two Brins porteurs (#4, #69) ──────────────────────────────────────────────────────────
+  // Every row above is one member's. These three are what the pair adds, and none of them reaches
+  // `evaluateVerdict`: the one-line case is #69's « cas défavorable », labelled and never judged.
+  if (base.soleCarrier !== null) {
+    rows.push(
+      row(
+        "memberLoad",
+        `Charge par ${label("line", "exact")}`,
+        formatQuantity("memberLoad", base.P, unit),
+        `moitié du ${label("passenger", "exact")}`,
+        "detail",
+      ),
+    );
+    // In the headline's own form, so a `DAF` the Verdict Gate refused is not multiplied in here
+    // either.
+    if (amplify) {
+      rows.push(
+        row(
+          "pairTotal",
+          "Total de la paire",
+          formatQuantity("Tdaf", 2 * envelope[headlineEnd].Tdaf, unit),
+          `ancrage ${headlineEnd}`,
+          "detail",
+        ),
+      );
+      const sole = envelopes(base.soleCarrier, base.unloaded, DAF);
+      rows.push(
+        row(
+          "soleCarrier",
+          SOLE_CARRIER_LABEL,
+          formatQuantity("Tdaf", sole[sole.headline].Tdaf, unit),
+          `ancrage ${sole.headline}, hors verdict`,
+          "detail",
+        ),
+      );
+    }
+  }
+
   // **The static envelope is picked by the static ordering**, not by the amplified one. The two
   // agree on any line the app can draw — the higher-tension anchor is the higher-tension anchor
   // whatever `DAF` multiplies it by — except at the `DAF ≤ 0` a link can carry, where the amplified
@@ -382,10 +460,10 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
   if (amplify) {
     rows.push({
       id: "amplification",
-      label: "↳ majoration dynamique",
+      label: `↳ ${label("startMultiplier", "exact")}`,
       // Decomposition of the row above it, so it hangs off the **same** end that row reports.
       value: signed("Tdaf", envelope[staticEnd].Tdaf - envelope[staticEnd].Tstatic, unit),
-      qualifier: `(DAF ${formatValue("DAF", DAF)})`,
+      qualifier: `(× ${formatValue("DAF", DAF)})`,
       rank: "detail",
       // The one indented row in the block: it is a decomposition of the row above it, not a
       // fourteenth quantity.
@@ -414,7 +492,7 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
   const noRegime = scenario.regime === null;
 
   return {
-    scope: TRAVERSE_SCOPE,
+    scope: base.soleCarrier === null ? TRAVERSE_SCOPE : PER_LINE_SCOPE,
     aside: noRegime ? NO_REGIME_ASIDE : null,
     rows,
     // **Five things absent, not four**: the criteria × ends grid goes with the four rows, because
@@ -424,6 +502,7 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
     prompt: noRegime ? REGIME_PROMPT : null,
     banner,
     verdict,
+    anchorTmax: amplify ? { A: envelope.A.Tdaf, B: envelope.B.Tdaf } : null,
   };
 }
 
@@ -435,30 +514,46 @@ export function deriveResults({ scenario, trace, base, report }: ResultsInput): 
  * prohibition that survives any margin (naming a régime there would suggest another régime could
  * repair it), and `Indéterminé` reports that nothing was judged at all.
  */
-export function verdictSentence(verdict: VerdictResult): string {
-  const label = REGIMES[verdict.regime].label;
+export function verdictSentence(verdict: VerdictResult, register: Register = "exact"): string {
+  const regimeLabel = REGIMES[verdict.regime].label;
 
   if (verdict.state === "refuse-usage-interdit") {
-    return `Refusé — ${REFUSAL_COPY[verdict.refusal ?? "serre-cables-sur-ligne-portant-des-personnes"]}`;
+    return `${label(verdict.state, register)} — ${refusalReason(verdict, register)}`;
   }
   if (verdict.state === "indetermine") {
     const total = verdict.coverage === 0 ? 0 : Math.round(verdict.stepsSolved / verdict.coverage);
-    return `Indéterminé — ${verdict.stepsSolved} des ${total} pas résolus`;
+    return `${label(verdict.state, register)} — ${verdict.stepsSolved} des ${total} pas résolus`;
   }
 
   const cell = verdict.governing;
-  if (cell === null) return `Indéterminé — ${verdict.stepsSolved} pas résolus`;
+  if (cell === null)
+    return `${label("indetermine", register)} — ${verdict.stepsSolved} pas résolus`;
 
   if (verdict.state === "hors-limites") {
-    return `Hors limites — ${label}, critère ${criterionName(cell)}`;
+    return `${label(verdict.state, register)} — ${regimeLabel}, critère ${criterionName(cell)}`;
   }
   if (verdict.state === "marge-faible") {
     // § 6's own copy reads « Marge faible — FS effectif 3,05 pour k = 3,0 » and names no régime;
     // the grammar rule — « nomme **toujours** le régime choisi à l'intérieur de la phrase » — is
     // the mechanism, and it is the stricter of the two. Hence the régime, then the spec's clause.
-    return `Marge faible — ${label} : FS effectif ${formatQuantity("FS", cell.FS)} pour k = ${divisor(cell.k)}`;
+    return `${label(verdict.state, register)} — ${regimeLabel} : ${EFFECTIVE_FACTOR[register]} ${formatQuantity("FS", cell.FS)} pour k = ${divisor(cell.k)}`;
   }
-  return `Dans les limites — ${label} (k = ${divisor(cell.k)})`;
+  return `${label(verdict.state, register)} — ${regimeLabel} (k = ${divisor(cell.k)})`;
+}
+
+/** The figure « Marge faible » quotes: `FS effectif` on Avancé, spelled out on a simplified Page. */
+const EFFECTIVE_FACTOR: Record<Register, string> = {
+  exact: "FS effectif",
+  terrain: label("safetyFactor", "terrain"),
+};
+
+/**
+ * Why the Verdict is « Interdit » — the prohibition it names, never a margin. `null` in any other
+ * state, which a simplified Page reads to show the reason with the state only where there is one.
+ */
+export function refusalReason(verdict: VerdictResult, register: Register = "exact"): string | null {
+  if (verdict.state !== "refuse-usage-interdit") return null;
+  return REFUSAL_COPY[register][verdict.refusal ?? "serre-cables-sur-ligne-portant-des-personnes"];
 }
 
 /**
@@ -473,7 +568,7 @@ export function verdictSentence(verdict: VerdictResult): string {
  * who divides finds the app contradicting itself. The banner still names the governing cell — the
  * two answer different questions, and only this row is a ratio the reader can re-derive.
  *
- * It is also what keeps the row whole under `Refusé` and `Indéterminé`, where `governing` is `null`
+ * It is also what keeps the row whole under `Interdit` and `Indéterminé`, where `governing` is `null`
  * **by contract** while a régime is very much chosen: § 6 defines the headline as « `FS effectif`
  * …, affiché contre le `k` exigé par le régime », and a lone safety factor invites the reader to
  * supply their own `k`. The cells survive both states, and `REGIMES` covers the empty traverse.
@@ -492,12 +587,21 @@ function requiredDivisor(verdict: VerdictResult): number | null {
 }
 
 /** § 6's three refusals, each a `[REGULATOR]` rule or a use-class boundary — never a margin. */
-const REFUSAL_COPY = {
+const EXACT_REFUSAL_COPY = {
   "serre-cables-sur-ligne-portant-des-personnes":
-    "serre-câbles sur une ligne portant des personnes",
-  "textile-en-installation-permanente": "corde textile en installation permanente (§10.4)",
+    "serre-câbles sur une ligne portant des passagers",
+  "textile-en-installation-permanente": "corde en installation permanente (§10.4)",
   "regime-indisponible-pour-cette-ligne": "régime indisponible pour cette ligne",
-} as const;
+} as const satisfies Record<NonNullable<VerdictResult["refusal"]>, string>;
+
+/** The same three on each register's Pages: only the régime is named differently (#61). */
+const REFUSAL_COPY = {
+  exact: EXACT_REFUSAL_COPY,
+  terrain: {
+    ...EXACT_REFUSAL_COPY,
+    "regime-indisponible-pour-cette-ligne": `${label("regime", "terrain")} indisponible pour cette ligne`,
+  },
+} as const satisfies Record<Register, Record<NonNullable<VerdictResult["refusal"]>, string>>;
 
 /** Which quantity a criterion bites on — « lequel est contraignant est une information ». */
 function criterionName(cell: VerdictCell): string {
@@ -616,11 +720,11 @@ type Envelope = {
  * as the static one and the scan needs one pass. At `DAF ≤ 0` — a value a link can carry — the two
  * orderings part, which is why `staticHeadline` is picked on `Tstatic` and never through `Tdaf`.
  */
-function envelopes(base: SolvedTraverse, DAF: number): Envelope {
-  const Tvide = { A: base.unloaded.TA, B: base.unloaded.TB };
+function envelopes(traverse: SweepResult, unloaded: SpanState, DAF: number): Envelope {
+  const Tvide = { A: unloaded.TA, B: unloaded.TB };
   // §10.1's suspended denominator rides along on the same pass and is dropped here: § 9 never
   // prints it, and at a refused `DAF ≤ 0` it is a maximum of negatives with no meaning to print.
-  const scan = scanTensionEnvelope(base.traverse.steps, base.unloaded, DAF);
+  const scan = scanTensionEnvelope(traverse.steps, unloaded, DAF);
 
   const A: EndFigures = {
     Tstatic: scan.A.Tstatic,
@@ -682,8 +786,8 @@ function coverageValue(base: SolvedTraverse): string {
  * @returns `null` where the traverse has no such step — **never a « — »**, which is spent on
  *   `Indéterminé`. An absent position simply drops the clause.
  */
-function riderAt(base: SolvedTraverse, stepIndex: number): string | null {
-  const step = base.traverse.steps[stepIndex];
+function riderAt(traverse: SweepResult, stepIndex: number): string | null {
+  const step = traverse.steps[stepIndex];
   return step === undefined ? null : `passager ${formatAtX(step.xD)}`;
 }
 

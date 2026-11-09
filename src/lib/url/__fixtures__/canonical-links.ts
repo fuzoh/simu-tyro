@@ -4,9 +4,9 @@
  * changed no byte.
  *
  * Provenance: `[MEASURED]` in `testing.md`'s sense, tagged on every row. Each link is this app's own
- * output as of 2026-11-07, written out here in § 7's canonical key order and checked against the
- * codec, not produced by it. A failing row after a refactor is a changed contract, not a stale
- * fixture.
+ * output as of the date its tag names, written out here in § 7's canonical key order and checked
+ * against the codec, not produced by it. A failing row after a refactor is a changed contract, not
+ * a stale fixture.
  *
  * Plain data, no codec import: a fixture must never be re-derived from the code it checks. The
  * scenarios are literals for the same reason — they do not spread `FIRST_RUN_SCENARIO`, so a
@@ -23,6 +23,7 @@ export const BRANCHES = [
   "trace",
   "driver-sag",
   "driver-tension",
+  "driver-pretension",
   "driver-ratio",
   "driver-length",
   "override-mbf",
@@ -39,6 +40,37 @@ export const BRANCHES = [
   "x-at-span-end",
   "x-clamped",
   "textile-blanks",
+  "textile-diameter",
+  "carrying-lines-absent",
+  "carrying-lines-two",
+  "carrying-lines-one-explicit",
+  "tensioning-side-absent",
+  "tensioning-side-b",
+  "tensioning-side-a-explicit",
+  "tensioning-device-absent",
+  "tensioning-device-maestro-s",
+  "tensioning-device-maestro-l",
+  "tensioning-device-pulley-explicit",
+  "wind-absent",
+  "wind-speed-and-direction",
+  "wind-direction-only",
+  "wind-explicit-zero",
+  "wind-without-positions",
+  "wind-on-positions",
+  "trace-stations-retired",
+  "dynamics-absent",
+  "dynamics-steel",
+  "dynamics-textile",
+  "dynamics-explicit-defaults",
+  "dynamics-foreign-family",
+  "positions-absent",
+  "positions-both",
+  "positions-one-anchor",
+  "positions-with-trace",
+  "positions-lone-coordinate",
+  "positions-off-profil",
+  "positions-off-profil-unplaced",
+  "trace-full-profil",
 ] as const;
 
 export type Branch = (typeof BRANCHES)[number];
@@ -46,7 +78,19 @@ export type Branch = (typeof BRANCHES)[number];
 /** A Scenario and the one link that encodes it — asserted in both directions. */
 export type CanonicalLinkFixture = {
   name: string;
-  source: typeof MEASURED;
+  source:
+    | typeof MEASURED
+    | typeof MEASURED_83
+    | typeof MEASURED_84
+    | typeof MEASURED_85
+    | typeof MEASURED_86
+    | typeof MEASURED_87
+    | typeof MEASURED_88
+    | typeof MEASURED_89
+    | typeof MEASURED_90
+    | typeof MEASURED_103
+    | typeof MEASURED_PH
+    | typeof MEASURED_WIND;
   covers: readonly Branch[];
   scenario: Scenario;
   link: string;
@@ -60,15 +104,44 @@ export type CanonicalLinkFixture = {
  */
 export type DecodeOnlyFixture = {
   name: string;
-  source: typeof MEASURED;
+  source:
+    | typeof MEASURED
+    | typeof MEASURED_83
+    | typeof MEASURED_84
+    | typeof MEASURED_85
+    | typeof MEASURED_86
+    | typeof MEASURED_87
+    | typeof MEASURED_88
+    | typeof MEASURED_89
+    | typeof MEASURED_90
+    | typeof MEASURED_103
+    | typeof MEASURED_PH;
   covers: readonly Branch[];
   link: string;
 } & ({ scenario: Scenario; canonical: string } | { scenario: ScenarioDraft; canonical: null });
 
 const MEASURED = "[MEASURED] issue #34, codec as of 2026-11-07";
+const MEASURED_83 = "[MEASURED] issue #83, codec as of 2026-11-08";
+const MEASURED_84 = "[MEASURED] issue #84, codec as of 2026-11-08";
+const MEASURED_85 = "[MEASURED] issue #85, codec as of 2026-11-08";
+const MEASURED_86 = "[MEASURED] issue #86, codec as of 2026-11-08";
+const MEASURED_87 = "[MEASURED] issue #87, codec as of 2026-11-08";
+const MEASURED_88 = "[MEASURED] issue #88, codec as of 2026-11-08";
+const MEASURED_89 = "[MEASURED] issue #89, codec as of 2026-11-08";
+const MEASURED_90 = "[MEASURED] issue #90, codec as of 2026-11-08";
+const MEASURED_103 = "[MEASURED] issue #103, codec as of 2026-11-08";
+const MEASURED_PH = "[MEASURED] map #1's review of `ph`, codec as of 2026-11-09";
+const MEASURED_WIND = "[MEASURED] geographic `wd`, codec as of 2026-11-09";
 
-/** Three stations `(0,0) (50,-4) (100,-9)`, as `encodeP1` writes them. */
+/** Three samples `(0,0) (50,-4) (100,-9)`, as `encodeP1` writes them — a 100 m profil. */
 export const TRACE_P1 = "p1.AwCQTpBOAJ8G5wcA";
+
+/**
+ * The trial line's profil geo.admin of 2026-11-08 (#103) — 200 points over 435,2 m, from 1453,7 m
+ * to 1438,7 m — as `encodeP1` wrote it from the recorded answer of `profile.json`.
+ */
+const GEOADMIN_P1 =
+  "p1.yAEAuAO4A7gDpAO4A7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDpAO4A7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDuAOkA7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDuAOkA7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDuAOkA7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDuAOkA7gDuAO4A7gDuAO4A7gDpAO4A7gDuAO4A7gDuAOkA7gDuAO4A7gDuAO4A7gDpAO4A7gDuAO4A7gDuAOkA7gDuAO4A7gDuAO4A7gDpAO4A7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDpAO4A7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDpAO4A7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDpAO4A7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDuAOkA7gDuAO4A7gDuAO4A6QDuAO4A7gDuAO4A7gDuAOkA7gDuAO4A7gDuAO03xGfAdMCnwHnApcCswF30wKrArMBqwKLAecCiwHTAqsCnwGfAb8CgwK_AgDTAqsCqwJ3swGXAp8BqwLTAp8Bd5cClwKXArMBT4MCqwKLAasCnwGDAneXAoMCd2ODAu8Bd3fHAYMCY4MCd8cBY8cBswF3T7MB2wGzAWN3swFPswGLAWM7iwF3iwEAiwF3dydjO08AdwBPE087ACc7JwAnJzsAExMnKBQTEwAnADw8ExQoPCgAPDw8KAA8KFA8FFBQUFBkAGR4ZFAoeIwBZKABZMgBZMgBmAJkoAHwAdwBhAIAhAKYAlCsAowB8AGMAZgCrAKEAgCYAvABmAKMAWTwAYQCtAHcAYwB3AFk3AGYAgCEAtQCwAKMAaABkAP8AqAB_ALcAfwC8AHgA9QC1AIApAMC";
 
 const STEEL: Scenario = {
   unit: "daN",
@@ -76,6 +149,9 @@ const STEEL: Scenario = {
   regime: null,
   geometry: { source: "manual", L: 150, h: -18 },
   anchors: { zA: 12, zB: 12 },
+  carryingLines: 1,
+  tensioningSide: "A",
+  tensioningDevice: "pulley",
   tightness: { mode: "sag", D_target: 6 },
   material: { family: "steel", d: 12, R0: 1770, construction: "iwrc" },
   terminations: {
@@ -83,7 +159,14 @@ const STEEL: Scenario = {
     B: { id: "cosse-oeil-flamand", eta: 0.9 },
   },
   rider: { mp: 120, hRider: 2.1, hClearMin: 1, DAF: 1.2, xD: 75 },
+  wind: { speedKmh: 0, directionDeg: 0 },
+  dynamics: { CdA: 0.45, rho: null, F0: 15, kv: 1.5, mu: 0.015 },
+  positions: { A: null, B: null },
 };
+
+/** The verified 2026-11-08 trace's two ends, as the geo.admin export spells them. */
+const POSITION_A = { lat: 46.843556, lon: 6.525035 };
+const POSITION_B = { lat: 46.846166, lon: 6.520783 };
 
 const TEXTILE: Scenario = {
   ...STEEL,
@@ -94,6 +177,10 @@ const TEXTILE: Scenario = {
     B: { id: "epissure-longue-hmpe", eta: 0.85 },
   },
 };
+
+/** The textile baseline's keys from `fam` through `daf`, between which the ride's keys never sit. */
+const TEXTILE_BODY =
+  "fam=tx&mu=0.16&cls=hmpe&mbl=30000&k=22&ta=oeil&tb=epissure&na=0.9&nb=0.85&mp=120&hr=2.1&gm=1&daf=1.2";
 
 /** What follows `za=12&zb=12&` through `fam=ac&d=12&r0=1770&cst=iwrc` on the steel baseline. */
 const TAIL = "ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=75";
@@ -110,9 +197,29 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
   {
     name: "first-run: steel, manual, sag driver, perm, no regime",
     source: MEASURED,
-    covers: ["steel", "manual", "driver-sag", "use-perm"],
+    // No `bp`, `cp`, `mt`, `ws`, `wd` or ride key, as before the keys existed: one Brin porteur,
+    // Mise en tension at A, by mouflage, no wind, §12.2's constants.
+    covers: [
+      "steel",
+      "manual",
+      "driver-sag",
+      "use-perm",
+      "carrying-lines-absent",
+      "tensioning-side-absent",
+      "tensioning-device-absent",
+      "wind-absent",
+      "dynamics-absent",
+      "positions-absent",
+    ],
     scenario: STEEL,
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "two Brins porteurs: `bp=2`, after the driver",
+    source: MEASURED_84,
+    covers: ["carrying-lines-two"],
+    scenario: { ...STEEL, carryingLines: 2 },
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&bp=2&${STEEL_HEAD}&${TAIL}`,
   },
   {
     name: "tension driver, daN on the wire whatever u says",
@@ -120,6 +227,189 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
     covers: ["driver-tension"],
     scenario: { ...STEEL, unit: "kN", tightness: { mode: "tension", H_target: 2535 } },
     link: `/?v=1&u=kN&use=perm&L=150&h=-18&za=12&zb=12&te=253.5&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "prétension driver: `tp` in daN, read at A",
+    source: MEASURED_85,
+    covers: ["driver-pretension"],
+    scenario: { ...STEEL, tightness: { mode: "anchor", T_target: 2600 } },
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&tp=260&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "prétension read at B on two Brins porteurs: `tp`, `cp`, `bp` in that order",
+    source: MEASURED_85,
+    covers: ["driver-pretension", "tensioning-side-b", "carrying-lines-two"],
+    scenario: {
+      ...STEEL,
+      carryingLines: 2,
+      tensioningSide: "B",
+      tightness: { mode: "anchor", T_target: 2600 },
+    },
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&tp=260&cp=b&bp=2&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "the side rides on its own, beside a flèche driver",
+    source: MEASURED_85,
+    covers: ["tensioning-side-b"],
+    scenario: { ...STEEL, tensioningSide: "B" },
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&cp=b&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "Maestro S on a rope: `mt=ms` after `bp`, before the family",
+    source: MEASURED_86,
+    covers: ["textile", "textile-diameter", "tensioning-device-maestro-s"],
+    scenario: {
+      ...TEXTILE,
+      carryingLines: 2,
+      tensioningDevice: "maestro-s",
+      material: {
+        family: "textile",
+        ropeClass: "pa-en1891a",
+        MBL: 31000,
+        mu: 0.073,
+        k: 1.27,
+        d: 11,
+      },
+      terminations: {
+        A: { id: "noeud-de-huit", eta: 0.6 },
+        B: { id: "noeud-de-chaise", eta: 0.65 },
+      },
+    },
+    link:
+      "/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&bp=2&mt=ms&fam=tx&d=11&mu=0.073&cls=pa&mbl=3100&k=1.27" +
+      "&ta=huit&tb=chaise&na=0.6&nb=0.65&mp=120&hr=2.1&gm=1&daf=1.2&x=75",
+  },
+  {
+    name: "Maestro L on a câble arrives as it is: `mt=ml` beside a steel family",
+    source: MEASURED_86,
+    covers: ["steel", "tensioning-device-maestro-l"],
+    scenario: { ...STEEL, tensioningDevice: "maestro-l" },
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&mt=ml&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    // `wd` is the azimuth the wind comes from: 45° is a north-east wind. With no Positions it is
+    // not applied, and it is still carried as given (ADR-0001).
+    name: "wind of 50 km/h from the north-east, 45°, no Positions: `ws`, `wd` after `daf`, before `x`",
+    source: MEASURED_87,
+    covers: ["wind-speed-and-direction", "wind-without-positions"],
+    scenario: { ...STEEL, wind: { speedKmh: 50, directionDeg: 45 } },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&ws=50&wd=45&x=75",
+  },
+  {
+    name: "a direction without a speed is kept: `wd` alone",
+    source: MEASURED_87,
+    covers: ["wind-direction-only"],
+    scenario: { ...STEEL, wind: { speedKmh: 0, directionDeg: 270 } },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&wd=270&x=75",
+  },
+  {
+    name: "ride constants on a câble: `cda`, `mur`, `rho` after the wind, before `x`",
+    source: MEASURED_89,
+    covers: ["dynamics-steel"],
+    scenario: {
+      ...STEEL,
+      wind: { speedKmh: 50, directionDeg: 45 },
+      dynamics: { ...STEEL.dynamics, CdA: 0.5, rho: 1.069, mu: 0.02 },
+    },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&ws=50&wd=45" +
+      "&cda=0.5&mur=0.02&rho=1.069&x=75",
+  },
+  {
+    name: "ride constants on a corde: `f0` in daN and `kv`, each alone off its default",
+    source: MEASURED_89,
+    covers: ["dynamics-textile"],
+    scenario: {
+      ...TEXTILE,
+      dynamics: { ...TEXTILE.dynamics, F0: 20 },
+    },
+    link: `/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&${TEXTILE_BODY}&f0=2&x=75`,
+  },
+  {
+    name: "the corde's `kv` without its `f0`",
+    source: MEASURED_89,
+    covers: ["dynamics-textile"],
+    scenario: {
+      ...TEXTILE,
+      dynamics: { ...TEXTILE.dynamics, kv: 2.25 },
+    },
+    link: `/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&${TEXTILE_BODY}&kv=2.25&x=75`,
+  },
+  {
+    name: "both Positions: four coordinates after `x`, before the profil",
+    source: MEASURED_90,
+    covers: ["positions-both"],
+    scenario: { ...STEEL, positions: { A: POSITION_A, B: POSITION_B } },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}` +
+      "&lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783",
+  },
+  {
+    name: "the trial's west wind on the trial's Positions: `ws`, `wd` before `x`, the four after",
+    source: MEASURED_WIND,
+    covers: ["wind-on-positions"],
+    scenario: {
+      ...STEEL,
+      wind: { speedKmh: 30, directionDeg: 264 },
+      positions: { A: POSITION_A, B: POSITION_B },
+    },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&ws=30&wd=264&x=75" +
+      "&lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783",
+  },
+  {
+    name: "only anchor B is known: its two coordinates, and none for A",
+    source: MEASURED_90,
+    covers: ["positions-one-anchor"],
+    scenario: { ...STEEL, positions: { A: null, B: POSITION_B } },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}` +
+      "&latb=46.846166&lonb=6.520783",
+  },
+  {
+    name: "Positions on an imported profil: the coordinates travel beside `tr`",
+    source: MEASURED_90,
+    covers: ["positions-with-trace", "trace"],
+    scenario: {
+      ...STEEL,
+      geometry: { source: "trace", trace: TRACE_P1 },
+      positions: { A: POSITION_A, B: POSITION_B },
+    },
+    link:
+      `/?v=1&u=daN&use=perm&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}` +
+      `&lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783&tr=${TRACE_P1}`,
+  },
+  {
+    name: "Position B typed off the profil: `ph` says it no longer runs between them",
+    source: MEASURED_PH,
+    covers: ["positions-off-profil", "positions-with-trace", "trace"],
+    scenario: {
+      ...STEEL,
+      geometry: { source: "trace", trace: TRACE_P1, offPositions: true },
+      positions: { A: POSITION_A, B: { lat: 46.858, lon: POSITION_B.lon } },
+    },
+    link:
+      `/?v=1&u=daN&use=perm&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}` +
+      `&lata=46.843556&lona=6.525035&latb=46.858&lonb=6.520783&ph=1&tr=${TRACE_P1}`,
+  },
+  {
+    name: "a profil geo.admin: its 200 points and the two Positions it was loaded between",
+    source: MEASURED_103,
+    covers: ["trace-full-profil", "positions-with-trace", "trace"],
+    scenario: {
+      ...STEEL,
+      geometry: { source: "trace", trace: GEOADMIN_P1 },
+      positions: { A: POSITION_A, B: POSITION_B },
+    },
+    link:
+      `/?v=1&u=daN&use=perm&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}` +
+      `&lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783&tr=${GEOADMIN_P1}`,
   },
   {
     name: "ratio driver, kgf display",
@@ -244,11 +534,11 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=0&daf=1.2&x=150`,
   },
   {
-    name: "imported trace geometry",
-    source: MEASURED,
+    name: "imported trace geometry: the profil taken whole, no `L`/`h` and no stations",
+    source: MEASURED_88,
     covers: ["trace", "steel"],
-    scenario: { ...STEEL, geometry: { source: "trace", trace: TRACE_P1, sa: 10, sb: 90 } },
-    link: `/?v=1&u=daN&use=perm&sa=10&sb=90&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}&tr=${TRACE_P1}`,
+    scenario: { ...STEEL, geometry: { source: "trace", trace: TRACE_P1 } },
+    link: `/?v=1&u=daN&use=perm&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}&tr=${TRACE_P1}`,
   },
   {
     name: "textile hmpe: sag driver, tempo, oeil and epissure",
@@ -258,6 +548,29 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
     link:
       "/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&fam=tx&mu=0.16&cls=hmpe&mbl=30000&k=22" +
       "&ta=oeil&tb=epissure&na=0.9&nb=0.85&mp=120&hr=2.1&gm=1&daf=1.2&x=75",
+  },
+  {
+    name: "textile Courant Bandit 11 mm preset: diameter rides on the `d` key",
+    source: MEASURED_83,
+    covers: ["textile", "textile-diameter"],
+    scenario: {
+      ...TEXTILE,
+      material: {
+        family: "textile",
+        ropeClass: "pa-en1891a",
+        MBL: 31000,
+        mu: 0.073,
+        k: 1.27,
+        d: 11,
+      },
+      terminations: {
+        A: { id: "noeud-de-huit", eta: 0.6 },
+        B: { id: "noeud-de-chaise", eta: 0.65 },
+      },
+    },
+    link:
+      "/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&fam=tx&d=11&mu=0.073&cls=pa&mbl=3100&k=1.27" +
+      "&ta=huit&tb=chaise&na=0.6&nb=0.65&mp=120&hr=2.1&gm=1&daf=1.2&x=75",
   },
   {
     name: "textile polyamide: huit and chaise",
@@ -277,11 +590,11 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
   },
   {
     name: "textile polyester on a trace, tension driver, attelage",
-    source: MEASURED,
+    source: MEASURED_88,
     covers: ["textile", "trace", "driver-tension"],
     scenario: {
       ...TEXTILE,
-      geometry: { source: "trace", trace: TRACE_P1, sa: 0, sb: 100 },
+      geometry: { source: "trace", trace: TRACE_P1 },
       tightness: { mode: "tension", H_target: 1500 },
       material: { family: "textile", ropeClass: "polyester", MBL: 250000, mu: 0.07, k: 12 },
       terminations: {
@@ -290,7 +603,7 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
       },
     },
     link:
-      "/?v=1&u=daN&use=tempo&sa=0&sb=100&za=12&zb=12&te=150&fam=tx&mu=0.07&cls=pes&mbl=25000&k=12" +
+      "/?v=1&u=daN&use=tempo&za=12&zb=12&te=150&fam=tx&mu=0.07&cls=pes&mbl=25000&k=12" +
       `&ta=attelage&tb=oeil&na=1&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=75&tr=${TRACE_P1}`,
   },
 ];
@@ -317,6 +630,92 @@ export const DECODE_ONLY_LINKS: readonly DecodeOnlyFixture[] = [
     canonical:
       `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
       "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=0",
+  },
+  {
+    name: "`bp=1` is one Brin porteur, and the canonical link says so by omitting it",
+    source: MEASURED_84,
+    covers: ["carrying-lines-one-explicit"],
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&bp=1&${STEEL_HEAD}&${TAIL}`,
+    scenario: STEEL,
+    canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "`cp=a` is the Mise en tension at A, and the canonical link says so by omitting it",
+    source: MEASURED_85,
+    covers: ["tensioning-side-a-explicit"],
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&tp=260&cp=a&${STEEL_HEAD}&${TAIL}`,
+    scenario: { ...STEEL, tightness: { mode: "anchor", T_target: 2600 } },
+    canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&tp=260&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "`ws=0&wd=0` is no wind, and the canonical link says so by omitting both",
+    source: MEASURED_87,
+    covers: ["wind-explicit-zero"],
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&ws=0&wd=0&x=75",
+    scenario: STEEL,
+    canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "§12.2's constants typed out are the defaults, and the canonical link omits them",
+    source: MEASURED_89,
+    covers: ["dynamics-explicit-defaults"],
+    link:
+      `/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&${TEXTILE_BODY}` +
+      "&cda=0.45&f0=1.5&kv=1.5&x=75",
+    scenario: TEXTILE,
+    canonical: `/?v=1&u=daN&use=tempo&L=150&h=-18&za=12&zb=12&fl=6&${TEXTILE_BODY}&x=75`,
+  },
+  {
+    name: "a corde's `f0` beside a câble is out of the active configuration, and leaves",
+    source: MEASURED_89,
+    covers: ["dynamics-foreign-family"],
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&f0=2&kv=3&x=75",
+    scenario: STEEL,
+    canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "a latitude without its longitude is dropped, and the Position stays unknown",
+    source: MEASURED_90,
+    covers: ["positions-lone-coordinate"],
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}&lata=46.843556`,
+    scenario: STEEL,
+    canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "`mt=mou` is the mouflage, and the canonical link says so by omitting it",
+    source: MEASURED_86,
+    covers: ["tensioning-device-pulley-explicit"],
+    link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&mt=mou&${STEEL_HEAD}&${TAIL}`,
+    scenario: STEEL,
+    canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "a link from before #88 keeps its profil whole: `sa` and `sb` are unknown keys",
+    source: MEASURED_88,
+    covers: ["trace-stations-retired"],
+    link: `/?v=1&u=daN&use=perm&sa=10&sb=90&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}&tr=${TRACE_P1}`,
+    scenario: { ...STEEL, geometry: { source: "trace", trace: TRACE_P1 } },
+    canonical: `/?v=1&u=daN&use=perm&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}&tr=${TRACE_P1}`,
+  },
+  {
+    name: "`ph` with one Position unknown has no line to run off, and leaves",
+    source: MEASURED_PH,
+    covers: ["positions-off-profil-unplaced"],
+    link:
+      `/?v=1&u=daN&use=perm&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}` +
+      `&lata=46.843556&lona=6.525035&ph=1&tr=${TRACE_P1}`,
+    scenario: {
+      ...STEEL,
+      geometry: { source: "trace", trace: TRACE_P1 },
+      positions: { A: POSITION_A, B: null },
+    },
+    canonical:
+      `/?v=1&u=daN&use=perm&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}` +
+      `&lata=46.843556&lona=6.525035&tr=${TRACE_P1}`,
   },
   {
     name: "textile with MBL and mu left blank",

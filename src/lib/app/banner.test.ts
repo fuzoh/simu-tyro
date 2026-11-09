@@ -4,12 +4,22 @@ import type { EngineRefusal } from "@/lib/app/refusals.ts";
 import type { GateReport, SaisieEnCours } from "@/lib/rail/gates.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 
+import { DYNAMIQUE_GATES } from "@/lib/dynamique/copy.ts";
 import { deduceValues } from "@/lib/rail/deduced.ts";
 import { committedValue, evaluateGates, saisieEnCours } from "@/lib/rail/gates.ts";
 import { NO_REGIME_BANNER } from "@/lib/rail/results.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
+import { STATIQUE_GATES } from "@/lib/statique/fields.ts";
 
-import { banner, CHOOSE_REGIME_LABEL, JUMP_LABEL, noResultCause } from "./banner.ts";
+import {
+  banner,
+  CHOOSE_REGIME_LABEL,
+  JUMP_LABEL,
+  noResultCause,
+  pageReport,
+  rideCause,
+  windCause,
+} from "./banner.ts";
 
 /**
  * The banner — « v1 build spec » § 7 (*Le bandeau : un occupant, quatre rangs*, *Le résumé
@@ -34,7 +44,7 @@ const REFUSAL: EngineRefusal = {
 };
 
 /** The shipped screen: no error, no refusal, no régime — the one rank-4b state § 9 opens on. */
-const FIRST_RUN: GateReport = evaluateGates({ scenario: scenario(), trace: null });
+const FIRST_RUN: GateReport = evaluateGates({ scenario: scenario() });
 
 /** A Verdict Gate breach that is a real error: `daf=-1` is a value a link can carry. */
 const BAD_DAF: GateReport = evaluateGates({
@@ -42,7 +52,6 @@ const BAD_DAF: GateReport = evaluateGates({
     draft.regime = "en15567";
     draft.rider.DAF = -1;
   }),
-  trace: null,
 });
 
 /** A Solve Gate breach: `?L=-5` restores faithfully, including invalid state. */
@@ -51,7 +60,6 @@ const BAD_SPAN: GateReport = evaluateGates({
     draft.regime = "en15567";
     draft.geometry = { source: "manual", L: -5, h: -18 };
   }),
-  trace: null,
 });
 
 describe("rank 1 — blocking errors, count and jump link only", () => {
@@ -122,10 +130,11 @@ describe("rank 3 — « Saisie en cours », and it has to be reachable", () => {
   /** A required field emptied **while the caret is in it**: the form's issue, not the Scenario's. */
   const state = scenario((draft) => {
     draft.regime = "en15567";
+    // The flèche has to be the driver for its field to be the one emptied.
+    draft.tightness = { mode: "sag", D_target: 6 };
   });
   const report = evaluateGates({
     scenario: state,
-    trace: null,
     issues: [{ field: "D_target", kind: "empty", message: "valeur requise" }],
   });
   const saisie = saisieEnCours(
@@ -144,7 +153,7 @@ describe("rank 3 — « Saisie en cours », and it has to be reachable", () => {
       rank: 3,
       kind: "saisie",
       field: "D_target",
-      text: "Saisie en cours — ces valeurs correspondent à Flèche à vide cible 6,00 m.",
+      text: "Saisie en cours — ces valeurs correspondent à Flèche à vide 6,00 m.",
     });
   });
 
@@ -152,9 +161,9 @@ describe("rank 3 — « Saisie en cours », and it has to be reachable", () => {
     const withInvalid = evaluateGates({
       scenario: scenario((draft) => {
         draft.regime = "en15567";
+        draft.tightness = { mode: "sag", D_target: 6 };
         draft.rider.mp = -1;
       }),
-      trace: null,
       issues: [{ field: "D_target", kind: "empty", message: "valeur requise" }],
     });
     const midEdit = saisieEnCours(withInvalid, "D_target", "6,00 m");
@@ -185,7 +194,6 @@ describe("rank 4 — the verdict, or the no-régime prompt", () => {
           scenario: scenario((draft) => {
             draft.regime = "en15567";
           }),
-          trace: null,
         }),
         refusal: null,
         saisie: null,
@@ -218,7 +226,6 @@ describe("rank 4 — the verdict, or the no-régime prompt", () => {
       scenario: scenario((draft) => {
         draft.regime = "en15567";
       }),
-      trace: null,
     });
     expect(banner({ report: chosen, refusal: null, saisie: null, verdict: null })).toBeNull();
   });
@@ -275,7 +282,6 @@ describe("« Aucun résultat » — one cause, written once", () => {
         draft.usage = "TEMPORAIRE";
         draft.material = { family: "textile", ropeClass: "hmpe", MBL: null, mu: null, k: 22 };
       }),
-      trace: null,
     });
     expect(noResultCause({ report: blanks, refusal: null })).toBe(
       "Aucun résultat — charge de rupture : valeur requise.",
@@ -293,7 +299,6 @@ describe("« Aucun résultat » — one cause, written once", () => {
     const state = scenario();
     const report = evaluateGates({
       scenario: state,
-      trace: null,
       issues: [{ field: "D_target", kind: "empty", message: "valeur requise" }],
     });
     const saisie = saisieEnCours(
@@ -308,5 +313,206 @@ describe("« Aucun résultat » — one cause, written once", () => {
     // « — » is spent on `Indéterminé` — *tenté, indisponible* — and reusing it for *nothing
     // attempted* collides with the distinction § 6 bought five verdict states to preserve.
     expect(noResultCause({ report: BAD_SPAN, refusal: null })).toMatch(/^Aucun résultat — .+\.$/);
+  });
+});
+
+describe("the terrain register — a simplified Page's banner (#91)", () => {
+  test("rank 4b asks for a marge exigée, in the strip and on its button", () => {
+    expect(
+      banner({
+        report: FIRST_RUN,
+        refusal: null,
+        saisie: null,
+        verdict: null,
+        register: "terrain",
+      }),
+    ).toEqual({
+      rank: 4,
+      kind: "no-regime",
+      text: "Choisissez une marge exigée pour obtenir un verdict.",
+      action: "Choisir une marge exigée",
+    });
+  });
+
+  test("the cause names a value only Avancé shows without its exact term", () => {
+    const report = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.tightness = { mode: "ratio", ratio: -1 };
+      }),
+      register: "terrain",
+    });
+    expect(noResultCause({ report, refusal: null, register: "terrain" })).toBe(
+      "Aucun résultat — réglage de la Page Avancé invalide.",
+    );
+  });
+});
+
+describe("a Page with no Verdict reads the report through the gates it prints", () => {
+  const slot = (report: GateReport) =>
+    banner({
+      report: pageReport(report, DYNAMIQUE_GATES),
+      refusal: null,
+      saisie: null,
+      verdict: null,
+    });
+
+  test("a Verdict Gate breach leaves the slot empty: there is no verdict to be missing", () => {
+    expect(banner({ report: BAD_DAF, refusal: null, saisie: null, verdict: null })).toMatchObject({
+      rank: 1,
+    });
+    expect(slot(BAD_DAF)).toBeNull();
+  });
+
+  test("the neutral no-régime strip goes too: that Page has no régime to choose", () => {
+    expect(FIRST_RUN.noRegime).toBe(true);
+    expect(slot(FIRST_RUN)).toBeNull();
+  });
+
+  test("a Solve Gate breach still stops the Page, worded for what it removes", () => {
+    expect(slot(BAD_SPAN)).toMatchObject({
+      rank: 1,
+      text: "⛔ 1 erreur bloquante — aucun résultat",
+      target: "L",
+    });
+  });
+
+  test("only the breaches of the gates it prints are counted, whatever else is wrong", () => {
+    const both = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.regime = "en15567";
+        draft.rider.DAF = -1;
+        draft.geometry = { source: "manual", L: -5, h: -18 };
+      }),
+    });
+    expect(both.errors.length).toBeGreaterThan(1);
+    expect(pageReport(both, DYNAMIQUE_GATES).errors.map((error) => error.gate)).toEqual(["solve"]);
+    expect(slot(both)?.text).toBe("⛔ 1 erreur bloquante — aucun résultat");
+  });
+
+  test("a refusal reaches the slot once no Verdict Gate breach pre-empts it", () => {
+    const refused = banner({
+      report: pageReport(BAD_DAF, DYNAMIQUE_GATES),
+      refusal: REFUSAL,
+      saisie: null,
+      verdict: null,
+    });
+    expect(refused).toMatchObject({ rank: 2, kind: "refusal" });
+  });
+
+  test("a ride value stops this Page's rides, worded for what it removes", () => {
+    const report = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.dynamics = { ...draft.dynamics, CdA: -0.45 };
+      }),
+    });
+    expect(slot(report)).toMatchObject({
+      rank: 1,
+      text: "⛔ 1 erreur bloquante — aucune estimation",
+      target: "CdA",
+    });
+  });
+});
+
+describe("Statique prints no ride: a ride constant leaves its slot to the Verdict", () => {
+  const BAD_CDA = evaluateGates({
+    scenario: scenario((draft) => {
+      draft.regime = "en15567";
+      draft.dynamics = { ...draft.dynamics, CdA: -0.45 };
+    }),
+  });
+
+  test("the whole report blocks, so Avancé and Terrain say it", () => {
+    expect(banner({ report: BAD_CDA, refusal: null, saisie: null, verdict: null })).toMatchObject({
+      rank: 1,
+      text: "⛔ 1 erreur bloquante — aucune estimation",
+    });
+  });
+
+  test("Statique's own report holds nothing, and its verdict keeps the slot", () => {
+    const statique = pageReport(BAD_CDA, STATIQUE_GATES);
+    expect(statique.errors).toEqual([]);
+    expect(
+      banner({
+        report: statique,
+        refusal: null,
+        saisie: null,
+        verdict: { state: "dans-les-limites", text: "Dans les limites" },
+      }),
+    ).toMatchObject({ rank: 4, kind: "verdict" });
+  });
+
+  test("a negative wind speed is Statique's too: its vue de dessus draws the Vent", () => {
+    const report = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.wind = { speedKmh: -60, directionDeg: 0 };
+      }),
+    });
+    expect(
+      banner({
+        report: pageReport(report, STATIQUE_GATES),
+        refusal: null,
+        saisie: null,
+        verdict: null,
+      }),
+    ).toMatchObject({
+      rank: 1,
+      text: "⛔ 1 erreur bloquante — vent indisponible",
+      target: "windSpeed",
+    });
+  });
+});
+
+describe("what the Wind and Ride Gates withhold says why, where it would be read", () => {
+  const reportOf = (patch: (draft: ScenarioDraft) => void, register: "exact" | "terrain") =>
+    evaluateGates({ scenario: scenario(patch), register });
+  const negativeWind = (draft: ScenarioDraft) => {
+    draft.wind = { speedKmh: -60, directionDeg: 0 };
+  };
+  const negativeCdA = (draft: ScenarioDraft) => {
+    draft.dynamics = { ...draft.dynamics, CdA: -0.45 };
+  };
+
+  test("a negative wind speed withholds the Vent and, through it, the rides", () => {
+    const report = reportOf(negativeWind, "terrain");
+    expect(windCause({ report, register: "terrain" })).toBe(
+      "Vent indisponible — vitesse du vent invalide.",
+    );
+    expect(rideCause({ report, refusal: null, register: "terrain" })).toBe(
+      "Aucune estimation — vitesse du vent invalide.",
+    );
+  });
+
+  test("a ride constant withholds the rides alone, and names its field in the Page's register", () => {
+    const exact = reportOf(negativeCdA, "exact");
+    expect(windCause({ report: exact })).toBeNull();
+    expect(rideCause({ report: exact, refusal: null })).toBe(
+      "Aucune estimation — surface de traînée C_dA invalide.",
+    );
+    // A simplified Page does not name a value only Avancé shows.
+    const terrain = reportOf(negativeCdA, "terrain");
+    expect(rideCause({ report: terrain, refusal: null, register: "terrain" })).toBe(
+      "Aucune estimation — réglage de la Page Avancé invalide.",
+    );
+  });
+
+  test("under « Aucun résultat » the line's own cause speaks, and the ride's is silent", () => {
+    const report = reportOf((draft) => {
+      negativeCdA(draft);
+      draft.geometry = { source: "manual", L: -5, h: -18 };
+    }, "exact");
+    expect(rideCause({ report, refusal: null })).toBeNull();
+    expect(rideCause({ report: FIRST_RUN, refusal: REFUSAL })).toBeNull();
+  });
+
+  test("a wind speed emptied under the caret is mid-edit: nothing is withheld", () => {
+    const report = evaluateGates({
+      scenario: scenario(),
+      issues: [{ field: "windSpeed", kind: "empty", message: "valeur requise" }],
+    });
+    const saisie = saisieEnCours(report, "windSpeed", "60 km/h");
+    expect(saisie).not.toBeNull();
+    expect(windCause({ report, saisie })).toBeNull();
+    expect(rideCause({ report, refusal: null, saisie })).toBeNull();
+    expect(windCause({ report })).toBe("Vent indisponible — vitesse du vent : valeur requise.");
   });
 });

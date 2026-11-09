@@ -89,6 +89,22 @@ type UnitKind =
   | "mm"
   /** Kilograms. */
   | "kg"
+  /** Kilometres per hour — the wind's speed, as it is read off an anemometer and typed. */
+  | "km/h"
+  /** Degrees of arc — the wind's bearing. */
+  | "°"
+  /** Square metres — the passager's `C_dA`. */
+  | "m²"
+  /** Kilograms per second — the trolley's speed-proportional friction `k_v`, as the SSF writes it. */
+  | "kg/s"
+  /** Kilograms per cubic metre — the air's density. */
+  | "kg/m³"
+  /** Metres per second — the passager's speed, as the dynamic outputs print it. */
+  | "m/s"
+  /** Metres per second squared — the passager's acceleration. */
+  | "m/s²"
+  /** Seconds — the duration of a ride. */
+  | "s"
   /** Linear mass, kg/m — a mass, so the force selector does not touch it. */
   | "kg/m"
   /** A force: **newtons canonical** — § 3's SI storage — displayed in the selected unit. */
@@ -130,13 +146,11 @@ export const QUANTITIES = {
   h: { unit: "m", decimals: 1 },
   /** `Hauteur d'ancrage A / B`, m — garde moves metre for metre, so 0,1 m suffices. */
   anchorHeight: { unit: "m", decimals: 1 },
-  /** `Station A / B`, m — the file's own grain (`Distance` is written to 0,1 m). */
-  station: { unit: "m", decimals: 1 },
   /**
-   * `Alt. base A / B`, m — the ground altitude § 4's anchor-placement block prints beside `Portée`
-   * and `Dénivelé`. The grain is that block's own printed « 540,4 m » — the file's `Altitude`
-   * column, written to 0,1 m, exactly as `Station` reads `Distance`. A read-out, never a field:
-   * `h` already carries the difference these two altitudes make, so no solve consumes them.
+   * `Alt. base A / B`, m — the ground altitude under each anchor, printed beside `Portée` and
+   * `Dénivelé`. The grain is § 4's own printed « 540,4 m » — the file's `Altitude` column, written
+   * to 0,1 m. A read-out, never a field: `h` already carries the difference these two altitudes
+   * make, so no solve consumes them.
    */
   zBase: { unit: "m", decimals: 1 },
   /**
@@ -145,8 +159,14 @@ export const QUANTITIES = {
    */
   D_target: { unit: "m", decimals: 2 },
   /**
-   * `Prétension cible` `H_target`, daN — prefilled; 0,05 daN has no effect. The deduced
-   * `Prétension` `H à vide` read-out is the same grandeur at the same grain, and § 3 tables it
+   * `Prétension` `T_target`, daN — the tension at the tensioning anchor, per member (#85).
+   * Prefilled from its read-out like `H`, and read on the same dynamometer grain; the deduced
+   * `Prétension` row renders through this row too.
+   */
+  T_target: { unit: "force", decimals: 1 },
+  /**
+   * `Tension horizontale` `H_target`, daN — prefilled; 0,05 daN has no effect. The deduced
+   * `Tension horizontale` read-out is the same grandeur at the same grain, and § 3 tables it
    * once: both render through this row.
    */
   H_target: { unit: "force", decimals: 1 },
@@ -162,8 +182,13 @@ export const QUANTITIES = {
   vRatio: { unit: "", decimals: 2 },
   /** `Diamètre nominal` `d`, mm — `MBF ∝ d²`, so rounding 12,7 → 13 inflates `MBF` by 4,8 %. */
   d: { unit: "mm", decimals: 1 },
-  /** `Raideur relative` `k` — the two published defaults (22 and 1,5) must show as they are. */
-  k: { unit: "", decimals: 1 },
+  /**
+   * `Raideur relative` `k` — the two published defaults (22 and 1,5) must show as they are, and the
+   * Courant Bandit 11 mm preset's deduced 1,27 must too: one decimal would show it as 1,3, a 2 %
+   * move of `EA` the state does not hold. Departs from the v1 spec's one-decimal table (« 22,0 / 1,5 »),
+   * deliberately (issue #83).
+   */
+  k: { unit: "", decimals: 2 },
   /** `Charge de rupture` `MBL`, daN — typed off a datasheet, always whole in daN. */
   MBL: { unit: "force", decimals: 0 },
   /** `Masse linéique` `μ`, kg/m — steel's `μ` is deduced to 4 decimals and enters `w` linearly. */
@@ -180,6 +205,33 @@ export const QUANTITIES = {
   DAF: { unit: "", decimals: 1 },
   /** `Position du passager` `x_D`, m — 1 px ≈ 1,2 m at 1500 m, so 0,1 m is under the pointer. */
   x_D: { unit: "m", decimals: 1 },
+  /** `Vitesse du vent`, km/h — a forecast or an anemometer reads whole km/h, and no model reads finer. */
+  windSpeed: { unit: "km/h", decimals: 0 },
+  /** `Direction du vent`, ° — « 45 à 55° » is how the field trial reported it: whole degrees. */
+  windDirection: { unit: "°", decimals: 0 },
+  /** A Position's latitude or longitude, ° — six decimals is about 0,1 m, the grain of a typed point. */
+  coordinate: { unit: "°", decimals: 6 },
+  /** `C_dA`, m² — §12.2's 0,45 and its 0,30–0,60 band are two-decimal figures. */
+  CdA: { unit: "m²", decimals: 2 },
+  /**
+   * `F₀`, daN — the SSF's 15 N is 1,5 daN: one decimal is its own 1 N grain, and a typed 15 N
+   * survives the selector's round trip.
+   */
+  F0: { unit: "force", decimals: 1 },
+  /** `k_v`, kg/s — the SSF's 1,5; 0,01 kg/s is 0,2 N at 20 m/s, under `F₀`'s 1 N grain. */
+  kv: { unit: "kg/s", decimals: 2 },
+  /** Trolley `μ` — §12.2's 0,015 and [ALGO §10.3]'s 0,015–0,02 need three decimals. */
+  trolleyMu: { unit: "", decimals: 3 },
+  /** `ρ`, kg/m³ — §12.2 prints 1,225, and the ISA density moves the third decimal every ~10 m. */
+  rho: { unit: "kg/m³", decimals: 3 },
+  /** The passager's speed, m/s — an estimation (§12.2): a tenth of a metre per second is its grain. */
+  speed: { unit: "m/s", decimals: 1 },
+  /** The same speed in km/h, whole: the unit a rider has a feel for, and no model reads finer. */
+  speedKmh: { unit: "km/h", decimals: 0 },
+  /** The passager's acceleration, m/s² — an estimation, and one decimal is what an axis tick can hold. */
+  acceleration: { unit: "m/s²", decimals: 1 },
+  /** A ride's duration, s — an estimation, read to a tenth of a second. */
+  duration: { unit: "s", decimals: 1 },
   /**
    * `Charge de rupture` `MBF`, daN — **consumed by the Override badge**: the formula gives
    * 9073,98 where a freshly prefilled override holds 9074, and float equality would badge it.
@@ -211,6 +263,11 @@ export const QUANTITIES = {
   Tstatic: { unit: "force", decimals: 1 },
   /** `Enveloppe DAF`, daN — the headline `T max`, and what `FS effectif` divides by. */
   Tdaf: { unit: "force", decimals: 1 },
+  /**
+   * `Charge par ligne`, daN — `m_p·g / 2` on each of two Brins porteurs (#84). Read beside the
+   * tensions it loads, so at their grain; whole kilograms halve to 0,49 daN steps, which it keeps.
+   */
+  memberLoad: { unit: "force", decimals: 1 },
   /** `Flèche chargée max`, m. */
   loadedSag: { unit: "m", decimals: 2 },
   /** `Garde min`, m — the app's central output. */

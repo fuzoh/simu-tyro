@@ -5,15 +5,32 @@
  * can be (amendment A).
  */
 
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import type { Session } from "@/lib/session/session.ts";
+import type { Fetch } from "@/lib/terrain/geoadmin.ts";
+import type { Trace } from "@/lib/terrain/trace.ts";
 
+import { buildScene } from "@/lib/chart/scene.ts";
+import { altitudeOnProfile } from "@/lib/map/measure.ts";
+import { vue3dPlacement } from "@/lib/map/vue-3d.ts";
+import { evaluateGates } from "@/lib/rail/gates.ts";
+import { deriveResults } from "@/lib/rail/results.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
-import { DEFAULT_LAYERS } from "@/lib/session/session.ts";
-import { encodeP1 } from "@/lib/url/p1.ts";
+import { placeSpan } from "@/lib/scenario/geometry.ts";
+import { DEFAULT_LAYERS, readSession, writeSession } from "@/lib/session/session.ts";
+import { replayTrial, TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
+import { parseProfileCsv } from "@/lib/terrain/csv.ts";
+import { loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
+import { profilRunsBetween } from "@/lib/terrain/trace.ts";
+import { encodeP1, URL_BUDGET_CHARS } from "@/lib/url/p1.ts";
 import { FIRST_RUN_LINK } from "@/lib/url/scenario.ts";
+import { canonicalLink } from "@/lib/url/schema.ts";
 
+import type { AppState } from "./state.ts";
+
+import { copyLink, publishedSearch, sessionOf } from "./persist.ts";
 import { appReducer, initialAppState } from "./state.ts";
 
 /** The query string of § 9's first-run link — a complete, canonical, nothing-to-do bag. */
@@ -28,6 +45,9 @@ const TRACE_DATA = {
 /** A real `p1.` payload: the validator walks it structurally, so a made-up one is a refusal. */
 const TRACE = encodeP1({ ...TRACE_DATA, dev: 0 });
 
+/** Where the tests' own cached profile came from: a CSV the user imported. */
+const PONT = { kind: "csv", fileName: "pont.csv" } as const;
+
 /** A returning user's Session: their own span, their own toggles, a rope kept on the side. */
 function storedSession(): Session {
   const scenario = firstRunDefaults();
@@ -38,7 +58,9 @@ function storedSession(): Session {
     retainedMaterial: FIRST_RUN_RETAINED_TEXTILE,
     retainedManual: { L: 150, h: -18 },
     trace: null,
+    retainedCsv: null,
     layers: { unloadedLine: true, chordAB: false, riderTip: false, trajectory: true },
+    map: { fond: "orthophoto", pentes: true, view: "3d" },
   };
 }
 
@@ -90,13 +112,14 @@ describe("initialAppState — § 8's mount order", () => {
     it("completes the recognised keys it omits, literally, from § 9", () => {
       const state = initialAppState({ query: "?L=250&h=-40", session: null });
 
-      expect(state.link.completed).toContain("fl");
+      expect(state.link.completed).toContain("tp");
+      expect(state.link.completed).not.toContain("fl");
       expect(state.link.completed).toContain("mp");
       // `reg` and the three overrides are exempt: their absence **is** the meaning.
       expect(state.link.completed).not.toContain("reg");
       expect(state.link.completed).not.toContain("mbf");
       expect(state.scenario.regime).toBeNull();
-      expect(state.scenario.tightness).toEqual({ mode: "sag", D_target: 6 });
+      expect(state.scenario.tightness).toEqual({ mode: "anchor", T_target: 2634 });
     });
   });
 
@@ -175,7 +198,7 @@ describe("initialAppState — § 8's mount order", () => {
       // A redundant `L` beside a `tr` gets no strip line — with a trace present `L` is derived —
       // but leaving it in the address bar would contradict the screen.
       const state = initialAppState({
-        query: `?v=1&L=250&sa=0&sb=200&tr=${TRACE}${completeTail()}`,
+        query: `?v=1&L=250&tr=${TRACE}${completeTail()}`,
         session: null,
       });
       expect(state.link.rewrite).not.toBeNull();
@@ -208,28 +231,28 @@ describe("initialAppState — § 8's mount order", () => {
   });
 
   describe("an arriving `tr` is a profile, so it is decoded and not merely carried", () => {
-    /** A link of an imported scenario: the two stations, and the payload they stand on. */
-    const IMPORTED_QUERY = `?v=1&sa=0&sb=200&tr=${TRACE}${completeTail()}`;
+    /** A link of an imported scenario: the payload, taken whole. */
+    const IMPORTED_QUERY = `?v=1&tr=${TRACE}${completeTail()}`;
 
-    it("holds the decoded Trace, so the span the stations describe exists", () => {
-      // Without it `geometry.source === "trace"` stands beside `trace: null` — stations on nothing,
-      // no `Portée`, no `Dénivelé`, no ground, and « (aucun tracé) » on the identity line.
+    it("holds the decoded Trace, so the span the profil describes exists", () => {
+      // Without it `geometry.source === "trace"` stands beside `trace: null` — a profil with no
+      // samples, no `Portée`, no `Dénivelé`, no ground, and « (aucun tracé) » on the identity line.
       const state = initialAppState({ query: IMPORTED_QUERY, session: null });
 
-      expect(state.scenario.geometry).toMatchObject({ source: "trace", sa: 0, sb: 200 });
+      expect(state.scenario.geometry).toEqual({ source: "trace", trace: TRACE });
       expect(state.trace?.d).toEqual(TRACE_DATA.d);
       expect(state.trace?.z).toEqual(TRACE_DATA.z);
-      // § 4's third identity state: the filename does not travel, so its absence *is* « tracé reçu
-      // par lien » rather than a blank the UI has to guess at.
-      expect(state.trace?.fileName).toBeNull();
+      // § 4's third identity state: the filename does not travel, so the profile is « reçu par
+      // lien » rather than a blank the UI has to guess at.
+      expect(state.trace?.origin).toEqual({ kind: "lien" });
     });
 
     it("keeps the Session's own file when the link carries that same profile", () => {
       // § 8: « The Session keeps the filename, since that is the user's own session. » Reloading a
       // link built from your own import may not rename your file « tracé reçu par lien ».
       const session = storedSession();
-      session.scenario.geometry = { source: "trace", trace: TRACE, sa: 0, sb: 200 };
-      const cached = { d: TRACE_DATA.d, z: TRACE_DATA.z, dev: 0, fileName: "pont.csv" };
+      session.scenario.geometry = { source: "trace", trace: TRACE };
+      const cached: Trace = { ...TRACE_DATA, dev: 0, origin: PONT };
       const state = initialAppState({
         query: IMPORTED_QUERY,
         session: { ...session, trace: cached },
@@ -241,18 +264,18 @@ describe("initialAppState — § 8's mount order", () => {
     it("decodes rather than adopting a cached Trace the link does not name", () => {
       // The payload is the identity test. A Session whose *active* geometry is manual has a Trace
       // in memory, not on the line, and nothing says it is the one that just arrived.
-      const cached = { d: TRACE_DATA.d, z: TRACE_DATA.z, dev: 0, fileName: "pont.csv" };
+      const cached: Trace = { ...TRACE_DATA, dev: 0, origin: PONT };
       const state = initialAppState({
         query: IMPORTED_QUERY,
         session: { ...storedSession(), trace: cached },
       });
 
       expect(state.trace).not.toBe(cached);
-      expect(state.trace?.fileName).toBeNull();
+      expect(state.trace?.origin).toEqual({ kind: "lien" });
     });
 
     it("leaves the cached Trace alone when the link carries no `tr` at all", () => {
-      const cached = { d: TRACE_DATA.d, z: TRACE_DATA.z, dev: 0, fileName: "pont.csv" };
+      const cached: Trace = { ...TRACE_DATA, dev: 0, origin: PONT };
       const state = initialAppState({
         query: "?L=250&h=-40",
         session: { ...storedSession(), trace: cached },
@@ -260,6 +283,24 @@ describe("initialAppState — § 8's mount order", () => {
 
       expect(state.trace).toBe(cached);
       expect(state.scenario.geometry).toEqual({ source: "manual", L: 250, h: -40 });
+    });
+
+    it("opens a link from before #88 on the whole profil, naming `sa` and `sb` as unknown", () => {
+      // The stations were the sender's placement; the profil now *is* the span, so they are keys
+      // nothing reads — dropped with a strip line, never a refusal of the link.
+      const state = initialAppState({
+        query: `?v=1&sa=50&sb=150&tr=${TRACE}${completeTail()}`,
+        session: null,
+      });
+
+      expect(state.link.refused).toBeNull();
+      expect(state.link.dropped).toEqual([
+        { key: "sa", reason: "clé-inconnue" },
+        { key: "sb", reason: "clé-inconnue" },
+      ]);
+      expect(state.scenario.geometry).toEqual({ source: "trace", trace: TRACE });
+      expect(state.link.rewrite).not.toHaveProperty("sa");
+      expect(state.link.rewrite).not.toHaveProperty("sb");
     });
   });
 });
@@ -310,14 +351,14 @@ describe("appReducer — the Rail's five structural actions", () => {
 
   describe("« Réinitialiser le scénario » — § 9's reset table, column by column", () => {
     const edited = appReducer(
-      { ...first, trace: { d: TRACE_DATA.d, z: TRACE_DATA.z, dev: 0, fileName: "pont.csv" } },
+      { ...first, trace: { ...TRACE_DATA, dev: 0, origin: PONT } },
       { type: "scénario/modifié", patch: { unit: "kN", regime: "en15567" } },
     );
     const reset = appReducer(edited, { type: "scénario/réinitialisé" });
 
     it("returns the active configuration to the shipped defaults", () => {
       expect(reset.scenario.geometry).toEqual({ source: "manual", L: 150, h: -18 });
-      expect(reset.scenario.tightness).toEqual({ mode: "sag", D_target: 6 });
+      expect(reset.scenario.tightness).toEqual({ mode: "anchor", T_target: 2634 });
       // « — choisir — » again: the régime is part of the active configuration.
       expect(reset.scenario.regime).toBeNull();
     });
@@ -381,16 +422,11 @@ describe("appReducer — the Rail's five structural actions", () => {
   });
 
   describe("import, removal and re-use — one Trace, three lifetimes", () => {
-    const trace = { d: TRACE_DATA.d, z: TRACE_DATA.z, dev: 0, fileName: "pont.csv" };
+    const trace: Trace = { ...TRACE_DATA, dev: 0, origin: PONT };
     const imported = appReducer(first, { type: "tracé/importé", trace, tr: TRACE });
 
-    it("anchor A goes to the first station and B to the last — the trace *is* the span", () => {
-      expect(imported.scenario.geometry).toEqual({
-        source: "trace",
-        trace: TRACE,
-        sa: 0,
-        sb: 200,
-      });
+    it("the profil is taken whole — A over its first sample, B over its last", () => {
+      expect(imported.scenario.geometry).toEqual({ source: "trace", trace: TRACE });
       expect(imported.trace).toBe(trace);
     });
 
@@ -398,11 +434,11 @@ describe("appReducer — the Rail's five structural actions", () => {
       const removed = appReducer(imported, { type: "tracé/retiré" });
       expect(imported.retainedManual).toEqual({ L: 150, h: -18 });
       expect(removed.scenario.geometry).toEqual({ source: "manual", L: 150, h: -18 });
-      // Removal discards the stations, **not** the Trace.
+      // Removal changes the terrain source, **not** the Trace.
       expect(removed.trace).toBe(trace);
     });
 
-    it("« Réutiliser ce tracé » re-places A and B exactly as an import does", () => {
+    it("« Réutiliser ce tracé » takes the profil back exactly as an import does", () => {
       const removed = appReducer(imported, { type: "tracé/retiré" });
       const reused = appReducer(removed, { type: "tracé/réutilisé", tr: TRACE });
       expect(reused.scenario.geometry).toEqual(imported.scenario.geometry);
@@ -432,5 +468,416 @@ describe("appReducer — the Rail's five structural actions", () => {
       expect(appReducer(first, { type: "tracé/retiré" })).toBe(first);
       expect(appReducer(first, { type: "tracé/réutilisé", tr: TRACE })).toBe(first);
     });
+  });
+});
+
+describe("#88's trial — the geoadmin profil of 2026-11-08, imported with nothing else typed", () => {
+  /** `[MEASURED]` geoadmin export of 2026-11-08: 200 points over 435,2 m. */
+  function trialProfil(): Trace {
+    const text = readFileSync(
+      new URL("../../../docs/mesures dynamometre/trace-geoadmin-2026-11-08.csv", import.meta.url),
+      "utf8",
+    );
+    const parsed = parseProfileCsv(text, "trace-geoadmin-2026-11-08.csv");
+    if (!parsed.ok) throw new Error("the trial profil must import");
+    return parsed.trace;
+  }
+
+  // The anchor heights of the trial, and a régime so that there is a verdict to reach.
+  const ready = appReducer(initialAppState({ query: "", session: null }), {
+    type: "scénario/modifié",
+    patch: { anchors: { zA: 1.5, zB: 1 }, regime: "en15567" },
+  });
+  const trace = trialProfil();
+  const state = appReducer(ready, { type: "tracé/importé", trace, tr: encodeP1(trace) });
+
+  it("spans the whole profil: L 435,2 m, h −15,5 m, the ground lowest near 243 m", () => {
+    const placed = placeSpan(state.scenario, state.trace);
+    if (placed === null) throw new Error("the trial profil must place");
+    expect(placed.L).toBeCloseTo(435.2, 9);
+    expect(placed.h).toBeCloseTo(-15.5, 9);
+    const lowest = placed.terrain.zs.indexOf(Math.min(...placed.terrain.zs));
+    expect(placed.terrain.xs[lowest]).toBeCloseTo(242.7, 9);
+  });
+
+  it("passes every gate and reaches a verdict", () => {
+    const report = evaluateGates({ scenario: state.scenario });
+    expect(report.errors).toEqual([]);
+    const results = deriveResults({
+      scenario: state.scenario,
+      base: buildScene({ scenario: state.scenario, trace: state.trace }),
+      report,
+    });
+    expect(results?.verdict).not.toBeNull();
+  });
+});
+
+describe("#90's Positions — they follow the profil, end to end", () => {
+  const A = { lat: 46.843556, lon: 6.525035 };
+  const B = { lat: 46.846166, lon: 6.520783 };
+  const csv = readFileSync(
+    new URL("../../../docs/mesures dynamometre/trace-geoadmin-2026-11-08.csv", import.meta.url),
+    "utf8",
+  );
+  function importFile(text: string) {
+    const parsed = parseProfileCsv(text, "trace.csv");
+    if (!parsed.ok) throw new Error("the file must import");
+    return parsed.trace;
+  }
+  function linkSearch(scenario: typeof bare.scenario) {
+    const search = publishedSearch(scenario);
+    if (search === null) throw new Error("the Scenario must be publishable");
+    return search;
+  }
+  const withCoordinates = importFile(csv);
+  const bare = initialAppState({ query: "", session: null });
+  const imported = appReducer(bare, {
+    type: "tracé/importé",
+    trace: withCoordinates,
+    tr: encodeP1(withCoordinates),
+  });
+
+  it("importing the verified CSV fills A and B, and the link carries them", () => {
+    expect(imported.scenario.positions).toEqual({ A, B });
+    const link = canonicalLink(linkSearch(imported.scenario), "/");
+    expect(link).toContain("lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783");
+  });
+
+  it("a CSV with no coordinate columns leaves the Positions empty, even over typed ones", () => {
+    const typed = appReducer(bare, {
+      type: "scénario/modifié",
+      patch: { positions: { A, B: null } },
+    });
+    const plain = importFile("Distance;Altitude\n0;100\n50;95\n100;90\n");
+    const after = appReducer(typed, { type: "tracé/importé", trace: plain, tr: encodeP1(plain) });
+    expect(after.scenario.positions).toEqual({ A: null, B: null });
+  });
+
+  it("removing a profil whose file had no coordinates keeps the Positions typed since", () => {
+    const plain = importFile("Distance;Altitude\n0;100\n50;95\n100;90\n");
+    const loaded = appReducer(bare, { type: "tracé/importé", trace: plain, tr: encodeP1(plain) });
+    const typed = appReducer(loaded, {
+      type: "scénario/modifié",
+      patch: { positions: { A, B: null } },
+    });
+    const removed = appReducer(typed, { type: "tracé/retiré" });
+    expect(removed.scenario.positions).toEqual({ A, B: null });
+  });
+
+  it("removing the profil unsets the Positions, and re-using it brings them back", () => {
+    const removed = appReducer(imported, { type: "tracé/retiré" });
+    expect(removed.scenario.positions).toEqual({ A: null, B: null });
+    expect(removed.trace?.ends).toEqual({ A, B });
+    const reused = appReducer(removed, { type: "tracé/réutilisé", tr: encodeP1(withCoordinates) });
+    expect(reused.scenario.positions).toEqual({ A, B });
+  });
+
+  it("a link arrives with its Positions, and the profil it carries keeps them as its ends", () => {
+    const query = canonicalLink(linkSearch(imported.scenario), "/").slice(2);
+    const arrived = initialAppState({ query, session: null });
+    expect(arrived.scenario.positions).toEqual({ A, B });
+    expect(arrived.trace?.ends).toEqual({ A, B });
+    expect(arrived.trace?.origin).toEqual({ kind: "lien" });
+  });
+
+  /** The Session the write side leaves for `state`, through the storage it is written to. */
+  function storedSession(state: AppState): Session {
+    const storage = new Map<string, string>();
+    const stub = {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => void storage.set(key, value),
+      removeItem: (key: string) => void storage.delete(key),
+    };
+    const session = sessionOf(state);
+    if (session === null) throw new Error("a complete Scenario has a Session");
+    writeSession(stub, session);
+    const read = readSession(stub);
+    if (read === null) throw new Error("the Session must read back");
+    return read;
+  }
+  /** A page load on the address bar `state` published, over `session`. */
+  function open(state: AppState, session: Session | null): AppState {
+    const link = canonicalLink(linkSearch(state.scenario), "/avance");
+    return initialAppState({ query: link.slice(link.indexOf("?")), session });
+  }
+  /** A page load on the address bar and the Session the write side left for `state`. */
+  function reload(state: AppState): AppState {
+    return open(state, storedSession(state));
+  }
+  /** What the app holds, leaving out what this page load's link did. */
+  function held(state: AppState) {
+    const { link: _, ...rest } = state;
+    return rest;
+  }
+  /** Where the profil stands for every reading that puts it on the earth. */
+  function standing(state: AppState, far: { lat: number; lon: number }) {
+    const { scenario, trace } = state;
+    if (trace === null) throw new Error("the line keeps its profil");
+    return {
+      runs: profilRunsBetween(scenario.positions, trace),
+      vue3d: vue3dPlacement(scenario.positions, buildScene({ scenario, trace }), trace),
+      mesure: altitudeOnProfile(trace, far),
+    };
+  }
+  const OFF = { runs: false, vue3d: { ok: false, block: "profil" }, mesure: null };
+
+  // B typed some 1,3 km north of the profil's own end: a new line, whose profil is not loaded.
+  const far = { lat: 46.858, lon: B.lon };
+  const typedOff = appReducer(imported, {
+    type: "scénario/modifié",
+    patch: { positions: { A, B: far } },
+  });
+
+  it("a reload over the profil's own Positions opens on the same line", () => {
+    const reloaded = reload(imported);
+    expect(held(reloaded)).toEqual(held(imported));
+    expect(profilRunsBetween(reloaded.scenario.positions, reloaded.trace)).toBe(true);
+  });
+
+  it("a Position typed off the profil is said in the Scenario, and the link carries it", () => {
+    expect(standing(typedOff, far)).toEqual(OFF);
+    expect(typedOff.scenario.geometry).toMatchObject({ offPositions: true });
+    expect(canonicalLink(linkSearch(typedOff.scenario), "/")).toContain("&ph=1&tr=");
+    // Typed back onto the profil's end, the line is the profil's again.
+    const back = appReducer(typedOff, { type: "scénario/modifié", patch: { positions: { A, B } } });
+    expect(back.scenario.geometry).toEqual(imported.scenario.geometry);
+  });
+
+  it("a Position typed off the profil stays off it through a reload, and nothing stretches the profil to it", () => {
+    const reloaded = reload(typedOff);
+    expect(held(reloaded)).toEqual(held(typedOff));
+    expect(reloaded.trace?.ends).toEqual({ A, B });
+    expect(standing(reloaded, far)).toEqual(OFF);
+  });
+
+  it("the link alone opens the same line: no Session, or one holding another profil", () => {
+    const other = importFile("Distance;Altitude\n0;100\n50;95\n100;90\n");
+    const another = appReducer(bare, { type: "tracé/importé", trace: other, tr: encodeP1(other) });
+    for (const session of [null, storedSession(another)]) {
+      const arrived = open(typedOff, session);
+      expect(arrived.scenario).toEqual(typedOff.scenario);
+      expect(arrived.trace?.origin).toEqual({ kind: "lien" });
+      // The link does not say where the profil lies, only that it is not between the Positions.
+      expect(arrived.trace?.ends).toBeUndefined();
+      expect(standing(arrived, far)).toEqual(OFF);
+      // The recipient's own reload is the same line again.
+      expect(held(reload(arrived))).toEqual(held(arrived));
+    }
+  });
+
+  it("Positions typed beside a profil with no coordinates never become its ends", () => {
+    const plain = importFile("Distance;Altitude\n0;100\n50;95\n100;90\n");
+    const loaded = appReducer(bare, { type: "tracé/importé", trace: plain, tr: encodeP1(plain) });
+    const typed = appReducer(loaded, {
+      type: "scénario/modifié",
+      patch: { positions: { A, B } },
+    });
+
+    for (const arrived of [reload(typed), open(typed, null)]) {
+      expect(arrived.scenario).toEqual(typed.scenario);
+      expect(arrived.trace?.ends).toBeUndefined();
+      expect(profilRunsBetween(arrived.scenario.positions, arrived.trace)).toBe(false);
+    }
+  });
+
+  it("a link that puts the profil between its Positions wins over the cached file's own ends", () => {
+    const retyped = { A: { lat: 46.8, lon: 6.5 }, B: { lat: 46.9, lon: 6.6 } };
+    // Hand-written: the app's own link for this line would say `ph`.
+    const sent = { ...imported, scenario: { ...imported.scenario, positions: retyped } };
+    const arrived = open(sent, storedSession(imported));
+    expect(arrived.trace?.ends).toEqual(retyped);
+    expect(arrived.trace?.origin).toEqual({ kind: "csv", fileName: "trace.csv" });
+    expect(profilRunsBetween(arrived.scenario.positions, arrived.trace)).toBe(true);
+  });
+
+  it("removing a profil the Positions were typed off keeps them, on either side of the link", () => {
+    for (const state of [typedOff, open(typedOff, null)]) {
+      const removed = appReducer(state, { type: "tracé/retiré" });
+      expect(removed.scenario.positions).toEqual({ A, B: far });
+    }
+  });
+
+  it("changes neither the Results nor the Verdict", () => {
+    const ready = appReducer(imported, {
+      type: "scénario/modifié",
+      patch: { anchors: { zA: 1.5, zB: 1 }, regime: "en15567" },
+    });
+    const read = (scenario: typeof ready.scenario) =>
+      deriveResults({
+        scenario,
+        base: buildScene({ scenario, trace: ready.trace }),
+        report: evaluateGates({ scenario }),
+      });
+    const unplaced = { ...ready.scenario, positions: { A: null, B: null } };
+    expect(read(ready.scenario)).toEqual(read(unplaced));
+    expect(read(ready.scenario)?.verdict).not.toBeNull();
+  });
+});
+
+describe("#103's profil geo.admin — loaded between the two Positions, a third origin", () => {
+  const ORIGIN = "https://scoutech.example";
+  const csv = readFileSync(
+    new URL("../../../docs/mesures dynamometre/trace-geoadmin-2026-11-08.csv", import.meta.url),
+    "utf8",
+  );
+  const parsed = parseProfileCsv(csv, "trace-geoadmin-2026-11-08.csv");
+  if (!parsed.ok) throw new Error("the trial CSV must import");
+  const fromCsv = parsed.trace;
+
+  /** The trial's anchor heights and a régime, so that there is a Verdict to compare. */
+  const ready = appReducer(initialAppState({ query: "", session: null }), {
+    type: "scénario/modifié",
+    patch: { anchors: { zA: 1.5, zB: 1 }, regime: "en15567" },
+  });
+  const onCsv = appReducer(ready, {
+    type: "tracé/importé",
+    trace: fromCsv,
+    tr: encodeP1(fromCsv),
+  });
+
+  /** « Charger le profil geo.admin », as the button runs it: the loader, then one dispatch. */
+  async function loadOver(state: AppState, fetch: Fetch): Promise<AppState> {
+    const { A, B } = state.scenario.positions;
+    if (A === null || B === null) throw new Error("both Positions are needed");
+    const outcome = await loadGeoadminProfile({ A, B }, fetch);
+    if (!outcome.ok) return state;
+    return appReducer(state, {
+      type: "tracé/importé",
+      trace: outcome.trace,
+      tr: encodeP1(outcome.trace),
+    });
+  }
+
+  function verdictOf(state: AppState) {
+    const { scenario, trace } = state;
+    return deriveResults({
+      scenario,
+      base: buildScene({ scenario, trace }),
+      report: evaluateGates({ scenario }),
+    })?.verdict;
+  }
+
+  it("loaded over a CSV, it is the active source and the CSV stays in the Session", async () => {
+    const loaded = await loadOver(onCsv, replayTrial());
+
+    expect(loaded.trace?.origin).toEqual({ kind: "geoadmin" });
+    expect(loaded.trace?.d.length).toBe(200);
+    expect(loaded.scenario.geometry).toEqual({
+      source: "trace",
+      trace: encodeP1(loaded.trace ?? fromCsv),
+    });
+    // The anchors stand on the profil's two ends, at the heights they had.
+    expect(loaded.scenario.anchors).toEqual({ zA: 1.5, zB: 1 });
+    expect(loaded.scenario.positions).toEqual(TRIAL_ENDS);
+
+    const session = sessionOf(loaded);
+    expect(session?.trace?.origin).toEqual({ kind: "geoadmin" });
+    expect(session?.retainedCsv).toBe(fromCsv);
+  });
+
+  it("a CSV cached behind manual geometry is kept just the same", async () => {
+    const removed = appReducer(onCsv, { type: "tracé/retiré" });
+    const typed = appReducer(removed, {
+      type: "scénario/modifié",
+      patch: { positions: TRIAL_ENDS },
+    });
+    const loaded = await loadOver(typed, replayTrial());
+    expect(loaded.trace?.origin).toEqual({ kind: "geoadmin" });
+    expect(loaded.retainedCsv).toBe(fromCsv);
+  });
+
+  it("re-using the kept CSV puts it back, and nothing is kept behind it", async () => {
+    const loaded = await loadOver(onCsv, replayTrial());
+    const kept = loaded.retainedCsv;
+    if (kept === null) throw new Error("the CSV must be kept");
+    const back = appReducer(loaded, { type: "tracé/importé", trace: kept, tr: encodeP1(kept) });
+    expect(back.trace).toBe(fromCsv);
+    expect(back.retainedCsv).toBeNull();
+  });
+
+  it("a failed load leaves the line exactly as it was", async () => {
+    const offline: Fetch = async () => {
+      throw new TypeError("Failed to fetch");
+    };
+    expect(await loadOver(onCsv, offline)).toBe(onCsv);
+  });
+
+  it("the link carries Positions and points, and reopens offline on the same Verdict", async () => {
+    const loaded = await loadOver(onCsv, replayTrial());
+    const copied = copyLink({
+      scenario: loaded.scenario,
+      trace: loaded.trace,
+      origin: ORIGIN,
+      page: "/avance",
+    });
+    if (!copied.ok) throw new Error(copied.message);
+    expect(copied.href.length).toBeLessThanOrEqual(URL_BUDGET_CHARS);
+    expect(copied.href).toContain("lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783");
+    expect(copied.href).toContain(`tr=${encodeP1(loaded.trace ?? fromCsv)}`);
+
+    // A recipient with no Session and no network: opening the link fetches nothing, and a press
+    // of « Charger le profil geo.admin » there fails without moving the line.
+    const offline: Fetch = async () => {
+      throw new TypeError("Failed to fetch");
+    };
+    const reopened = initialAppState({
+      query: copied.href.slice(copied.href.indexOf("?")),
+      session: null,
+    });
+    const pressed = await loadOver(reopened, offline);
+
+    expect(pressed).toBe(reopened);
+    expect(reopened.trace?.origin).toEqual({ kind: "lien" });
+    expect(reopened.scenario.positions).toEqual(TRIAL_ENDS);
+    const verdict = verdictOf(loaded);
+    expect(verdict).not.toBeNull();
+    expect(verdictOf(pressed)).toEqual(verdict);
+  });
+});
+
+describe("#93's Fond de carte and Couche pentes, #95's Vue 3D — the Session's, never the link's", () => {
+  const ORIGIN = "https://scoutech.example";
+  const CHOSEN = { fond: "orthophoto", pentes: true, view: "3d" } as const;
+
+  /** A page load with `query` on whatever the last one stored. */
+  function reload(storage: Map<string, string>, state: AppState, query = ""): AppState {
+    const stub = {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => void storage.set(key, value),
+      removeItem: (key: string) => void storage.delete(key),
+    };
+    const session = sessionOf(state);
+    if (session === null) throw new Error("a complete Scenario has a Session");
+    writeSession(stub, session);
+    return initialAppState({ query, session: readSession(stub) });
+  }
+
+  const opened = initialAppState({ query: "", session: null });
+  const switched = appReducer(opened, { type: "carte/affichée", map: CHOSEN });
+
+  it("opens on the carte claire with no Couche pentes, in 2D, and a switch moves no part of the Scenario", () => {
+    expect(opened.map).toEqual({ fond: "carte-claire", pentes: false, view: "2d" });
+    expect(switched.map).toEqual(CHOSEN);
+    expect(switched.scenario).toBe(opened.scenario);
+  });
+
+  it("survives a reload", () => {
+    expect(reload(new Map(), switched).map).toEqual(CHOSEN);
+  });
+
+  it("is not in the link, and a link arriving leaves the recipient's own choice", () => {
+    const link = (state: AppState) =>
+      copyLink({ scenario: state.scenario, trace: state.trace, origin: ORIGIN, page: "/" });
+    const shared = link(switched);
+    if (!shared.ok) throw new Error(shared.message);
+    expect(shared).toEqual(link(opened));
+    expect(shared.href).not.toMatch(/orthophoto|pentes|carte|3d/);
+
+    const arrived = reload(new Map(), switched, shared.href.slice(shared.href.indexOf("?")));
+    expect(arrived.map).toEqual(CHOSEN);
+  });
+
+  it("« Réinitialiser le scénario » leaves it as chosen", () => {
+    expect(appReducer(switched, { type: "scénario/réinitialisé" }).map).toEqual(CHOSEN);
   });
 });

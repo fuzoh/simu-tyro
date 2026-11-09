@@ -21,7 +21,7 @@
  *   pointed at the chart's legibility. What ships is a **toggle** « ×1 vraie échelle » — a press
  *   switches the drawing to true scale, the next press switches it back — and it is **disabled
  *   whenever the ×1 clamp is already in force** — *except* where amendment F's plot cap is what cut
- *   the cable out of that ×1 frame, where it reads « voir tout le câble » and shows the whole cable
+ *   the cable out of that ×1 frame, where it reads « voir toute la ligne » and shows the whole cable
  *   instead (the user's **decision 4**; voir `peekMode` in `@/lib/layout/contract.ts`). § 5 had it
  *   as a hold-to-peek on fine pointers; the user asked for a plain toggle on 2026-09-23, so the
  *   drawing now stays at ×1 until it is switched back, on every pointer and from the keyboard alike.
@@ -44,6 +44,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { Toggle } from "@/components/ui/toggle.tsx";
+import { LAYER_LABEL, PEEK_LABEL } from "@/lib/chart/copy.ts";
 import { formatValue } from "@/lib/format/quantity.ts";
 import { keepCaret } from "@/lib/layout/collapse.ts";
 import { riderPositionEntry } from "@/lib/rail/fields.ts";
@@ -90,18 +91,6 @@ function Abbr({
 const PRESSED =
   "text-muted-foreground aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:text-background aria-pressed:hover:bg-foreground/85";
 
-/**
- * The peek control's two labels, per mode — § 5's « ×1 vraie échelle », and the **decision 4**
- * toggle that puts a box-clipped cable back inside the frame. The label names *what pressing it does*, so
- * the mode that no longer shows ×1 no longer says ×1; the disabled control keeps § 5's own words,
- * because that is the row the spec's table describes.
- */
-const PEEK_LABEL: Record<PeekMode, { full: string; short: string }> = {
-  off: { full: "×1 vraie échelle", short: "×1" },
-  "true-scale": { full: "×1 vraie échelle", short: "×1" },
-  fit: { full: "voir tout le câble", short: "tout" },
-};
-
 /** The layer toggles, in the row's order: § 5's two, then the two of 2026-09-23. */
 const LAYERS = [
   "unloadedLine",
@@ -109,14 +98,6 @@ const LAYERS = [
   "trajectory",
   "riderTip",
 ] as const satisfies readonly (keyof LayerToggles)[];
-
-/** Each layer toggle's two labels. `full` is also its `aria-label` and `title`. */
-const LAYER_LABEL: Record<keyof LayerToggles, { full: string; short: string }> = {
-  unloadedLine: { full: "ligne à vide", short: "à vide" },
-  chordAB: { full: "corde A–B", short: "corde" },
-  trajectory: { full: "trajectoire", short: "trajet" },
-  riderTip: { full: "distances", short: "dist." },
-};
 
 /**
  * A layer's swatch — **its own stroke, drawn small**: the dash of « ligne à vide », the straight dash
@@ -214,7 +195,8 @@ export function ViewStrip({
   /** The drawn position, m — already clamped into `[0, L]` by the scene. */
   xD: number;
   L: number;
-  onX: (metres: number) => void;
+  /** Absent on the Page Terrain (#101): the position is read there, never typed. */
+  onX?: (metres: number) => void;
 }) {
   return (
     <>
@@ -275,8 +257,35 @@ export function ViewStrip({
         <Abbr full={PEEK_LABEL[peek].full} narrow="short" short={PEEK_LABEL[peek].short} />
       </Toggle>
 
-      <PositionField L={L} onFocusChange={onPositionFocus} onX={onX} xD={xD} />
+      {onX === undefined ? (
+        <PositionReading L={L} xD={xD} />
+      ) : (
+        <PositionField L={L} onFocusChange={onPositionFocus} onX={onX} xD={xD} />
+      )}
     </>
+  );
+}
+
+/** The position as {@link PositionField} prints it, with no field: `x 74,8 m · 50 %`. */
+function PositionReading({ xD, L }: { xD: number; L: number }) {
+  return (
+    <span className="flex items-center gap-1 whitespace-nowrap">
+      <span className="text-muted-foreground">x</span>
+      <span className="font-mono text-base">{formatValue("x_D", xD)}</span>
+      <span className="text-muted-foreground">m</span>
+      <Share L={L} xD={xD} />
+    </span>
+  );
+}
+
+/** The position's share of the span, the secondary both forms of it carry. */
+function Share({ xD, L }: { xD: number; L: number }) {
+  // The unit and the separator are prose and stay sans; the percentage is a computed quantity
+  // and is mono, like every other number the engine produced.
+  return (
+    <span className="text-muted-foreground/70">
+      · <span className="font-mono">{L > 0 ? Math.round((xD / L) * 100) : 0}</span> %
+    </span>
   );
 }
 
@@ -374,11 +383,7 @@ function PositionField({
         value={draft ?? shown}
       />
       <span className="text-muted-foreground">m</span>
-      {/* The unit and the separator are prose and stay sans; the percentage is a computed quantity
-          and is mono, like every other number the engine produced. */}
-      <span className="text-muted-foreground/70">
-        · <span className="font-mono">{L > 0 ? Math.round((xD / L) * 100) : 0}</span> %
-      </span>
+      <Share L={L} xD={xD} />
     </Label>
   );
 }

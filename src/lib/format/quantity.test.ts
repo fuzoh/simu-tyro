@@ -43,12 +43,13 @@ const ALL_IDS = Object.keys(QUANTITIES) as QuantityId[];
 
 /**
  * One case per row of {@link QUANTITIES}, in its order, valued from the spec's own « Premier
- * lancement » column wherever it has one. That is **§ 3's table plus two rows**: `regimeK` is the
+ * lancement » column wherever it has one. That is **§ 3's table plus three rows**: `regimeK` is the
  * régime's safety divisor, which § 3 has no row for because it spends `k` on textile relative
  * stiffness — voir its own comment in the table, and ticket 37 defect 4 for why it is a
- * `QuantityId` rather than a second rounding site — and `unloadedGap`, the « Écart à vide » cell
- * added after § 3 was written. The four rows the column leaves empty or dashed
- * (`Station`, `MBL`, `T adm`, `Réserve de tension`) take § 3's or § 6's quoted figures instead.
+ * `QuantityId` rather than a second rounding site — `unloadedGap`, the « Écart à vide » cell
+ * added after § 3 was written, and `memberLoad`, the « Charge par ligne » of two Brins porteurs.
+ * The three rows the column leaves empty or dashed (`MBL`, `T adm`, `Réserve de tension`) take
+ * § 3's or § 6's quoted figures instead.
  *
  * `value` is always the row's **canonical** unit — § 3's SI storage: metres, mm, kg, kg/m,
  * **newtons**, N/m, percent — so the N → daN → kN → kgf and N → MN conversions are exercised by
@@ -60,16 +61,16 @@ const ROWS: ReadonlyArray<{ id: QuantityId; value: number; expected: string }> =
   { id: "L", value: 150, expected: "150,0 m" },
   { id: "h", value: -18, expected: "-18,0 m" },
   { id: "anchorHeight", value: 12, expected: "12,0 m" },
-  // No first-run value: the Stations exist in imported mode only, at the file's 0,1 m grain.
-  { id: "station", value: 87.42, expected: "87,4 m" },
+
   // § 4's own printed « Alt. base A 540,4 m » — an altitude in the file's frame, not a difference.
   { id: "zBase", value: 540.44, expected: "540,4 m" },
   { id: "D_target", value: 6, expected: "6,00 m" },
+  { id: "T_target", value: 2605.2, expected: "260,5 daN" },
   { id: "H_target", value: 2535.2, expected: "253,5 daN" },
   { id: "L0", value: 151.644, expected: "151,64 m" },
   { id: "vRatio", value: 0.8175, expected: "0,82" },
   { id: "d", value: 12, expected: "12,0 mm" },
-  { id: "k", value: 22, expected: "22,0" },
+  { id: "k", value: 22, expected: "22,00" },
   // « vide, requis » on first run — a datasheet figure, always whole in daN.
   { id: "MBL", value: 60_000, expected: "6000 daN" },
   { id: "mu", value: 0.5465, expected: "0,5465 kg/m" },
@@ -79,6 +80,22 @@ const ROWS: ReadonlyArray<{ id: QuantityId; value: number; expected: string }> =
   { id: "h_clear_min", value: 1, expected: "1,0 m" },
   { id: "DAF", value: 1.2, expected: "1,2" },
   { id: "x_D", value: 75, expected: "75,0 m" },
+  // The Vent (#87): whole km/h and whole degrees, in state exactly as typed.
+  { id: "windSpeed", value: 50, expected: "50 km/h" },
+  { id: "windDirection", value: 45, expected: "45 °" },
+  // A Position's coordinate (#90): six decimals, the comma, the sign kept for a western longitude.
+  { id: "coordinate", value: 46.843556, expected: "46,843556 °" },
+  // The ride's constants (#89) at §12.2's defaults — `F₀` 15 N is a force, so daN like the rest.
+  { id: "CdA", value: 0.45, expected: "0,45 m²" },
+  { id: "F0", value: 15, expected: "1,5 daN" },
+  { id: "kv", value: 1.5, expected: "1,50 kg/s" },
+  { id: "trolleyMu", value: 0.015, expected: "0,015" },
+  { id: "rho", value: 1.225, expected: "1,225 kg/m³" },
+  // The passager's ride (#92), prints of the Page Dynamique: speeds, acceleration, duration.
+  { id: "speed", value: 20.46, expected: "20,5 m/s" },
+  { id: "speedKmh", value: 73.66, expected: "74 km/h" },
+  { id: "acceleration", value: -1.234, expected: "-1,2 m/s²" },
+  { id: "duration", value: 23.449, expected: "23,4 s" },
   // The badge's own row: the formula value, not the override, so the padding is what rounds it.
   { id: "MBF", value: 90_739.8, expected: "9074 daN" },
   // 6,897 MN in canonical newtons — the declared carve-out renders MN under every setting.
@@ -91,6 +108,8 @@ const ROWS: ReadonlyArray<{ id: QuantityId; value: number; expected: string }> =
   // Results and read-out cells.
   { id: "Tstatic", value: 8171.3, expected: "817,1 daN" },
   { id: "Tdaf", value: 9278.8, expected: "927,9 daN" },
+  // Not a § 3 row: half the shipped 120 kg on each of two Brins porteurs, 120 · 9,81 / 2 N (#84).
+  { id: "memberLoad", value: 588.6, expected: "58,9 daN" },
   { id: "loadedSag", value: 7.4831, expected: "7,48 m" },
   { id: "clearance", value: 2.4399, expected: "2,44 m" },
   // Not a § 3 row: the read-out cell of 2026-09-23, valued at the first-run line's own `x_D` 75.
@@ -251,14 +270,17 @@ describe("« le changement d'unité n'écrit jamais dans l'état ; daN→X→daN
     return kind === "force" || kind === "force/m";
   });
 
-  test("the eight force rows are the ones the selector moves", () => {
+  test("the eleven force rows are the ones the selector moves", () => {
     expect(FORCE_IDS).toEqual([
+      "T_target",
       "H_target",
       "MBL",
+      "F0",
       "MBF",
       "w",
       "Tstatic",
       "Tdaf",
+      "memberLoad",
       "Tadm",
       "tensionReserve",
     ]);

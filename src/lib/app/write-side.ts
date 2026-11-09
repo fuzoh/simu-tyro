@@ -5,10 +5,15 @@
  * `./persist.ts` decides *which* writes happen and *in which order*; this module owns *when*, and
  * performs them through three injected effects. It holds no React and reads no `window`, so the
  * timing is a `node` test under fake timers, and `@/components/app/use-persist.ts` is left with
- * what only React can do: re-arm on change, disarm on cleanup, and skip the Scenario it opened on.
+ * what only React can do: re-arm on change, cancel on cleanup, flush when a link leaves the Page,
+ * and skip the Scenario it opened on.
  *
  * - **The debounce is a trailing timer per change**, so a burst of keystrokes writes once. The
- *   returned disarm clears it, which is what makes « the last state wins » true without a queue.
+ *   returned {@link Pending}'s `cancel` clears it, which is what makes « the last state wins » true
+ *   without a queue.
+ * - **A Page leaving flushes rather than cancels.** The next Page reads the URL before anything
+ *   else, so a write still inside its debounce when a link is pressed would hand that Page the
+ *   Scenario from before the last edit; `flush` performs it now, once, and says what it wrote.
  * - **Both writes suspend together** under « Saisie en cours »: neither timer is armed, whatever the
  *   draft — an oversize one included, since its Session write rides on the address-bar timer.
  * - **The address-bar timer reads the state when it fires**, through `read`, because an oversize
@@ -34,9 +39,11 @@ import {
 export type WriteEffects = {
   /** `siteOrigin()` — read at write time, since the link budget is on the whole href. */
   readonly origin: () => string;
+  /** The current Page's router path — the address bar is written onto it, so it is budgeted too. */
+  readonly page: () => string;
   /** `browserStorage()` — `null` where the origin refuses `localStorage` outright. */
   readonly storage: () => SessionStorage | null;
-  /** A `replace: true` navigation to `/` with exactly this search. */
+  /** A `replace: true` navigation onto the current Page with exactly this search. */
   readonly navigate: (search: ValidatedSearch) => void;
 };
 
@@ -57,8 +64,44 @@ export function perform(writes: readonly Write[], effects: WriteEffects): void {
   }
 }
 
-/** Disarms a pending write; `undefined` when nothing was armed. */
-export type Disarm = (() => void) | undefined;
+/** The search the address bar was given among `writes` — `null` when it was left alone. */
+export function writtenSearch(writes: readonly Write[]): ValidatedSearch | null {
+  const write = writes.find((candidate) => candidate.to === "address-bar");
+  return write?.to === "address-bar" ? write.search : null;
+}
+
+/** A write armed and not yet performed; the arms return `undefined` when nothing was armed. */
+export type Pending = {
+  /** Drops it: a newer state re-arms it, or the Page is gone. */
+  readonly cancel: () => void;
+  /**
+   * Performs it now rather than when its debounce ends — once. Returns the writes it performed:
+   * none once it has run, been flushed or been cancelled.
+   */
+  readonly flush: () => readonly Write[];
+};
+
+/** A trailing timer that performs `writes()` once, when it fires or when it is flushed. */
+function armed(delay: number, writes: () => readonly Write[], effects: WriteEffects): Pending {
+  let settled = false;
+  const run = (): readonly Write[] => {
+    if (settled) return [];
+    settled = true;
+    clearTimeout(timer);
+    // Built when it runs, so a burst of keystrokes serialises once rather than once per frame.
+    const performed = writes();
+    perform(performed, effects);
+    return performed;
+  };
+  const timer = setTimeout(run, delay);
+  return {
+    cancel: () => {
+      settled = true;
+      clearTimeout(timer);
+    },
+    flush: run,
+  };
+}
 
 /**
  * Arms the ≈400 ms address-bar write — and, for an oversize draft, the Session write ahead of it.
@@ -73,13 +116,13 @@ export function armAddressBarWrite({
   read: () => AppState;
   suspended: boolean;
   effects: WriteEffects;
-}): Disarm {
+}): Pending | undefined {
   if (suspended) return undefined;
-  const timer = setTimeout(() => {
-    // Built inside the timer, so a burst of keystrokes serialises once rather than once per frame.
-    perform(addressBarWrites(read(), effects.origin()), effects);
-  }, URL_WRITE_DEBOUNCE_MS);
-  return () => clearTimeout(timer);
+  return armed(
+    URL_WRITE_DEBOUNCE_MS,
+    () => addressBarWrites(read(), effects.origin(), effects.page()),
+    effects,
+  );
 }
 
 /** Arms the ≈1 s Session write of `state`. */
@@ -91,8 +134,7 @@ export function armSessionWrite({
   state: AppState;
   suspended: boolean;
   effects: WriteEffects;
-}): Disarm {
+}): Pending | undefined {
   if (suspended) return undefined;
-  const timer = setTimeout(() => perform(sessionWrites(state), effects), SESSION_WRITE_DEBOUNCE_MS);
-  return () => clearTimeout(timer);
+  return armed(SESSION_WRITE_DEBOUNCE_MS, () => sessionWrites(state), effects);
 }

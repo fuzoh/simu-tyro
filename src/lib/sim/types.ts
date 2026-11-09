@@ -151,12 +151,12 @@ export type SolveResult =
  * `bound` and `boundKind` are **not decoration**. Without them « Tension impossible » is
  * unwritable — the state degrades to quoting an `L₀` floor at a user editing a tension.
  * `resolveL0` catches `field: "L0"` and re-emits the bound in the **driving quantity**
- * (`D_target` / `H_target`), mapped forward through the same inversion that failed.
+ * (`D_target` / `H_target` / `T_target`), mapped forward through the same inversion that failed.
  */
 export type SolveError =
   | {
       kind: "invalid-input";
-      /** `"L0"` | `"w"` | `"EA"` | `"L"`, or `"D_target"` | `"H_target"` once re-emitted. */
+      /** `"L0"` | `"w"` | `"EA"` | `"L"`, or `"D_target"` | `"H_target"` | `"T_target"` once re-emitted. */
       field: string;
       /** The offending value, in the field's own engine unit. */
       value: number;
@@ -241,6 +241,11 @@ export type MaterialSpec =
       mu: number;
       /** Stiffness factor, `EA = k·MBL`. */
       k: number;
+      /**
+       * Nominal diameter, mm — **absent** when nobody typed one. Informational: no formula reads it,
+       * the tensioning work that needs it does.
+       */
+      d?: number;
     };
 
 /** What the solver consumes, whichever family produced it. Units: N/m, N, N. */

@@ -8,9 +8,10 @@
  *
  * It reproduces **containers, not controls**:
  *
- * - the Rail's five section headings in order, plus the app's name as static text — no field rows,
- *   no group frames;
- * - both chart frames at the spine's proportions, from the same CSS the live app uses;
+ * - the Rail's five section headings in order — `Paramètres` in the left column, the other four in
+ *   the right — plus the app's name as static text — no field rows, no group frames;
+ * - both chart frames at the spine's proportions, from the same CSS the live app uses, and from
+ *   three columns the vue de dessus's empty frame under them (#104);
  * - the read-out cells' **labels, never their values, and never a « — »** — « — » is spent on
  *   `Indéterminé` (attempted, unavailable), and a dash in a clearance cell before anything was
  *   attempted is a number-shaped thing with no provenance;
@@ -27,18 +28,20 @@
  * to script. **A state nobody scripts there is a state nobody checks.**
  */
 
+import { TopViewFrame } from "@/components/statique/top-view.tsx";
 import { CELL_IDS, CELL_LABEL } from "@/lib/rail/cells.ts";
 
 import {
   BannerSlot,
+  LEFT_SECTIONS,
   NOSCRIPT_LINE,
   ProfileBand,
-  RAIL_SECTIONS,
   RailHeader,
   RailSection,
   READ_OUT_CELLS,
   ReadOutCell,
   ReadOutCells,
+  RIGHT_SECTIONS,
   Shell,
   StripBand,
   ViewStripSlot,
@@ -48,15 +51,18 @@ export function Skeleton() {
   return (
     <Shell
       busy
-      rail={
+      left={
         <>
           <RailHeader />
-          {RAIL_SECTIONS.map((title) => (
+          {LEFT_SECTIONS.map((title) => (
             <RailSection key={title} title={title} />
           ))}
           <noscript className="px-3 py-3 text-xs">{NOSCRIPT_LINE}</noscript>
         </>
       }
+      right={RIGHT_SECTIONS.map((title) => (
+        <RailSection key={title} title={title} />
+      ))}
       chart={
         <>
           <BannerSlot />
@@ -70,6 +76,7 @@ export function Skeleton() {
           </ReadOutCells>
         </>
       }
+      views={<TopViewFrame />}
     />
   );
 }

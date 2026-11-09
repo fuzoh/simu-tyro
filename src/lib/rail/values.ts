@@ -23,19 +23,20 @@
  *   that is correct, not a bug to smooth over.
  * - **`x_D` clamps on every path**, and in **both** terrain modes. It selects a view, not a design
  *   input, and refusing to draw a valid span because the viewpoint is stale is worse than moving
- *   the viewpoint. The clamp runs against {@link spanLength} — typed `L` in manual mode, `s_B − s_A`
- *   in imported mode — so state never holds an out-of-span `x_D` for one mode and not the other,
- *   and the transient note has a single event to fire on: the value that *entered* state differing
- *   from the one that was asked for.
+ *   the viewpoint. {@link applyField} clamps against {@link spanLength} — typed `L` in manual mode,
+ *   the profil's extent in imported mode — after **every** write, so neither a new span nor a new
+ *   position can leave state holding an out-of-span `x_D`, and the transient note has a single
+ *   event to fire on: the value that *entered* state differing from the one that was asked for.
  * - **One lens per numeric field.** {@link FIELD_ACCESS} is the only place a field is read out of
  *   or written into the Scenario, so the Rail, the gates and « Saisie en cours » cannot disagree on
  *   what a field holds — the drift that left « Rapport V cible » without a committed value.
  */
 
 import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
-import type { Geometry, ScenarioDraft, TightnessDraft } from "@/lib/scenario/types.ts";
+import type { ScenarioDraft, TightnessDraft } from "@/lib/scenario/types.ts";
 import type { TextileSpec } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
+import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { G, roundToDisplay } from "@/lib/format/quantity.ts";
 import {
@@ -45,12 +46,22 @@ import {
 } from "@/lib/scenario/first-run.ts";
 import { clampX, spanOfGeometry } from "@/lib/scenario/geometry.ts";
 import { TEXTILE } from "@/lib/sim";
+import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 import type { Deduced, DeducedMaterial, DeducedSolve } from "./deduced.ts";
 import type { FieldContext, FieldId, TightnessFieldId } from "./fields.ts";
 
 import { deduceValues } from "./deduced.ts";
-import { displayField, FIELD_ORDER, FIELDS, TIGHTNESS_FIELD } from "./fields.ts";
+import {
+  checkField,
+  commitField,
+  displayField,
+  FIELD_ORDER,
+  FIELDS,
+  isOptionalField,
+  TIGHTNESS_FIELD,
+} from "./fields.ts";
+import { pretensionOf } from "./tensioning.ts";
 
 /**
  * The fields the form holds as **text**: the rows of `FIELDS` with a display-precision row. Every
@@ -61,7 +72,7 @@ export type NumericFieldId = {
   [K in FieldId]: (typeof FIELDS)[K]["quantity"] extends null ? never : K;
 }[FieldId];
 
-/** The numeric fields a gate reads: all but `x_D`, which sits in no gate. */
+/** The numeric fields a gate reads: all but `x_D` and the Positions, which sit in no gate. */
 export type GatedFieldId = {
   [K in NumericFieldId]: (typeof FIELDS)[K]["gate"] extends null ? never : K;
 }[NumericFieldId];
@@ -120,8 +131,32 @@ export function isOverrideField(id: FieldId): id is OverrideFieldId {
   return (OVERRIDE_FIELDS as readonly FieldId[]).includes(id);
 }
 
-/** The fields whose blank is state: § 9's textile blanks and the three Overrides. */
-type NullableFieldId = OverrideFieldId | "MBL" | "muTextile" | "k";
+/**
+ * The two coordinate fields of each anchor's Position, latitude first. They are typed as a pair
+ * ({@link applyPosition}) because a Position is both coordinates or neither.
+ */
+export const POSITION_FIELDS = {
+  A: ["latA", "lonA"],
+  B: ["latB", "lonB"],
+} as const satisfies Record<"A" | "B", readonly [FieldId, FieldId]>;
+
+/** Which anchor a coordinate field belongs to, or `null` for any other field. */
+function positionEnd(id: PositionFieldId): "A" | "B";
+function positionEnd(id: FieldId): "A" | "B" | null;
+function positionEnd(id: FieldId): "A" | "B" | null {
+  if ((POSITION_FIELDS.A as readonly FieldId[]).includes(id)) return "A";
+  return (POSITION_FIELDS.B as readonly FieldId[]).includes(id) ? "B" : null;
+}
+
+/** The four coordinate fields, whose blank is « inconnue ». */
+export type PositionFieldId = (typeof POSITION_FIELDS)[keyof typeof POSITION_FIELDS][number];
+
+export function isPositionField(id: FieldId): id is PositionFieldId {
+  return positionEnd(id) !== null;
+}
+
+/** The fields whose blank is state: § 9's textile blanks, the three Overrides and `ρ`. */
+type NullableFieldId = OverrideFieldId | "MBL" | "muTextile" | "dTextile" | "k" | "rho";
 
 /**
  * What each lens reads. A Tightness Driver's reads the driver alone, so a refusal holding only the
@@ -137,7 +172,11 @@ type LensScope<K extends NumericFieldId> = K extends TightnessFieldId
 type FieldAccess = {
   readonly [K in NumericFieldId]: K extends OverrideFieldId
     ? OverrideLens<LensScope<K>>
-    : FieldLens<LensScope<K>, K extends NullableFieldId ? number | null : number>;
+    : K extends PositionFieldId
+      ? // Read-only: a Position is written as a pair, by {@link applyPosition} alone, so a
+        // coordinate has no second way in.
+        Pick<FieldLens<ScenarioDraft, number | null>, "read">
+      : FieldLens<LensScope<K>, K extends NullableFieldId ? number | null : number>;
 };
 
 /**
@@ -147,12 +186,15 @@ type FieldAccess = {
  * A write to a field the Scenario does not render is the mode's own rule: a Tightness Driver field
  * becomes the driver, and `Portée` and `Dénivelé` in imported mode, the steel fields on a rope and
  * the rope fields on steel leave the Scenario as it was.
+ *
+ * No lens clamps `x_D`: {@link applyField} does, after whichever write moved the span or the
+ * position.
  */
 export const FIELD_ACCESS: FieldAccess = {
   L: {
     read: ({ geometry }) => (geometry.source === "manual" ? geometry.L : undefined),
-    // `x_D` selects a view, so a shorter span moves the viewpoint rather than refusing the span.
-    write: (s, L) => (s.geometry.source === "manual" ? applyGeometry(s, { ...s.geometry, L }) : s),
+    write: (s, L) =>
+      s.geometry.source === "manual" ? { ...s, geometry: { ...s.geometry, L } } : s,
   },
   h: {
     read: ({ geometry }) => (geometry.source === "manual" ? geometry.h : undefined),
@@ -167,16 +209,7 @@ export const FIELD_ACCESS: FieldAccess = {
     read: ({ anchors }) => anchors.zB,
     write: (s, zB) => ({ ...s, anchors: { ...s.anchors, zB } }),
   },
-  // The stations *are* the span in imported mode (`L = s_B − s_A`), so moving one moves the
-  // viewpoint exactly as `Portée` does in the other mode.
-  sa: {
-    read: ({ geometry }) => (geometry.source === "trace" ? geometry.sa : undefined),
-    write: (s, sa) => (s.geometry.source === "trace" ? applyGeometry(s, { ...s.geometry, sa }) : s),
-  },
-  sb: {
-    read: ({ geometry }) => (geometry.source === "trace" ? geometry.sb : undefined),
-    write: (s, sb) => (s.geometry.source === "trace" ? applyGeometry(s, { ...s.geometry, sb }) : s),
-  },
+
   d: {
     read: ({ material }) => (material.family === "steel" ? material.d : undefined),
     write: (s, d) => (s.material.family === "steel" ? { ...s, material: { ...s.material, d } } : s),
@@ -193,6 +226,15 @@ export const FIELD_ACCESS: FieldAccess = {
     read: ({ material }) => (material.family === "textile" ? material.mu : undefined),
     write: (s, mu) =>
       s.material.family === "textile" ? { ...s, material: { ...s.material, mu } } : s,
+  },
+  // Optional: `null` removes the key, so a blank diameter is « absent » on the wire and in the draft.
+  dTextile: {
+    read: ({ material }) => (material.family === "textile" ? (material.d ?? null) : undefined),
+    write: (s, d) => {
+      if (s.material.family !== "textile") return s;
+      const { d: _dropped, ...rest } = s.material;
+      return { ...s, material: d === null ? rest : { ...rest, d } };
+    },
   },
   k: {
     read: ({ material }) => (material.family === "textile" ? material.k : undefined),
@@ -216,6 +258,11 @@ export const FIELD_ACCESS: FieldAccess = {
   D_target: {
     read: ({ tightness }) => (tightness.mode === "sag" ? tightness.D_target : undefined),
     write: (s, D_target) => ({ ...s, tightness: { mode: "sag", D_target } }),
+  },
+  // The target alone: the anchor it is read at is `tensioningSide`, which the lens leaves as it is.
+  T_target: {
+    read: ({ tightness }) => (tightness.mode === "anchor" ? tightness.T_target : undefined),
+    write: (s, T_target) => ({ ...s, tightness: { mode: "anchor", T_target } }),
   },
   H_target: {
     read: ({ tightness }) => (tightness.mode === "tension" ? tightness.H_target : undefined),
@@ -247,11 +294,50 @@ export const FIELD_ACCESS: FieldAccess = {
   },
   xD: {
     read: ({ rider }) => rider.xD,
-    // **Both modes**: an imported span is a span, and a viewpoint past station B is as stale there
-    // as one past `Portée` is here.
-    write: (s, xD) => ({ ...s, rider: { ...s.rider, xD: clampRider(xD, s.geometry) } }),
+    write: (s, xD) => ({ ...s, rider: { ...s.rider, xD } }),
   },
+  windSpeed: {
+    read: ({ wind }) => wind.speedKmh,
+    write: (s, speedKmh) => ({ ...s, wind: { ...s.wind, speedKmh } }),
+  },
+  windDirection: {
+    read: ({ wind }) => wind.directionDeg,
+    write: (s, directionDeg) => ({ ...s, wind: { ...s.wind, directionDeg } }),
+  },
+  CdA: {
+    read: ({ dynamics }) => dynamics.CdA,
+    write: (s, CdA) => ({ ...s, dynamics: { ...s.dynamics, CdA } }),
+  },
+  // One trolley law per family (§12.2): the SSF fit on a corde, the constant `μ` on a câble. The
+  // other family's constants stay in the Scenario, unshown, as the link carries them.
+  F0: {
+    read: ({ material, dynamics }) => (material.family === "textile" ? dynamics.F0 : undefined),
+    write: (s, F0) => ({ ...s, dynamics: { ...s.dynamics, F0 } }),
+  },
+  kv: {
+    read: ({ material, dynamics }) => (material.family === "textile" ? dynamics.kv : undefined),
+    write: (s, kv) => ({ ...s, dynamics: { ...s.dynamics, kv } }),
+  },
+  trolleyMu: {
+    read: ({ material, dynamics }) => (material.family === "steel" ? dynamics.mu : undefined),
+    write: (s, mu) => ({ ...s, dynamics: { ...s.dynamics, mu } }),
+  },
+  rho: {
+    read: ({ dynamics }) => dynamics.rho,
+    write: (s, rho) => ({ ...s, dynamics: { ...s.dynamics, rho } }),
+  },
+  latA: coordinateRead("A", "lat"),
+  lonA: coordinateRead("A", "lon"),
+  latB: coordinateRead("B", "lat"),
+  lonB: coordinateRead("B", "lon"),
 };
+
+/** One coordinate's read: blank where the Position is unknown. */
+function coordinateRead(end: "A" | "B", key: "lat" | "lon") {
+  return {
+    read: ({ positions }: ScenarioDraft) => positions[end]?.[key] ?? null,
+  };
+}
 
 /**
  * A steel Override. The three derived rows are editable at all times on a steel line — typing
@@ -270,13 +356,20 @@ function overrideLens(
   };
 }
 
-/** Everything tier one needs beside a field's own text, gathered once from the Scenario. */
-export function fieldContext(scenario: TraverseScenario, trace: Trace | null): FieldContext {
+/**
+ * Everything tier one needs beside a field's own text, gathered once from the Scenario.
+ *
+ * @param register the vocabulary of the Page the messages are read on.
+ */
+export function fieldContext(
+  scenario: TraverseScenario,
+  register: Register = "exact",
+): FieldContext {
   return {
     unit: scenario.unit,
     ropeClass: scenario.material.family === "textile" ? scenario.material.ropeClass : undefined,
-    extent: trace === null ? undefined : { min: trace.d[0], max: trace.d[trace.d.length - 1] },
     L: scenario.geometry.source === "manual" ? scenario.geometry.L : undefined,
+    register,
   };
 }
 
@@ -312,52 +405,232 @@ export function heldValue(
  * has already run `commitField`, so the number here is newtons, metres, millimetres or kilograms
  * and already sits on the field's display grid.
  *
+ * **`x_D` comes out inside the span** whatever was written — a shorter `Portée` moves the
+ * viewpoint rather than refusing the span — through `clampX`'s one rule, so a geometry that is no
+ * span leaves `x_D` exactly as the reducer's terrain path does.
+ *
+ * @param trace the decoded profile beside the Scenario — the span `x_D` clamps to in imported mode.
  * @returns a new draft; the argument is never mutated, because the store's shallow patch merge is
  *   what keeps `unloadedInputs` stable across a scrub.
  */
 export function applyField(
   scenario: ScenarioDraft,
-  id: NumericFieldId,
+  id: Exclude<NumericFieldId, PositionFieldId>,
   value: number,
+  trace: Trace | null,
 ): ScenarioDraft {
-  return FIELD_ACCESS[id].write(scenario, value);
+  const written = FIELD_ACCESS[id].write(scenario, value);
+  const xD = clampX(written.rider.xD, spanOfGeometry(written.geometry, trace));
+  return xD === written.rider.xD ? written : { ...written, rider: { ...written.rider, xD } };
 }
 
+/** What one keystroke or blur in a numeric field does to the Scenario. */
+export type FieldCommit = {
+  /** The Scenario to write, or `null` when the text left state as it was. */
+  readonly next: ScenarioDraft | null;
+  /** The canonical value that **entered state** — what the field snaps to on blur — or `null`. */
+  readonly value: number | null;
+  /** The value the text asked for, before `x_D` clamped it. `null` where no number was asked. */
+  readonly asked: number | null;
+};
+
+/** What {@link commitText} reads: the Scenario, the field and its text, and the form around it. */
+export type CommitTextInput = {
+  readonly scenario: ScenarioDraft;
+  readonly trace: Trace | null;
+  readonly id: NumericFieldId;
+  readonly raw: string;
+  readonly settled: boolean;
+  readonly text: RailValues;
+  readonly context: FieldContext;
+};
+
 /**
- * The span `x_D` is clamped against: `Portée` in manual mode, `s_B − s_A` in imported mode — the
- * same arithmetic `deriveSpan` uses, and the only part of it the clamp needs, which is why it does
- * not wait for the Trace to be decoded.
+ * One numeric field's text, committed — the one write path every Page's fields share, so a value
+ * typed on Statique and on Avancé lands in the Scenario the same way.
  *
- * @returns `null` when the placement describes no span at all — `station B ≤ station A`, or an `L`
- *   the hard range has yet to refuse. Nothing is clamped against a non-span.
+ * @param settled `true` when the edit has landed — a blur — and `false` for a keystroke still
+ *   mid-word. It changes nothing about the value; it decides only whether a span change may drag
+ *   `x_D` with it.
+ * @param text the form's text, for a Position, which commits with its pair.
  */
-export function spanLength(scenario: ScenarioDraft): number | null {
-  return spanOf(scenario.geometry);
+export function commitText({
+  scenario,
+  trace,
+  id,
+  raw,
+  settled,
+  text,
+  context,
+}: CommitTextInput): FieldCommit {
+  if (checkField(id, raw, context) !== null) return { next: null, value: null, asked: null };
+  if (isPositionField(id)) {
+    const committed = commitPosition(scenario, id, { ...text, [id]: raw }, context);
+    return { next: committed.scenario, value: committed.value, asked: null };
+  }
+  // An optional field emptied is « absent »: the one blank that is written, not refused.
+  if (isOptionalField(id) && raw.trim() === "") {
+    return { next: FIELD_ACCESS[id].write(scenario, null), value: null, asked: null };
+  }
+  const value = commitField(id, raw, context);
+  if (value === null) return { next: null, value: null, asked: null };
+  const applied = applyField(scenario, id, value, trace);
+  // **A span still being typed does not drag the viewpoint.** « 100 » into Portée passes through
+  // « 1 », and clamping against a 1 m span would leave `x_D` at 1,0 m on the 100 m span the user
+  // actually typed. The clamp lands when the edit lands; until then the scene clamps the *drawing*
+  // and state keeps the position. `x_D` itself is the direct path and clamps as it is typed.
+  const next = settled || id !== "L" ? applied : { ...applied, rider: scenario.rider };
+  return { next, value: id === "xD" ? next.rider.xD : value, asked: value };
 }
 
-function spanOf(geometry: Geometry): number | null {
-  const L = spanOfGeometry(geometry);
+/**
+ * The one Tightness Driver a Page offers (#91: Statique's tension de pose), with what a line that
+ * arrives on another driver is taken over from — the rider-free chain's read-out, or the last good
+ * one under « Aucun résultat », as Avancé's selector prefills ({@link switchTightness}).
+ */
+export type DriverTakeOver = {
+  readonly mode: TightnessDraft["mode"];
+  readonly deduced: Deduced;
+  readonly lastGood: DeducedSolve | null;
+};
+
+/** {@link commitText}'s result, and what the Page dispatches for it — `null` for nothing. */
+export type PageCommit = FieldCommit & { readonly write: ScenarioDraft | null };
+
+/**
+ * A field's text, committed by a Page — {@link commitText}, and on a Page that offers one driver
+ * alone, the **takeover**. A line arriving on another driver shows its read-out in the offered
+ * field ({@link idleDriverText}); the first keystroke moves the line onto the offered driver. Typed
+ * text that reads lands as `commitText` lands it, which already moves the line. **Refused text
+ * moves it too**, prefilled from the read-out: the gates judge the driver's text alone, so a « −5 »
+ * typed over another driver would otherwise earn no ⛔ on the field responsible. The Scenario then
+ * holds the read-out — the last good value, which is what any refused text leaves in state.
+ */
+export function commitPageText({
+  takeOver,
+  ...input
+}: CommitTextInput & { readonly takeOver?: DriverTakeOver }): PageCommit {
+  const base =
+    takeOver !== undefined && input.id === TIGHTNESS_FIELD[takeOver.mode]
+      ? switchTightness(input.scenario, takeOver.mode, takeOver.deduced, takeOver.lastGood)
+      : input.scenario;
+  const committed = commitText({ ...input, scenario: base });
+  return { ...committed, write: committed.next ?? (base === input.scenario ? null : base) };
+}
+
+/**
+ * What the offered driver's field shows while the line is on another driver: the read-out, at the
+ * field's grain, or nothing when there is none to show. `undefined` once the line is on it, when
+ * the field shows its own text.
+ *
+ * @param readOut the offered quantity as the line hangs now, `null` under « Aucun résultat ».
+ */
+export function idleDriverText(
+  scenario: ScenarioDraft,
+  mode: TightnessDraft["mode"],
+  readOut: number | null,
+): string | undefined {
+  if (scenario.tightness.mode === mode) return undefined;
+  return readOut === null ? "" : displayField(TIGHTNESS_FIELD[mode], readOut, scenario.unit);
+}
+
+/**
+ * The idle read-out while the field still shows it — nothing typed into it yet — or `null` once it
+ * shows its own text. Leaving an idle field writes nothing, so a glance at a shared line does not
+ * re-drive it.
+ *
+ * @param idle {@link idleDriverText}'s text, `undefined` where the field holds the line.
+ * @param text the form's text for the field, which stays empty until a keystroke.
+ */
+export function idleShown(idle: string | undefined, text: string): string | null {
+  return idle !== undefined && text === "" ? idle : null;
+}
+
+/**
+ * An anchor's two coordinate texts, committed as one Position. Both readable is the Position; a
+ * blank in either is « inconnue » — the Position is unset rather than kept beside a field that
+ * shows nothing, so the screen, the link and the Session never disagree. Text tier one refuses
+ * leaves the Scenario as it was, as every refused text does: it keeps its evidence on screen and
+ * the last good value in state.
+ *
+ * @returns the argument itself when nothing changed.
+ */
+export function applyPosition(
+  scenario: ScenarioDraft,
+  end: "A" | "B",
+  text: Pick<RailValues, PositionFieldId>,
+  context: FieldContext,
+): ScenarioDraft {
+  const [latField, lonField] = POSITION_FIELDS[end];
+  const [latText, lonText] = [text[latField], text[lonField]];
+  if (latText.trim() === "" || lonText.trim() === "") {
+    if (scenario.positions[end] === null) return scenario;
+    return { ...scenario, positions: { ...scenario.positions, [end]: null } };
+  }
+  if (checkField(latField, latText, context) !== null) return scenario;
+  if (checkField(lonField, lonText, context) !== null) return scenario;
+  const lat = commitField(latField, latText, context);
+  const lon = commitField(lonField, lonText, context);
+  if (lat === null || lon === null) return scenario;
+  return { ...scenario, positions: { ...scenario.positions, [end]: { lat, lon } } };
+}
+
+/**
+ * One coordinate field's commit: {@link applyPosition} on the pair with `raw` in place, and the
+ * coordinate that **entered state** — `null` when this write did not land (a blank, or a pair the
+ * Scenario would not take), so the field is never snapped to a value state does not hold.
+ */
+export function commitPosition(
+  scenario: ScenarioDraft,
+  id: PositionFieldId,
+  text: Pick<RailValues, PositionFieldId>,
+  context: FieldContext,
+): { readonly scenario: ScenarioDraft; readonly value: number | null } {
+  const end = positionEnd(id);
+  const applied = applyPosition(scenario, end, text, context);
+  const position = applied.positions[end];
+  if (applied === scenario || position === null) return { scenario: applied, value: null };
+  const [latField] = POSITION_FIELDS[end];
+  return { scenario: applied, value: position[id === latField ? "lat" : "lon"] };
+}
+
+/**
+ * Whether `id` is the other coordinate of the anchor whose coordinate holds the caret. Its text is
+ * not the store's to rewrite mid-edit: backspacing one half unsets the Position, and the twin's
+ * digits are the user's, not a stale copy.
+ */
+export function isPositionTwin(id: FieldId, focused: FieldId | null): boolean {
+  if (focused === null) return false;
+  const end = positionEnd(focused);
+  return end !== null && id !== focused && positionEnd(id) === end;
+}
+
+/**
+ * What the Rail says under an anchor's coordinates while one is blank and the other is not — a
+ * property of the world, not an act: the Position is not the pair typed so far.
+ */
+export function positionPairNote(
+  text: Pick<RailValues, PositionFieldId>,
+  end: "A" | "B",
+): string | null {
+  const [latField, lonField] = POSITION_FIELDS[end];
+  const blanks = [text[latField], text[lonField]].filter((raw) => raw.trim() === "").length;
+  return blanks === 1
+    ? `${heading("position", "exact")} incomplète : ${label("latitude", "exact")} et ${label("longitude", "exact")} vont ensemble.`
+    : null;
+}
+
+/**
+ * The span `x_D` is clamped against: `Portée` in manual mode, the profil's whole extent in imported
+ * mode — the `L` `deriveSpan` returns, without deriving the terrain.
+ *
+ * @param trace the decoded profile beside the Scenario, `null` when none is loaded.
+ * @returns `null` when the geometry describes no span at all — an imported line with no profil, or
+ *   an `L` the hard range has yet to refuse. Nothing is clamped against a non-span.
+ */
+export function spanLength(scenario: ScenarioDraft, trace: Trace | null): number | null {
+  const L = spanOfGeometry(scenario.geometry, trace);
   return Number.isFinite(L) && L > 0 ? L : null;
-}
-
-/**
- * One geometry change, **with the viewpoint brought along** — the shared path for `Portée`, the two
- * stations and « Inverser A et B », so no route into a new span can forget the clamp.
- */
-export function applyGeometry(scenario: ScenarioDraft, geometry: Geometry): ScenarioDraft {
-  return {
-    ...scenario,
-    geometry,
-    rider: { ...scenario.rider, xD: clampRider(scenario.rider.xD, geometry) },
-  };
-}
-
-/**
- * `x_D` clamps on every path, and it is the one field that does — through `clampX`'s one rule, so
- * a placement that is no span leaves `x_D` exactly as the reducer's terrain path does.
- */
-function clampRider(x: number, geometry: Geometry): number {
-  return clampX(x, spanOfGeometry(geometry));
 }
 
 /** Typing into a derived field flips it to « valeur saisie ». Steel only, and per value. */
@@ -464,6 +737,8 @@ export function switchTightness(
 const PREFILL: Record<TightnessFieldId, (solve: DeducedSolve, scenario: ScenarioDraft) => number> =
   {
     D_target: (solve) => solve.sag,
+    // The unloaded tension at the anchor the Mise en tension stands at — {@link pretensionOf}.
+    T_target: (solve, scenario) => pretensionOf(solve, scenario),
     H_target: (solve) => solve.H,
     L0: (solve) => solve.L0,
     // `P / H` from the read-out `H` — voir `scenario/tightness.ts`.
