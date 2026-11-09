@@ -458,6 +458,10 @@ function draw(
     },
   });
   // The Trajectoire, dotted as on the coupe, so it never reads as a cable: one polyline per run.
+  // `dashLength` is the whole pattern's cycle, px, and the pattern's sixteen bits share it: 5/16 of
+  // a 6 px cycle is a dot, then a gap about twice as long.
+  const dotted = (color: Color) =>
+    new PolylineDashMaterialProperty({ color, dashLength: 6, dashPattern: 0b1111100000000000 });
   const trajectory = (scene.trajectory ?? []).map((run) =>
     entities.add({
       show: false,
@@ -465,12 +469,9 @@ function draw(
         positions: run.map(cartesian),
         arcType: ArcType.NONE,
         width: 3,
-        material: new PolylineDashMaterialProperty({
-          color: FAINT_INK,
-          dashLength: 6,
-          // Five pixels on in sixteen: a dot, then a gap twice its length.
-          dashPattern: 0b1111100000000000,
-        }),
+        material: dotted(FAINT_INK),
+        // Behind a ridge it fades, as the lines it hangs from do, rather than vanishing.
+        depthFailMaterial: dotted(HIDDEN_INK),
       },
     }),
   );
