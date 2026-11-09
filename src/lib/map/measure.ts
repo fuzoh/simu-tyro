@@ -30,8 +30,8 @@ import { samePosition } from "@/lib/terrain/trace.ts";
 export type MeasurePoints = readonly Position[];
 
 /** The ellipsoid WGS84's defining constants: semi-major axis, m, and flattening. */
-export const WGS84_A = 6378137;
-export const WGS84_F = 1 / 298.257223563;
+const WGS84_A = 6378137;
+const WGS84_F = 1 / 298.257223563;
 
 /**
  * How far from the profil a click may land and still be on it, m. A `[CONVENTION]`: a pick
@@ -77,22 +77,43 @@ export function measureAim({
   return kind !== "touch" && onCanvas ? at : null;
 }
 
+/** A local plane of the ellipsoid: metres east and north of its origin, and back. */
+export type LocalPlane = {
+  /** A Position's offset from the origin, m east and north. */
+  readonly metres: (at: Position) => { east: number; north: number };
+  /** The Position `east` and `north` metres from the origin. */
+  readonly position: (east: number, north: number) => Position;
+};
+
 /**
- * The offset of `to` from `from` in metres, east and north — the ellipsoid's local radii of
- * curvature at the mid-latitude. For the few kilometres a zip line spans this is exact to well
- * under a millimetre per kilometre; it is not a geodesic for a continent.
+ * The local plane around `origin` — the ellipsoid's radii of curvature at the mid-latitude of
+ * `origin` and `other`, the meridian's north and the prime vertical's east. For the few kilometres a
+ * zip line spans this is exact to well under a millimetre per kilometre; it is not a geodesic for a
+ * continent. The Mesure's distances and the Vue 3D's Vues prédéfinies both stand on it: the one
+ * geodesy of `src/lib/map/`.
  */
-function offsetMetres(from: Position, to: Position): { east: number; north: number } {
+export function localPlane(origin: Position, other: Position): LocalPlane {
   const rad = Math.PI / 180;
   const e2 = WGS84_F * (2 - WGS84_F);
-  const phi = ((from.lat + to.lat) / 2) * rad;
+  const phi = ((origin.lat + other.lat) / 2) * rad;
   const w = Math.sqrt(1 - e2 * Math.sin(phi) ** 2);
-  const meridian = (WGS84_A * (1 - e2)) / w ** 3;
-  const primeVertical = WGS84_A / w;
+  const perLat = ((WGS84_A * (1 - e2)) / w ** 3) * rad;
+  const perLon = (WGS84_A / w) * Math.cos(phi) * rad;
   return {
-    east: (to.lon - from.lon) * rad * primeVertical * Math.cos(phi),
-    north: (to.lat - from.lat) * rad * meridian,
+    metres: ({ lat, lon }) => ({
+      east: (lon - origin.lon) * perLon,
+      north: (lat - origin.lat) * perLat,
+    }),
+    position: (east, north) => ({
+      lon: origin.lon + east / perLon,
+      lat: origin.lat + north / perLat,
+    }),
   };
+}
+
+/** The offset of `to` from `from` in metres, east and north, on {@link localPlane}. */
+function offsetMetres(from: Position, to: Position): { east: number; north: number } {
+  return localPlane(from, to).metres(to);
 }
 
 /** The horizontal distance between two Positions, m, on the WGS84 ellipsoid. */

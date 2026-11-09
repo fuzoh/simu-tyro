@@ -23,6 +23,7 @@ import {
   groundDistance,
   horizontalDistance,
   loadMeasureProfile,
+  localPlane,
   measureAim,
   ON_PROFILE_TOLERANCE_M,
   profileFor,
@@ -84,6 +85,39 @@ describe("the horizontal distance, by geodesy", () => {
     const km = horizontalDistance({ lat: 46, lon: 7 }, { lat: 47, lon: 7 }) / 1000;
     expect(km).toBeGreaterThan(110.9);
     expect(km).toBeLessThan(111.4);
+  });
+});
+
+/**
+ * The one local plane the Mesure and the Vues prédéfinies stand on. Its expected values are the
+ * WGS84 lengths of one degree tabulated in « Latitude » (Wikipedia, § Meridian distance on the
+ * ellipsoid: Δ¹lat and Δ¹long, to the metre) — not this module's output — so a mistake in `e²`, a
+ * radius or the `cos φ` reaches neither the Mesure nor the Vue 3D unseen.
+ */
+describe("the local plane, against the tabulated degree of WGS84", () => {
+  const north = (lat: number) =>
+    localPlane({ lat: lat - 0.5, lon: 0 }, { lat: lat + 0.5, lon: 0 }).metres({
+      lat: lat + 0.5,
+      lon: 0,
+    }).north;
+  const east = (lat: number) =>
+    localPlane({ lat, lon: 0 }, { lat, lon: 1 }).metres({ lat, lon: 1 }).east;
+
+  test.each([
+    { lat: 0, dLat: 110574, dLon: 111320 },
+    { lat: 45, dLat: 111132, dLon: 78847 },
+    { lat: 60, dLat: 111412, dLon: 55800 },
+  ])("one degree at $lat° is $dLat m north and $dLon m east", ({ lat, dLat, dLon }) => {
+    expect(Math.abs(north(lat) - dLat)).toBeLessThanOrEqual(1);
+    expect(Math.abs(east(lat) - dLon)).toBeLessThanOrEqual(1);
+  });
+
+  test("goes back to the Position it measured", () => {
+    const plane = localPlane(A, B);
+    const { east: e, north: n } = plane.metres(B);
+    expect(plane.position(e, n).lat).toBeCloseTo(B.lat, 12);
+    expect(plane.position(e, n).lon).toBeCloseTo(B.lon, 12);
+    expect(plane.metres(A)).toEqual({ east: 0, north: 0 });
   });
 });
 

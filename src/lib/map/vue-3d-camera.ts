@@ -23,7 +23,7 @@ import type { Position } from "@/lib/scenario/types.ts";
 
 import type { EarthPoint, Vue3dScene } from "./vue-3d.ts";
 
-import { WGS84_A, WGS84_F } from "./measure.ts";
+import { localPlane } from "./measure.ts";
 import { CAMERA_REACH } from "./vue-3d.ts";
 
 /** Where a camera stands and where it looks: heading clockwise from north, pitch up positive. */
@@ -294,26 +294,6 @@ export function zoomAmount(distance: number, step: 1 | -1, height: number): numb
  */
 export function walkAmount(distance: number, step: 1 | -1): number {
   return step * Math.max(MIN_WALK_M, distance * CAMERA_STEP.walk);
-}
-
-/** The local plane around `origin`: east and north in metres, at the radii of the mid-latitude. */
-function localPlane(origin: Position, other: Position) {
-  const rad = Math.PI / 180;
-  const e2 = WGS84_F * (2 - WGS84_F);
-  const phi = ((origin.lat + other.lat) / 2) * rad;
-  const w = Math.sqrt(1 - e2 * Math.sin(phi) ** 2);
-  const perLat = ((WGS84_A * (1 - e2)) / w ** 3) * rad;
-  const perLon = (WGS84_A / w) * Math.cos(phi) * rad;
-  return {
-    metres: ({ lat, lon }: Position) => ({
-      east: (lon - origin.lon) * perLon,
-      north: (lat - origin.lat) * perLat,
-    }),
-    position: (east: number, north: number): Position => ({
-      lon: origin.lon + east / perLon,
-      lat: origin.lat + north / perLat,
-    }),
-  };
 }
 
 /** The tangents of the lens's half-angles across and up the view. */

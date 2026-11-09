@@ -3,7 +3,9 @@
  * how far one step moves it.
  *
  * The lines are hand-placed so every expectation is a closed form: B due north or due east of A, and
- * distances read back by the Mesure's own geodesy (`horizontalDistance`), not by this module's.
+ * distances read back by the Mesure's `horizontalDistance`. It stands on the same `localPlane` as
+ * the camera — `src/lib/map/` has one geodesy — and `measure.test.ts` holds that plane to WGS84's
+ * tabulated degree, so a mistake in it cannot pass both suites unseen.
  */
 
 import { describe, expect, test } from "vitest";
