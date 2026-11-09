@@ -1409,9 +1409,10 @@ describe("#115 — the coupe's gutter is the containers' margin", () => {
  * `agent-browser`'s to measure (`docs/conventions/routing.md`, 2026-11-09), not a class to grep.
  */
 describe("#109 — Statique's first row: the vue de dessus, then the block of tiles", () => {
-  it("each tile is capped at 180 px, so the block is about 370 px, its gap included", () => {
-    // By hand, the brief's « environ 180 px » and its « environ 370 px gouttière comprise »: two
-    // tiles and the `gap-2` between them, 0,5 rem — 2 × 180 + 8 = 368.
+  it("the tile cap is the brief's 180 px", () => {
+    // By hand, the brief's « environ 180 px ». The block it makes with the `gap-2` between its two
+    // tracks — 368 px, the brief's « environ 370 px gouttière comprise » —, the Verdict across both
+    // and Terrain's untouched row of five are measured by `agent-browser` (routing.md), not here.
     expect(STATIQUE_TILE_MAX_PX).toBe(180);
   });
 });
