@@ -34,12 +34,14 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { area, line } from "d3-shape";
 
 import type { ChartScene, Polyline, SceneFrame, SceneRider } from "@/lib/chart/scene.ts";
+import type { PixelLine } from "@/lib/chart/tip-placement.ts";
 import type { SharedX, ZScale } from "@/lib/layout/contract.ts";
 import type { LayerToggles } from "@/lib/session/session.ts";
 import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { coupeLines, coupeReading, RIDER_REACH_PX } from "@/lib/chart/hover.ts";
 import { polylineAt } from "@/lib/chart/scene.ts";
+import { placeTip, tipRows } from "@/lib/chart/tip-placement.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { cn } from "@/lib/utils.ts";
 import { label } from "@/lib/vocabulary/labels.ts";
@@ -394,7 +396,21 @@ export function Profile({
       {/* « distances » — outside the clip, so a rider near the frame's top keeps its numbers. */}
       {layers.riderTip && rider !== null && (
         <RiderTip
+          cable={{ xs: rider.cable.xs.map((m) => x.x(m)), ys: rider.cable.zs.map((m) => z.y(m)) }}
           clearance={clearance}
+          ground={{ xs: ground.xs.map((m) => x.x(m)), ys: ground.zs.map((m) => z.y(m)) }}
+          others={[
+            ...(layers.chordAB ? [{ xs: [x.x(0), x.x(L)], ys: [z.y(0), z.y(h)] }] : []),
+            ...(layers.unloadedLine && scene !== null
+              ? [
+                  {
+                    xs: scene.unloadedCable.xs.map((m) => x.x(m)),
+                    ys: scene.unloadedCable.zs.map((m) => z.y(m)),
+                  },
+                ]
+              : []),
+          ]}
+          offsets={scene?.members.map((member) => member.offsetPx)}
           plot={plot}
           rider={rider}
           wide={wide}
@@ -493,13 +509,18 @@ const TIP_WIDTH = { wide: 150, narrow: 96 } as const;
  * « Garde au sol » cell) and the load's gap to the unloaded line (« Écart à vide »). Labels in the
  * app's sans and values in mono, the call-site rule the read-out cells keep.
  *
- * Right of the handle and above it, flipped left near the right edge and below near the frame's
- * top, so the tip never covers the handle it annotates. The garde line goes with the Clearance
+ * Right of the handle and above it by default; `placeTip` moves it to the quadrant the loaded line,
+ * the ground and the frame's edges leave free, so the tip never covers the handle it annotates nor
+ * the line through it. The garde line goes with the Clearance
  * Gate, exactly as the cell does: it is computed from the anchor heights and envelope the gate
  * refused. `pointer-events-none`, so the tip is never a hole in the scrub surface.
  */
 function RiderTip({
   rider,
+  cable,
+  ground,
+  others,
+  offsets,
   clearance,
   x,
   y,
@@ -508,6 +529,11 @@ function RiderTip({
   wide,
 }: {
   rider: SceneRider;
+  /** The loaded line and the ground, in SVG user units, and the Brins' pixel shifts. */
+  cable: PixelLine;
+  ground: PixelLine;
+  others: readonly PixelLine[];
+  offsets: readonly number[] | undefined;
   clearance: boolean;
   /** The handle's centre, SVG user units. */
   x: number;
@@ -517,9 +543,6 @@ function RiderTip({
   plot: { top: number; height: number };
   wide: boolean;
 }) {
-  const left = x + 14 + (wide ? TIP_WIDTH.wide : TIP_WIDTH.narrow) > width;
-  const below = y - 30 < plot.top;
-  const tx = left ? x - 14 : x + 14;
   const lines = [
     ...(clearance
       ? [
@@ -534,7 +557,20 @@ function RiderTip({
       value: formatQuantity("unloadedGap", rider.belowUnloaded),
     },
   ];
-  const first = below ? y + 20 : y - 8 - 13 * (lines.length - 1);
+  const { left, below } = placeTip({
+    x,
+    y,
+    width,
+    plot,
+    lines: lines.length,
+    tipWidth: wide ? TIP_WIDTH.wide : TIP_WIDTH.narrow,
+    cable,
+    ground,
+    others,
+    offsets,
+  });
+  const tx = left ? x - 14 : x + 14;
+  const { first } = tipRows(y, lines.length, below);
   return (
     <text
       className="fill-foreground stroke-background pointer-events-none text-[11px]"
