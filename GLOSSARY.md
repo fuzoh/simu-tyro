@@ -367,7 +367,9 @@ report on the right; below it they stack into one scroll, Chart Block first, the
 sections after it in their own order. A right-hand column was once rejected because it steals
 the width a 1500 m span needs; 1024 px is the narrowest landscape tablet, where stacking would
 cost the chart its whole profile; the middle column is then 448 px, and it takes every pixel of
-the window past the two 288 px columns beyond — Avancé has no width cap.
+the window past the two side columns beyond — Avancé has no width cap. Both are 288 px; from
+1920 px the left one is 576 px and `Paramètres` stands its field groups on two columns, read
+down the left one first, no group cut between them, the Rail Header across both.
 _Avoid_: results panel, output half as a place, sidebar, form
 
 **Rail Header**:
@@ -385,8 +387,9 @@ The banner slot, profile chart, clearance strip, View Strip and five read-out ce
 one co-visible unit sharing a single x scale and a single gutter constant. On Avancé it stands
 in the middle column between the Rail's two, under Statique's vue de dessus, which heads that
 column from the three-column width — never a view of Avancé's own — and it widens with the
-window up to the column at 2560 px, past which it letterboxes, centred in the column, so the
-whole block stays short enough for a 1440 px window. It reflows and collapses as a whole; no
+window up to 1984 px — the column at 2848 px of window since the left column doubles from
+1920 — past which it letterboxes, centred in the column, so the whole block stays short enough
+for a 1440 px window. It reflows and collapses as a whole; no
 member is ever hidden or occluded on its own.
 _Avoid_: chart area, main pane, canvas
 
