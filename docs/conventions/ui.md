@@ -215,10 +215,13 @@ classes spell them as `min-[1024px]:` and `w-72`, and `contract.test.ts` holds t
   1024 × 768 it leaves the map 116 px. The column reserves its scrollbar gutter
   (`scrollbar-gutter: stable`), so a scrollbar that comes and goes cannot move the width every band
   is a function of; on a platform with classic scrollbars the measured column is that gutter
-  narrower than `chartColumnWidth()`. **What it costs**: the Chart Block starts under the map — at
-  677 px from the top of the window at 1440 and at 2560 (the map's 448 px cap plus its controls and
-  five caption lines), 534 px at 1024 —, so the banner and « Garde min » are one scroll down on any
-  window shorter than that plus the block.
+  narrower than `chartColumnWidth()`. **What it costs**: the Chart Block starts under the map — its
+  banner slot at about 633 px from the top of the window at 1440 and at 2560 (the map's region,
+  36 + 597 px: its 448 px cap plus its controls and five caption lines), about 458 px at 1024
+  (36 + 421,7) — and the profile under the banner at 677 and 533,7 px (routing.md's measurements).
+  So the banner is below the fold on a window shorter than about 633 px (458 at 1024), and
+  « Garde min » and the read-out cells, under the profile, clearance strip and View Strip, are a
+  scroll down on any window shorter than the map plus the whole block — 1440 × 900 among them.
 - **The vue de dessus is three columns only.** Below 1024 its box is `display: none`, and the map
   is not started there at all — `threeColumns()` in `contract.ts`, the same B2, decides what to
   *mount*, never a size: a MapLibre map started in a box with no size holds a WebGL context for
@@ -227,8 +230,12 @@ classes spell them as `min-[1024px]:` and `w-72`, and `contract.test.ts` holds t
 - **Why 1024.** A stacked block is sized from the *whole* viewport width and owes `MIN_RAIL` under
   it, so stacking costs the chart its profile on any screen that is not tall: at 1024 × 768 it is a
   796 px block against 612 px left (782 when measured, at the 24 px gutter), and Avancé opens on « Garde min. ligne » alone (measured at the
-  built `/avance`, with 1180 × 820 and 1194 × 834 the same). In three columns the same screens keep
-  everything: 1024 × 768 is a 448 px middle column, a 626 px block and 732 px of height. **What it
+  built `/avance`, with 1180 × 820 and 1194 × 834 the same). In three columns nothing is collapsed
+  and the Rail stands beside the block rather than under it: 1024 × 768 is a 448 px middle column
+  and 732 px of height, the map's region to y ≈ 458 and the whole 626 px block under it, to
+  y ≈ 1084 — so « Garde min » is a scroll of the middle column away there, never folded away, and
+  the profile is never spent to pay for the Rail. Until #110 the block headed the column and the
+  same screen held it whole above the fold; putting the map above it spent that. **What it
   costs**: at the switch the middle column is under B1 (`CELL_WRAP_PX`, 624) and under 768, so the
   banner takes three lines and the View Strip its short labels (« à vide », « A–B »); the column
   clears B1 from 1200.
