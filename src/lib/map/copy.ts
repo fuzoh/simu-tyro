@@ -1,6 +1,7 @@
 /**
  * The vue de dessus's words (#93), in the terrain register: the Fonds de carte, the Couche pentes,
- * the two placing controls, the switch to the Vue 3D (#95) and the lines under the map. One table,
+ * the two placing controls, the switch to the Vue 3D (#95), the Repères (#107) and the lines under
+ * the map. One table,
  * read by the map and by the label tables of the Pages that show it.
  */
 
@@ -54,6 +55,11 @@ export const MAP_COPY = {
   vue3dLoading: "Chargement de la Vue 3D…",
   /** No network, no WebGL: the vue de dessus is back, and this says why. */
   vue3dUnavailable: "Vue 3D indisponible",
+  /** The button that hides or shows every dotted cross of the vue de dessus (#107). */
+  reperes: "Repères",
+  /** What it hides, on hover: the crosses alone, never what they help to place. */
+  reperesHelp:
+    "Afficher ou masquer les croix pointillées : par A et B, par les points de la Mesure et sous le pointeur.",
 } as const;
 
 /** The Mesure's words (#98). */

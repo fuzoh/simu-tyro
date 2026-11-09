@@ -114,7 +114,7 @@ function fullSession(): Session {
     trace: TRACE,
     retainedCsv: null,
     layers: { unloadedLine: true, chordAB: false, riderTip: false, trajectory: true },
-    map: { fond: "carte-nationale", pentes: true, view: "3d" },
+    map: { fond: "carte-nationale", pentes: true, view: "3d", reperes: false },
   };
 }
 
@@ -866,10 +866,10 @@ describe("the Positions in the Session (#90)", () => {
   });
 });
 
-describe("the vue de dessus's Fond de carte and Couche pentes (#93), 2D or 3D (#95), in the Session", () => {
-  test("the orthophoto under the Couche pentes, in 3D, survives a write and a read", () => {
+describe("the vue de dessus's Fond de carte and Couche pentes (#93), 2D or 3D (#95), its Repères (#107), in the Session", () => {
+  test("the orthophoto under the Couche pentes, in 3D with its Repères hidden, survives a write and a read", () => {
     const storage = memoryStorage();
-    const map = { fond: "orthophoto", pentes: true, view: "3d" } as const;
+    const map = { fond: "orthophoto", pentes: true, view: "3d", reperes: false } as const;
     writeSession(storage, { ...bareSession(), map });
     expect(readSession(storage)?.map).toEqual(map);
   });
@@ -881,7 +881,12 @@ describe("the vue de dessus's Fond de carte and Couche pentes (#93), 2D or 3D (#
 
     const restored = readSession(storage);
     expect(restored?.trace).not.toBeNull();
-    expect(restored?.map).toEqual({ fond: "carte-claire", pentes: false, view: "2d" });
+    expect(restored?.map).toEqual({
+      fond: "carte-claire",
+      pentes: false,
+      view: "2d",
+      reperes: true,
+    });
   });
 
   test("a Session stored before the Vue 3D keeps its Fond and reads the vue de dessus", () => {
@@ -889,7 +894,25 @@ describe("the vue de dessus's Fond de carte and Couche pentes (#93), 2D or 3D (#
     const blob = storedBlob(fullSession());
     const before95 = { fond: "carte-nationale", pentes: true };
     storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, map: before95 }));
-    expect(readSession(storage)?.map).toEqual({ ...before95, view: "2d" });
+    expect(readSession(storage)?.map).toEqual({ ...before95, view: "2d", reperes: true });
+  });
+
+  test("a Session stored before the Repères keeps its Fond and view, and shows them", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const before107 = { fond: "orthophoto", pentes: false, view: "3d" };
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, map: before107 }));
+    const restored = readSession(storage);
+    expect(restored?.trace).not.toBeNull();
+    expect(restored?.map).toEqual({ ...before107, reperes: true });
+  });
+
+  test("Repères that are not a yes or a no are not a Session — the blob is discarded whole", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const map = { fond: "carte-claire", pentes: false, view: "2d", reperes: "non" };
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, map }));
+    expect(readSession(storage)).toBeNull();
   });
 
   test("a view the app does not know is not a Session — the blob is discarded whole", () => {

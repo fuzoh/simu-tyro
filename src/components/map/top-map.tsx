@@ -28,12 +28,18 @@
  * - **The Mesure is the map's own state** (#98): `./use-measure.ts` holds its points, which never
  *   reach the store, the Session or the link. While it is on, a click on the map is a point of the
  *   ruler and places no anchor; the Vue 3D has no Mesure.
+ * - **The aperçu and the Repères are drawn, never held by the store** (#107): the pixel a hovering
+ *   pointer stands on is a ref of the map's, read as a click there would be read and drawn in the
+ *   Mesure's source of every style — so a changed Fond keeps it, and the click sets the point where
+ *   the cross showed. A finger draws none. The Repères d'ancrage cross A and B where they are
+ *   drawn, a dragged one under the pointer. « Repères » is a display choice, beside the Fond.
  * - **One gesture machine for both views** (#97): an anchor dragged in the Vue 3D is sent to the
  *   same `send` as a marker, so its release is the same new line, recomputed by the same rule.
  * - **On the Page Terrain the map writes nothing** (#101): no click places an anchor, no anchor is
  *   taken in either view, the rose has no handle and no Fond or Couche pentes is offered — the Fond
- *   is the one the Session holds. The Mesure stays, being the map's own; the coupe stands under the
- *   map, and the switch flips the two together between « 2D » and « 3D ».
+ *   is the one the Session holds. The Mesure stays, being the map's own, as #98 drew it — no aperçu,
+ *   no Repère d'ancrage, no « Repères » (#107); the coupe stands under the map, and the switch flips
+ *   the two together between « 2D » and « 3D ».
  */
 
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -50,7 +56,7 @@ import type { SceneBase, SceneFrame } from "@/lib/chart/scene.ts";
 import type { Fond, MapDisplay } from "@/lib/map/display.ts";
 import type { Anchor, MapEvent, MapGesture } from "@/lib/map/gesture.ts";
 import type { MeasurePoints, MeasureReading } from "@/lib/map/measure.ts";
-import type { FondHealth, MapStyle } from "@/lib/map/style.ts";
+import type { FondHealth, MapStyle, MeasureDrawing } from "@/lib/map/style.ts";
 import type { Vue3dBlock, Vue3dScene } from "@/lib/map/vue-3d.ts";
 import type { Position, Positions } from "@/lib/scenario/types.ts";
 import type { Fetch } from "@/lib/terrain/geoadmin.ts";
@@ -101,6 +107,7 @@ import {
   mapStyle,
   MEASURE_SOURCE,
   measureData,
+  measureDrawing,
   SWISSTOPO_COVERAGE,
 } from "@/lib/map/style.ts";
 import { drapedAttribution, vue3dPlacement, vue3dScene } from "@/lib/map/vue-3d.ts";
@@ -313,6 +320,7 @@ export function TopMap({
                   across={across}
                   measure={measure.points}
                   measuring={measuring}
+                  reperes={display.reperes}
                   // A function is a state updater to `setState`, so the projection goes in wrapped.
                   onProject={(next) => setProject(() => next)}
                   // The line moved under a still pointer: what was read is stale.
@@ -639,6 +647,17 @@ function MapControls({
         />
         {MAP_COPY.pentes}
       </Label>
+      {/* A display choice like the Fond: it hides the crosses, never a point or a reading. */}
+      <Toggle
+        className="shrink-0"
+        onPressedChange={(reperes) => onDisplay({ ...display, reperes })}
+        pressed={display.reperes}
+        size="sm"
+        title={MAP_COPY.reperesHelp}
+        variant="outline"
+      >
+        {MAP_COPY.reperes}
+      </Toggle>
       {/* A disabled button takes no hover, so the reason's title is on its wrapper. */}
       <span className="shrink-0" title={blocked === null ? undefined : VUE_3D_BLOCKED[blocked]}>
         <Toggle
@@ -702,6 +721,7 @@ function MapCanvas({
   across,
   measure,
   measuring,
+  reperes,
   onProject,
   onMove,
   rose,
@@ -713,12 +733,18 @@ function MapCanvas({
   display: MapDisplay;
   drawn: Positions;
   gesture: MapGesture;
-  /** The Page Terrain: no anchor is taken, and no zoom button under the 44 px floor is drawn. */
+  /**
+   * The Page Terrain: no anchor is taken, and no zoom button under the 44 px floor is drawn — and
+   * the Mesure draws no aperçu, no Repère d'ancrage, and the crosses of its points always (#107).
+   */
   locked: boolean;
   target: Anchor | null;
   /** The Mesure's points, drawn above the line. */
   measure: MeasurePoints;
+  /** The Mesure is on: a click sets one of its points, and a hovering pointer draws its aperçu. */
   measuring: boolean;
+  /** The Repères are shown: every dotted cross, through A and B, the points and the aperçu. */
+  reperes: boolean;
   /** What a click on the map does: place an anchor, or set a point of the Mesure. */
   onClick: (at: Position) => void;
   /** The wind's cross component, m/s: the Banane's only input. */
@@ -744,12 +770,39 @@ function MapCanvas({
   const line = useRef(drawn);
   const bow = useRef(across);
   const ruler = useRef(measure);
+  const shownReperes = useRef(reperes);
+  // The aperçu (#107): the pixel the pointer hovers in the map's box — re-read on every move of the
+  // view, so a pan under a still pointer keeps the cross under it — and whether it is drawn at all:
+  // only while the Mesure is on.
+  const aim = useRef<readonly [number, number] | null>(null);
+  const measures = useRef(measuring);
+  // A finger never hovers: the compatibility mouse events a tap fires after it draw no aperçu.
+  const hovers = useRef(true);
   const clicked = useRef(onClick);
   const moved = useRef(onMove);
   useLayoutEffect(() => {
     clicked.current = onClick;
     moved.current = onMove;
   }, [onClick, onMove]);
+
+  // What the Mesure's source draws now, the aperçu at the pixel the pointer hovers — read as a click
+  // there reads it, so the point lands where the cross shows.
+  const drawing = useCallback((): MeasureDrawing => {
+    const live = map.current;
+    const at = aim.current;
+    const pointer = live === null || at === null ? null : live.unproject([at[0], at[1]]);
+    return measureDrawing({
+      points: ruler.current,
+      pointer: pointer === null ? null : { lat: pointer.lat, lon: pointer.lng },
+      anchors: line.current,
+      reperes: shownReperes.current,
+      measuring: measures.current,
+      readOnly: locked,
+    });
+  }, [locked]);
+  const redrawMeasure = useCallback(() => {
+    void map.current?.getSource<GeoJSONSource>(MEASURE_SOURCE)?.setData(measureData(drawing()));
+  }, [drawing]);
 
   // The rose follows the line's midpoint through every pan and zoom: it runs on every frame, so it
   // moves the host's style rather than render.
@@ -771,7 +824,7 @@ function MapCanvas({
           vector: vector.current,
           positions: line.current,
           across: bow.current,
-          measure: ruler.current,
+          measure: drawing(),
         }),
         attributionControl: false,
         // A vue de dessus: north stays up, so the drawing reads like the plan it is.
@@ -799,6 +852,25 @@ function MapCanvas({
     created.on("click", (event) =>
       clicked.current({ lat: event.lngLat.lat, lon: event.lngLat.lng }),
     );
+    // The aperçu follows a pointer that hovers — a mouse, a pen — and leaves with it. Pointer events
+    // come before the mouse events they cause, so a tap is known for one before MapLibre hears it.
+    const sense = (event: PointerEvent) => {
+      hovers.current = event.pointerType !== "touch";
+    };
+    node.addEventListener("pointerdown", sense, true);
+    node.addEventListener("pointermove", sense, true);
+    created.on("mousemove", (event) => {
+      aim.current = hovers.current ? [event.point.x, event.point.y] : null;
+      if (measures.current) redrawMeasure();
+    });
+    created.on("mouseout", () => {
+      aim.current = null;
+      if (measures.current) redrawMeasure();
+    });
+    // A pan or a zoom under a still pointer: the cross stays under it.
+    created.on("move", () => {
+      if (measures.current && aim.current !== null) redrawMeasure();
+    });
     created.on("error", (event) => {
       const source: unknown = (event as { sourceId?: unknown }).sourceId;
       if (typeof source === "string" && isFondSource(source)) {
@@ -815,8 +887,11 @@ function MapCanvas({
     placeRose();
     applied.current = styleKey(display, vector.current);
     return () => {
+      node.removeEventListener("pointerdown", sense, true);
+      node.removeEventListener("pointermove", sense, true);
       created.remove();
       map.current = null;
+      aim.current = null;
       onProject(null);
       markers.current = { A: null, B: null };
     };
@@ -839,7 +914,8 @@ function MapCanvas({
           vector: vector.current,
           positions: line.current,
           across: bow.current,
-          measure: ruler.current,
+          // The aperçu included: a Fond changed under the pointer leaves the cross where it was.
+          measure: drawing(),
         }),
         { diff: true },
       );
@@ -917,11 +993,15 @@ function MapCanvas({
     void map.current?.getSource<GeoJSONSource>(BANANE_SOURCE)?.setData(bananeData(drawn, across));
   }, [drawn, across]);
 
-  // The Mesure follows its clicks: a source of its own, in every style.
+  // The Mesure follows its clicks, the Repères d'ancrage the anchors as drawn — a dragged one under
+  // the pointer — and the Repères' button hides or shows every cross: a source of its own, in every
+  // style. After the effect above, which keeps `line` on the drawing.
   useEffect(() => {
     ruler.current = measure;
-    void map.current?.getSource<GeoJSONSource>(MEASURE_SOURCE)?.setData(measureData(measure));
-  }, [measure]);
+    shownReperes.current = reperes;
+    measures.current = measuring;
+    redrawMeasure();
+  }, [measure, drawn, reperes, measuring, redrawMeasure]);
 
   // A crosshair while a click would place an anchor or a point; MapLibre's own hand otherwise.
   useEffect(() => {

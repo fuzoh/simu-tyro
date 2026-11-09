@@ -156,7 +156,10 @@ export type Session = {
   /** § 5's two toggles. The other display preferences — `u`, the active tightness mode — are the
    * Scenario's own fields, so they persist with it rather than beside it. */
   readonly layers: LayerToggles;
-  /** The vue de dessus's Fond de carte and Couche pentes (#93), 2D or 3D (#95) — never in a link. */
+  /**
+   * The vue de dessus's Fond de carte and Couche pentes (#93), 2D or 3D (#95), its Repères (#107) —
+   * never in a link.
+   */
   readonly map: MapDisplay;
 };
 
@@ -400,12 +403,14 @@ const STORED_SESSION: v.GenericSchema<unknown, StoredSession> = v.object({
     trajectory: v.optional(v.boolean(), DEFAULT_LAYERS.trajectory),
   }),
   // Added with #93, optional with the carte claire for the same reason as the later layers; its
-  // `view` came with #95, optional with the vue de dessus for the same reason again.
+  // `view` came with #95 and its `reperes` with #107, each optional with its default for the same
+  // reason again.
   map: v.optional(
     v.object({
       fond: v.picklist(FONDS),
       pentes: v.boolean(),
       view: v.optional(v.picklist(MAP_VIEWS), DEFAULT_MAP_DISPLAY.view),
+      reperes: v.optional(v.boolean(), DEFAULT_MAP_DISPLAY.reperes),
     }),
     () => ({ ...DEFAULT_MAP_DISPLAY }),
   ),

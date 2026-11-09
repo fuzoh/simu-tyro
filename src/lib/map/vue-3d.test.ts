@@ -22,6 +22,9 @@ import { TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
 import { mapStyle, wmtsTiles } from "./style.ts";
 import { CAMERA_REACH, DRAPED, vue3dFollowing, vue3dPlacement, vue3dScene } from "./vue-3d.ts";
 
+/** No Mesure and no anchor to cross: the vue de dessus's style with nothing of #98 or #107. */
+const NO_MEASURE = { points: [], preview: null, anchors: { A: null, B: null }, reperes: true };
+
 const PROFIL: Trace = {
   d: Float64Array.from([0, 243, 435.2]),
   z: Float64Array.from([1453.7, 1368.1, 1438.7]),
@@ -99,11 +102,11 @@ describe("what each Fond de carte drapes", () => {
   test("a raster Fond drapes the very tiles the vue de dessus shows", () => {
     for (const fond of ["orthophoto", "carte-nationale"] as const) {
       const style = mapStyle({
-        display: { fond, pentes: false, view: "3d" },
+        display: { fond, pentes: false, view: "3d", reperes: true },
         vector: null,
         positions: TRIAL_ENDS,
         across: 0,
-        measure: [],
+        measure: NO_MEASURE,
       });
       const source = style.sources.fond;
       expect(source?.type === "raster" ? source.tiles : null).toEqual([wmtsTiles(DRAPED[fond])]);
