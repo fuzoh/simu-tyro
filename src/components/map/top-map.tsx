@@ -39,7 +39,7 @@
  *   layers are read from the store, so the Vue 3D shows the curves the coupe shows; they reach the
  *   renderer beside the scene, never in it, so a toggle redraws nothing. On the Page Terrain, whose
  *   coupe hides while the 3D is shown, no strip stands beside it, and the view keeps its own lines
- *   (`NO_VIEW_STRIP_LAYERS`).
+ *   (`vue3dLayers` with `viewStrip: false`).
  * - **One gesture machine for both views** (#97): an anchor dragged in the Vue 3D is sent to the
  *   same `send` as a marker, so its release is the same new line, recomputed by the same rule.
  * - **On the Page Terrain the map writes nothing** (#101): no click places an anchor, no anchor is
@@ -119,13 +119,7 @@ import {
   SWISSTOPO_COVERAGE,
 } from "@/lib/map/style.ts";
 import { vue3dKeyCommand } from "@/lib/map/vue-3d-camera.ts";
-import {
-  drapedAttribution,
-  NO_VIEW_STRIP_LAYERS,
-  vue3dLayers,
-  vue3dPlacement,
-  vue3dScene,
-} from "@/lib/map/vue-3d.ts";
+import { drapedAttribution, vue3dLayers, vue3dPlacement, vue3dScene } from "@/lib/map/vue-3d.ts";
 import { roseReference } from "@/lib/map/wind-rose.ts";
 import { windBearing } from "@/lib/rail/gates.ts";
 import { geoadminNotice, loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
@@ -194,10 +188,7 @@ export function TopMap({
   const scene3d = useVue3dScene(shows3d, frame, profil, solved, across);
   // The View Strip's layers where the strip stands beside the Vue 3D; on the Page Terrain it hides
   // with the coupe while the 3D is shown, and toggles out of reach decide nothing.
-  const layers3d = useMemo(
-    () => (locked ? NO_VIEW_STRIP_LAYERS : vue3dLayers(layers)),
-    [locked, layers],
-  );
+  const layers3d = useMemo(() => vue3dLayers(layers, { viewStrip: !locked }), [locked, layers]);
 
   const plain = failed ? plainDrawing(drawn, across) : null;
   const measure = useMeasure(browserFetch, profil);

@@ -152,22 +152,28 @@ export type Vue3dLayers = {
   readonly trajectory: boolean;
 };
 
-/** The View Strip's toggles, as the Vue 3D reads them. */
-export function vue3dLayers({ unloadedLine, chordAB, trajectory }: LayerToggles): Vue3dLayers {
-  return { unloaded: unloadedLine, ligneAB: chordAB, trajectory };
-}
-
 /**
  * The layers of a Vue 3D with no View Strip beside it — the Page Terrain's, whose coupe, and the
- * strip with it, hides while the 3D is shown: toggles the reader cannot reach there decide nothing,
- * and the view draws what it drew before the layers came to it (#95, #96), the Ligne à vide with its
- * Banane and the loaded line.
+ * strip with it, hides while the 3D is shown: the view draws what it drew before the layers came to
+ * it (#95, #96), the Ligne à vide with its Banane and the loaded line.
  */
-export const NO_VIEW_STRIP_LAYERS: Vue3dLayers = {
+const NO_VIEW_STRIP_LAYERS: Vue3dLayers = {
   unloaded: true,
   ligneAB: false,
   trajectory: false,
 };
+
+/**
+ * The layers the Vue 3D shows: the View Strip's toggles where the strip stands beside it; with
+ * none beside it, toggles the reader cannot reach decide nothing ({@link NO_VIEW_STRIP_LAYERS}).
+ */
+export function vue3dLayers(
+  { unloadedLine, chordAB, trajectory }: LayerToggles,
+  { viewStrip }: { readonly viewStrip: boolean } = { viewStrip: true },
+): Vue3dLayers {
+  if (!viewStrip) return NO_VIEW_STRIP_LAYERS;
+  return { unloaded: unloadedLine, ligneAB: chordAB, trajectory };
+}
 
 /** Everything the Vue 3D draws over the relief. */
 export type Vue3dScene = {

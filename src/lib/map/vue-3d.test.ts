@@ -25,7 +25,6 @@ import { mapStyle, wmtsTiles } from "./style.ts";
 import {
   CAMERA_REACH,
   DRAPED,
-  NO_VIEW_STRIP_LAYERS,
   vue3dFollowing,
   vue3dLayers,
   vue3dPlacement,
@@ -351,10 +350,24 @@ describe("the coupe's layers in the Vue 3D (#111)", () => {
     expect(vue3dLayers({ ...ALL, riderTip: false })).toEqual(vue3dLayers(ALL));
   });
 
-  test("with no View Strip beside it — the Page Terrain — the Vue 3D keeps the lines it drew before", () => {
-    // #95 and #96: the Ligne à vide with its Banane and the loaded line; the Ligne A–B only under a
-    // drag, which Terrain never starts; no Trajectoire.
-    expect(NO_VIEW_STRIP_LAYERS).toEqual({ unloaded: true, ligneAB: false, trajectory: false });
+  test("with no View Strip beside it — the Page Terrain — the toggles decide nothing", () => {
+    const none = { viewStrip: false } as const;
+    const NONE: LayerToggles = {
+      unloadedLine: false,
+      chordAB: false,
+      riderTip: false,
+      trajectory: false,
+    };
+    // #95 and #96: the Ligne à vide with its Banane, even where the strip's defaults hide it; the
+    // Ligne A–B only under a drag, which Terrain never starts; no Trajectoire.
+    for (const toggles of [DEFAULT_LAYERS, ALL, NONE]) {
+      const shown = vue3dLayers(toggles, none);
+      expect(shown.unloaded).toBe(true);
+      expect(shown.ligneAB).toBe(false);
+      expect(shown.trajectory).toBe(false);
+    }
+    // With the strip beside it, the same defaults hide the Ligne à vide.
+    expect(vue3dLayers(DEFAULT_LAYERS, { viewStrip: true }).unloaded).toBe(false);
   });
 
   test("the Ligne A–B stands from anchor to anchor without a solve", () => {
