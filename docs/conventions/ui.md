@@ -271,12 +271,33 @@ shell, measured by `agent-browser` (`docs/conventions/routing.md`, 2026-11-09), 
 - **The block is Statique's alone** (`<OutputGrid block>`, its Verdict `wide`): two columns at every
   width. Terrain's grid keeps its row of five from a 56 rem column. Statique dropped that arm with
   nothing lost below 1024 — its column, `md:w-80` short of the viewport, is 703 px at the most there.
-- **The vue de dessus keeps its frame**: 3 : 2 up to the 448 px height cap (#115), its height never
-  read off the window. Its width is the column, `min(viewport, 1728) − 320`, less the block (368),
-  four `px-3` (48) and the hairline between the regions (1). **What it costs**: at the switch the
-  map is 287 px wide (191 px tall), narrower than the block; it is the wider from 1106 px of
-  viewport, 703 px at 1440, and **989 px** from the shell's cap — `1408 − 417 = 991` less the
-  shell's own two hairlines (`min-[1730px]:border-x`) — wider than 3 : 2 there, under the cap.
+- **The vue de dessus keeps its format**: 3 : 2 at every width of the row, its height read off its
+  width and never off the window — the brief's « format conservé ». The row lifts the frame's
+  448 px height cap (#115) through the frame's own `--top-view-max-h` (`none` on the region from
+  1024), so the cap still holds for the stacked phone shape, Terrain and Avancé, and `TopMap`'s
+  mount takes no new prop. Its width is the column, `min(viewport, 1728) − 320`, less the block
+  (368), four `px-3` (48) and the hairline between the regions (1): **287 × 191** px at the switch,
+  narrower than the block, the wider from 1106 px of viewport, **703 × 469** at 1440 and
+  **989 × 659** from the shell's cap — `1408 − 417 = 991` less the shell's own two hairlines
+  (`min-[1730px]:border-x`). **What it costs**: the row is as tall as the map, so at 1440 × 900 the
+  coupe starts at 710 px and at 2560 × 900 it starts at the fold (900 px), one scroll down — the
+  price of a map that keeps its format beside the tiles.
+- **Seven caption lines in the row** (`--top-view-caption`, 7 rem, against five elsewhere): the
+  caption sets the row's height, and so the coupe's place, where it was the last region and moved
+  nothing. Seven is one per line the caption can hold in 2D (A, B, the Vent, the gesture, the fond
+  indisponible, the Banane, the Vue 3D); on the narrow map from 1024 to about 1200 px the Vent and
+  the Vue 3D lines wrap to two each, and the trial line's six lines on load, seven with « Mesure »
+  armed, stay inside it. **What it costs**: 32 to 48 px of empty caption at 1440 on a calm line;
+  and a caption of more than seven lines — a Vent, the Banane and « Mesure » armed on the 287 px
+  map make eight — still pushes the coupe down a line. The Skeleton cannot foresee a caption any
+  more than a tile's Avertissement; seven covers every line the caption can hold unwrapped.
+- **The map's own controls at 287 px**: « Placer A / Placer B / Mesure » wrap onto a second line
+  rather than run under MapLibre's zoom buttons (the overlay row is `right-12` and `flex-wrap`,
+  every Page), so « Quitter la mesure » sits under « Placer A » at 1024. The rose's handle, the
+  Mesure, « Placer B » and the Vue 3D work there (`docs/conventions/routing.md`), but the overlay
+  and the Mesure's readout cover much of a 191 px map, and at the switch the « Fond de carte »
+  select shrinks to « Carte c… » beside « Pentes supérieures à 30° ». Accepted: the brief puts the
+  switch at 1024, and the map is the wider of the two from 1106.
 - **The Skeleton is the same tree** (`StatiqueFrame`), so it lands in the same boxes at every width.
 
 ## Charts
