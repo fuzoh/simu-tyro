@@ -270,10 +270,14 @@ and `max-w-[1984px]`, and `contract.test.ts` holds the two together. B2 and B3 a
   (`scrollbar-gutter: stable`), so a scrollbar that comes and goes cannot move the width every band
   is a function of; on a platform with classic scrollbars the measured block is that gutter
   narrower than `avanceBlockWidth()` up to 2848 px of viewport. **What it costs**: the Chart Block starts under the map — its
-  banner slot at about 633 px from the top of the window at 1440 and at 2560 (the map's region,
-  36 + 597 px: its 448 px cap plus its controls and five caption lines), about 458 px at 1024
-  (36 + 421,7) — and the profile under the banner at 677 and 533,7 px (routing.md's measurements).
-  So the banner is below the fold on a window shorter than about 633 px (458 at 1024), and
+  banner slot at 665 px from the top of the window at 1440 and at 2560 (the map's region,
+  36 + 629 px: its 448 px cap plus its controls and **seven** caption lines), 489,7 px at 1024
+  (36 + 453,7) — and the profile under the banner at 709 and 565,7 px (routing.md's measurements).
+  The seven lines are Statique's first row's reserve (`--top-view-caption: 7rem`, below), for the
+  same reason: the block sits right under the caption, so a Banane line from a cross wind, a
+  failing Fond or a blocked Vue 3D must land inside the reserve, not push the whole block — and the
+  coupe the Skeleton placed — 16 px down per line while the user edits.
+  So the banner is below the fold on a window shorter than about 665 px (490 at 1024), and
   « Garde min » and the read-out cells, under the profile, clearance strip and View Strip, are a
   scroll down on any window shorter than the map plus the whole block — 1440 × 900 among them.
   Scrolled to, the block itself stands whole in any window 36 px taller than it — 1276 px at most,
@@ -394,9 +398,9 @@ arithmetic over the shell, measured by `agent-browser` (`docs/conventions/routin
   (`min-[1730px]:border-x`). **What it costs**: the row is as tall as the map, so at 1440 × 900 the
   coupe starts at 710 px and at 2560 × 900 it starts at the fold (900 px), one scroll down — the
   price of a map that keeps its format beside the tiles.
-- **Seven caption lines in the row** (`--top-view-caption`, 7 rem, against five elsewhere): the
-  caption sets the row's height, and so the coupe's place, where it was the last region and moved
-  nothing. Seven is one per line the caption can hold in 2D (A, B, the Vent, the gesture, the fond
+- **Seven caption lines in the row** (`--top-view-caption`, 7 rem, as Avancé's middle column, and
+  against five on Terrain and the stacked shape): the caption sets the row's height, and so the
+  coupe's place, where it was the last region and moved nothing. Seven is one per line the caption can hold in 2D (A, B, the Vent, the gesture, the fond
   indisponible, the Banane, the Vue 3D); on the narrow map from 1024 to about 1200 px the Vent and
   the Vue 3D lines wrap to two each, and the trial line's six lines on load, seven with « Mesure »
   armed, stay inside it. **What it costs**: 32 to 48 px of empty caption at 1440 on a calm line;

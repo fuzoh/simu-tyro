@@ -411,11 +411,18 @@ export function Shell({
           {/* The vue de dessus heads the column from B2 (#110), above the Chart Block, in the DOM
               too, so the focus order is the order on screen. Below B2 there is no middle column and
               the box is `display: none`, so the stacked shape — the block over the Rail — is the
-              one it always was. Its hairline is under it, between it and the block. */}
+              one it always was. Its hairline is under it, between it and the block.
+
+              The Chart Block sits right under the caption, so the caption reserves its **seven**
+              lines (`--top-view-caption`, as Statique's first row): one per line it can hold in 2D
+              — A, B, the Vent, the gesture, the fond indisponible, the Banane, the Vue 3D. A cross
+              wind or a failing Fond then adds a line inside the reserve rather than pushing the
+              whole block down while the user edits, and the Skeleton, which shares this section,
+              reserves the same box: ui.md's « the caption sets the row's height ». */}
           {views !== undefined && (
             <section
               aria-label={SECTION.topView}
-              className="border-border three-columns:block hidden border-b px-3 py-3"
+              className="border-border three-columns:block three-columns:[--top-view-caption:7rem] hidden border-b px-3 py-3"
             >
               {views}
             </section>
