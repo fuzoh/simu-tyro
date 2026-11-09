@@ -239,6 +239,12 @@ describe("a coordinate without its pair (#90)", () => {
   test("a link with no Position completes none, so it is not announced", () => {
     expect(strip("?L=150")?.completed).not.toMatch(/latitude|longitude/);
   });
+
+  test("a profil off the Positions said with anything but `1` is named, not taken", () => {
+    expect(strip("?L=150&ph=oui")?.ignored).toBe(
+      "Une partie du lien a été ignorée : « ph » n'était pas une valeur reconnue (profil hors des Positions ignoré).",
+    );
+  });
 });
 
 describe("a completed force is converted from the URL's daN into the screen's unit", () => {

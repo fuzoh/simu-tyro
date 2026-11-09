@@ -811,6 +811,14 @@ describe("the Positions in the Session (#90)", () => {
     expect(readSession(storage)?.trace).not.toHaveProperty("ends");
   });
 
+  test("a profil the Positions were typed off stays off them through a write and a read", () => {
+    const storage = memoryStorage();
+    const geometry = { source: "trace", trace: PAYLOAD, offPositions: true } as const;
+    const scenario = { ...firstRunDefaults(), geometry, positions: { A, B } };
+    writeSession(storage, { ...bareSession(), scenario, trace: TRACE });
+    expect(readSession(storage)?.scenario.geometry).toEqual(geometry);
+  });
+
   test("a Session stored before the key is kept, and reads both Positions unknown", () => {
     const storage = memoryStorage();
     const blob = storedBlob(fullSession());

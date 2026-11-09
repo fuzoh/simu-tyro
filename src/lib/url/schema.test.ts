@@ -106,6 +106,7 @@ describe("the key table and canonical order", () => {
       "lona",
       "latb",
       "lonb",
+      "ph",
       "tr",
     ]);
     expect(new Set(CANONICAL_KEYS).size).toBe(CANONICAL_KEYS.length);
@@ -427,6 +428,12 @@ describe("an unknown or unrepresentable key is ignored and named", () => {
       query: "?L=250&lata=46.8&lona=6.5&lonb=6.52",
       dropped: [{ key: "lonb", reason: "coordonnée-isolée" }],
       kept: { L: 250, lata: 46.8, lona: 6.5 },
+    },
+    {
+      name: "a profil off the Positions said with anything but `1`",
+      query: "?L=250&ph=oui",
+      dropped: [{ key: "ph", reason: "valeur-non-représentable" }],
+      kept: { L: 250 },
     },
     {
       name: "a duplicate key, which arrives as an array",

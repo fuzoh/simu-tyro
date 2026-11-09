@@ -23,7 +23,7 @@
  *   dependency-free; it imports the engine's `Terrain` **type** and nothing else.
  */
 
-import type { Position } from "@/lib/scenario/types.ts";
+import type { Position, Positions } from "@/lib/scenario/types.ts";
 import type { Terrain } from "@/lib/sim";
 
 /**
@@ -59,9 +59,29 @@ export type Trace = {
   readonly dev: number | null;
   /** A link's payload carries no origin, so what a link brings is always `lien`. */
   readonly origin: TraceOrigin;
-  /** The first and last sample's coordinates. **Absent** when the file carried none (#90). */
+  /**
+   * The first and last sample's coordinates. **Absent** when the file carried none (#90), or when a
+   * link said its profil does not run between the link's Positions and gave no others.
+   */
   readonly ends?: TraceEnds;
 };
+
+/**
+ * Does the profil run between the two Positions? Only where its own ends are those Positions: two
+ * Positions fix a profil end to end, so one moved since, or typed beside a profil with no
+ * coordinates, stands at the end of a line the profil knows nothing of.
+ *
+ * Positions that are not both known draw no line to contradict the profil.
+ *
+ * @param trace the profil standing in as the line's ground, `null` for a manual span.
+ */
+export function profilRunsBetween(positions: Positions, trace: Trace | null): boolean {
+  const { A, B } = positions;
+  if (A === null || B === null) return true;
+  const ends = trace?.ends;
+  const same = (one: Position, other: Position) => one.lat === other.lat && one.lon === other.lon;
+  return ends !== undefined && same(A, ends.A) && same(B, ends.B);
+}
 
 /** § 4's derived read-outs: `L` and `h`, measured anchor top to anchor top. */
 export type DerivedSpan = {

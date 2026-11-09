@@ -55,14 +55,15 @@
  * - **Forces are daN in the URL, always**, whatever `u` says. `u` is display-only, so hand-editing
  *   `u=daN` → `u=kN` must not make the line 100× tighter. The engine holds newtons; `./scenario.ts`
  *   is the one place the ÷10 happens, in both directions.
- * - **Absence carries exactly nine meanings and never a tenth.** `reg` absent is « — choisir — »,
+ * - **Absence carries exactly ten meanings and never an eleventh.** `reg` absent is « — choisir — »,
  *   `mbf`/`ea`/`mu` absent is « non surchargée », `bp` absent is one Brin porteur, `cp` absent is
  *   the Mise en tension at A, `mt` absent is the mouflage, `ws`/`wd` absent is no wind (speed 0,
  *   direction 0), `cda`/`f0`/`kv`/`mur`/`rho` absent is §12.2's default for the passager's ride (#89)
  *   — `ρ`'s being derived from the profil —, `lata`/`lona`/`latb`/`lonb` absent is an unknown Position
- *   (#90), and a family- or terrain-scoped key absent means that
- *   configuration is not the active one. So `stripSearchParams` is rejected, every other key with a
- *   value is stated even at its default, and `./scenario.ts`'s completion exempts the first eight.
+ *   (#90), `ph` absent is a profil that runs between the Positions, and a family- or terrain-scoped
+ *   key absent means that configuration is not the active one. So `stripSearchParams` is rejected,
+ *   every other key with a value is stated even at its default, and `./scenario.ts`'s completion
+ *   exempts the first nine.
  * - **The dropped-keys reporter takes the raw query string as a parameter**
  *   ({@link reportDroppedKeys}), never reading `window.location` — amendment A removed the jsdom
  *   environment that would otherwise be needed, and as a pure function this is a plain unit test.
@@ -135,6 +136,7 @@ export const CANONICAL_KEYS = [
   "lona",
   "latb",
   "lonb",
+  "ph",
   "tr",
 ] as const;
 
@@ -326,6 +328,9 @@ const KEY_SCHEMAS = {
   lona: FINITE, // Longitude de l'ancrage A.
   latb: FINITE, // Latitude de l'ancrage B.
   lonb: FINITE, // Longitude de l'ancrage B.
+  // The profil does not run between the two Positions (`offPositions`). Absent **is** it runs
+  // between them, so a link older than the key reads as it always did.
+  ph: v.literal(1),
   // `tr` is validated **structurally** by the codec, not by valibot: sentinel, base64url alphabet,
   // varint walk, declared `n` against bytes consumed, character budget. A structural failure is a
   // refusal, not a salvage, so it is handled in {@link refuse} rather than here.

@@ -13,6 +13,8 @@ import type { Fetch } from "@/lib/terrain/geoadmin.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { buildScene } from "@/lib/chart/scene.ts";
+import { altitudeOnProfile } from "@/lib/map/measure.ts";
+import { vue3dPlacement } from "@/lib/map/vue-3d.ts";
 import { evaluateGates } from "@/lib/rail/gates.ts";
 import { deriveResults } from "@/lib/rail/results.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
@@ -21,6 +23,7 @@ import { DEFAULT_LAYERS, readSession, writeSession } from "@/lib/session/session
 import { replayTrial, TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
 import { parseProfileCsv } from "@/lib/terrain/csv.ts";
 import { loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
+import { profilRunsBetween } from "@/lib/terrain/trace.ts";
 import { encodeP1, URL_BUDGET_CHARS } from "@/lib/url/p1.ts";
 import { FIRST_RUN_LINK } from "@/lib/url/scenario.ts";
 import { canonicalLink } from "@/lib/url/schema.ts";
@@ -576,25 +579,121 @@ describe("#90's Positions — they follow the profil, end to end", () => {
     expect(arrived.trace?.origin).toEqual({ kind: "lien" });
   });
 
-  it("a link's Positions win over the cached file's, so « Réutiliser » restores the link's", () => {
-    const retyped = { A: { lat: 46.8, lon: 6.5 }, B: { lat: 46.9, lon: 6.6 } };
-    const query = canonicalLink(
-      linkSearch({ ...imported.scenario, positions: retyped }),
-      "/",
-    ).slice(2);
-    const session: Session = {
-      scenario: imported.scenario as Session["scenario"],
-      retainedMaterial: imported.retainedMaterial,
-      retainedManual: imported.retainedManual,
-      trace: imported.trace,
-      retainedCsv: imported.retainedCsv,
-      layers: imported.layers,
-      map: imported.map,
+  /** The Session the write side leaves for `state`, through the storage it is written to. */
+  function storedSession(state: AppState): Session {
+    const storage = new Map<string, string>();
+    const stub = {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => void storage.set(key, value),
+      removeItem: (key: string) => void storage.delete(key),
     };
-    const arrived = initialAppState({ query, session });
-    expect(arrived.scenario.positions).toEqual(retyped);
+    const session = sessionOf(state);
+    if (session === null) throw new Error("a complete Scenario has a Session");
+    writeSession(stub, session);
+    const read = readSession(stub);
+    if (read === null) throw new Error("the Session must read back");
+    return read;
+  }
+  /** A page load on the address bar `state` published, over `session`. */
+  function open(state: AppState, session: Session | null): AppState {
+    const link = canonicalLink(linkSearch(state.scenario), "/avance");
+    return initialAppState({ query: link.slice(link.indexOf("?")), session });
+  }
+  /** A page load on the address bar and the Session the write side left for `state`. */
+  function reload(state: AppState): AppState {
+    return open(state, storedSession(state));
+  }
+  /** What the app holds, leaving out what this page load's link did. */
+  function held(state: AppState) {
+    const { link: _, ...rest } = state;
+    return rest;
+  }
+  /** Where the profil stands for every reading that puts it on the earth. */
+  function standing(state: AppState, far: { lat: number; lon: number }) {
+    const { scenario, trace } = state;
+    if (trace === null) throw new Error("the line keeps its profil");
+    return {
+      runs: profilRunsBetween(scenario.positions, trace),
+      vue3d: vue3dPlacement(scenario.positions, buildScene({ scenario, trace }), trace),
+      mesure: altitudeOnProfile(trace, far),
+    };
+  }
+  const OFF = { runs: false, vue3d: { ok: false, block: "profil" }, mesure: null };
+
+  // B typed some 1,3 km north of the profil's own end: a new line, whose profil is not loaded.
+  const far = { lat: 46.858, lon: B.lon };
+  const typedOff = appReducer(imported, {
+    type: "scénario/modifié",
+    patch: { positions: { A, B: far } },
+  });
+
+  it("a reload over the profil's own Positions opens on the same line", () => {
+    const reloaded = reload(imported);
+    expect(held(reloaded)).toEqual(held(imported));
+    expect(profilRunsBetween(reloaded.scenario.positions, reloaded.trace)).toBe(true);
+  });
+
+  it("a Position typed off the profil is said in the Scenario, and the link carries it", () => {
+    expect(standing(typedOff, far)).toEqual(OFF);
+    expect(typedOff.scenario.geometry).toMatchObject({ offPositions: true });
+    expect(canonicalLink(linkSearch(typedOff.scenario), "/")).toContain("&ph=1&tr=");
+    // Typed back onto the profil's end, the line is the profil's again.
+    const back = appReducer(typedOff, { type: "scénario/modifié", patch: { positions: { A, B } } });
+    expect(back.scenario.geometry).toEqual(imported.scenario.geometry);
+  });
+
+  it("a Position typed off the profil stays off it through a reload, and nothing stretches the profil to it", () => {
+    const reloaded = reload(typedOff);
+    expect(held(reloaded)).toEqual(held(typedOff));
+    expect(reloaded.trace?.ends).toEqual({ A, B });
+    expect(standing(reloaded, far)).toEqual(OFF);
+  });
+
+  it("the link alone opens the same line: no Session, or one holding another profil", () => {
+    const other = importFile("Distance;Altitude\n0;100\n50;95\n100;90\n");
+    const another = appReducer(bare, { type: "tracé/importé", trace: other, tr: encodeP1(other) });
+    for (const session of [null, storedSession(another)]) {
+      const arrived = open(typedOff, session);
+      expect(arrived.scenario).toEqual(typedOff.scenario);
+      expect(arrived.trace?.origin).toEqual({ kind: "lien" });
+      // The link does not say where the profil lies, only that it is not between the Positions.
+      expect(arrived.trace?.ends).toBeUndefined();
+      expect(standing(arrived, far)).toEqual(OFF);
+      // The recipient's own reload is the same line again.
+      expect(held(reload(arrived))).toEqual(held(arrived));
+    }
+  });
+
+  it("Positions typed beside a profil with no coordinates never become its ends", () => {
+    const plain = importFile("Distance;Altitude\n0;100\n50;95\n100;90\n");
+    const loaded = appReducer(bare, { type: "tracé/importé", trace: plain, tr: encodeP1(plain) });
+    const typed = appReducer(loaded, {
+      type: "scénario/modifié",
+      patch: { positions: { A, B } },
+    });
+
+    for (const arrived of [reload(typed), open(typed, null)]) {
+      expect(arrived.scenario).toEqual(typed.scenario);
+      expect(arrived.trace?.ends).toBeUndefined();
+      expect(profilRunsBetween(arrived.scenario.positions, arrived.trace)).toBe(false);
+    }
+  });
+
+  it("a link that puts the profil between its Positions wins over the cached file's own ends", () => {
+    const retyped = { A: { lat: 46.8, lon: 6.5 }, B: { lat: 46.9, lon: 6.6 } };
+    // Hand-written: the app's own link for this line would say `ph`.
+    const sent = { ...imported, scenario: { ...imported.scenario, positions: retyped } };
+    const arrived = open(sent, storedSession(imported));
     expect(arrived.trace?.ends).toEqual(retyped);
     expect(arrived.trace?.origin).toEqual({ kind: "csv", fileName: "trace.csv" });
+    expect(profilRunsBetween(arrived.scenario.positions, arrived.trace)).toBe(true);
+  });
+
+  it("removing a profil the Positions were typed off keeps them, on either side of the link", () => {
+    for (const state of [typedOff, open(typedOff, null)]) {
+      const removed = appReducer(state, { type: "tracé/retiré" });
+      expect(removed.scenario.positions).toEqual({ A, B: far });
+    }
   });
 
   it("changes neither the Results nor the Verdict", () => {

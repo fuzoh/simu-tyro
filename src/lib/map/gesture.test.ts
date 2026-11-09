@@ -267,7 +267,7 @@ describe("dragging B in the Vue 3D (#97) — the same machine, the same release"
   /** The Vue 3D the Page draws for a state: the coupe's line on its two Positions. */
   function vue3dOf({ scenario, trace }: AppState) {
     const scene = buildScene({ scenario, trace });
-    const at = vue3dPlacement(scenario.positions, scene);
+    const at = vue3dPlacement(scenario.positions, scene, trace);
     if (scene === null || !at.ok) throw new Error("the line stands in the Vue 3D");
     return vue3dScene({ placement: at.placement, solved: scene, rider: scene.rider, across: 0 });
   }

@@ -73,8 +73,13 @@ export type Geometry =
    * An imported profile, taken whole: anchor A over its first sample, B over its last (#88).
    * `trace` is § 7's `tr` value **verbatim** (`p1.<base64url>`) — decoding is a memoised client
    * derivation, never part of the state object.
+   *
+   * `offPositions` is `ph` in a link: the profil does **not** run between the two Positions, both
+   * known — one was typed off it, or beside a profil with no coordinates. The payload carries no
+   * coordinates, so a recipient puts a received profil's ends on the link's Positions unless this
+   * says otherwise. Absent, it runs between them, or they are not both known.
    */
-  | { source: "trace"; trace: string };
+  | { source: "trace"; trace: string; offPositions?: true };
 
 /** § 7's `za` / `zb` — each anchor's height above its own base, m. */
 export type AnchorHeights = { zA: number; zB: number };

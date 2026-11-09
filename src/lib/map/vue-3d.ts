@@ -20,7 +20,8 @@
  *   the bow is the unloaded line's, and says nothing of the line under a passager.
  * - **No profil, no Vue 3D.** Manual geometry has a span and a dénivelé but no altitude to stand
  *   them on; placing them on the relief would be a rule nobody decided, so the switch says why it
- *   is off instead, as it does without the two Positions.
+ *   is off instead, as it does without the two Positions. A profil that does not run between the
+ *   two Positions (`profilRunsBetween`) is no profil here: its altitudes are another line's.
  * - **A dragged anchor takes its Fil à plomb and the Ligne A–B with it, and nothing else** (#97).
  *   The engine's lines belong to the last release; until the next one has its profil they are not
  *   drawn, rather than drawn between ends they were not solved for.
@@ -28,6 +29,9 @@
 
 import type { Polyline, SceneBase, SceneFrame, SceneRider } from "@/lib/chart/scene.ts";
 import type { Position, Positions } from "@/lib/scenario/types.ts";
+import type { Trace } from "@/lib/terrain/trace.ts";
+
+import { profilRunsBetween } from "@/lib/terrain/trace.ts";
 
 import type { Fond } from "./display.ts";
 import type { Anchor } from "./gesture.ts";
@@ -95,21 +99,26 @@ export type Vue3dPlacement = {
 };
 
 /**
- * Can the Vue 3D stand? It needs both anchors on the earth and the profil's altitude under them.
+ * Can the Vue 3D stand? It needs both anchors on the earth and the altitude under them of a profil
+ * that runs between them.
  *
  * @param frame the coupe's input half — `null` for the *exception géométrique*, which has no profil
  *   either.
+ * @param profil the profil the coupe stands on, `null` for manual geometry.
  * @returns where the line stands, or why the switch is off.
  */
 export function vue3dPlacement(
   positions: Positions,
   frame: SceneFrame | null,
+  profil: Trace | null,
 ):
   | { readonly ok: true; readonly placement: Vue3dPlacement }
   | { readonly ok: false; readonly block: Vue3dBlock } {
   const { A, B } = positions;
   if (A === null || B === null) return { ok: false, block: "positions" };
-  if (frame === null || frame.bases === null) return { ok: false, block: "profil" };
+  if (frame === null || frame.bases === null || !profilRunsBetween({ A, B }, profil)) {
+    return { ok: false, block: "profil" };
+  }
   return { ok: true, placement: { ends: { A, B }, frame, bases: frame.bases } };
 }
 

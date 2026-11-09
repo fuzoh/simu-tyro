@@ -27,6 +27,7 @@ const PROFIL: Trace = {
   z: Float64Array.from([1453.7, 1368.1, 1438.7]),
   dev: null,
   origin: { kind: "geoadmin" },
+  ends: TRIAL_ENDS,
 };
 
 const ANCHORS = { zA: 1.5, zB: 1 };
@@ -51,7 +52,7 @@ function solved(scenario: Scenario): ChartScene {
 }
 
 function placed(scene: ChartScene) {
-  const at = vue3dPlacement(TRIAL_ENDS, scene);
+  const at = vue3dPlacement(TRIAL_ENDS, scene, PROFIL);
   if (!at.ok) throw new Error(`the trial line stands on the earth, not « ${at.block} »`);
   return at.placement;
 }
@@ -62,8 +63,11 @@ describe("the switch to the Vue 3D", () => {
   );
 
   test("is off without both Positions", () => {
-    expect(vue3dPlacement({ A: null, B: null }, frame)).toEqual({ ok: false, block: "positions" });
-    expect(vue3dPlacement({ A: TRIAL_ENDS.A, B: null }, frame)).toEqual({
+    expect(vue3dPlacement({ A: null, B: null }, frame, PROFIL)).toEqual({
+      ok: false,
+      block: "positions",
+    });
+    expect(vue3dPlacement({ A: TRIAL_ENDS.A, B: null }, frame, PROFIL)).toEqual({
       ok: false,
       block: "positions",
     });
@@ -73,12 +77,21 @@ describe("the switch to the Vue 3D", () => {
     const manual = buildSceneFrame(
       placeSpan({ geometry: { source: "manual", L: 435.2, h: -15.5 }, anchors: ANCHORS }, null),
     );
-    expect(vue3dPlacement(TRIAL_ENDS, manual)).toEqual({ ok: false, block: "profil" });
-    expect(vue3dPlacement(TRIAL_ENDS, null)).toEqual({ ok: false, block: "profil" });
+    expect(vue3dPlacement(TRIAL_ENDS, manual, null)).toEqual({ ok: false, block: "profil" });
+    expect(vue3dPlacement(TRIAL_ENDS, null, null)).toEqual({ ok: false, block: "profil" });
+  });
+
+  test("is off where the profil does not run between the Positions: its altitudes are another line's", () => {
+    // B typed some 1,3 km north of the profil's own end, with no profil loaded between them.
+    const typed = { A: TRIAL_ENDS.A, B: { lat: 46.858, lon: TRIAL_ENDS.B.lon } };
+    expect(vue3dPlacement(typed, frame, PROFIL)).toEqual({ ok: false, block: "profil" });
+    // A file with no coordinates, and Positions typed beside it.
+    const { ends: _, ...unplaced } = PROFIL;
+    expect(vue3dPlacement(TRIAL_ENDS, frame, unplaced)).toEqual({ ok: false, block: "profil" });
   });
 
   test("is on with both Positions over a profil", () => {
-    expect(vue3dPlacement(TRIAL_ENDS, frame)).toMatchObject({ ok: true });
+    expect(vue3dPlacement(TRIAL_ENDS, frame, PROFIL)).toMatchObject({ ok: true });
   });
 });
 

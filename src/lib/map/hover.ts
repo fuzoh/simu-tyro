@@ -7,8 +7,6 @@
  */
 
 import type { Px } from "@/lib/chart/hover-gesture.ts";
-import type { Position, Positions } from "@/lib/scenario/types.ts";
-import type { Trace } from "@/lib/terrain/trace.ts";
 
 /**
  * How far from the line the pointer may be and still be on it, px. A `[CONVENTION]`: a mouse pick
@@ -59,23 +57,4 @@ export function pointerOnLine(ends: LineEnds | null, box: Size, pointer: Px): Li
     y: (y / ends.view.height) * box.height,
   });
   return alongLine(scale(ends.A), scale(ends.B), pointer);
-}
-
-/**
- * Does the drawn line run along the profil the coupe is solved on? The reading takes the ground and
- * the distance from that profil at a share of the portée, so it holds only where the line between
- * the two Positions *is* the profil's own: an imported profil's ends are its Positions. Typed
- * Positions beside a manual span, or moved since the import, draw a line the span knows nothing of.
- *
- * Positions that are not both known draw no real line — the plain schematic is the portée itself,
- * and reads it.
- *
- * @param trace the profil standing in as the line's ground, `null` for a manual span.
- */
-export function profilRunsBetween(positions: Positions, trace: Trace | null): boolean {
-  const { A, B } = positions;
-  if (A === null || B === null) return true;
-  const ends = trace?.ends;
-  const same = (one: Position, other: Position) => one.lat === other.lat && one.lon === other.lon;
-  return ends !== undefined && same(A, ends.A) && same(B, ends.B);
 }

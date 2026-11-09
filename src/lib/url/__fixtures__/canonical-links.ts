@@ -66,6 +66,8 @@ export const BRANCHES = [
   "positions-one-anchor",
   "positions-with-trace",
   "positions-lone-coordinate",
+  "positions-off-profil",
+  "positions-off-profil-unplaced",
   "trace-full-profil",
 ] as const;
 
@@ -84,7 +86,8 @@ export type CanonicalLinkFixture = {
     | typeof MEASURED_88
     | typeof MEASURED_89
     | typeof MEASURED_90
-    | typeof MEASURED_103;
+    | typeof MEASURED_103
+    | typeof MEASURED_PH;
   covers: readonly Branch[];
   scenario: Scenario;
   link: string;
@@ -108,7 +111,8 @@ export type DecodeOnlyFixture = {
     | typeof MEASURED_88
     | typeof MEASURED_89
     | typeof MEASURED_90
-    | typeof MEASURED_103;
+    | typeof MEASURED_103
+    | typeof MEASURED_PH;
   covers: readonly Branch[];
   link: string;
 } & ({ scenario: Scenario; canonical: string } | { scenario: ScenarioDraft; canonical: null });
@@ -123,6 +127,7 @@ const MEASURED_88 = "[MEASURED] issue #88, codec as of 2026-11-08";
 const MEASURED_89 = "[MEASURED] issue #89, codec as of 2026-11-08";
 const MEASURED_90 = "[MEASURED] issue #90, codec as of 2026-11-08";
 const MEASURED_103 = "[MEASURED] issue #103, codec as of 2026-11-08";
+const MEASURED_PH = "[MEASURED] map #1's review of `ph`, codec as of 2026-11-09";
 
 /** Three samples `(0,0) (50,-4) (100,-9)`, as `encodeP1` writes them — a 100 m profil. */
 export const TRACE_P1 = "p1.AwCQTpBOAJ8G5wcA";
@@ -359,6 +364,19 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
     link:
       `/?v=1&u=daN&use=perm&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}` +
       `&lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783&tr=${TRACE_P1}`,
+  },
+  {
+    name: "Position B typed off the profil: `ph` says it no longer runs between them",
+    source: MEASURED_PH,
+    covers: ["positions-off-profil", "positions-with-trace", "trace"],
+    scenario: {
+      ...STEEL,
+      geometry: { source: "trace", trace: TRACE_P1, offPositions: true },
+      positions: { A: POSITION_A, B: { lat: 46.858, lon: POSITION_B.lon } },
+    },
+    link:
+      `/?v=1&u=daN&use=perm&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}` +
+      `&lata=46.843556&lona=6.525035&latb=46.858&lonb=6.520783&ph=1&tr=${TRACE_P1}`,
   },
   {
     name: "a profil geo.admin: its 200 points and the two Positions it was loaded between",
@@ -662,6 +680,22 @@ export const DECODE_ONLY_LINKS: readonly DecodeOnlyFixture[] = [
     link: `/?v=1&u=daN&use=perm&sa=10&sb=90&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}&tr=${TRACE_P1}`,
     scenario: { ...STEEL, geometry: { source: "trace", trace: TRACE_P1 } },
     canonical: `/?v=1&u=daN&use=perm&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}&tr=${TRACE_P1}`,
+  },
+  {
+    name: "`ph` with one Position unknown has no line to run off, and leaves",
+    source: MEASURED_PH,
+    covers: ["positions-off-profil-unplaced"],
+    link:
+      `/?v=1&u=daN&use=perm&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}` +
+      `&lata=46.843556&lona=6.525035&ph=1&tr=${TRACE_P1}`,
+    scenario: {
+      ...STEEL,
+      geometry: { source: "trace", trace: TRACE_P1 },
+      positions: { A: POSITION_A, B: null },
+    },
+    canonical:
+      `/?v=1&u=daN&use=perm&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}` +
+      `&lata=46.843556&lona=6.525035&tr=${TRACE_P1}`,
   },
   {
     name: "textile with MBL and mu left blank",

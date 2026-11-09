@@ -4,7 +4,14 @@ import { zGroundAt } from "@/lib/sim";
 
 import type { Trace } from "./trace.ts";
 
-import { deriveSpan, deriveTerrain, maxSpacing, meanAltitude, traceExtent } from "./trace.ts";
+import {
+  deriveSpan,
+  deriveTerrain,
+  maxSpacing,
+  meanAltitude,
+  profilRunsBetween,
+  traceExtent,
+} from "./trace.ts";
 
 /**
  * The Trace and its one seam — « v1 build spec » § 4 (*La Trace est immuable ; le `Terrain` est
@@ -120,5 +127,36 @@ describe("deriveTerrain", () => {
     deriveTerrain(RAMP, 1);
     expect(Array.from(RAMP.d)).toEqual(before.d);
     expect(Array.from(RAMP.z)).toEqual(before.z);
+  });
+});
+
+describe("profilRunsBetween — the profil between the two Positions", () => {
+  const POS_A = { lat: 46.5, lon: 6.6 };
+  const POS_B = { lat: 46.51, lon: 6.62 };
+  const profil = (ends?: { A: typeof POS_A; B: typeof POS_B }): Trace => ({
+    d: new Float64Array([0, 100]),
+    z: new Float64Array([500, 480]),
+    dev: null,
+    origin: { kind: "lien" },
+    ...(ends === undefined ? {} : { ends }),
+  });
+
+  test("holds where the profil's own ends are the Positions", () => {
+    expect(profilRunsBetween({ A: POS_A, B: POS_B }, profil({ A: POS_A, B: POS_B }))).toBe(true);
+  });
+
+  test("does not hold on a manual span whose Positions were typed, whatever their distance", () => {
+    expect(profilRunsBetween({ A: POS_A, B: POS_B }, null)).toBe(false);
+  });
+
+  test("does not hold once a Position moved off the profil's end, or where the profil has none", () => {
+    const moved = { A: POS_A, B: { ...POS_B, lon: POS_B.lon + 0.001 } };
+    expect(profilRunsBetween(moved, profil({ A: POS_A, B: POS_B }))).toBe(false);
+    expect(profilRunsBetween({ A: POS_A, B: POS_B }, profil())).toBe(false);
+  });
+
+  test("holds while the Positions are not both known: they draw no line to contradict it", () => {
+    expect(profilRunsBetween({ A: null, B: null }, null)).toBe(true);
+    expect(profilRunsBetween({ A: POS_A, B: null }, null)).toBe(true);
   });
 });

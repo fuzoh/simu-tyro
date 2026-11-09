@@ -549,6 +549,26 @@ describe("searchToScenario — the read side of § 7's key table", () => {
     expect(out.lonb).toBe(6.520783);
   });
 
+  it("reads `ph` as a profil that does not run between the Positions, and absent as one that does", () => {
+    const positions = "lata=46.843556&lona=6.525035&latb=46.858&lonb=6.520783";
+    expect(decode(`?${positions}&ph=1&tr=${TRACE}`).geometry).toEqual({
+      source: "trace",
+      trace: TRACE,
+      offPositions: true,
+    });
+    const { search, completed } = complete(`?${positions}&tr=${TRACE}`);
+    expect(search.ph).toBeUndefined();
+    expect(completed).not.toContain("ph");
+    expect(searchToScenario(search).geometry).toEqual({ source: "trace", trace: TRACE });
+  });
+
+  it("drops `ph` without a profil or without both Positions: there is no line for it to run off", () => {
+    expect("ph" in complete("?L=250&lata=46.8&lona=6.5&latb=46.9&lonb=6.6&ph=1").search).toBe(
+      false,
+    );
+    expect("ph" in complete(`?lata=46.8&lona=6.5&ph=1&tr=${TRACE}`).search).toBe(false);
+  });
+
   it("keeps a negative wind speed as it arrived, for the form to refuse (ADR-0001)", () => {
     expect(decode("?L=250&ws=-5").wind.speedKmh).toBe(-5);
   });

@@ -206,10 +206,13 @@ export function terminationIdFromToken(
 
 type Absent<K extends SearchKey> = { readonly [P in K]?: never };
 
-/** The terrain keys of a completed bag: manual `L`/`h`, or the imported profil `tr`. */
+/**
+ * The terrain keys of a completed bag: manual `L`/`h`, or the imported profil `tr` and whether it
+ * runs off the Positions, `ph`.
+ */
 type CompletedTerrain =
-  | (Pick<SearchValues, "L" | "h"> & Absent<"tr">)
-  | (Pick<SearchValues, "tr"> & Absent<"L" | "h">);
+  | (Pick<SearchValues, "L" | "h"> & Absent<"tr" | "ph">)
+  | (Pick<SearchValues, "tr"> & Partial<Pick<SearchValues, "ph">> & Absent<"L" | "h">);
 
 /** Exactly one tightness driver — two refuse the link before it is ever completed. */
 type CompletedDriver = {
@@ -257,9 +260,9 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
  * `mbf`/`ea`/`mu` absent is « non surchargée », which differs from « equal to the formula value »,
  * `mbl` absent — with `mu`, under `fam=tx` — is § 9's rope nobody typed, `bp` absent is one
  * Brin porteur, `cp` absent is the Mise en tension at A, `mt` absent is the mouflage, `ws` / `wd`
- * absent is no wind, `cda` / `f0` / `kv` / `mur` / `rho` absent is §12.2's default for the ride and
- * the four coordinates absent are Positions unknown: completing any would rewrite, and name in the
- * strip, every link older than the key.
+ * absent is no wind, `cda` / `f0` / `kv` / `mur` / `rho` absent is §12.2's default for the ride, the
+ * four coordinates absent are Positions unknown and `ph` absent is a profil that runs between them:
+ * completing any would rewrite, and name in the strip, every link older than the key.
  */
 const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>([
   "reg",
@@ -277,6 +280,7 @@ const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>([
   "lona",
   "latb",
   "lonb",
+  "ph",
   "mbf",
   "ea",
   "mu",
@@ -318,12 +322,13 @@ export type Completion = {
  * Three groups are exempt, all of them § 7's meanings of absence:
  *
  * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, `cp`, `mt`, `ws`, `wd`, the ride's constants, the
- *    Positions, the Overrides and the textile blanks. Under `fam=tx`
+ *    Positions and `ph`, the Overrides and the textile blanks. Under `fam=tx`
  *    **no rope is invented**: § 9 ships `MBL` and `μ` « vides et requis », because one made-up
  *    `MBL` decides the verdict, and those two blocking errors are the correct arrival state.
  *    Polyester's `k` stays blank too, because §13.2 publishes none.
  * 2. The **inactive** terrain source. `tr` present ⇒ imported: `L`/`h` are derived read-outs of
- *    the whole profil and are dropped rather than completed; `tr` absent ⇒ manual.
+ *    the whole profil and are dropped rather than completed; `tr` absent ⇒ manual. `ph` goes
+ *    with `tr`, and only where both Positions are known: there is no line to run off otherwise.
  * 3. The **inactive** family's keys, dropped the same way.
  *
  * Some keys complete from the link rather than from a constant. `x` completes to half the
@@ -339,6 +344,7 @@ export type Completion = {
  */
 export function completeFromDefaults(search: AcceptedSearch): Completion {
   const imported = search.tr !== undefined;
+  const located = search.lata !== undefined && search.latb !== undefined;
   const family = search.fam ?? DEFAULT_FAMILY;
   const hasDriver = TIGHTNESS_KEYS.some((key) => search[key] !== undefined);
   const values = completionValues(search, family);
@@ -347,7 +353,7 @@ export function completeFromDefaults(search: AcceptedSearch): Completion {
   const completed: SearchKey[] = [];
 
   for (const key of CANONICAL_KEYS) {
-    if (!inActiveConfiguration(key, imported, family)) continue;
+    if (!inActiveConfiguration(key, imported, located, family)) continue;
 
     const present = search[key];
     if (present !== undefined) {
@@ -400,14 +406,23 @@ function completionValues(search: AcceptedSearch, family: FamilyToken): Accepted
  * Out-of-scope keys leave the canonical bag **without** a strip line: the strip's two kinds are an
  * unknown key and an unrepresentable value, and a redundant `L` beside a `tr` is neither — with a
  * trace present `L` is derived, so nothing the line needs is removed.
+ *
+ * @param located both Positions are in the bag — the salvage has already dropped a lone coordinate.
  */
-function inActiveConfiguration(key: SearchKey, imported: boolean, family: FamilyToken): boolean {
+function inActiveConfiguration(
+  key: SearchKey,
+  imported: boolean,
+  located: boolean,
+  family: FamilyToken,
+): boolean {
   switch (key) {
     case "L":
     case "h":
       return !imported;
     case "tr":
       return imported;
+    case "ph":
+      return imported && located;
     case "r0":
     case "cst":
     case "mbf":
@@ -505,7 +520,7 @@ export function searchToScenario(search: CompletedSearch): ScenarioDraft {
     geometry:
       search.tr === undefined
         ? { source: "manual", L: search.L, h: search.h }
-        : { source: "trace", trace: search.tr },
+        : { source: "trace", trace: search.tr, ...(search.ph === 1 ? { offPositions: true } : {}) },
     anchors: { zA: search.za, zB: search.zb },
     // Absent **is** one member — the meaning of absence, never a completed default.
     carryingLines: search.bp ?? 1,
@@ -654,7 +669,10 @@ export function scenarioToSearch(scenario: Scenario): CompletedSearch {
     out.lonb = B.lon;
   }
 
-  if (geometry.source === "trace") out.tr = geometry.trace;
+  if (geometry.source === "trace") {
+    if (geometry.offPositions === true) out.ph = 1;
+    out.tr = geometry.trace;
+  }
 
   return out as CompletedSearch;
 }

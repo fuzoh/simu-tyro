@@ -222,6 +222,7 @@ const GEOMETRY: v.GenericSchema<unknown, Scenario["geometry"]> = v.variant("sour
   v.object({
     source: v.literal("trace"),
     trace: v.pipe(v.string(), v.check(isDecodableP1, "not a p1. payload")),
+    offPositions: v.optional(v.literal(true)),
   }),
 ]);
 

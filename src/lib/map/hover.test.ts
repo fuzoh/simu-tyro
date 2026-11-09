@@ -1,8 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import type { Trace } from "@/lib/terrain/trace.ts";
-
-import { alongLine, LINE_PICK_PX, pointerOnLine, profilRunsBetween } from "./hover.ts";
+import { alongLine, LINE_PICK_PX, pointerOnLine } from "./hover.ts";
 
 const A = { x: 0, y: 0 };
 const B = { x: 100, y: 0 };
@@ -59,36 +57,5 @@ describe("the pointer on the line drawn in either frame", () => {
 
   test("reads nothing while the ends are not known", () => {
     expect(pointerOnLine(null, box, { x: 300, y: 50 })).toBeNull();
-  });
-});
-
-describe("the profil that runs between the drawn Positions", () => {
-  const POS_A = { lat: 46.5, lon: 6.6 };
-  const POS_B = { lat: 46.51, lon: 6.62 };
-  const trace = (ends?: { A: typeof POS_A; B: typeof POS_B }): Trace => ({
-    d: new Float64Array([0, 100]),
-    z: new Float64Array([500, 480]),
-    dev: null,
-    origin: { kind: "lien" },
-    ...(ends === undefined ? {} : { ends }),
-  });
-
-  test("is read where the imported profil's ends are the Positions", () => {
-    expect(profilRunsBetween({ A: POS_A, B: POS_B }, trace({ A: POS_A, B: POS_B }))).toBe(true);
-  });
-
-  test("is not read on a manual span whose Positions were typed, whatever their distance", () => {
-    expect(profilRunsBetween({ A: POS_A, B: POS_B }, null)).toBe(false);
-  });
-
-  test("is not read once a Position was moved off the profil's end, or the profil has none", () => {
-    const moved = { A: POS_A, B: { ...POS_B, lon: POS_B.lon + 0.001 } };
-    expect(profilRunsBetween(moved, trace({ A: POS_A, B: POS_B }))).toBe(false);
-    expect(profilRunsBetween({ A: POS_A, B: POS_B }, trace())).toBe(false);
-  });
-
-  test("is read on the plain schematic, which draws the portée itself", () => {
-    expect(profilRunsBetween({ A: null, B: null }, null)).toBe(true);
-    expect(profilRunsBetween({ A: POS_A, B: null }, null)).toBe(true);
   });
 });

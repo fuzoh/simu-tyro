@@ -175,6 +175,7 @@ const KEYS: Record<StripKey, KeyRow> = {
   lona: fromField("lonA", "f"),
   latb: fromField("latB", "f"),
   lonb: fromField("lonB", "f"),
+  ph: { label: "Profil hors des Positions", source: null, genre: "m", quantity: null },
   tr: { label: "Profil", source: { term: "profile" }, genre: "m", quantity: null },
   // `v` is deliberately absent: it is the schema version, not a champ of the scenario, and naming
   // « version de schéma 1 » among the completed fields buries the numbers the sentence exists for.
@@ -249,6 +250,7 @@ const TOKENS: Record<StripKey, Readonly<Record<string, string>> | null> = {
   lona: null,
   latb: null,
   lonb: null,
+  ph: null,
   tr: null,
 };
 

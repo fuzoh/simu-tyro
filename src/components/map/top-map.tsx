@@ -23,7 +23,8 @@
  * - **The Vue 3D is behind one door** (#95): the « 3D » switch stands it in the map's place, and its
  *   renderer is fetched through `./load-vue-3d.ts` the first time it is chosen — never imported
  *   here. Whatever stops it (no network, no WebGL) brings the vue de dessus back with « Vue 3D
- *   indisponible »; without the two Positions or a profil the switch is off and says why.
+ *   indisponible »; without the two Positions or a profil between them the switch is off and says
+ *   why.
  * - **The Mesure is the map's own state** (#98): `./use-measure.ts` holds its points, which never
  *   reach the store, the Session or the link. While it is on, a click on the map is a point of the
  *   ruler and places no anchor; the Vue 3D has no Mesure.
@@ -53,6 +54,7 @@ import type { FondHealth, MapStyle } from "@/lib/map/style.ts";
 import type { Vue3dBlock, Vue3dScene } from "@/lib/map/vue-3d.ts";
 import type { Position, Positions } from "@/lib/scenario/types.ts";
 import type { Fetch } from "@/lib/terrain/geoadmin.ts";
+import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { useAppDispatch, useAppState } from "@/components/app/store.tsx";
 import { useHover } from "@/components/chart/use-hover.ts";
@@ -85,7 +87,7 @@ import {
 } from "@/lib/map/copy.ts";
 import { FONDS } from "@/lib/map/display.ts";
 import { clickTarget, drawnPositions, IDLE, stepGesture } from "@/lib/map/gesture.ts";
-import { type LineEnds, type LinePick, pointerOnLine, profilRunsBetween } from "@/lib/map/hover.ts";
+import { type LineEnds, type LinePick, pointerOnLine } from "@/lib/map/hover.ts";
 import {
   BANANE_SOURCE,
   bananeData,
@@ -104,6 +106,7 @@ import {
 import { drapedAttribution, vue3dPlacement, vue3dScene } from "@/lib/map/vue-3d.ts";
 import { LEVEL_REFERENCE, roseReference } from "@/lib/map/wind-rose.ts";
 import { geoadminNotice, loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
+import { profilRunsBetween } from "@/lib/terrain/trace.ts";
 import { cn } from "@/lib/utils.ts";
 
 import type { Vue3d } from "./vue-3d-renderer.ts";
@@ -142,6 +145,8 @@ export function TopMap({
   const { scenario, map: display, trace } = useAppState();
   const dispatch = useAppDispatch();
   const { positions } = scenario;
+  // `trace` stays cached behind manual geometry, where it is no ground of the line's.
+  const profil = scenario.geometry.source === "trace" ? trace : null;
   const locked = readOnly !== undefined;
   const { gesture, send } = useMapGesture(positions);
   const drawn = drawnPositions(gesture, positions);
@@ -149,7 +154,7 @@ export function TopMap({
   const [failed, setFailed] = useState(false);
   const [health, setHealth] = useState<FondHealth>(() => freshHealth(display.fond));
 
-  const placement = vue3dPlacement(positions, frame);
+  const placement = vue3dPlacement(positions, frame, profil);
   // The Vue 3D fell over this visit: the vue de dessus is back until the switch is pressed again.
   const [lost3d, setLost3d] = useState(false);
   const shows3d = display.view === "3d" && placement.ok && !lost3d;
@@ -159,10 +164,10 @@ export function TopMap({
   // Vent the gates accept.
   const wind = windCause === null ? scenario.wind : { ...scenario.wind, speedKmh: 0 };
   const across = bananeAcross(wind);
-  const scene3d = useVue3dScene(shows3d, frame, solved, across);
+  const scene3d = useVue3dScene(shows3d, frame, profil, solved, across);
 
   const plain = failed ? plainDrawing(drawn, across) : null;
-  const measure = useMeasure(browserFetch, scenario.geometry.source === "trace" ? trace : null);
+  const measure = useMeasure(browserFetch, profil);
   const measuring = measure.active && !shows3d && plain === null;
   const { click: measureClick } = measure;
   const clicked = useCallback(
@@ -184,7 +189,7 @@ export function TopMap({
     !measuring &&
     gesture.kind === "idle" &&
     frame !== null &&
-    profilRunsBetween(drawn, scenario.geometry.source === "trace" ? trace : null);
+    profilRunsBetween(drawn, profil);
   const { at: hovered, bind, clear: clearHover } = useHover<LinePick>();
   const hover = bind((event) => {
     // A control over the line — a toggle, the rose and its handle — is not the line's to read. Not
@@ -546,6 +551,7 @@ function Vue3dHost({
 function useVue3dScene(
   shown: boolean,
   frame: SceneFrame | null,
+  profil: Trace | null,
   solved: SceneBase | null,
   across: number,
 ) {
@@ -553,11 +559,11 @@ function useVue3dScene(
   const { xD } = rider;
   return useMemo(() => {
     if (!shown) return null;
-    const at = vue3dPlacement(positions, frame);
+    const at = vue3dPlacement(positions, frame, profil);
     if (!at.ok) return null;
     const placed = solved === null ? null : placeRider(solved, xD);
     return vue3dScene({ placement: at.placement, solved, rider: placed, across });
-  }, [shown, positions, frame, solved, xD, across]);
+  }, [shown, positions, frame, profil, solved, xD, across]);
 }
 
 function MapControls({
