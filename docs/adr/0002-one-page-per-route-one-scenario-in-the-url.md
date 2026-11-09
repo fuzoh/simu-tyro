@@ -85,3 +85,11 @@ Chart Block below 1024 only, where the Rail stands under it; from three columns 
 under the vue de dessus in a column that scrolls and never pins. So the « 907 px of height » above
 no longer applies to Avancé, and the 36 px bar is owed to the fit below 1024 alone, where `MIN_RAIL`
 is paid under it. The bar's height stands.
+
+## Update — 2026-11-09, #112
+
+From 1920 px the left column is 576 px (`WIDE_RAIL_WIDTH`), so the middle column is
+`viewport − 864` there, and `viewport − 576` from 1024 to 1919 only. The #110 paragraph's « up to
+1984 px, the column at 2560 » therefore no longer holds: at 2560 the middle column is 1696 px, and
+the Chart Block reaches its 1984 px letterbox at 2848 px of viewport (`AVANCE_BLOCK_VIEWPORT_PX`).
+The plateau, the raised plot ceiling and the « never pins from three columns » stand.
