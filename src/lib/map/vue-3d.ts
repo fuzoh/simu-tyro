@@ -25,10 +25,15 @@
  * - **A dragged anchor takes its Fil à plomb and the Ligne A–B with it, and nothing else** (#97).
  *   The engine's lines belong to the last release; until the next one has its profil they are not
  *   drawn, rather than drawn between ends they were not solved for.
+ * - **The coupe's layers are the Vue 3D's** (#111): the View Strip's « ligne à vide », « corde A–B »
+ *   and « trajectoire » show or hide the Ligne à vide, the Ligne A–B and the Trajectoire here too,
+ *   with no picker of the Vue 3D's own; the loaded line is always drawn, as on the coupe. The Ligne
+ *   A–B and the Fils à plomb need no solve, so they stand under « Aucun résultat » as well.
  */
 
 import type { Polyline, SceneBase, SceneFrame, SceneRider } from "@/lib/chart/scene.ts";
 import type { Positions } from "@/lib/scenario/types.ts";
+import type { LayerToggles } from "@/lib/session/session.ts";
 import type { Trace, TraceEnds } from "@/lib/terrain/trace.ts";
 
 import { profilRunsBetween } from "@/lib/terrain/trace.ts";
@@ -132,10 +137,30 @@ export type FilAPlomb = {
   readonly top: EarthPoint;
 };
 
+/**
+ * Which of the View Strip's layers the Vue 3D shows. « distances », the passager's tip, has no
+ * counterpart here; the loaded line and the Fils à plomb are always drawn.
+ */
+export type Vue3dLayers = {
+  /** « ligne à vide ». */
+  readonly unloaded: boolean;
+  /** « corde A–B ». */
+  readonly ligneAB: boolean;
+  /** « trajectoire ». */
+  readonly trajectory: boolean;
+};
+
+/** The View Strip's toggles, as the Vue 3D reads them. */
+export function vue3dLayers({ unloadedLine, chordAB, trajectory }: LayerToggles): Vue3dLayers {
+  return { unloaded: unloadedLine, ligneAB: chordAB, trajectory };
+}
+
 /** Everything the Vue 3D draws over the relief. */
 export type Vue3dScene = {
   readonly ends: TraceEnds;
   readonly fils: { readonly A: FilAPlomb; readonly B: FilAPlomb };
+  /** The Ligne A–B, straight from anchor to anchor: it needs no solve. */
+  readonly ligneAB: readonly [EarthPoint, EarthPoint];
   /** The Ligne à vide — `null` under « Aucun résultat », when the line did not solve. */
   readonly unloaded: readonly EarthPoint[] | null;
   /**
@@ -143,6 +168,14 @@ export type Vue3dScene = {
    * « Aucun résultat », or where the exact solve at that position refused.
    */
   readonly loaded: readonly EarthPoint[] | null;
+  /**
+   * The Trajectoire — the passager's node over the whole traverse, one polyline per run as the
+   * coupe splits it (`SceneBase.trajectory`) — or `null` under « Aucun résultat ». Straight like the
+   * loaded line it hangs from: the Banane is the Ligne à vide's.
+   */
+  readonly trajectory: readonly (readonly EarthPoint[])[] | null;
+  /** The View Strip's layers, as this view draws them. */
+  readonly layers: Vue3dLayers;
   /**
    * One shift per Brin porteur, px, down positive — the coupe's (`SceneBase.members`): two members
    * are one solve drawn twice, told apart on screen and nowhere else (#4).
@@ -156,17 +189,20 @@ export type Vue3dScene = {
  * @param solved the solved half, or `null` under « Aucun résultat ».
  * @param rider the passager placed at the Scenario's `x_D`, or `null`.
  * @param across the wind's cross component, m/s: the Ligne à vide's bow, nil without it.
+ * @param layers the View Strip's toggles.
  */
 export function vue3dScene({
   placement: { ends, frame, bases },
   solved,
   rider,
   across,
+  layers,
 }: {
   placement: Vue3dPlacement;
   solved: SceneBase | null;
   rider: SceneRider | null;
   across: number;
+  layers: LayerToggles;
 }): Vue3dScene {
   const { L, h, anchors } = frame;
   const topA = bases.zBaseA + anchors.zA;
@@ -174,14 +210,18 @@ export function vue3dScene({
   const onBanane = earthFrame({ ends, L, topA, across });
   const fil = (x: number, top: number, height: number) =>
     filAPlomb(onEarth(x, top - height), height);
+  const fils = { A: fil(0, 0, anchors.zA), B: fil(L, h, anchors.zB) };
   return {
     ends,
-    fils: { A: fil(0, 0, anchors.zA), B: fil(L, h, anchors.zB) },
+    fils,
+    ligneAB: [fils.A.anchor, fils.B.anchor],
     unloaded: solved === null ? null : alongLine(onBanane, solved.unloadedCable),
     loaded:
       solved === null || rider === null
         ? null
         : alongLine(onEarth, throughNode(rider.cable, rider.step.xD, rider.step.zD)),
+    trajectory: solved === null ? null : solved.trajectory.map((run) => alongLine(onEarth, run)),
+    layers: vue3dLayers(layers),
     membersPx: solved?.members.map((member) => member.offsetPx) ?? [0],
   };
 }

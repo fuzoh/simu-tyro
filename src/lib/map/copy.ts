@@ -64,6 +64,46 @@ export const MAP_COPY = {
   reperes3d: "Repères : la Vue 3D n'en trace pas — revenez en 2D.",
 } as const;
 
+/** The Gimbal's words (#111): each button's name, and the key that does the same. */
+export const GIMBAL_COPY = {
+  /** The Gimbal's accessible name. */
+  title: "Caméra de la Vue 3D",
+  north: "Nord en haut",
+  orbitLeft: "Tourner autour de la ligne vers la gauche",
+  orbitRight: "Tourner autour de la ligne vers la droite",
+  tiltUp: "Incliner vers le haut",
+  tiltDown: "Incliner vers le bas",
+  zoomIn: "Zoom avant",
+  zoomOut: "Zoom arrière",
+  vueDuDepart: "Vue du départ",
+  vueLaterale: "Vue latérale",
+  /** The hover help's heading: the keys act once the Vue 3D has been clicked or tabbed to. */
+  keys: "Clavier, après un clic dans la Vue 3D",
+} as const;
+
+/** The keys of the Vue 3D, as the hover help lists them: the key, then what it does. */
+export const VUE_3D_KEYS = [
+  ["← / →", "tourner autour de la ligne"],
+  ["↑ / ↓", "avancer / reculer"],
+  ["Maj + ↑ / ↓", "incliner"],
+  ["+ / −", "zoom"],
+  ["1", GIMBAL_COPY.vueDuDepart],
+  ["2", GIMBAL_COPY.vueLaterale],
+  ["N", GIMBAL_COPY.north.toLocaleLowerCase("fr")],
+] as const;
+
+/** The hover help over the Gimbal: one line per key. */
+export function vue3dKeysHelp(): string {
+  return [`${GIMBAL_COPY.keys} :`, ...VUE_3D_KEYS.map(([key, does]) => `${key} : ${does}`)].join(
+    "\n",
+  );
+}
+
+/** A Gimbal button's hover: its name and the key that does the same. */
+export function gimbalHint(name: string, key: string): string {
+  return `${name} (${key})`;
+}
+
 /** The Mesure's words (#98). */
 export const MEASURE_COPY = {
   /** The button that enters the tool. */
@@ -238,6 +278,8 @@ export function mapLabelTable(): readonly string[] {
   return [
     ...Object.values(FOND_LABEL),
     ...Object.values(MAP_COPY),
+    ...Object.values(GIMBAL_COPY),
+    vue3dKeysHelp(),
     ...Object.values(VUE_3D_BLOCKED),
     ...Object.values(VUE_3D_BLOCKED_READ_ONLY),
     ...Object.values(MEASURE_COPY),

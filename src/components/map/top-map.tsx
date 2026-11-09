@@ -33,6 +33,10 @@
  *   Mesure's source of every style — so a changed Fond keeps it, and the click sets the point where
  *   the cross showed. A finger draws none. The Repères d'ancrage cross A and B where they are
  *   drawn, a dragged one under the pointer. « Repères » is a display choice, beside the Fond.
+ * - **The Vue 3D's camera is the reader's, and its keys are its own** (#111): the Gimbal
+ *   (`./vue-3d-gimbal.tsx`) sits over its corner, and a key reaches it only from inside the view —
+ *   its canvas or a Gimbal button — where an arrow no longer scrolls the page. The View Strip's
+ *   layers are read from the store, so the Vue 3D shows the curves the coupe shows.
  * - **One gesture machine for both views** (#97): an anchor dragged in the Vue 3D is sent to the
  *   same `send` as a marker, so its release is the same new line, recomputed by the same rule.
  * - **On the Page Terrain the map writes nothing** (#101): no click places an anchor, no anchor is
@@ -111,6 +115,7 @@ import {
   measureDrawing,
   SWISSTOPO_COVERAGE,
 } from "@/lib/map/style.ts";
+import { vue3dKeyCommand } from "@/lib/map/vue-3d-camera.ts";
 import { drapedAttribution, vue3dPlacement, vue3dScene } from "@/lib/map/vue-3d.ts";
 import { roseReference } from "@/lib/map/wind-rose.ts";
 import { windBearing } from "@/lib/rail/gates.ts";
@@ -122,6 +127,7 @@ import type { Vue3d } from "./vue-3d-renderer.ts";
 
 import { loadVue3d } from "./load-vue-3d.ts";
 import { useMeasure } from "./use-measure.ts";
+import { Gimbal } from "./vue-3d-gimbal.tsx";
 import { WindRose } from "./wind-rose.tsx";
 
 // MapLibre cannot find its worker inside a bundle; Vite hands over the file's URL.
@@ -233,11 +239,12 @@ export function TopMap({
       : null;
   const unavailable = failed || fondUnavailable(health, drawn);
   // The Banane is on screen when there is a cross wind and a line for it to bow: the map's, or the
-  // Ligne à vide the Vue 3D drew — which it does not while an anchor follows the pointer.
+  // Ligne à vide the Vue 3D drew — which it does not while an anchor follows the pointer, nor while
+  // the View Strip's « ligne à vide » is off.
   const bananeShown =
     across !== 0 &&
     (shows3d
-      ? scene3d?.unloaded != null && gesture.kind === "idle"
+      ? scene3d?.unloaded != null && scene3d.layers.unloaded && gesture.kind === "idle"
       : drawn.A !== null && drawn.B !== null);
   // A release loads its profil the same way in both views, and says so under either.
   const gestureLine = measuring
@@ -509,6 +516,7 @@ function Vue3dHost({
 }) {
   const container = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<Vue3d | null>(null);
+  const [heading, setHeading] = useState(0);
   const fallen = useRef(onUnavailable);
   const gestured = useRef(onGesture);
   useLayoutEffect(() => {
@@ -529,6 +537,8 @@ function Vue3dHost({
     const options = {
       onGesture: (event: MapEvent) => gestured.current(event),
       onUnavailable: fail,
+      onHeading: setHeading,
+      label: MAP_COPY.vue3dTitle,
     };
     renderer.openVue3d(node, options).then((open) => {
       if (live) {
@@ -547,15 +557,34 @@ function Vue3dHost({
     view?.show(scene, display, idle);
   }, [view, scene, display, idle]);
 
+  // The keys reach the view only from inside it: the canvas — a focusable `application` once pressed
+  // or tabbed to — or a Gimbal button. Handled, a key's default, the page scrolling under an arrow,
+  // is cancelled. Heard on the region rather than on either, so a key works after a Gimbal press.
+  const region = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const node = region.current;
+    if (node === null || view === null) return;
+    const keyed = (event: KeyboardEvent) => {
+      const command = vue3dKeyCommand(event);
+      if (command === null) return;
+      event.preventDefault();
+      view.command(command);
+    };
+    node.addEventListener("keydown", keyed);
+    return () => node.removeEventListener("keydown", keyed);
+  }, [view]);
+
   return (
-    <div className="absolute inset-0">
+    <div aria-label={MAP_COPY.vue3dTitle} className="absolute inset-0" ref={region} role="region">
       <div
-        aria-label={MAP_COPY.vue3dTitle}
-        className="h-full w-full"
+        className="[&_canvas:focus-visible]:outline-ring h-full w-full [&_canvas]:outline-none [&_canvas:focus-visible]:outline-2 [&_canvas:focus-visible]:-outline-offset-2"
         ref={container}
-        role="region"
       />
-      {view === null && <Vue3dLoading />}
+      {view === null ? (
+        <Vue3dLoading />
+      ) : (
+        <Gimbal headingDeg={heading} onCommand={(command) => view.command(command)} />
+      )}
     </div>
   );
 }
@@ -571,15 +600,18 @@ function useVue3dScene(
   solved: SceneBase | null,
   across: number,
 ) {
-  const { positions, rider } = useAppState().scenario;
+  const {
+    scenario: { positions, rider },
+    layers,
+  } = useAppState();
   const { xD } = rider;
   return useMemo(() => {
     if (!shown) return null;
     const at = vue3dPlacement(positions, frame, profil);
     if (!at.ok) return null;
     const placed = solved === null ? null : placeRider(solved, xD);
-    return vue3dScene({ placement: at.placement, solved, rider: placed, across });
-  }, [shown, positions, frame, profil, solved, xD, across]);
+    return vue3dScene({ placement: at.placement, solved, rider: placed, across, layers });
+  }, [shown, positions, frame, profil, solved, xD, across, layers]);
 }
 
 function MapControls({

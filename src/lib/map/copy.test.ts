@@ -17,10 +17,13 @@ import {
   BANANE_HELP,
   clickHint,
   describeRelative,
+  GIMBAL_COPY,
+  gimbalHint,
   MAP_COPY,
   mapLabelTable,
   measureHint,
   measureLines,
+  vue3dKeysHelp,
   windReading,
 } from "./copy.ts";
 import { horizontalDistance } from "./measure.ts";
@@ -192,6 +195,25 @@ describe("the Mesure's readout", () => {
     expect(measureHint([])).toBe("Mesure : cliquez sur le premier point.");
     expect(measureHint([TRIAL_ENDS.A])).toBe("Mesure : cliquez sur le second point.");
     expect(measureHint([TRIAL_ENDS.A, TRIAL_ENDS.B])).toBe("Mesure : un nouveau clic recommence.");
+  });
+});
+
+describe("the Gimbal's hover help (#111)", () => {
+  test("lists the issue's keys, one per line, in its order", () => {
+    expect(vue3dKeysHelp().split("\n")).toEqual([
+      "Clavier, après un clic dans la Vue 3D :",
+      "← / → : tourner autour de la ligne",
+      "↑ / ↓ : avancer / reculer",
+      "Maj + ↑ / ↓ : incliner",
+      "+ / − : zoom",
+      "1 : Vue du départ",
+      "2 : Vue latérale",
+      "N : nord en haut",
+    ]);
+  });
+
+  test("a button's hover names the key that does the same", () => {
+    expect(gimbalHint(GIMBAL_COPY.vueDuDepart, "1")).toBe("Vue du départ (1)");
   });
 });
 
