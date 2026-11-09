@@ -877,7 +877,11 @@ describe("#93's Fond de carte and Couche pentes, #95's Vue 3D, #107's Repères �
     expect(arrived.map).toEqual(CHOSEN);
   });
 
-  it("copies the same link with the Repères shown or hidden, on a line placed on the map", () => {
+  it("hides the Repères without touching the Scenario, so the copied link cannot change", () => {
+    // #107's « Le lien copié est identique avec les repères affichés ou masqués »: `copyLink` reads
+    // the Scenario and the Trace alone, so the link is the same exactly when hiding the Repères
+    // leaves both the very same objects. That identity is what can go red here; the codec's side —
+    // no `rep` key in a link — is the test above's.
     const placed = appReducer(opened, {
       type: "scénario/modifié",
       patch: {
@@ -889,13 +893,8 @@ describe("#93's Fond de carte and Couche pentes, #95's Vue 3D, #107's Repères �
       map: { ...placed.map, reperes: false },
     });
     expect(hidden.map.reperes).toBe(false);
-    const link = (state: AppState) =>
-      copyLink({ scenario: state.scenario, trace: state.trace, origin: ORIGIN, page: "/" });
-    const shown = link(placed);
-    if (!shown.ok) throw new Error(shown.message);
-    expect(shown.href).toContain("6.525035");
-    expect(link(hidden)).toEqual(shown);
     expect(hidden.scenario).toBe(placed.scenario);
+    expect(hidden.trace).toBe(placed.trace);
   });
 
   it("« Réinitialiser le scénario » leaves it as chosen", () => {
