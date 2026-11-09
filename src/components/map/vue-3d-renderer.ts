@@ -24,7 +24,8 @@
  *   sampled at its finest under the anchor, then the gesture ends and the profil is asked for.
  * - **The camera is always given back** (#111). Whatever ends the press on an anchor — a release on
  *   the canvas or off it, a `pointercancel`, the window losing the focus — ends the gesture and
- *   re-enables the camera's gestures, once.
+ *   re-enables the camera's gestures, once. Off the canvas, only the pointer that took the anchor
+ *   ends its press.
  * - **The coupe's layers decide what is shown, never what is drawn** (#111): every line of the
  *   scene is an entity, drawn when the scene is new; the layers come beside the scene, not in it,
  *   so the View Strip's toggles and a drag only flip their `show`.
@@ -171,6 +172,16 @@ export async function openVue3d(
   canvas.setAttribute("role", "application");
   canvas.setAttribute("aria-label", label);
   canvas.addEventListener("pointerdown", () => canvas.focus({ preventScroll: true }));
+  // The pointer of the last press on the canvas, heard in the capture phase, before CesiumJS's own
+  // listener turns it into the press that may take an anchor.
+  let pressing: number | null = null;
+  canvas.addEventListener(
+    "pointerdown",
+    (event) => {
+      pressing = event.pointerId;
+    },
+    { capture: true },
+  );
 
   // The heading the Gimbal's north shows, told only when its whole degree changes.
   let heading = Number.NaN;
@@ -203,8 +214,9 @@ export async function openVue3d(
   } | null = null;
   let drawn: Drawn | null = null;
   // The anchor under a press; `moved` once it has left its Position, which is when the gesture
-  // starts — a press and release on an anchor is no new line.
-  let grip: { anchor: Anchor; moved: boolean } | null = null;
+  // starts — a press and release on an anchor is no new line. `pointerId` is the pointer that took
+  // it, `null` where the press came with none.
+  let grip: { anchor: Anchor; moved: boolean; pointerId: number | null } | null = null;
   // Where the dragged anchor stands, from its first move until the machine is idle again.
   let pose: { anchor: Anchor; foot: EarthPoint } | null = null;
   let following: Vue3dFollowing | null = null;
@@ -240,14 +252,14 @@ export async function openVue3d(
   /**
    * Ends the press on an anchor, wherever it ended: the camera's gestures come back, and a drag
    * that moved the anchor ends on the relief under it. Heard from CesiumJS's own release and from
-   * the window's, so a pointer let go off the canvas, a cancelled one or a window that lost the
-   * focus ends it too; the first to arrive does, the others find no grip.
+   * the window's ({@link ended}), so a pointer let go off the canvas, a cancelled one or a window
+   * that lost the focus ends it too; the first to arrive does, the others find no grip.
    */
   function release() {
     if (grip === null) return;
     const { moved } = grip;
     grip = null;
-    for (const type of ENDS_OF_A_PRESS) window.removeEventListener(type, release);
+    for (const type of ENDS_OF_A_PRESS) window.removeEventListener(type, ended);
     cesium.screenSpaceCameraController.enableInputs = true;
     canvas.style.cursor = "";
     const released = pose;
@@ -261,13 +273,26 @@ export async function openVue3d(
     });
   }
 
+  /**
+   * The window's word that a press ended: the release or cancel of the pointer that took the
+   * anchor — another finger or pen lifted elsewhere is not this press's end — or the window losing
+   * the focus, which ends every press.
+   */
+  function ended(event: Event) {
+    const other =
+      event instanceof PointerEvent &&
+      grip?.pointerId != null &&
+      event.pointerId !== grip.pointerId;
+    if (!other) release();
+  }
+
   const pointer = new ScreenSpaceEventHandler(canvas);
   pointer.setInputAction(({ position }: ScreenSpaceEventHandler.PositionedEvent) => {
     if (shown?.idle !== true || grip !== null) return;
     const anchor = anchorAt(position);
     if (anchor === null) return;
-    grip = { anchor, moved: false };
-    for (const type of ENDS_OF_A_PRESS) window.addEventListener(type, release);
+    grip = { anchor, moved: false, pointerId: pressing };
+    for (const type of ENDS_OF_A_PRESS) window.addEventListener(type, ended);
     cesium.screenSpaceCameraController.enableInputs = false;
     canvas.style.cursor = "grabbing";
   }, ScreenSpaceEventType.LEFT_DOWN);
@@ -326,7 +351,7 @@ export async function openVue3d(
     },
     destroy() {
       pointer.destroy();
-      for (const type of ENDS_OF_A_PRESS) window.removeEventListener(type, release);
+      for (const type of ENDS_OF_A_PRESS) window.removeEventListener(type, ended);
       // Closed under a moving anchor, the view hears no release: the gesture ends where the anchor
       // was drawn, or the machine would wait for it — and keep the vue de dessus's markers — forever.
       if (grip?.moved === true && pose !== null) {
