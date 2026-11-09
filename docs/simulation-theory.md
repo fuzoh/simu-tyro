@@ -558,7 +558,9 @@ points `z < x < L − z` of the line and of the ground enter the inner minimum. 
 read; the same minimum with nothing left out is still computed and shown, judged by
 nothing. `z` is the same at both ends, 10 m by default with no normative source
 (EN 15567 stays `[PAYWALLED]`); `z = 0` is no zone and reproduces every figure above bit
-for bit. Two zones that meet (`2z ≥ L`) leave nothing to judge and are a Blocking Error.
+for bit. Two zones that meet (`2z ≥ L`) leave nothing to judge and are a Blocking Error;
+so are zones whose gap holds no sweep step (`2z` within one step spacing, ≈ `L₀/241`, of
+`L`), since the reduction is over the sweep's own `x_P` and its judged minimum is then empty.
 
 `h_rider` default 2.1 m `[CONVENTION]` (§6.3). Normative EN 15567 free-space/fall-space
 numbers, lateral wind corridor and design wind speed: `[PAYWALLED]` — [R1 B12]'s

@@ -3,6 +3,8 @@ import { describe, expect, test } from "vitest";
 import type { ScenarioDraft, TextileDraft } from "@/lib/scenario/types.ts";
 
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
+import { sweepRider, sweepRiderOf } from "@/lib/scenario/traverse.ts";
+import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 
 import type { FieldId, GateId } from "./fields.ts";
 
@@ -15,6 +17,7 @@ import {
   fieldUnavailable,
   GATE_CONSEQUENCE,
   isFieldActive,
+  noRiderBetweenMessage,
   regimeUnavailableNote,
   saisieEnCours,
   terminationOptions,
@@ -961,6 +964,63 @@ describe("two Zones d'ancrage that meet are a Blocking Error (#106)", () => {
 
   test("2z just under L leaves a sliver to judge, and nothing blocks", () => {
     expect(evaluateGates({ scenario: zoned(74.9) }).errors).toEqual([]);
+  });
+
+  /** §11 over the scenario's own solved traverse, as the scene hands it to the gates. */
+  function solvedClearance(draft: ScenarioDraft) {
+    const unloaded = deriveUnloaded(unloadedInputs(draft, null));
+    if (!unloaded.ok) throw new Error("the line solves");
+    const swept = sweepRider(unloaded, sweepRiderOf(draft));
+    if (swept === null) throw new Error("the traverse solves");
+    return swept.clearance;
+  }
+
+  test("a sliver narrower than one sweep step holds no passager, and blocks as zones that meet", () => {
+    // The sweep's `x_P` run about 0,63 m apart across mid-span: …74,43 then 75,06. At z = 74,95 the
+    // open gap ]74,95 ; 75,05[ holds none of them, although 2z = 149,9 m < L.
+    const draft = zoned(74.95);
+    const clearance = solvedClearance(draft);
+    expect(clearance.atStepIndex).toBe(-1);
+    // The Scenario alone cannot see it…
+    expect(evaluateGates({ scenario: draft }).errors).toEqual([]);
+    // …the solved reduction can, and the same field answers for it.
+    const report = evaluateGates({ scenario: draft, clearance });
+    expect(report.errors).toHaveLength(1);
+    expect(report.errors[0]).toMatchObject({
+      gate: "clearance",
+      kind: "invalid",
+      field: "anchorZone",
+      fixes: [],
+      message:
+        "⛔ Longueur de la zone d'ancrage — entre les deux zones d'ancrage, la portée de 150,0 m ne laisse aucune position du passager où juger la garde. Valeur : 75,0 m.",
+    });
+    expect(report.passed).toMatchObject({ solve: true, clearance: false, verdict: true });
+    expect(blockingSummary(report)).toBe("⛔ 1 erreur bloquante — garde au sol indisponible");
+  });
+
+  test("a sliver that still holds a sweep step is judged, and nothing blocks", () => {
+    const draft = zoned(74.9);
+    const clearance = solvedClearance(draft);
+    expect(clearance.atStepIndex).toBeGreaterThanOrEqual(0);
+    expect(evaluateGates({ scenario: draft, clearance }).errors).toEqual([]);
+  });
+
+  test("an empty minimum is the zones' only where the sweep has steps, and only with zones", () => {
+    const none = { hMin: Number.POSITIVE_INFINITY, atX: Number.NaN, atStepIndex: -1 };
+    const some = { hMin: 1, atX: 3, atStepIndex: 0 };
+    const sliver = { atStepIndex: -1, whole: some };
+    expect(evaluateGates({ scenario: zoned(60), clearance: sliver }).errors[0]?.message).toBe(
+      noRiderBetweenMessage(60, 150),
+    );
+    // A sweep that lost every step judges nothing either, but that is not the zones' doing.
+    expect(
+      evaluateGates({ scenario: zoned(60), clearance: { atStepIndex: -1, whole: none } }).errors,
+    ).toEqual([]);
+    expect(evaluateGates({ scenario: zoned(0), clearance: sliver }).errors).toEqual([]);
+    // Zones that meet keep their own sentence, whatever the reduction says.
+    expect(evaluateGates({ scenario: zoned(75), clearance: sliver }).errors[0]?.message).toBe(
+      zonesMeetMessage(75, 150),
+    );
   });
 
   test("the span it is measured against is the Scenario's: a shorter span under the same zones", () => {

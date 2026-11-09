@@ -760,6 +760,16 @@ describe("the Zones d'ancrage on Avancé's `Résultats` (#106)", () => {
     expect(results.clearanceScope).toBe(TRAVERSE_SCOPE);
   });
 
+  test("zones that leave no swept passager between them remove both garde rows, as a breach", () => {
+    // 2z = 149,9 m < L, but no sweep step falls in ]74,95 ; 75,05[: the judged minimum is empty.
+    // The gates read the solved garde, so the Clearance Gate fails and takes both rows with it —
+    // the unjudged one does not stay behind to stand in for a garde nobody may read (#106).
+    const results = resultsOf({ rider: { ...SHIPPED.rider, anchorZone: 74.95 } });
+    expect(rowIds(results)).not.toContain("clearance");
+    expect(rowIds(results)).not.toContain("clearanceWhole");
+    expect(rowIds(results)).toContain("Tmax");
+  });
+
   test("on the shipped line the zones change nothing: both rows read the 2,42 m at x 74,4", () => {
     // § 9's minimum is at mid-span, sixty metres from either zone.
     const results = resultsOf();

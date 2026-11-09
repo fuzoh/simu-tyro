@@ -58,8 +58,9 @@
  *   so it is the caller's argument and this module ships no value for it; `z = 0` is no zone at
  *   all and reproduces every figure from before the zones, bit for bit. The scan itself is
  *   unchanged — same vertices, same order — and `whole` keeps the reduction over everything, so
- *   Avancé can still print what the zones hide. `2z ≥ L` leaves nothing to judge; refusing it is
- *   the Rail's gate, not this reducer's.
+ *   Avancé can still print what the zones hide. `2z ≥ L` leaves nothing to judge, and so does a
+ *   gap between the zones narrower than one sweep step (`atStepIndex` −1 while `whole` has one);
+ *   refusing either is the Rail's gate, not this reducer's.
  * - **The engine is dependency-free, synchronous and SI** — `m`, `N`, `N/m`; `z` positive up,
  *   `x` measured from anchor A.
  */

@@ -272,8 +272,9 @@ export type ResultsInput = {
   /**
    * The **standing** gate report, from the app root — the one the banner and the charts read, over
    * the Scenario **and** the text the form currently holds. Omitted, the gates are evaluated over
-   * the Scenario alone, which is what a link arrival and every `node` test have: a Scenario of
-   * numbers cannot hold an emptied field or « 12,3,4 », so with no form in the room the two agree.
+   * the Scenario and `base`'s garde alone, which is what a link arrival and every `node` test
+   * have: a Scenario of numbers cannot hold an emptied field or « 12,3,4 », so with no form in the
+   * room the two agree.
    *
    * It is a parameter rather than a second `evaluateGates` call because a committed-invalid « −5 »
    * lives in the **form** and never reaches the Scenario — re-deriving here would keep printing a
@@ -296,7 +297,9 @@ export function deriveResults({
   report,
   register = "exact",
 }: ResultsInput): Results | null {
-  const gates = report ?? evaluateGates({ scenario });
+  // The solved garde goes in beside the Scenario: zones that leave no swept position between them
+  // are a breach only the reduction can show, and it must name its field here as in the app.
+  const gates = report ?? evaluateGates({ scenario, clearance: base?.clearance ?? null });
   if (base === null || !gates.passed.solve) return null;
 
   const { unit } = scenario;

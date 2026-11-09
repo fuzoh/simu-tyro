@@ -63,7 +63,13 @@
 
 import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
-import type { RegimeId, RegimeMismatch, TerminationId, TextileSpec } from "@/lib/sim";
+import type {
+  ClearanceResult,
+  RegimeId,
+  RegimeMismatch,
+  TerminationId,
+  TextileSpec,
+} from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 import type { Register } from "@/lib/vocabulary/labels.ts";
 
@@ -263,6 +269,14 @@ export type GateInput = {
    * not made — the profil's own absence is « l'exception géométrique », not this gate's.
    */
   readonly trace?: Pick<Trace, "d"> | null;
+  /**
+   * §11's reduction over the solved traverse, for the one check only a sweep can answer: do the
+   * Zones d'ancrage leave a rider position between them? `2z < L` is not enough — the reducer
+   * judges the sweep's own `x_P`, about `L/241` apart, so a sliver narrower than that holds none,
+   * and the garde would vanish with no field named. Omitted or `null` (no solve, or a `node` test
+   * of the Scenario alone), only `2z ≥ L` is checked.
+   */
+  readonly clearance?: Pick<ClearanceResult, "atStepIndex" | "whole"> | null;
   /**
    * Tier one's standing failures, from the form. Text the Scenario cannot hold: an emptied field,
    * or « 12,3,4 ». Omitted, the gates judge the Scenario alone — which is what a link arrival, a
@@ -494,6 +508,7 @@ export function isFieldActive(id: FieldId, scenario: TraverseScenario): boolean 
 export function evaluateGates({
   scenario,
   trace = null,
+  clearance = null,
   issues = [],
   register = "exact",
 }: GateInput): GateReport {
@@ -629,20 +644,27 @@ export function evaluateGates({
     push({ gate, kind: issue.kind, field, alsoOutlined: [], message: issue.message, fixes: [] });
   }
 
-  // ── Two Zones d'ancrage that meet ───────────────────────────────────────────────────────────
+  // ── Two Zones d'ancrage that meet, or leave no rider position between them ──────────────────
   // `2z ≥ L` leaves no rider position and no point of the line to judge, so a garde read there
   // would be the identity of an empty minimum. ADR-0001: the length is kept as given and the
   // Clearance Gate refuses it, whichever path brought it — a typed value, a link, a Session, or a
-  // shorter span under unchanged zones.
+  // shorter span under unchanged zones. Just under `L/2` the zones may still leave no *sweep step*
+  // between them, which is the same empty minimum: the solved reduction says so, and the same
+  // field answers for it. A sweep with no step at all is not the zones' doing.
   const zone = scenario.rider.anchorZone;
   const span = spanOfGeometry(scenario.geometry, trace);
-  if (zone > 0 && span > 0 && 2 * zone >= span) {
+  const meet = span > 0 && 2 * zone >= span;
+  const noRiderBetween =
+    clearance !== null && clearance.atStepIndex < 0 && clearance.whole.atStepIndex >= 0;
+  if (zone > 0 && (meet || noRiderBetween)) {
     push({
       gate: "clearance",
       kind: "invalid",
       field: "anchorZone",
       alsoOutlined: [],
-      message: zonesMeetMessage(zone, span, register),
+      message: meet
+        ? zonesMeetMessage(zone, span, register)
+        : noRiderBetweenMessage(zone, span, register),
       fixes: [],
     });
   }
@@ -669,6 +691,23 @@ export function evaluateGates({
  */
 export function zonesMeetMessage(zone: number, span: number, register: Register = "exact"): string {
   return `⛔ ${fieldErrorLabel("anchorZone", register)} — les deux ${label("anchorZones", register)} couvrent toute la ${label("span", register)} de ${formatQuantity("L", span)}, il n'y reste aucune garde à juger. Valeur : ${formatQuantity("anchorZone", zone)}.`;
+}
+
+/**
+ * The breach of two Zones d'ancrage that do not meet but leave no position of the swept passager
+ * between them — a sliver narrower than one sweep step — in the same template as
+ * {@link zonesMeetMessage}.
+ *
+ * @param span the span the zones are measured against, m; `NaN` when unknown, and then not quoted.
+ */
+export function noRiderBetweenMessage(
+  zone: number,
+  span: number,
+  register: Register = "exact",
+): string {
+  // An imported span read without its profil is unknown here; the sentence holds without it.
+  const of = span > 0 ? ` de ${formatQuantity("L", span)}` : "";
+  return `⛔ ${fieldErrorLabel("anchorZone", register)} — entre les deux ${label("anchorZones", register)}, la ${label("span", register)}${of} ne laisse aucune position du passager où juger la garde. Valeur : ${formatQuantity("anchorZone", zone)}.`;
 }
 
 /**
