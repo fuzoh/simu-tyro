@@ -32,7 +32,7 @@ import { RailHeader, Shell } from "./shell.tsx";
 import { AppStoreProvider } from "./store.tsx";
 import { useCollapse } from "./use-collapse.ts";
 import { usePage } from "./use-page.ts";
-import { useBandHeight, useViewport } from "./use-viewport.ts";
+import { useViewport } from "./use-viewport.ts";
 
 /** @param page the router path of the Page the app is rendered on — every link it writes opens it. */
 export function App({ page }: { page: string }) {
@@ -66,14 +66,6 @@ function Live({ page }: { page: string }) {
    * `src/lib/layout/contract.test.ts` holds that line against these files' own source.
    */
   const viewport = useViewport();
-  /**
-   * § 8's strip is the **one** thing the shell paints above the two columns, and above B2 its height
-   * comes straight out of the chart column's — so (c) is measured with it, not without. Ticket 31's
-   * **D3** is the term unspent: `data-fit="roomy"` at 1440 × 900 over a column 42 px too short, and
-   * « Garde min » clipped by the shell's `overflow-hidden`. `0` while there is no strip, which is
-   * also what dismissing it restores.
-   */
-  const chrome = useBandHeight();
   const { deduced, strip, rail, rides, surfaces, copyDiagnostic } = usePage({
     page,
     register: "exact",
@@ -88,14 +80,15 @@ function Live({ page }: { page: string }) {
    * reading and the same measured column width the charts are drawn from: (c), « the whole block
    * cannot coexist with a usable Rail », and § 5's `compact` row under `--kb`. Both arrive as
    * booleans, so no component below this line knows a viewport exists — and no band is sized from
-   * one, which is § 5's invariant.
+   * one, which is § 5's invariant. Both bind below B2 only (#110): from three columns the block
+   * stands under the vue de dessus in a column that scrolls, and the window's height costs it
+   * nothing.
    */
   const fit: ViewportFit = {
     viewportWidth: viewport.width,
     viewportHeight: viewport.height,
     keyboardInset: viewport.keyboardInset,
     columnWidth: width,
-    chromeHeight: chrome.height,
     // Every app Page stands under the navigation bar, so the shell never has the whole viewport.
     navigationHeight: NAV_BAR,
   };
@@ -121,7 +114,7 @@ function Live({ page }: { page: string }) {
           onRailFocus={collapse.onRailFocus}
           onRailScroll={collapse.onRailScroll}
           tight={collapse.tight}
-          strip={<LinkStripNotice bandRef={chrome.ref} strip={strip} />}
+          strip={<LinkStripNotice strip={strip} />}
           left={
             <>
               <RailHeader>

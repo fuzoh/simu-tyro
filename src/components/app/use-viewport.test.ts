@@ -130,7 +130,7 @@ describe("ce que la porte change en aval, dans `compactRequired`", () => {
       scale: 1,
     });
     expect(keyboardInset).toBe(1);
-    expect(compactRequired({ viewportHeight: 2000, keyboardInset })).toBe(true);
+    expect(compactRequired({ viewportWidth: 390, viewportHeight: 2000, keyboardInset })).toBe(true);
   });
 
   test("et le zoom ne l'atteint plus : ×1,5 laisse la rangée compacte au repos", () => {
@@ -138,8 +138,12 @@ describe("ce que la porte change en aval, dans `compactRequired`", () => {
     // inset and `compactRequired` answered `true` — the chart deleted by a zoom.
     const reading = { layoutHeight: 2000, visualHeight: 1500, offsetTop: 0, scale: 1.5 } as const;
     expect(reading.layoutHeight - reading.visualHeight - reading.offsetTop).toBe(500);
-    expect(compactRequired({ viewportHeight: 2000, keyboardInset: keyboardInsetOf(reading) })).toBe(
-      false,
-    );
+    expect(
+      compactRequired({
+        viewportWidth: 390,
+        viewportHeight: 2000,
+        keyboardInset: keyboardInsetOf(reading),
+      }),
+    ).toBe(false);
   });
 });
