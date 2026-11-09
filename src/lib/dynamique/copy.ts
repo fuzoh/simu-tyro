@@ -15,7 +15,8 @@ import { ASSUMED_NOTE, AVANCE_NOTICE, avanceNoticeText } from "@/lib/app/avance-
 import { refusalLabelTable } from "@/lib/app/refusal-copy.ts";
 import { COUPE_HOVER, NO_SPAN_LINE } from "@/lib/chart/copy.ts";
 import { fieldLabel } from "@/lib/rail/fields.ts";
-import { GATE_CONSEQUENCE } from "@/lib/rail/gates.ts";
+import { GATE_CONSEQUENCE, WIND_UNPLACED } from "@/lib/rail/gates.ts";
+import { FIELD_NOTE } from "@/lib/rail/help.ts";
 import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 /** The fields' groups, in the order the Page lists them. */
@@ -134,6 +135,9 @@ export function dynamiqueLabelTable(): readonly string[] {
   return [
     ...Object.values(DYNAMIQUE_GROUPS),
     ...DYNAMIQUE_FIELDS.map((id) => fieldLabel(id, "terrain")),
+    ...DYNAMIQUE_FIELDS.flatMap((id) => FIELD_NOTE[id] ?? []),
+    WIND_UNPLACED.reason,
+    WIND_UNPLACED.notice,
     ...Object.values(SECTION),
     ...Object.values(RIDE_LABEL),
     ...Object.values(MARKER_LABEL),

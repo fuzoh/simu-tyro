@@ -54,12 +54,13 @@ function Live({ page }: { page: string }) {
     page,
     register: "terrain",
   });
-  const { cause, clearance, frame, occupant, results, rideCause, solved, windCause } = surfaces;
+  const { cause, clearance, frame, occupant, results, rideCause, solved, windCause, windNotice } =
+    surfaces;
   const { scenario } = state;
 
   const view = useMemo(
-    () => terrainView({ scenario, deduced, results, cause, rideCause, reading }),
-    [scenario, deduced, results, cause, rideCause, reading],
+    () => terrainView({ scenario, deduced, results, cause, rideCause, windNotice, reading }),
+    [scenario, deduced, results, cause, rideCause, windNotice, reading],
   );
   const toStatique = useOpenPage("/");
   const toAvance = useOpenPage("/avance");

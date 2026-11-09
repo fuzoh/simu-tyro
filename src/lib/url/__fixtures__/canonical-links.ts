@@ -55,6 +55,8 @@ export const BRANCHES = [
   "wind-speed-and-direction",
   "wind-direction-only",
   "wind-explicit-zero",
+  "wind-without-positions",
+  "wind-on-positions",
   "trace-stations-retired",
   "dynamics-absent",
   "dynamics-steel",
@@ -87,7 +89,8 @@ export type CanonicalLinkFixture = {
     | typeof MEASURED_89
     | typeof MEASURED_90
     | typeof MEASURED_103
-    | typeof MEASURED_PH;
+    | typeof MEASURED_PH
+    | typeof MEASURED_WIND;
   covers: readonly Branch[];
   scenario: Scenario;
   link: string;
@@ -128,6 +131,7 @@ const MEASURED_89 = "[MEASURED] issue #89, codec as of 2026-11-08";
 const MEASURED_90 = "[MEASURED] issue #90, codec as of 2026-11-08";
 const MEASURED_103 = "[MEASURED] issue #103, codec as of 2026-11-08";
 const MEASURED_PH = "[MEASURED] map #1's review of `ph`, codec as of 2026-11-09";
+const MEASURED_WIND = "[MEASURED] geographic `wd`, codec as of 2026-11-09";
 
 /** Three samples `(0,0) (50,-4) (100,-9)`, as `encodeP1` writes them — a 100 m profil. */
 export const TRACE_P1 = "p1.AwCQTpBOAJ8G5wcA";
@@ -283,9 +287,11 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&mt=ml&${STEEL_HEAD}&${TAIL}`,
   },
   {
-    name: "wind of 50 km/h from 45°: `ws`, `wd` after `daf`, before `x`",
+    // `wd` is the azimuth the wind comes from: 45° is a north-east wind. With no Positions it is
+    // not applied, and it is still carried as given (ADR-0001).
+    name: "wind of 50 km/h from the north-east, 45°, no Positions: `ws`, `wd` after `daf`, before `x`",
     source: MEASURED_87,
-    covers: ["wind-speed-and-direction"],
+    covers: ["wind-speed-and-direction", "wind-without-positions"],
     scenario: { ...STEEL, wind: { speedKmh: 50, directionDeg: 45 } },
     link:
       `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
@@ -341,6 +347,20 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
     scenario: { ...STEEL, positions: { A: POSITION_A, B: POSITION_B } },
     link:
       `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}` +
+      "&lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783",
+  },
+  {
+    name: "the trial's west wind on the trial's Positions: `ws`, `wd` before `x`, the four after",
+    source: MEASURED_WIND,
+    covers: ["wind-on-positions"],
+    scenario: {
+      ...STEEL,
+      wind: { speedKmh: 30, directionDeg: 264 },
+      positions: { A: POSITION_A, B: POSITION_B },
+    },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&ws=30&wd=264&x=75" +
       "&lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783",
   },
   {

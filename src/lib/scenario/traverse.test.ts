@@ -28,6 +28,7 @@ const KEYS: readonly (keyof TraverseInputs)[] = [
   "terminations",
   "wind",
   "dynamics",
+  "positions",
   "mp",
   "hRider",
   "hClearMin",
@@ -38,7 +39,7 @@ describe("`traverseInputs` — the fields a memo keys on", () => {
   const before = firstRunDefaults() as ScenarioDraft;
   const inputs = traverseInputs(before);
 
-  test("the Scenario's sixteen Traverse-scope fields, and no `x_D`", () => {
+  test("the Scenario's seventeen Traverse-scope fields, and no `x_D`", () => {
     expect(Object.keys(inputs).sort()).toEqual([...KEYS].sort());
   });
 
@@ -53,6 +54,15 @@ describe("`traverseInputs` — the fields a memo keys on", () => {
     const windy = traverseInputs({ ...before, wind });
     expect(windy.wind).toBe(wind);
     for (const key of KEYS.filter((key) => key !== "wind")) expect(windy[key]).toBe(inputs[key]);
+  });
+
+  test("an anchor moved changes `positions` alone: the Vent is projected on their bearing", () => {
+    const positions = { A: { lat: 46.8, lon: 7.4 }, B: { lat: 46.81, lon: 7.4 } };
+    const placed = traverseInputs({ ...before, positions });
+    expect(placed.positions).toBe(positions);
+    for (const key of KEYS.filter((key) => key !== "positions")) {
+      expect(placed[key]).toBe(inputs[key]);
+    }
   });
 
   test("a « Garde min. admise » edit changes `hClearMin`, and nothing else", () => {

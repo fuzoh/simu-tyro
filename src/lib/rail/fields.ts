@@ -628,8 +628,9 @@ export const FIELDS = {
     warning: null,
     gate: "ride",
   },
-  // The two Positions (#90). Both sit in no gate — no computation reads a Position — and a blank
-  // pair is « inconnue », not « vide et requis », so none is required.
+  // The two Positions (#90). Both sit in no gate — their one reader is the Vent's bearing, and
+  // without it the Vent is not applied rather than refused (`windBearing`) — and a blank pair is
+  // « inconnue », not « vide et requis », so none is required.
   latA: coordinateField("latA", "latitude", "A"),
   lonA: coordinateField("lonA", "longitude", "A"),
   latB: coordinateField("latB", "latitude", "B"),

@@ -8,12 +8,12 @@ import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { errorSurfaces, gatedRides } from "@/lib/app/surfaces.ts";
 import { buildSceneBase, buildSceneFrame } from "@/lib/chart/scene.ts";
-import { ridesUnder } from "@/lib/dynamique/__fixtures__/rides.ts";
+import { DUE_NORTH, ridesUnder } from "@/lib/dynamique/__fixtures__/rides.ts";
 import { INCOMPLETE, NO_ARRIVAL } from "@/lib/dynamique/copy.ts";
 import { dynamiqueOutputs } from "@/lib/dynamique/outputs.ts";
 import { formatAtX, KGF } from "@/lib/format/quantity.ts";
 import { deducedFrom, deducedRows } from "@/lib/rail/deduced.ts";
-import { evaluateGates } from "@/lib/rail/gates.ts";
+import { evaluateGates, WIND_UNPLACED } from "@/lib/rail/gates.ts";
 import { applyMaterialPreset } from "@/lib/rail/presets.ts";
 import { drivingField, railValues } from "@/lib/rail/values.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
@@ -60,9 +60,17 @@ function pagesOn(scenario: ScenarioDraft) {
 
   const avance = surfacesIn("exact");
   const surfaces = surfacesIn("terrain");
-  const { results, cause, rideCause } = surfaces;
+  const { results, cause, rideCause, windNotice } = surfaces;
   const reading = gatedRides(surfaces, traverse, trace);
-  const terrain = terrainView({ scenario, deduced, results, cause, rideCause, reading });
+  const terrain = terrainView({
+    scenario,
+    deduced,
+    results,
+    cause,
+    rideCause,
+    windNotice,
+    reading,
+  });
   return { deduced, avance, cause, reading, surfaces, terrain };
 }
 
@@ -246,12 +254,28 @@ describe("the vitesse d'arrivée", () => {
   test(`a head wind that stops the passager: « ${NO_ARRIVAL} », and the Point d'arrêt`, () => {
     const { reading } = ridesUnder(50, 0);
     if (reading.windy.end.kind !== "stop") throw new Error("a 50 km/h head wind stops the ride");
-    const { terrain } = pagesOn({ ...SHIPPED, wind: { speedKmh: 50, directionDeg: 0 } });
+    // A north wind on a line running north.
+    const { terrain } = pagesOn({
+      ...SHIPPED,
+      positions: DUE_NORTH,
+      wind: { speedKmh: 50, directionDeg: 0 },
+    });
     expect(tile(terrain, "arrival")).toMatchObject({
       kind: "word",
       value: NO_ARRIVAL,
       notes: [`point d'arrêt ${formatAtX(reading.windy.end.x)}`, "estimation"],
     });
+  });
+
+  test("a Vent without Positions is not applied: the ride without wind, and the tile says why", () => {
+    const still = tile(pagesOn(SHIPPED).terrain, "arrival");
+    const { terrain } = pagesOn({ ...SHIPPED, wind: { speedKmh: 50, directionDeg: 0 } });
+    // The 50 km/h head wind that stops the passager above is not applied: the calm arrival stands.
+    expect(tile(terrain, "arrival")).toEqual({
+      ...still,
+      notes: [...still.notes, WIND_UNPLACED.notice],
+    });
+    expect(still.kind).toBe("quantity");
   });
 
   test(`a ride that never settles: « ${NO_ARRIVAL} », and that it keeps swinging`, () => {
@@ -263,6 +287,7 @@ describe("the vitesse d'arrivée", () => {
       results: null,
       cause: null,
       rideCause: null,
+      windNotice: null,
       reading: { ...reading, calm: swinging, windy: swinging },
     });
     expect(tile(view, "arrival")).toMatchObject({
@@ -285,6 +310,7 @@ describe("the vitesse d'arrivée", () => {
       results: null,
       cause: null,
       rideCause: null,
+      windNotice: null,
       reading: null,
     });
     expect(tile(incomplete, "arrival")).toMatchObject({ kind: "absent", value: INCOMPLETE });

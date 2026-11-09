@@ -23,9 +23,15 @@ import { kmhToMs, windComponents } from "@/lib/sim";
 /** The segments a drawn Banane is made of. */
 export const BANANE_STEPS = 32;
 
-/** The wind's cross component, m/s: positive toward the left of the travel A → B. */
-export function bananeAcross(wind: Wind): number {
-  return windComponents(kmhToMs(wind.speedKmh), wind.directionDeg).across;
+/**
+ * The wind's cross component, m/s: positive toward the left of the travel A → B.
+ *
+ * @param bearing the bearing of A → B, degrees from north (`windBearing`), or `null` when the line
+ *   has none: the Vent's direction is geographic, so without a bearing it has no side to bow to.
+ */
+export function bananeAcross(wind: Wind, bearing: number | null): number {
+  if (bearing === null) return 0;
+  return windComponents(kmhToMs(wind.speedKmh), wind.directionDeg, bearing).across;
 }
 
 /**

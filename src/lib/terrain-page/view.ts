@@ -60,6 +60,8 @@ export type TerrainInput = StatiqueInput & {
   readonly reading: DynamicsReading | null;
   /** Why the gates withhold the rides from a line that stands (`rideCause`), or `null`. */
   readonly rideCause: string | null;
+  /** Why the Vent entered is not applied — no Positions (`windNotice`) — or `null`. */
+  readonly windNotice: string | null;
 };
 
 /** A tile's scope before there is a result to read it over — what the Skeleton reserves. */
@@ -80,7 +82,12 @@ export function terrainView(input: TerrainInput): TerrainView {
       statique("pretension"),
       statique("sag"),
       statique("clearance"),
-      arrivalTile(input.reading, input.scenario.material.family, input.cause ?? input.rideCause),
+      arrivalTile(
+        input.reading,
+        input.scenario.material.family,
+        input.cause ?? input.rideCause,
+        input.windNotice,
+      ),
       verdictTile(verdict),
     ],
   };
@@ -99,12 +106,13 @@ function fromStatique(id: TerrainTileId, output: StatiqueOutput): TerrainTile {
 /**
  * The ride with the Vent entered, as Dynamique prints it: its vitesse d'arrivée, or « n'arrive
  * pas » and where it stops instead — an estimation either way. This Page has no field, so a ride
- * the gates withhold says why on the tile itself.
+ * the gates withhold says why on the tile itself, and so does a Vent that is not applied.
  */
 function arrivalTile(
   reading: DynamicsReading | null,
   family: ScenarioDraft["material"]["family"],
   cause: string | null,
+  windNotice: string | null,
 ): TerrainTile {
   const tile = {
     id: "arrival",
@@ -115,19 +123,26 @@ function arrivalTile(
   if (reading === null || cause !== null) {
     return { ...tile, value: cause ?? INCOMPLETE, kind: "absent", tone: "muted", notes: [] };
   }
-  const [, windy] = dynamiqueOutputs(reading, family).rides;
+  const [, windy] = dynamiqueOutputs(reading, family, windNotice).rides;
+  const notice = windy.notice === null ? [] : [windy.notice];
   if (windy.arrival !== null) {
     return {
       ...tile,
       value: windy.arrival.kmh,
       kind: "quantity",
       tone: "plain",
-      notes: [windy.arrival.ms, ESTIMATE],
+      notes: [windy.arrival.ms, ESTIMATE, ...notice],
     };
   }
   const instead =
     windy.stopX === null ? windy.stop : `${label("stopPoint", "terrain")} ${windy.stop}`;
-  return { ...tile, value: NO_ARRIVAL, kind: "word", tone: "plain", notes: [instead, ESTIMATE] };
+  return {
+    ...tile,
+    value: NO_ARRIVAL,
+    kind: "word",
+    tone: "plain",
+    notes: [instead, ESTIMATE, ...notice],
+  };
 }
 
 /** The Verdict in its state's tone, the prohibition under an « Interdit »; neutral without one. */

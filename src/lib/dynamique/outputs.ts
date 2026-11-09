@@ -19,6 +19,7 @@ import { msToKmh } from "@/lib/sim";
 
 import {
   ARRIVES_AT_END,
+  COINCIDE_NOTE,
   CONSTANTS_NOTE,
   ESTIMATE,
   NEVER_SETTLES,
@@ -47,12 +48,23 @@ export type RideOutput = {
   readonly duration: string;
   /** « estimation » — what each of the three values above is read with (#6). */
   readonly estimate: string;
+  /**
+   * « Vent saisi non appliqué : … » on the ride with the Vent, when the Vent the Scenario carries has
+   * no line to be projected on; `null` otherwise, and always on the ride without wind.
+   */
+  readonly notice: string | null;
 };
 
 export type DynamiqueOutputs = {
   readonly rides: readonly [RideOutput, RideOutput];
   /** No Vent pushes along the line: both rides are one, and so are the markers. */
   readonly coincide: boolean;
+  /**
+   * The sentence under the rides when they coincide — {@link COINCIDE_NOTE} — or `null`: while the
+   * Vent is not applied, the ride with the Vent says why instead, and « no wind pushes along the
+   * line » would say the wrong thing.
+   */
+  readonly coincideNote: string | null;
   /** The sentences of the engine's warnings this Page words, quasi-staticity first. */
   readonly warnings: readonly string[];
   /** The constants' provenance, in one line. */
@@ -62,20 +74,23 @@ export type DynamiqueOutputs = {
 /**
  * @param reading the two rides and what qualifies them.
  * @param family the line's material: the provenance line names the trolley law it rides on.
+ * @param windNotice why the Vent entered is not applied (`ErrorSurfaces.windNotice`), or `null`.
  */
 export function dynamiqueOutputs(
   reading: DynamicsReading,
   family: ScenarioDraft["material"]["family"],
+  windNotice: string | null = null,
 ): DynamiqueOutputs {
   return {
-    rides: [rideOutput("calm", reading.calm), rideOutput("windy", reading.windy)],
+    rides: [rideOutput("calm", reading.calm, null), rideOutput("windy", reading.windy, windNotice)],
     coincide: reading.windless,
+    coincideNote: reading.windless && windNotice === null ? COINCIDE_NOTE : null,
     warnings: reading.warnings.flatMap((id) => WARNING_COPY[id] ?? []),
     constants: CONSTANTS_NOTE[family],
   };
 }
 
-function rideOutput(id: RideId, { end }: Ride): RideOutput {
+function rideOutput(id: RideId, { end }: Ride, notice: string | null): RideOutput {
   const arrives = end.kind === "arrival";
   return {
     id,
@@ -96,5 +111,6 @@ function rideOutput(id: RideId, { end }: Ride): RideOutput {
     noArrival: arrives ? null : NO_ARRIVAL,
     duration: formatQuantity("duration", end.t),
     estimate: ESTIMATE,
+    notice,
   };
 }

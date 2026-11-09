@@ -11,7 +11,7 @@ import type { DynamiqueOutputs, RideOutput } from "@/lib/dynamique/outputs.ts";
 
 import { GroupHeading } from "@/components/rail/controls.tsx";
 import { TileFrame } from "@/components/statique/outputs.tsx";
-import { COINCIDE_NOTE, OUTPUT_LABEL, RIDE_LABEL } from "@/lib/dynamique/copy.ts";
+import { OUTPUT_LABEL, RIDE_LABEL } from "@/lib/dynamique/copy.ts";
 import { RIDE_IDS } from "@/lib/dynamique/outputs.ts";
 
 /**
@@ -33,6 +33,7 @@ export function DynamiqueOutputTiles({ model }: { model: DynamiqueOutputs }) {
       {model.rides.map((ride) => (
         <section className="flex flex-col gap-1" key={ride.id}>
           <GroupHeading title={ride.label} />
+          {ride.notice !== null && <p className="text-muted-foreground text-xs">{ride.notice}</p>}
           <RideGrid>
             <StopTile ride={ride} />
             <ArrivalTile ride={ride} />
@@ -44,7 +45,9 @@ export function DynamiqueOutputTiles({ model }: { model: DynamiqueOutputs }) {
           </RideGrid>
         </section>
       ))}
-      {model.coincide && <p className="text-muted-foreground text-xs">{COINCIDE_NOTE}</p>}
+      {model.coincideNote !== null && (
+        <p className="text-muted-foreground text-xs">{model.coincideNote}</p>
+      )}
       {model.warnings.map((warning) => (
         <p className="text-warning text-xs" key={warning}>
           ⚠ {warning}

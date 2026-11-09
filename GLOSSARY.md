@@ -120,7 +120,9 @@ _Avoid_: pole height, tower height, offset, amarrage
 **Position**:
 Where an anchor stands on the earth: its geographic coordinates (WGS84 or LV95). Set by a
 click or a drag on the Fond de carte, or typed, as **latitude** and **longitude**; a Position read off the map is **approchée** until it is typed. Two Positions fix a Trace end to end; moving
-one means a new line between two points, not an anchor slid along the old profil.
+one means a new line between two points, not an anchor slid along the old profil. The two
+Positions also give the line its bearing A → B, on which the Vent is projected: moving one turns
+the line under the Vent and leaves the Vent as it is.
 _Avoid_: marqueur, marker, pin, point GPS, waypoint, anchor placement
 
 ### What is saved and shared
@@ -243,13 +245,19 @@ _Avoid_: déport, drift, flèche latérale
 
 **Vent**:
 The wind the Scénario carries: the **vitesse du vent** in km/h (zero or more) and the **direction du vent**. The direction is
-where the wind comes **from**, relative to the travel A → B, in degrees clockwise seen from
-above: 0° head wind, 90° from the right, 180° tail wind (dans le dos), 270° from the left. It is
-relative to the line, so a Scénario needs no Position; the Rose des vents on the map converts from
-an azimuth. No wind is speed 0 and direction 0, and it is what a link without `ws` and `wd`
-reads. The engine projects it onto the line as a component along it (positive toward B) and one
-across it (positive from the right); it is a vector, never a whole `±` along the line.
-_Avoid_: rafale, souffle, orientation du vent (as an azimuth)
+geographic: the azimuth the wind comes **from**, in degrees clockwise from north — 0° du nord,
+90° d'est, 180° du sud, 270° d'ouest — the direction a forecast gives (MeteoSwiss reads
+« d'où vient »). Every field that types it says « d'où vient le vent, en degrés depuis le nord ».
+The engine projects it onto the line through the bearing A → B the two Positions give, as a
+component along it (positive toward B, so a tail wind) and one across it (positive from the right);
+it is a vector, never a whole `±` along the line. Moving an anchor therefore changes those
+components and never the Vent. **The Vent needs Positions**: without A and B on the map the line
+has no bearing, so the wind fields and the Rose des vents' handle are disabled with that reason,
+and the passager's ride and the Banane run without wind. A Vent a link or a Session carries without
+Positions is kept as given, never dropped, and the results read with it say it is not applied and
+why; it is not a Blocking Error and hides no result. No wind is speed 0 and direction 0, and it is
+what a link without `ws` and `wd` reads.
+_Avoid_: rafale, souffle, orientation du vent, direction relative à la ligne (as what is typed)
 
 **Marge exigée**:
 The margin the chosen Safety Regime demands. Not the margin the line actually has — that
@@ -440,7 +448,7 @@ line follows the pointer, the recalculation waits for the release. Loaded only w
 _Avoid_: 3D map, globe, scene, viewer
 
 **Rose des vents**:
-The compass rose drawn on the vue de dessus, with a handle that sets the Vent's direction and force by dragging. It reads an azimuth and writes the direction relative to the line A → B, so it works without Positions; where the line is drawn level its reading says « nord inconnu ». On Terrain it is read-only. It sets the wind that draws the Banane.
+The compass rose drawn on the vue de dessus, with a handle that sets the Vent's direction and force by dragging. It edits the azimuth directly: on the north-up map the handle stands where the wind comes from. Its reading gives that azimuth and, from the line's bearing, where the wind comes from relative to the line A → B (« Vent d'ouest (264°), 30 km/h : par la gauche à l'avant, 312° par rapport à la ligne A → B »). Without A and B on the map it has no handle and says why. On Terrain it is read-only. It sets the wind that draws the Banane.
 _Avoid_: boussole, anémomètre
 
 **Fil à plomb**:

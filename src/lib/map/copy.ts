@@ -7,6 +7,7 @@
 import type { Positions, Wind } from "@/lib/scenario/types.ts";
 
 import { formatQuantity, formatValue } from "@/lib/format/quantity.ts";
+import { WIND_UNPLACED } from "@/lib/rail/gates.ts";
 import { formatLv95, inLv95Domain, lv95FromWgs84 } from "@/lib/terrain/lv95.ts";
 import { label } from "@/lib/vocabulary/labels.ts";
 
@@ -14,12 +15,10 @@ import type { Fond } from "./display.ts";
 import type { Anchor } from "./gesture.ts";
 import type { MeasurePoints, MeasureReading } from "./measure.ts";
 import type { Vue3dBlock } from "./vue-3d.ts";
-import type { RoseReference } from "./wind-rose.ts";
 
 import { FONDS } from "./display.ts";
 import { fondAttribution } from "./style.ts";
 import { drapedAttribution } from "./vue-3d.ts";
-import { windAzimuth } from "./wind-rose.ts";
 
 export const FOND_LABEL = {
   "carte-claire": "Carte claire",
@@ -42,8 +41,6 @@ export const MAP_COPY = {
   roseCalm: "Pas de vent. Glissez la poignée de la rose pour en régler la direction et la force.",
   /** The same calm on a rose that has no handle (#101). */
   calm: "Pas de vent.",
-  /** Where the line is drawn level the reading says why it gives no azimuth. */
-  roseNorthUnknown: "nord inconnu",
   /** The ambient note under a drawn Banane (#96): a shape, never a distance. */
   bananeNote: "Banane : allure, pas une distance.",
   /** The switch that puts the Vue 3D in the vue de dessus's place (#95). */
@@ -183,20 +180,29 @@ export function describeRelative(relativeDeg: number): string {
 }
 
 /**
- * The line under the map that says what the rose says: the true azimuth when the Positions give
- * one, and in every case the direction relative to the line — the number the field holds.
+ * The line under the map that says what the rose says: where the wind comes from — the azimuth, the
+ * number the field holds — and where that puts it relative to the line A → B, which the line's
+ * bearing gives. Moving an anchor turns the second half and leaves the first as it is.
  *
+ * @param bearing the bearing of A → B (`windBearing`), or `null` without A and B on the map: the
+ *   Vent is then not applied, and the reading says so — or, with no Vent, why the rose has no handle.
  * @param handle the rose has a handle to set the wind with — not on the Page Terrain (#101).
  */
-export function windReading(wind: Wind, reference: RoseReference, handle = true): string {
-  if (wind.speedKmh === 0) return handle ? MAP_COPY.roseCalm : MAP_COPY.calm;
-  const relative = Math.round(((wind.directionDeg % 360) + 360) % 360) % 360;
-  const speed = formatQuantity("windSpeed", wind.speedKmh);
-  const side = `${describeRelative(relative)}, ${relative}° par rapport à la ligne A → B`;
-  if (!reference.oriented) return `Vent à ${speed} : ${side} (${MAP_COPY.roseNorthUnknown}).`;
-  const azimuth = Math.round(windAzimuth(relative, reference)) % 360;
+export function windReading(wind: Wind, bearing: number | null, handle = true): string {
+  if (wind.speedKmh === 0) {
+    if (!handle) return MAP_COPY.calm;
+    return bearing === null ? WIND_UNPLACED.reason : MAP_COPY.roseCalm;
+  }
+  const azimuth = Math.round(mod360(wind.directionDeg)) % 360;
   const point = COMPASS[Math.round(azimuth / 45) % 8];
-  return `Vent ${point} (${azimuth}°), ${speed} : ${side}.`;
+  const opening = `Vent ${point} (${azimuth}°), ${formatQuantity("windSpeed", wind.speedKmh)}`;
+  if (bearing === null) return `${opening}. ${WIND_UNPLACED.notice}`;
+  const relative = Math.round(mod360(wind.directionDeg - bearing)) % 360;
+  return `${opening} : ${describeRelative(relative)}, ${relative}° par rapport à la ligne A → B.`;
+}
+
+function mod360(degrees: number): number {
+  return ((degrees % 360) + 360) % 360;
 }
 
 /** What the next click does, said under the map — `null` when a click does nothing. */
@@ -228,6 +234,8 @@ export function mapLabelTable(): readonly string[] {
     ...Object.values(VUE_3D_BLOCKED_READ_ONLY),
     ...Object.values(MEASURE_COPY),
     BANANE_HELP,
+    WIND_UNPLACED.reason,
+    WIND_UNPLACED.notice,
     ...[0, 90, 180, 270, 45, 108].map(describeRelative),
     ...new Set([...FONDS.map(fondAttribution), ...FONDS.map(drapedAttribution)]),
     ...(["A", "B"] as const).flatMap((anchor) => [

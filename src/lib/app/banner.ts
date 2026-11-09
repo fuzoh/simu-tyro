@@ -257,6 +257,7 @@ export function pageReport(report: GateReport, gates: readonly GateId[]): GateRe
   const noRegime = report.noRegime && gates.includes("verdict");
   if (errors.length === report.errors.length && noRegime === report.noRegime) return report;
   return {
+    ...report,
     errors,
     passed: passedGates(errors, noRegime),
     worst: errors[0]?.gate ?? null,

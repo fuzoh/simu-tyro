@@ -104,7 +104,8 @@ import {
   SWISSTOPO_COVERAGE,
 } from "@/lib/map/style.ts";
 import { drapedAttribution, vue3dPlacement, vue3dScene } from "@/lib/map/vue-3d.ts";
-import { LEVEL_REFERENCE, roseReference } from "@/lib/map/wind-rose.ts";
+import { roseReference } from "@/lib/map/wind-rose.ts";
+import { windBearing } from "@/lib/rail/gates.ts";
 import { geoadminNotice, loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
 import { profilRunsBetween } from "@/lib/terrain/trace.ts";
 import { cn } from "@/lib/utils.ts";
@@ -163,7 +164,10 @@ export function TopMap({
   // A withheld Vent is drawn as none, and the rose's handle waits at the centre, where a drag sets a
   // Vent the gates accept.
   const wind = windCause === null ? scenario.wind : { ...scenario.wind, speedKmh: 0 };
-  const across = bananeAcross(wind);
+  // The Vent is geographic: the line it is projected on is the one drawn, a dragged anchor included.
+  // Without A and B there is none, and no Vent bows it — the gates' one check, `windBearing`.
+  const bearing = windBearing({ positions: drawn });
+  const across = bananeAcross(wind, bearing);
   const scene3d = useVue3dScene(shows3d, frame, profil, solved, across);
 
   const plain = failed ? plainDrawing(drawn, across) : null;
@@ -177,9 +181,9 @@ export function TopMap({
     },
     [measuring, measureClick, send, locked],
   );
-  // The plain drawing orients itself by the LV95 domain, so the rose reads the line as it is drawn.
-  const reference =
-    plain !== null && plain.unoriented !== null ? LEVEL_REFERENCE : roseReference(drawn);
+  // The plain drawing orients itself by the LV95 domain: outside it the line is drawn level, and the
+  // rose turns by the line's bearing to stand where the wind comes from on that drawing.
+  const reference = roseReference(bearing, plain !== null && plain.unoriented !== null);
   const rose = useRef<HTMLDivElement>(null);
   const [project, setProject] = useState<Project | null>(null);
   // The line is read under the pointer only while nothing else is using the pointer on the map.
@@ -249,7 +253,7 @@ export function TopMap({
               {anchorReading(anchor, drawn)}
             </span>
           ))}
-          {!shows3d && <span>{windCause ?? windReading(wind, reference, !locked)}</span>}
+          {!shows3d && <span>{windCause ?? windReading(wind, bearing, !locked)}</span>}
           <span>{gestureLine}</span>
           {!shows3d && unavailable && (
             <span>{[MAP_COPY.unavailable, plain?.unoriented].filter(Boolean).join(" · ")}</span>

@@ -30,7 +30,7 @@ import type { TraverseScenario } from "@/lib/scenario/traverse.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 import type { Register } from "@/lib/vocabulary/labels.ts";
 
-import { saisieEnCours } from "@/lib/rail/gates.ts";
+import { saisieEnCours, windBearing, windNotice } from "@/lib/rail/gates.ts";
 import { deriveResults } from "@/lib/rail/results.ts";
 import { readDynamics } from "@/lib/scenario/dynamics.ts";
 
@@ -75,6 +75,12 @@ export type ErrorSurfaces = {
    * dessus draws no Banane and no wind on the rose, and says this where the rose's reading goes.
    */
   readonly windCause: string | null;
+  /**
+   * « Vent saisi non appliqué : … » — the Vent the Scenario carries has no line to be projected on,
+   * since A or B is not on the map — or `null`. Not a cause: nothing is withheld, the rides are
+   * computed without wind, and the ones read with the Vent carry this sentence.
+   */
+  readonly windNotice: string | null;
 };
 
 /**
@@ -138,6 +144,7 @@ export function errorSurfaces({
     clearance: !removed.clearance,
     rideCause: rideCause({ report, refusal, saisie, register }),
     windCause: windCause({ report, saisie, register }),
+    windNotice: windNotice(report, traverse.wind),
   };
 }
 
@@ -146,15 +153,20 @@ export function errorSurfaces({
  * reads it: off the gated solved half, and none while {@link ErrorSurfaces.rideCause} withholds
  * them. Reading `readDynamics` beside it would integrate a ride the gates refuse.
  *
- * @param traverse the Scenario without `x_D`, which no ride reads: a scrub re-runs no ride.
+ * @param traverse the Scenario without `x_D`, which no ride reads: a scrub re-runs no ride. Its
+ *   Positions give the bearing the Vent is projected on (`windBearing`); without one the ride with
+ *   the Vent is the ride without, and {@link ErrorSurfaces.windNotice} says so.
  * @param trace the cached Trace; it sets `ρ` only while it is the line's ground.
  */
 export function gatedRides(
   { solved, rideCause: withheld }: Pick<ErrorSurfaces, "solved" | "rideCause">,
-  traverse: Pick<TraverseScenario, "material" | "rider" | "wind" | "dynamics" | "geometry">,
+  traverse: Pick<
+    TraverseScenario,
+    "material" | "rider" | "wind" | "dynamics" | "geometry" | "positions"
+  >,
   trace: Trace | null,
 ): DynamicsReading | null {
   if (solved === null || withheld !== null) return null;
   const profile = traverse.geometry.source === "trace" ? trace : null;
-  return readDynamics(traverse, solved, solved, profile);
+  return readDynamics(traverse, solved, solved, profile, windBearing(traverse));
 }

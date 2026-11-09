@@ -3,10 +3,17 @@ import { describe, expect, test } from "vitest";
 import type { Ride } from "@/lib/sim";
 
 import { formatAtX, formatQuantity } from "@/lib/format/quantity.ts";
+import { WIND_UNPLACED } from "@/lib/rail/gates.ts";
 import { msToKmh } from "@/lib/sim";
 
 import { ridesUnder } from "./__fixtures__/rides.ts";
-import { ARRIVES_AT_END, CONSTANTS_NOTE, NEVER_SETTLES, NO_ARRIVAL } from "./copy.ts";
+import {
+  ARRIVES_AT_END,
+  COINCIDE_NOTE,
+  CONSTANTS_NOTE,
+  NEVER_SETTLES,
+  NO_ARRIVAL,
+} from "./copy.ts";
 import { dynamiqueOutputs } from "./outputs.ts";
 import { dynamiqueScene } from "./scene.ts";
 
@@ -55,7 +62,30 @@ describe("the two Points d'arrêt are the engine's", () => {
   test("with a wind entered the two Points d'arrêt differ", () => {
     const { outputs } = ridesUnder(50, 0);
     expect(outputs.coincide).toBe(false);
+    expect(outputs.coincideNote).toBeNull();
     expect(outputs.rides[0].stopX).not.toBe(outputs.rides[1].stopX);
+  });
+
+  test("coinciding rides say why under them; a Vent that is not applied says it on its own ride", () => {
+    const { reading } = ridesUnder(0, 0);
+    expect(dynamiqueOutputs(reading, "steel").coincideNote).toBe(COINCIDE_NOTE);
+    expect(dynamiqueOutputs(reading, "steel").rides.map((ride) => ride.notice)).toEqual([
+      null,
+      null,
+    ]);
+    // A Vent with no Positions: the rides are one, and « no wind pushes » is not the reason.
+    const unplaced = dynamiqueOutputs(reading, "steel", WIND_UNPLACED.notice);
+    expect(unplaced.coincide).toBe(true);
+    expect(unplaced.coincideNote).toBeNull();
+    expect(unplaced.rides.map((ride) => ride.notice)).toEqual([null, WIND_UNPLACED.notice]);
+  });
+
+  test("the same Vent on the same line, with no Positions, rides as no wind at all", () => {
+    const placed = ridesUnder(50, 0);
+    const unplaced = ridesUnder(50, 0, undefined, null, { A: null, B: null });
+    expect(placed.outputs.coincide).toBe(false);
+    expect(unplaced.reading.windy).toBe(unplaced.reading.calm);
+    expect(unplaced.reading.calm).toEqual(placed.reading.calm);
   });
 });
 

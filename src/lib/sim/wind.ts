@@ -5,8 +5,10 @@
  * collinear `±`. This module does the projection and nothing else: the drag is the ride's
  * (`./dynamics.ts`, #89), and the line's lateral deflection has no source yet.
  *
- * The direction is where the wind comes **from**, relative to the travel A → B, in degrees
- * clockwise seen from above: 0° head wind, 90° from the right, 180° tail wind, 270° from the left.
+ * Both angles are geographic, in degrees clockwise from north: the wind's is the azimuth it comes
+ * **from** (0° a north wind, 270° a west wind), the line's is the bearing of the travel A → B. The
+ * engine takes the bearing as a number and never a Position, so it stays free of the earth: the
+ * caller reads the bearing off the Positions, and without one there is no wind to project.
  */
 
 /** Metres per second in one kilometre per hour: 1 000 m / 3 600 s, exactly. */
@@ -44,12 +46,16 @@ const CARDINAL: Readonly<Record<number, readonly [cos: number, sin: number]>> = 
 /**
  * Project a wind onto the line.
  *
+ * The wind comes from `from − bearing` degrees clockwise of the head-on direction, as the rider
+ * sees it: 0° head wind, 90° from the right, 180° tail wind, 270° from the left.
+ *
  * @param speed wind speed, m/s (≥ 0).
- * @param direction where the wind comes from, degrees, clockwise from the head-on bearing. Any
- *   finite angle is read modulo 360°.
+ * @param from the azimuth the wind comes from, degrees clockwise from north.
+ * @param bearing the bearing of the travel A → B, degrees clockwise from north. Both angles are
+ *   read modulo 360°, any finite value.
  */
-export function windComponents(speed: number, direction: number): WindComponents {
-  const degrees = ((direction % 360) + 360) % 360;
+export function windComponents(speed: number, from: number, bearing: number): WindComponents {
+  const degrees = (((from - bearing) % 360) + 360) % 360;
   const [cos, sin] = CARDINAL[degrees] ?? [
     Math.cos((degrees * Math.PI) / 180),
     Math.sin((degrees * Math.PI) / 180),

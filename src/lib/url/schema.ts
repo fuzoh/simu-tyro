@@ -314,7 +314,7 @@ const KEY_SCHEMAS = {
   daf: FINITE, // Coefficient dynamique.
   // The Vent (#87). Absent **is** no wind, so a link older than the keys reads none.
   ws: FINITE, // Vitesse du vent, km/h.
-  wd: FINITE, // Direction du vent, degrés — d'où il vient, relativement au sens A → B.
+  wd: FINITE, // Direction du vent, degrés — d'où il vient, depuis le nord, sens horaire.
   // The passager's ride (#89). Absent **is** §12.2's default, so a link older than the keys reads it.
   cda: FINITE, // `C_dA` du passager, m².
   f0: FINITE, // Frottement constant de la poulie `F₀`, **daN** — corde.

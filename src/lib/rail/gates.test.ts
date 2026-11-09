@@ -12,11 +12,15 @@ import {
   committedValue,
   culprits,
   evaluateGates,
+  fieldUnavailable,
   GATE_CONSEQUENCE,
   isFieldActive,
   regimeUnavailableNote,
   saisieEnCours,
   terminationOptions,
+  WIND_UNPLACED,
+  windBearing,
+  windNotice,
 } from "./gates.ts";
 import { applyRopeClass, applyShippedTerminations } from "./values.ts";
 
@@ -850,6 +854,73 @@ describe("the terrain register (#91)", () => {
     });
     expect(report.errors.map((error) => error.message)).toEqual([
       "⛔ Réglage de la Page Avancé — une valeur strictement positive est requise. Valeur : −1,0.",
+    ]);
+  });
+});
+
+/**
+ * The Vent's direction is geographic, so it needs the line's bearing, which the Positions give.
+ * Without them the wind fields are disabled and the Vent is not applied — kept as given (ADR-0001),
+ * never a blocking error: the report carries a flag, as it does for an absent régime.
+ */
+describe("the Vent needs Positions — one check for the link, the Session and the click", () => {
+  const TRIAL = {
+    A: { lat: 46.843556, lon: 6.525035 },
+    B: { lat: 46.846166, lon: 6.520783 },
+  };
+  const windy = (positions: ScenarioDraft["positions"]) =>
+    scenario((draft) => {
+      draft.wind = { speedKmh: 30, directionDeg: 264 };
+      draft.positions = positions;
+    });
+
+  test("the bearing is the Positions' own, and there is none without both", () => {
+    expect(windBearing(windy(TRIAL))).toBeCloseTo(311.9, 1);
+    expect(windBearing(windy({ A: TRIAL.A, B: null }))).toBeNull();
+    expect(windBearing(windy({ A: null, B: null }))).toBeNull();
+  });
+
+  test("without Positions: a flag, no error, every gate passes — the results stand", () => {
+    const report = evaluateGates({ scenario: windy({ A: TRIAL.A, B: null }) });
+    expect(report.windNeedsPositions).toBe(true);
+    expect(report.errors).toEqual([]);
+    expect(report.passed.wind).toBe(true);
+    expect(report.passed.ride).toBe(true);
+    expect(report.passed.solve).toBe(true);
+  });
+
+  test("with both Positions the Vent is set and applied", () => {
+    const report = evaluateGates({ scenario: windy(TRIAL) });
+    expect(report.windNeedsPositions).toBe(false);
+    expect(fieldUnavailable("windSpeed", report)).toBeNull();
+    expect(fieldUnavailable("windDirection", report)).toBeNull();
+    expect(windNotice(report, { speedKmh: 30 })).toBeNull();
+  });
+
+  test("the two wind fields are disabled with the reason, and no other field is", () => {
+    const report = evaluateGates({ scenario: windy({ A: null, B: null }) });
+    expect(fieldUnavailable("windSpeed", report)).toBe(WIND_UNPLACED.reason);
+    expect(fieldUnavailable("windDirection", report)).toBe(WIND_UNPLACED.reason);
+    for (const id of ["mp", "L", "CdA", "latA"] as const) {
+      expect(fieldUnavailable(id, report)).toBeNull();
+    }
+  });
+
+  test("a carried Vent is noticed as not applied; no Vent, nothing to notice", () => {
+    const report = evaluateGates({ scenario: windy({ A: null, B: null }) });
+    expect(windNotice(report, { speedKmh: 30 })).toBe(WIND_UNPLACED.notice);
+    expect(windNotice(report, { speedKmh: 0 })).toBeNull();
+  });
+
+  test("a negative speed without Positions is still the Wind Gate's breach (ADR-0001)", () => {
+    const report = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.wind = { speedKmh: -30, directionDeg: 264 };
+      }),
+    });
+    expect(report.windNeedsPositions).toBe(true);
+    expect(report.errors.map((error) => [error.gate, error.field])).toEqual([
+      ["wind", "windSpeed"],
     ]);
   });
 });

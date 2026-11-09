@@ -95,6 +95,7 @@ import {
   warningFor,
 } from "@/lib/rail/fields.ts";
 import {
+  fieldUnavailable,
   regimeUnavailableNote,
   TEXTILE_UNAVAILABLE_REASON,
   terminationOptions,
@@ -102,6 +103,7 @@ import {
 import {
   DEDUCED_HELP,
   FIELD_HELP,
+  FIELD_NOTE,
   GEOADMIN_HELP,
   LV95_HELP,
   PRESET_HELP,
@@ -181,6 +183,11 @@ export type RailRowContext = {
   readonly breaches: ReadonlyMap<FieldId, BlockingError>;
   /** A second culprit of the same check: **outline only**, never a second copy of the message. */
   readonly outlined: ReadonlySet<FieldId>;
+  /**
+   * Why a field cannot be typed into, or `null` — the gates' `fieldUnavailable`, read off the same
+   * report: the Vent's two fields without Positions.
+   */
+  readonly unavailable: (id: FieldId) => string | null;
   /** @returns the canonical value that **entered state**, or `null` when tier one refused. */
   readonly commit: (id: NumericFieldId, raw: string, settled: boolean) => number | null;
   /** A choice's write — a whole Scenario, through the store's one patch action. */
@@ -289,6 +296,7 @@ export function useFieldRows({
     register,
     breaches,
     outlined,
+    unavailable: (id) => fieldUnavailable(id, report),
     commit,
     patch,
     runFix,
@@ -615,7 +623,8 @@ export function RailInputs({
         </Group>
 
         {/* The Vent (#87): no statics, clearance or Verdict reads it — the ride (#89) and the
-              Banane do. The rose writes the same two fields from the vue de dessus. */}
+              Banane do. The rose writes the same two fields from the vue de dessus. Its direction
+              is geographic, so both rows are disabled while A or B is not on the map. */}
         <Group title={heading("wind", "exact")}>
           <NumericRow hint="km/h" id="windSpeed" />
           <NumericRow hint="°" id="windDirection" />
@@ -851,9 +860,22 @@ export function NumericRow({
    */
   idle?: string;
 }) {
-  const { form, text, context, unit, register, breaches, outlined, commit, runFix, setFocused } =
-    useRailRowContext();
+  const {
+    form,
+    text,
+    context,
+    unit,
+    register,
+    breaches,
+    outlined,
+    unavailable,
+    commit,
+    runFix,
+    setFocused,
+  } = useRailRowContext();
   const breach = breaches.get(id);
+  const reason = unavailable(id);
+  const meaning = FIELD_NOTE[id];
   const value = text[id] ?? "";
   const issue = checkField(id, value, context);
   const parsed = issue === null ? (parseDecimal(value) ?? NaN) : NaN;
@@ -873,6 +895,7 @@ export function NumericRow({
             help={register === "exact" ? FIELD_HELP[id] : undefined}
             control={
               <NumericInput
+                disabled={reason !== null}
                 id={`rail-${id}`}
                 invalid={shown !== null && shown.kind !== "empty"}
                 onBlur={(raw) => {
@@ -902,6 +925,10 @@ export function NumericRow({
             }
             note={
               <>
+                {meaning !== undefined && (
+                  <p className="text-muted-foreground text-xs">{meaning}</p>
+                )}
+                {reason !== null && <DisabledReason reason={reason} />}
                 {note}
                 {breach !== undefined && <FixButtons breach={breach} onFix={runFix} />}
               </>

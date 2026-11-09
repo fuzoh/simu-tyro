@@ -1,11 +1,12 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, test } from "vitest";
 
 import type { Trace } from "@/lib/terrain/trace.ts";
 
+import { TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
 import { parseProfileCsv } from "@/lib/terrain/csv.ts";
 
-import { clampX, placeSpan, spanOfGeometry } from "./geometry.ts";
+import { clampX, lineBearing, placeSpan, spanOfGeometry } from "./geometry.ts";
 
 /**
  * The trial profil of 2026-11-08 — `[MEASURED]` geoadmin export, 200 points over 435,2 m, ground
@@ -91,5 +92,27 @@ describe("clampX", () => {
   it("does not clamp against a span that is not a span", () => {
     expect(clampX(74.8, -5)).toBe(74.8);
     expect(clampX(74.8, Number.NaN)).toBe(74.8);
+  });
+});
+
+describe("lineBearing — the bearing the Vent is projected on", () => {
+  const NORTH_LINE = { A: { lat: 46.8, lon: 7.4 }, B: { lat: 46.81, lon: 7.4 } };
+
+  test("the trial's line runs at about 312°, north-west", () => {
+    // Δλ = −0,004252° = −7,4211e-5 rad east; Δ(Mercator y) ≈ Δφ / cos φ = 4,5553e-5 / 0,68395 =
+    // 6,6603e-5 north; atan2(−7,4211, 6,6603) = −48,09°, so 311,9°.
+    expect(lineBearing(TRIAL_ENDS)).toBeCloseTo(311.9, 1);
+  });
+
+  test("a line due north is 0°, due east 90°, due south 180°", () => {
+    expect(lineBearing(NORTH_LINE)).toBeCloseTo(0, 6);
+    expect(lineBearing({ A: NORTH_LINE.A, B: { lat: 46.8, lon: 7.41 } })).toBeCloseTo(90, 6);
+    expect(lineBearing({ A: NORTH_LINE.B, B: NORTH_LINE.A })).toBeCloseTo(180, 6);
+  });
+
+  test("is unknown while a Position is missing or both name one point", () => {
+    expect(lineBearing({ A: NORTH_LINE.A, B: null })).toBeNull();
+    expect(lineBearing({ A: null, B: null })).toBeNull();
+    expect(lineBearing({ A: NORTH_LINE.A, B: NORTH_LINE.A })).toBeNull();
   });
 });

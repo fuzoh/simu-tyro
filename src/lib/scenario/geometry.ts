@@ -3,7 +3,7 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { deriveSpan, deriveTerrain, traceExtent } from "@/lib/terrain/trace.ts";
 
-import type { AnchorHeights, Geometry } from "./types.ts";
+import type { AnchorHeights, Geometry, Position, Positions } from "./types.ts";
 
 /**
  * The span a {@link Geometry} describes: typed `Portée` in manual mode, the whole extent of the
@@ -87,4 +87,36 @@ export function clampX(xD: number, L: number): number {
   if (!Number.isFinite(L) || L <= 0) return xD;
   if (xD < 0) return 0;
   return xD > L ? L : xD;
+}
+
+/**
+ * The bearing of the travel A → B, degrees clockwise from north in [0, 360), or `null` while a
+ * Position is missing or both name one point — **the one thing a computation reads of the
+ * Positions**: the Vent is a geographic direction, and it is projected on the line through this
+ * angle (#87, `windComponents`). Without it there is no wind on the line.
+ *
+ * It is the rhumb line's, the angle the north-up Mercator map draws A → B at, so the line on the
+ * map, the rose des vents over it and the projection agree by construction. Over a portée of a few
+ * hundred metres it differs from the great circle's initial bearing by far less than the whole
+ * degree the direction field holds.
+ */
+export function lineBearing({ A, B }: Positions): number | null {
+  if (A === null || B === null) return null;
+  const east = longitudeDelta(A, B);
+  const north = mercatorY(B.lat) - mercatorY(A.lat);
+  if (east === 0 && north === 0) return null;
+  return ((((Math.atan2(east, north) * 180) / Math.PI) % 360) + 360) % 360;
+}
+
+const radians = (degrees: number) => (degrees * Math.PI) / 180;
+
+/** East-west separation of two Positions in radians of longitude, the short way round. */
+function longitudeDelta(from: Position, to: Position): number {
+  const delta = radians(to.lon - from.lon);
+  return Math.abs(delta) > Math.PI ? delta - Math.sign(delta) * 2 * Math.PI : delta;
+}
+
+/** The Mercator ordinate of a latitude, which makes angles on the screen the true ones. */
+function mercatorY(lat: number): number {
+  return Math.log(Math.tan(Math.PI / 4 + radians(lat) / 2));
 }

@@ -17,12 +17,12 @@ import type { UnloadedLine } from "./unloaded.ts";
 
 /**
  * The Scenario as every Traverse-scope reader takes it — the gates and the `Résultats`: all of it
- * but `x_D`, which selects a Sweep Step and judges nothing, the Mise en tension device, which is
- * descriptive (#86), and the Positions, which only « Charger le profil geo.admin » reads (#90,
- * #103). The Vent and the ride's constants stay in: no statics number reads them, but the Wind and
- * Ride Gates judge them, so the report must move when they do.
+ * but `x_D`, which selects a Sweep Step and judges nothing, and the Mise en tension device, which is
+ * descriptive (#86). The Vent, the ride's constants and the Positions stay in: no statics number
+ * reads them, but the Wind and Ride Gates judge the first two, and the Vent is projected on the
+ * bearing the Positions give (`windBearing`), so the report and the rides must move when they do.
  */
-export type TraverseScenario = Omit<ScenarioDraft, "rider" | "tensioningDevice" | "positions"> & {
+export type TraverseScenario = Omit<ScenarioDraft, "rider" | "tensioningDevice"> & {
   readonly rider: Omit<Rider, "xD">;
 };
 
@@ -31,7 +31,7 @@ export type TraverseScenario = Omit<ScenarioDraft, "rider" | "tensioningDevice" 
  * memo compares its keys one level deep, and `rider` is a fresh object on every scrub.
  */
 export type TraverseInputs = Readonly<
-  Omit<ScenarioDraft, "rider" | "tensioningDevice" | "positions"> & Omit<Rider, "xD">
+  Omit<ScenarioDraft, "rider" | "tensioningDevice"> & Omit<Rider, "xD">
 >;
 
 /**
@@ -52,6 +52,7 @@ export function traverseInputs(scenario: ScenarioDraft): TraverseInputs {
     terminations,
     wind,
     dynamics,
+    positions,
   } = scenario;
   const { mp, hRider, hClearMin, DAF } = scenario.rider;
   return {
@@ -67,6 +68,7 @@ export function traverseInputs(scenario: ScenarioDraft): TraverseInputs {
     terminations,
     wind,
     dynamics,
+    positions,
     mp,
     hRider,
     hClearMin,

@@ -7,6 +7,8 @@
 
 import { describe, expect, test } from "vitest";
 
+import { WIND_UNPLACED } from "@/lib/rail/gates.ts";
+import { lineBearing } from "@/lib/scenario/geometry.ts";
 import { TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
 import { exactTermsIn, proscribedIn } from "@/lib/vocabulary/labels.ts";
 
@@ -22,7 +24,6 @@ import {
   windReading,
 } from "./copy.ts";
 import { horizontalDistance } from "./measure.ts";
-import { roseReference } from "./wind-rose.ts";
 
 const PARIS = { lat: 48.85, lon: 2.35 };
 
@@ -54,8 +55,10 @@ describe("an anchor's reading", () => {
 });
 
 describe("the wind's reading", () => {
-  const trial = roseReference(TRIAL_ENDS);
-  const level = roseReference({ A: null, B: null });
+  // The trial's line runs at ≈ 311,9°, north-west (`wind-rose.test.ts` checks it by hand).
+  const trial = lineBearing(TRIAL_ENDS);
+  /** B moved 0,000262° — about 20 m — east: the line turns to ≈ 313,7°. */
+  const moved = lineBearing({ A: TRIAL_ENDS.A, B: { lat: 46.846166, lon: 6.521045 } });
 
   test("says where a relative direction comes from, from the rider's seat", () => {
     expect(describeRelative(0)).toBe("de face");
@@ -68,16 +71,31 @@ describe("the wind's reading", () => {
     expect(describeRelative(300)).toBe("par la gauche à l'avant");
   });
 
-  test("gives the azimuth and the relative direction on the trial's line", () => {
-    expect(windReading({ speedKmh: 25, directionDeg: 108 }, trial)).toBe(
+  test("gives the azimuth and the direction relative to the trial's line", () => {
+    // 60° − 311,9° = −251,9°, so 108° clockwise of head-on.
+    expect(windReading({ speedKmh: 25, directionDeg: 60 }, trial)).toBe(
       "Vent de nord-est (60°), 25 km/h : par la droite à l'arrière, 108° par rapport à la ligne A → B.",
+    );
+    // The browser trial's west wind: 264° − 311,9° = −47,9°, so 312°, from the left ahead.
+    expect(windReading({ speedKmh: 30, directionDeg: 264 }, trial)).toBe(
+      "Vent d'ouest (264°), 30 km/h : par la gauche à l'avant, 312° par rapport à la ligne A → B.",
     );
   });
 
-  test("gives the relative direction alone where north is unknown", () => {
-    expect(windReading({ speedKmh: 25, directionDeg: 108 }, level)).toBe(
-      "Vent à 25 km/h : par la droite à l'arrière, 108° par rapport à la ligne A → B (nord inconnu).",
+  test("moving an anchor keeps the azimuth and turns only the reading relative to the line", () => {
+    // 264° − 313,7° = −49,7°, so 310°.
+    expect(windReading({ speedKmh: 30, directionDeg: 264 }, moved)).toBe(
+      "Vent d'ouest (264°), 30 km/h : par la gauche à l'avant, 310° par rapport à la ligne A → B.",
     );
+  });
+
+  test("without A and B on the map, says the Vent is not applied, and why", () => {
+    expect(windReading({ speedKmh: 30, directionDeg: 264 }, null)).toBe(
+      `Vent d'ouest (264°), 30 km/h. ${WIND_UNPLACED.notice}`,
+    );
+    // No Vent to apply: the rose has no handle, and the reading says what would give it one.
+    expect(windReading({ speedKmh: 0, directionDeg: 264 }, null)).toBe(WIND_UNPLACED.reason);
+    expect(windReading({ speedKmh: 0, directionDeg: 264 }, null, false)).toBe("Pas de vent.");
   });
 
   test("says there is no wind, and what to do about it", () => {
@@ -86,8 +104,8 @@ describe("the wind's reading", () => {
 
   test("on a rose with no handle, says there is no wind and asks for no gesture (#101)", () => {
     expect(windReading({ speedKmh: 0, directionDeg: 0 }, trial, false)).toBe("Pas de vent.");
-    expect(windReading({ speedKmh: 25, directionDeg: 108 }, trial, false)).toBe(
-      windReading({ speedKmh: 25, directionDeg: 108 }, trial),
+    expect(windReading({ speedKmh: 25, directionDeg: 60 }, trial, false)).toBe(
+      windReading({ speedKmh: 25, directionDeg: 60 }, trial),
     );
   });
 });
@@ -181,9 +199,9 @@ describe("every line the map prints stays in the terrain register", () => {
   const lines = [
     ...mapLabelTable(),
     ...Object.values(READINGS).flat(),
-    windReading({ speedKmh: 25, directionDeg: 108 }, roseReference(TRIAL_ENDS)),
-    windReading({ speedKmh: 25, directionDeg: 108 }, roseReference({ A: null, B: null })),
-    windReading({ speedKmh: 0, directionDeg: 0 }, roseReference({ A: null, B: null })),
+    windReading({ speedKmh: 25, directionDeg: 60 }, lineBearing(TRIAL_ENDS)),
+    windReading({ speedKmh: 25, directionDeg: 60 }, null),
+    windReading({ speedKmh: 0, directionDeg: 0 }, null),
     ...(["A", "B"] as const).flatMap((anchor) => [
       anchorReading(anchor, TRIAL_ENDS) ?? "",
       anchorReading(anchor, { A: PARIS, B: PARIS }) ?? "",

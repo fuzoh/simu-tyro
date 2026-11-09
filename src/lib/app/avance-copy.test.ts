@@ -21,6 +21,7 @@ const report = (...errors: BlockingError[]): GateReport => ({
   passed: passedGates(errors, false),
   worst: errors[0]?.gate ?? null,
   noRegime: false,
+  windNeedsPositions: false,
 });
 
 const GATES: readonly GateId[] = ["solve", "clearance", "verdict", "wind", "ride"];

@@ -37,15 +37,25 @@ function solved(scenario: ScenarioDraft): { unloaded: UnloadedLine; rider: Rider
   return { unloaded, rider };
 }
 
-function reading(scenario: ScenarioDraft, profile: Trace | null = null) {
+/**
+ * The line's bearing, unless a test says otherwise: due north, so the Vent's azimuth is its angle
+ * from head-on — 0 a head wind, 90 from the right, 180 a tail wind.
+ */
+const NORTH = 0;
+
+function reading(
+  scenario: ScenarioDraft,
+  profile: Trace | null = null,
+  bearing: number | null = NORTH,
+) {
   const { unloaded, rider } = solved(scenario);
-  const read = readDynamics(scenario, unloaded, rider, profile);
+  const read = readDynamics(scenario, unloaded, rider, profile, bearing);
   if (read === null) throw new Error("a complete traverse has a ride");
   return read;
 }
 
-function windy(directionDeg: number) {
-  return reading({ ...SHIPPED, wind: { speedKmh: 50, directionDeg } });
+function windy(directionDeg: number, bearing: number | null = NORTH) {
+  return reading({ ...SHIPPED, wind: { speedKmh: 50, directionDeg } }, null, bearing);
 }
 
 function lowest(one: Ride): number {
@@ -96,7 +106,7 @@ describe("`readDynamics` — what every dynamic output carries", () => {
   test("an incomplete traverse has no ride: a slope nobody solved is not ridden", () => {
     const { unloaded, rider } = solved(SHIPPED);
     const holed = { ...rider, traverse: { ...rider.traverse, coverage: 0.5 } };
-    expect(readDynamics(SHIPPED, unloaded, holed, null)).toBeNull();
+    expect(readDynamics(SHIPPED, unloaded, holed, null, NORTH)).toBeNull();
   });
 });
 
@@ -127,6 +137,41 @@ describe("the windy ride — the Vent's component along the line", () => {
 
   test("the calm ride does not depend on the wind", () => {
     expect(windy(0).calm).toEqual(calm.calm);
+  });
+});
+
+/**
+ * The Vent's direction is geographic: the line's bearing, read off the Positions, turns it into a
+ * head, tail or cross wind. Moving an anchor turns the line under the same Vent.
+ */
+describe("the windy ride — the Vent on the line's bearing", () => {
+  const calm = reading(SHIPPED);
+
+  test("the same north wind is a head wind on a line running north, a tail wind on one running south", () => {
+    expect(windy(0, 0).windy.end.kind).toBe("stop");
+    const south = windy(0, 180);
+    if (south.windy.end.kind !== "arrival" || calm.calm.end.kind !== "arrival") {
+      throw new Error("both rides reach B");
+    }
+    expect(south.windy.end.v).toBeGreaterThan(calm.calm.end.v);
+  });
+
+  test("a north wind on a line running east is a cross wind, and changes nothing", () => {
+    expect(windy(0, 90).windy).toEqual(calm.calm);
+    expect(windy(0, 90).windless).toBe(true);
+  });
+
+  test("turning the line and the wind by the same angle rides the same", () => {
+    // The trial's west wind of 264° on its line at 312° is 312° from head-on, as a wind from 312°
+    // on a line running north.
+    expect(windy(264, 312).windy).toEqual(windy(312, NORTH).windy);
+  });
+
+  test("without a bearing — no Positions — the Vent is not applied: the windy ride is the calm one", () => {
+    const unplaced = windy(0, null);
+    expect(unplaced.windy).toBe(unplaced.calm);
+    expect(unplaced.windless).toBe(true);
+    expect(unplaced.calm).toEqual(calm.calm);
   });
 });
 

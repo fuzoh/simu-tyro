@@ -152,15 +152,17 @@ export type TensioningSide = AnchorSide;
 export type TensioningDevice = "pulley" | "maestro-s" | "maestro-l";
 
 /**
- * The **Vent** (#87): how fast, and from where relative to the travel A → B — `direction` is
- * degrees clockwise seen from above, 0 head wind, 90 from the right, 180 tail wind, 270 from the
- * left. Relative to the line so a Scenario needs no Position. `ws` / `wd` in a link, **both absent
- * for no wind**. Only the passager's ride reads it (#89): statics and the Verdict are unchanged.
+ * The **Vent** (#87): how fast, and from where — `direction` is the azimuth the wind comes **from**,
+ * degrees clockwise from north (0 a north wind, 90 from the east, 270 from the west), the direction a
+ * forecast gives. It is projected on the line through the bearing A → B the {@link Positions} give,
+ * so moving an anchor turns the line under it and leaves it as it is; without both Positions it is
+ * kept as given and not applied (`windBearing`). `ws` / `wd` in a link, **both absent for no wind**.
+ * Only the passager's ride and the Banane read it (#89, #96): statics and the Verdict are unchanged.
  */
 export type Wind = {
   /** Wind speed, km/h (≥ 0). */
   speedKmh: number;
-  /** Where the wind comes from, degrees. */
+  /** The azimuth the wind comes from, degrees clockwise from north. */
   directionDeg: number;
 };
 
@@ -179,8 +181,9 @@ export type Position = {
  * The two anchors' {@link Position}s, `null` where unknown (manual geometry, or a CSV with no
  * coordinates). In a link the four numbers are `lata` / `lona` / `latb` / `lonb`, **all absent for
  * unknown**. They place the anchors on the map and in the Vue 3D and give Mesure its distances; the
- * `ph` link key (`offPositions`) says whether the profil runs between them; and « Charger le profil
- * geo.admin » (#103) reads them, only when pressed. Statics, the ride and the Verdict never do.
+ * `ph` link key (`offPositions`) says whether the profil runs between them; « Charger le profil
+ * geo.admin » (#103) reads them, only when pressed; and their bearing A → B is what the Vent is
+ * projected on. Statics and the Verdict never read them.
  */
 export type Positions = { A: Position | null; B: Position | null };
 

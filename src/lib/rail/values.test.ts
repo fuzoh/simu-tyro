@@ -5,13 +5,7 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { appReducer, initialAppState } from "@/lib/app/state.ts";
 import { drawnPositions, IDLE, stepGesture } from "@/lib/map/gesture.ts";
-import {
-  handleOffset,
-  LEVEL_REFERENCE,
-  ROSE_RADIUS_PX,
-  roseReference,
-  windFromOffset,
-} from "@/lib/map/wind-rose.ts";
+import { handleOffset, ROSE_RADIUS_PX, NORTH_UP, windFromOffset } from "@/lib/map/wind-rose.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { traverseInputs } from "@/lib/scenario/traverse.ts";
 
@@ -657,14 +651,15 @@ describe("Positions (#90) — an anchor's two coordinates, committed as one", ()
     });
   });
 
-  test("a Position changes nothing the Sweep reads, so it cannot re-run it", () => {
+  test("a Position moves the Traverse scope by its Positions alone — the Vent's bearing", () => {
     const before = scenario();
     const placed = applyPosition(before, "A", { ...blank, latA: "46,84", lonA: "6,52" }, {});
     expect(placed.positions.A).not.toBeNull();
     const [kept, moved] = [traverseInputs(before), traverseInputs(placed)];
-    expect(moved).toEqual(kept);
-    // The memo keys are compared by identity, not by value.
+    expect(moved.positions).not.toBe(kept.positions);
+    // The memo keys are compared by identity, not by value: every other one holds.
     for (const key of Object.keys(kept) as (keyof typeof kept)[]) {
+      if (key === "positions") continue;
       expect(Object.is(moved[key], kept[key])).toBe(true);
     }
   });
@@ -928,31 +923,24 @@ describe("the vue de dessus and the rose write what the Position and Vent fields
   });
 
   test("the rose's handle writes the two Vent fields, and typed ones place the handle", () => {
-    // Half the rose's radius toward the line's own heading, A → B due east without Positions: a
-    // 30 km/h head wind, 0°. A full radius due north is 60 km/h from the left, 270°.
+    // On the north-up map the handle stands where the wind comes from: half the rose's radius to
+    // the east is a 30 km/h wind from the east, 90°; a full radius north is 60 km/h from the north.
     for (const [offset, shown] of [
       [
         { x: ROSE_RADIUS_PX / 2, y: 0 },
-        { windSpeed: "30", windDirection: "0" },
+        { windSpeed: "30", windDirection: "90" },
       ],
       [
         { x: 0, y: -ROSE_RADIUS_PX },
-        { windSpeed: "60", windDirection: "270" },
+        { windSpeed: "60", windDirection: "0" },
       ],
     ] as const) {
-      const wind = windFromOffset(
-        offset,
-        roseReference(blank.scenario.positions),
-        blank.scenario.wind,
-      );
+      const wind = windFromOffset(offset, NORTH_UP, blank.scenario.wind);
       const next = appReducer(blank, { type: "scénario/modifié", patch: { wind } });
       expect(railValues(next.scenario)).toMatchObject(shown);
     }
     const typed = applyField(blank.scenario, "windSpeed", 60, null);
-    const handle = handleOffset(
-      applyField(typed, "windDirection", 270, null).wind,
-      LEVEL_REFERENCE,
-    );
+    const handle = handleOffset(applyField(typed, "windDirection", 0, null).wind, NORTH_UP);
     expect(handle.x).toBeCloseTo(0, 9);
     expect(handle.y).toBeCloseTo(-ROSE_RADIUS_PX, 9);
   });

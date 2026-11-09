@@ -56,7 +56,7 @@ function Live({ page }: { page: string }) {
     page,
     register: "terrain",
   });
-  const { cause, clearance, frame, refusal, rideCause, saisie, solved } = surfaces;
+  const { cause, clearance, frame, refusal, rideCause, saisie, solved, windNotice } = surfaces;
   // The Verdict, and the request for a marge exigée that asks for one, are not this Page's: only
   // what stops the computation or the rides reaches the banner here.
   const occupant = useMemo(
@@ -74,8 +74,8 @@ function Live({ page }: { page: string }) {
 
   // What the gates leave: no ride under « Aucun résultat » or while a ride value is refused.
   const model = useMemo(
-    () => (reading === null ? null : dynamiqueOutputs(reading, material.family)),
-    [reading, material.family],
+    () => (reading === null ? null : dynamiqueOutputs(reading, material.family, windNotice)),
+    [reading, material.family, windNotice],
   );
   const dynamicSolved: DynamiqueSolved | null =
     solved === null

@@ -1,17 +1,18 @@
 import { describe, expect, test } from "vitest";
 
 import type { FieldId, FieldIssue } from "@/lib/rail/fields.ts";
-import type { ScenarioDraft } from "@/lib/scenario/types.ts";
+import type { Scenario, ScenarioDraft } from "@/lib/scenario/types.ts";
+import type { Ride } from "@/lib/sim";
 import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { buildSceneBase, buildSceneFrame } from "@/lib/chart/scene.ts";
 import { deducedFrom } from "@/lib/rail/deduced.ts";
 import { quasiStaticRow } from "@/lib/rail/dynamics.ts";
-import { committedValue, evaluateGates } from "@/lib/rail/gates.ts";
+import { committedValue, evaluateGates, WIND_UNPLACED } from "@/lib/rail/gates.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { sweepRiderOf, traverseInputs, traverseScenario } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
-import { completeFromDefaults, searchToScenario } from "@/lib/url/scenario.ts";
+import { completeFromDefaults, scenarioToSearch, searchToScenario } from "@/lib/url/scenario.ts";
 import { parseLinkSearch, validateSearch } from "@/lib/url/schema.ts";
 
 import { errorSurfaces, gatedRides } from "./surfaces.ts";
@@ -105,7 +106,11 @@ describe("what each standing state leaves on screen", () => {
 function arrivedOn(query: string, register: Register) {
   const search = validateSearch(parseLinkSearch(query));
   if (search.refused !== undefined) throw new Error(`${query} refused`);
-  const scenario = searchToScenario(completeFromDefaults(search).search);
+  return readOn(searchToScenario(completeFromDefaults(search).search), register);
+}
+
+/** A Scenario as a Page reads it, however it came — a link, a Session or a click. */
+function readOn(scenario: ScenarioDraft, register: Register) {
   const unloaded = deriveUnloaded(unloadedInputs(scenario, null));
   const frame = buildSceneFrame(unloaded.span);
   const solved = buildSceneBase(frame, unloaded, sweepRiderOf(scenario));
@@ -177,5 +182,65 @@ describe("a ride value the app refuses withholds the rides, and says why", () =>
     expect(reading).toBeNull();
     expect(surfaces.cause).toMatch(/^Aucun résultat — /);
     expect(surfaces.rideCause).toBeNull();
+  });
+});
+
+/**
+ * The Vent's direction is geographic, so it is projected on the line through the bearing the
+ * Positions give. Without A and B on the map it cannot be: it is kept as given and not applied, and
+ * the rides read with it say so — never a cause, never an error.
+ */
+describe("the Vent needs Positions", () => {
+  const LINE = "?L=200&h=-20&fl=6&ws=30&wd=264";
+  /** The browser trial's anchors: A → B runs at ≈ 311,9°, so a wind from 264° is ahead, left. */
+  const TRIAL = "&lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783";
+
+  test("on the trial's Positions the west wind is applied: a head wind from the left", () => {
+    const { surfaces, reading } = arrivedOn(`${LINE}${TRIAL}`, "terrain");
+    expect(surfaces.windNotice).toBeNull();
+    expect(reading?.windless).toBe(false);
+    // The head component drags the passager back: the fastest point of the ride is slower.
+    const fastest = (ride: Ride | undefined) =>
+      Math.max(...(ride?.samples ?? []).map((at) => at.v));
+    expect(fastest(reading?.windy)).toBeLessThan(fastest(reading?.calm));
+  });
+
+  test("without Positions it is kept as given, not applied, and the rides say so", () => {
+    for (const register of ["exact", "terrain"] as const) {
+      const { scenario, surfaces, reading } = arrivedOn(LINE, register);
+      // Kept: the Scenario and the link it writes back still carry it.
+      expect(scenario.wind).toEqual({ speedKmh: 30, directionDeg: 264 });
+      expect(scenarioToSearch(scenario as Scenario)).toMatchObject({ ws: 30, wd: 264 });
+      // Not applied: both rides are the ride without wind, and nothing is withheld.
+      expect(reading).not.toBeNull();
+      expect(reading?.windy).toBe(reading?.calm);
+      expect(surfaces).toMatchObject({ cause: null, rideCause: null, windCause: null });
+      expect(surfaces.results).not.toBeNull();
+      expect(surfaces.windNotice).toBe(WIND_UNPLACED.notice);
+    }
+  });
+
+  test("without Positions and without wind there is nothing to say", () => {
+    const { surfaces } = arrivedOn("?L=200&h=-20&fl=6&wd=264", "terrain");
+    expect(surfaces.windNotice).toBeNull();
+  });
+
+  test("moving an anchor keeps the Vent and turns only its effect on the line", () => {
+    const placed = arrivedOn(`${LINE}${TRIAL}`, "terrain");
+    // B moved to the east of A: the line now runs east, and the west wind blows from behind.
+    const moved = readOn(
+      {
+        ...placed.scenario,
+        positions: { ...placed.scenario.positions, B: { lat: 46.843556, lon: 6.531 } },
+      },
+      "terrain",
+    );
+    expect(moved.scenario.wind).toEqual({ speedKmh: 30, directionDeg: 264 });
+    expect(scenarioToSearch(moved.scenario as Scenario)).toMatchObject({ ws: 30, wd: 264 });
+    expect(moved.surfaces.windNotice).toBeNull();
+    const calm = moved.reading?.calm.end;
+    const windy = moved.reading?.windy.end;
+    if (calm?.kind !== "arrival" || windy?.kind !== "arrival") throw new Error("both reach B");
+    expect(windy.v).toBeGreaterThan(calm.v);
   });
 });

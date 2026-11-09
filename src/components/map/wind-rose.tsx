@@ -13,6 +13,9 @@
  * - **The host is a point.** Its parent places it — at the line's midpoint on the map, at the middle
  *   of the box without one — and everything the rose draws is relative to it.
  * - **Without `onWind` there is no handle** (#101): the Page Terrain shows the Vent and sets none.
+ * - **Without a reference there is no wind and no handle either**: A or B is not on the map, so the
+ *   line has no bearing and the Vent can be neither drawn nor set (`windBearing`). The rose draws
+ *   the level line, A on the left, and the reading under the map says why.
  */
 
 import type { PointerEvent, RefObject } from "react";
@@ -44,13 +47,15 @@ export function WindRose({
   /** The point the rose is drawn around — `TopMap`'s map places it as the map moves. */
   hostRef: RefObject<HTMLDivElement | null>;
   wind: Wind;
-  reference: RoseReference;
+  /** `null` when the line has no bearing: no wind is drawn and no handle offered. */
+  reference: RoseReference | null;
   onWind?: (wind: Wind) => void;
 }) {
   // Where the pointer took the handle, so it does not jump to the pointer's centre.
   const grab = useRef<RoseOffset | null>(null);
   const [dragging, setDragging] = useState(false);
-  const handle = handleOffset(wind, reference);
+  const handle = reference === null ? { x: 0, y: 0 } : handleOffset(wind, reference);
+  const oriented = reference?.oriented ?? false;
 
   function centre(): RoseOffset {
     const box = hostRef.current?.getBoundingClientRect();
@@ -69,7 +74,7 @@ export function WindRose({
   }
 
   function onPointerMove(event: PointerEvent<HTMLDivElement>) {
-    if (grab.current === null) return;
+    if (grab.current === null || reference === null) return;
     const origin = centre();
     const next = windFromOffset(
       {
@@ -111,8 +116,8 @@ export function WindRose({
         {handle.x !== 0 || handle.y !== 0 ? (
           <line stroke="currentColor" strokeWidth={2} x1={0} x2={handle.x} y1={0} y2={handle.y} />
         ) : null}
-        {/* No line is drawn where the Positions are unknown: the rose draws the level one. */}
-        {!reference.oriented && (
+        {/* Where the drawing is not the north-up map, the rose draws the line level itself. */}
+        {!oriented && (
           <line
             stroke="currentColor"
             strokeWidth={3}
@@ -133,7 +138,7 @@ export function WindRose({
           {ring === ROSE_MAX_KMH ? `${ring} km/h` : ring}
         </span>
       ))}
-      {reference.oriented ? (
+      {oriented ? (
         <span
           className="text-muted-foreground absolute -translate-x-1/2 -translate-y-full"
           style={{ top: -ROSE_RADIUS_PX - 14 }}
@@ -153,7 +158,7 @@ export function WindRose({
           ))}
         </>
       )}
-      {onWind !== undefined && (
+      {onWind !== undefined && reference !== null && (
         <div
           className={cn(
             "pointer-events-auto absolute grid touch-none place-items-center",

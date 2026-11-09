@@ -52,7 +52,10 @@ export type DynamicsReading = {
   readonly calm: Ride;
   /** With the Vent entered, through its component along the line; `calm` itself without one. */
   readonly windy: Ride;
-  /** The Vent entered has no component along the line — none, or a crosswind: `windy` is `calm`. */
+  /**
+   * The Vent entered has no component along the line — none, a crosswind, or no bearing to project
+   * it on: `windy` is `calm`.
+   */
   readonly windless: boolean;
   /** The air density both rides used, kg/m³. */
   readonly rho: { readonly value: number; readonly source: AirDensitySource };
@@ -77,6 +80,9 @@ export type RiddenLine = {
  * @param unloaded the line the traverse was swept over.
  * @param profile the **active** imported profil, `null` on a manual line — a Trace cached while
  *   manual geometry drives is no altitude of this line.
+ * @param bearing the bearing of A → B the Vent is projected on, degrees from north, or `null` when
+ *   the line has none (no Positions): the Vent's direction is geographic, so without a bearing it
+ *   has no component along the line and the ride with the Vent is the ride without.
  * @returns `null` when the traverse is incomplete: a ride across a hole would run on a slope
  *   nobody solved, so like the Verdict it is suppressed rather than qualified.
  */
@@ -92,6 +98,7 @@ export function readDynamics(
   unloaded: RiddenLine,
   { traverse }: Pick<RiderSweep, "traverse">,
   profile: Trace | null,
+  bearing: number | null,
 ): DynamicsReading | null {
   if (traverse.coverage < 1) return null;
 
@@ -100,7 +107,8 @@ export function readDynamics(
   const trolley = trolleyOf(material.family, dynamics);
   const posed = { path, m: rider.mp, CdA: dynamics.CdA, rho: rho.value, trolley };
   const calm = ride({ ...posed, windAlong: 0 });
-  const { along } = windComponents(kmhToMs(wind.speedKmh), wind.directionDeg);
+  const along =
+    bearing === null ? 0 : windComponents(kmhToMs(wind.speedKmh), wind.directionDeg, bearing).along;
   const windy = along === 0 ? calm : ride({ ...posed, windAlong: along });
 
   // The member's own `μ`, kg/m: its weight per metre over the `g` that made it.

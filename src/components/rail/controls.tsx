@@ -204,6 +204,7 @@ export function NumericInput({
   id,
   value,
   invalid = false,
+  disabled = false,
   onChange,
   onFocus,
   onBlur,
@@ -211,6 +212,8 @@ export function NumericInput({
   id: string;
   value: string;
   invalid?: boolean;
+  /** Visible but not typed into: the row says why, as every disabled choice does (§ 10.1). */
+  disabled?: boolean;
   onChange: (raw: string) => void;
   onFocus: () => void;
   onBlur: (raw: string) => void;
@@ -223,6 +226,7 @@ export function NumericInput({
     <Input
       aria-invalid={invalid || undefined}
       className="w-24 text-right font-mono text-base"
+      disabled={disabled}
       // Enter commits and blurs: on iOS there is otherwise no way to dismiss the keypad.
       enterKeyHint="done"
       id={id}

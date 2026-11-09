@@ -27,7 +27,8 @@ import {
   TENSIONING_SIDE_OPTIONS,
   usageOptions,
 } from "@/lib/rail/fields.ts";
-import { GATE_CONSEQUENCE, TEXTILE_UNAVAILABLE_REASON } from "@/lib/rail/gates.ts";
+import { GATE_CONSEQUENCE, TEXTILE_UNAVAILABLE_REASON, WIND_UNPLACED } from "@/lib/rail/gates.ts";
+import { FIELD_NOTE } from "@/lib/rail/help.ts";
 import { MATERIAL_PRESETS, PRESET_LABEL, SHEET_CHIP, VALUE_CHIP } from "@/lib/rail/presets.ts";
 import { NO_REGIME_BANNER_BY_REGISTER, TRAVERSE_SCOPE } from "@/lib/rail/results.ts";
 import { MAESTRO_ROPE_ONLY, PASS_TO_PULLEY } from "@/lib/rail/tensioning.ts";
@@ -140,6 +141,8 @@ export function statiqueLabelTable(): readonly string[] {
     VALUE_CHIP.detail,
     TEXTILE_UNAVAILABLE_REASON,
     MAESTRO_ROPE_ONLY,
+    ...STATIQUE_FIELDS.flatMap((id) => FIELD_NOTE[id] ?? []),
+    WIND_UNPLACED.reason,
     ...Object.values(REGIMES).map((regime) => regime.label),
     ...Object.values(OUTPUT_LABEL),
     TRAVERSE_SCOPE,

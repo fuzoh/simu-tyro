@@ -160,25 +160,31 @@ describe("the Point d'arrêt without wind lies in the band the slope cannot star
 
 describe("wind shifts the Point d'arrêt, through its component along the line only", () => {
   const wind = kmhToMs(50);
+  // A line running north: the wind's azimuth is its angle from head-on.
+  const NORTH = 0;
   const calm = stopX(levelRide(SSF).end);
 
   test("a head wind stops the passager before the calm Point d'arrêt", () => {
-    expect(stopX(levelRide(SSF, windComponents(wind, 0).along).end)).toBeLessThan(calm);
+    expect(stopX(levelRide(SSF, windComponents(wind, 0, NORTH).along).end)).toBeLessThan(calm);
   });
 
   test("a tail wind stops the passager beyond it", () => {
-    expect(stopX(levelRide(SSF, windComponents(wind, 180).along).end)).toBeGreaterThan(calm);
+    expect(stopX(levelRide(SSF, windComponents(wind, 180, NORTH).along).end)).toBeGreaterThan(calm);
   });
 
   test("a pure cross wind changes nothing", () => {
-    expect(levelRide(SSF, windComponents(wind, 90).along)).toEqual(levelRide(SSF));
-    expect(levelRide(SSF, windComponents(wind, 270).along)).toEqual(levelRide(SSF));
+    expect(levelRide(SSF, windComponents(wind, 90, NORTH).along)).toEqual(levelRide(SSF));
+    expect(levelRide(SSF, windComponents(wind, 270, NORTH).along)).toEqual(levelRide(SSF));
   });
 
   test("the same holds on a câble", () => {
     const steelCalm = stopX(levelRide(STEEL).end);
-    expect(stopX(levelRide(STEEL, windComponents(wind, 0).along).end)).toBeLessThan(steelCalm);
-    expect(stopX(levelRide(STEEL, windComponents(wind, 180).along).end)).toBeGreaterThan(steelCalm);
+    expect(stopX(levelRide(STEEL, windComponents(wind, 0, NORTH).along).end)).toBeLessThan(
+      steelCalm,
+    );
+    expect(stopX(levelRide(STEEL, windComponents(wind, 180, NORTH).along).end)).toBeGreaterThan(
+      steelCalm,
+    );
   });
 });
 

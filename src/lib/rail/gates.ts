@@ -27,7 +27,16 @@
  *   régime × famille/usage clash is a different thing: that one **is** a blocking error with its
  *   `[ Choisir un autre régime ]`, and § 8's message table has a row for it.
  * - **`x_D` and the Positions sit in no gate.** `x_D` clamps on every path, and a clamp produces no
- *   error state; no computation reads a Position.
+ *   error state. The one thing a computation reads of the Positions is the line's bearing, which
+ *   the Vent is projected on — and its absence is not a breach either: see the next rule.
+ * - **The Vent needs Positions, and their absence is not an error.** The Vent's direction is
+ *   geographic, so without A and B on the map the line has no bearing to project it on. Then the
+ *   wind fields are disabled with {@link WIND_UNPLACED}'s reason, the ride and the Banane run without
+ *   wind, and a Vent that arrived in a link or a Session is **kept as given** (ADR-0001) with a
+ *   notice where the results would have read it. {@link windBearing} is the one check: the fields,
+ *   the rose, the rides and the notice all read it, so a link, a Session and a click cannot
+ *   disagree. Like an absent régime it is a flag on the report, never an entry on the blocking
+ *   list: it hides no result.
  * - **The passager's ride has two gates of its own**, past the three: the Wind Gate (the Vent, #87)
  *   and the Ride Gate (§12.2's constants, #89 and the ride-gates fix). Their fields reach no
  *   statics number, but ADR-0001 keeps them as they arrive **and** gates them, so a negative wind
@@ -58,6 +67,7 @@ import type { RegimeId, RegimeMismatch, TerminationId, TextileSpec } from "@/lib
 import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
+import { lineBearing } from "@/lib/scenario/geometry.ts";
 import { isFamilyAllowed, REGIMES, regimeMismatch, TERMINATIONS } from "@/lib/sim";
 import { heading, label } from "@/lib/vocabulary/labels.ts";
 
@@ -194,7 +204,53 @@ export type GateReport = {
    * rank 4, so an error here would make the neutral no-regime prompt structurally unreachable.
    */
   readonly noRegime: boolean;
+  /**
+   * The line has no bearing — A or B is not on the map — so the Vent can be neither set nor
+   * applied: {@link windBearing} is `null`. **Not an error and not a gate breach**: the rides run
+   * without wind and every result stays, while the wind fields are disabled with
+   * {@link WIND_UNPLACED}'s reason and {@link windNotice} says a carried Vent is not applied.
+   */
+  readonly windNeedsPositions: boolean;
 };
+
+/**
+ * What the app says when the Vent has no line to be projected on: why its fields and the rose's
+ * handle are disabled, and what stands where a result would have read it.
+ */
+export const WIND_UNPLACED = {
+  reason: "Placez A et B sur la carte pour saisir le vent.",
+  notice: "Vent saisi non appliqué : sans A et B sur la carte, la ligne n'a pas d'orientation.",
+} as const;
+
+/**
+ * The bearing of A → B the Vent is projected on, degrees from north, or `null` when the line has
+ * none — **the one check** behind « the Vent needs Positions »: the report's
+ * {@link GateReport.windNeedsPositions}, the disabled wind fields, the rose's handle, the rides and
+ * the Banane all read it, whichever path the Scenario came by.
+ */
+export function windBearing({ positions }: Pick<ScenarioDraft, "positions">): number | null {
+  return lineBearing(positions);
+}
+
+/** Why a field cannot be typed into, or `null` when it can: the Vent's two, without Positions. */
+export function fieldUnavailable(
+  id: FieldId,
+  report: Pick<GateReport, "windNeedsPositions">,
+): string | null {
+  if (id !== "windSpeed" && id !== "windDirection") return null;
+  return report.windNeedsPositions ? WIND_UNPLACED.reason : null;
+}
+
+/**
+ * The notice a result read with the Vent carries when the Vent is not applied — a wind that arrived
+ * without Positions, kept as given — or `null`. A Vent of zero speed has nothing to apply.
+ */
+export function windNotice(
+  report: Pick<GateReport, "windNeedsPositions">,
+  wind: Pick<ScenarioDraft["wind"], "speedKmh">,
+): string | null {
+  return report.windNeedsPositions && wind.speedKmh !== 0 ? WIND_UNPLACED.notice : null;
+}
 
 /** What the gates read. Everything else in the app is downstream of them. */
 export type GateInput = {
@@ -576,7 +632,7 @@ export function evaluateGates({
   const passed = passedGates(errors, noRegime);
   const worst = errors.length === 0 ? null : errors[0].gate;
 
-  return { errors, passed, worst, noRegime };
+  return { errors, passed, worst, noRegime, windNeedsPositions: windBearing(scenario) === null };
 }
 
 /**
