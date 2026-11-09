@@ -87,7 +87,9 @@ export function vueDuDepart({ ends, fils }: Placed, view = VUE_DU_DEPART): Camer
 /**
  * The Vue latérale: looking square across A → B, from its right, so that A stands on the left of
  * the screen as on the coupe; {@link VUE_LATERALE}'s pitch; at the distance where every point of
- * `lines`, both anchors and both feet fit the lens with the margin.
+ * `lines`, both anchors and both feet fit the lens with the margin. The right of A → B is chosen:
+ * #111's « du côté gauche » would put A on the right of the screen, and A on the left — the coupe's
+ * reading — is what the view is for (GLOSSARY.md, « Vue latérale »).
  *
  * @param lines the polylines drawn, so a line sagging below both feet stays in the frame.
  */

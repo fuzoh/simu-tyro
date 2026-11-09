@@ -481,7 +481,9 @@ _Avoid_: vue passager, vue subjective
 **Vue latérale**:
 The Vue prédéfinie square across the line, A on the left of the screen as on the coupe, looking
 10° down, just far enough back for the whole line, both anchors and both feet included, to fit
-with a margin. The view the Vue 3D opens on. Key 2.
+with a margin. The camera stands on the right of A → B, the side that puts A on the left: the
+brief of #111 asked for « du côté gauche » and for A on the left, which no camera gives at once,
+and A on the left — the coupe's reading — won. The view the Vue 3D opens on. Key 2.
 _Avoid_: vue de profil, vue de côté
 
 **Rose des vents**:
