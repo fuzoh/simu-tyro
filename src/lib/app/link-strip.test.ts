@@ -59,6 +59,24 @@ describe("§ 8's first sentence — the `vr` and `gm` keys are named like every 
     );
   });
 
+  test("an unreadable `zan` names the Zone d'ancrage's length (#106)", () => {
+    expect(strip("?L=250&zan=abc")?.ignored).toBe(
+      "Une partie du lien a été ignorée : « zan » n'était pas un nombre " +
+        "(longueur de la zone d'ancrage ignorée).",
+    );
+  });
+
+  test("`zan` absent is the shipped zones, a meaning and not a hole: never completed (#106)", () => {
+    // Like `bp`, completing it would name the zones in the strip of every link older than the key.
+    expect(strip("?L=250&h=-40")?.completed).not.toContain("zone d'ancrage");
+    // Unreadable, it is ignored once, and still not completed in the second sentence.
+    expect(strip("?L=250&zan=abc")?.completed).not.toContain("zone d'ancrage");
+    // Present and readable, it is a value the link carries: nothing to report about it.
+    const carried = strip("?L=250&h=-40&zan=5");
+    expect(carried?.ignored).toBeNull();
+    expect(carried?.completed).not.toContain("zone d'ancrage");
+  });
+
   test("an unreadable `vr` names Rapport V", () => {
     expect(strip("?L=250&vr=abc")?.ignored).toBe(
       "Une partie du lien a été ignorée : « vr » n'était pas un nombre (rapport V ignoré).",
