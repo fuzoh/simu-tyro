@@ -22,7 +22,15 @@ import { DEFAULT_LAYERS } from "@/lib/session/session.ts";
 import { TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
 
 import { mapStyle, wmtsTiles } from "./style.ts";
-import { CAMERA_REACH, DRAPED, vue3dFollowing, vue3dPlacement, vue3dScene } from "./vue-3d.ts";
+import {
+  CAMERA_REACH,
+  DRAPED,
+  NO_VIEW_STRIP_LAYERS,
+  vue3dFollowing,
+  vue3dLayers,
+  vue3dPlacement,
+  vue3dScene,
+} from "./vue-3d.ts";
 
 /** No Mesure and no anchor to cross: the vue de dessus's style with nothing of #98 or #107. */
 const NO_MEASURE = { points: [], preview: null, anchors: { A: null, B: null }, reperes: true };
@@ -129,7 +137,6 @@ describe("the line on the earth", () => {
     solved: scene,
     rider: scene.rider,
     across: 0,
-    layers: DEFAULT_LAYERS,
   });
   const { loaded, unloaded } = drawn;
   if (loaded === null || unloaded === null) throw new Error("both lines are drawn");
@@ -168,7 +175,6 @@ describe("the line on the earth", () => {
       solved: symmetric,
       rider: symmetric.rider,
       across: 0,
-      layers: DEFAULT_LAYERS,
     }).loaded;
     const lowest = line?.reduce((low, point) => (point.altitude < low.altitude ? point : low));
     // Half-way from A to B: (6,525035 + 6,520783) / 2 and (46,843556 + 46,846166) / 2.
@@ -193,7 +199,6 @@ describe("the line on the earth", () => {
       solved: two,
       rider: two.rider,
       across: 0,
-      layers: DEFAULT_LAYERS,
     });
     expect(membersPx).toHaveLength(2);
     expect((membersPx[1] ?? 0) - (membersPx[0] ?? 0)).toBe(MEMBER_GAP_PX);
@@ -209,7 +214,6 @@ describe("the line on the earth", () => {
       solved: null,
       rider: null,
       across: 0,
-      layers: DEFAULT_LAYERS,
     });
     expect([none, neither]).toEqual([null, null]);
     expect(fils.A.anchor.altitude).toBeCloseTo(1455.2, 9);
@@ -223,14 +227,12 @@ describe("the Banane on the Ligne à vide", () => {
     solved: scene,
     rider: scene.rider,
     across: 10,
-    layers: DEFAULT_LAYERS,
   });
   const calm = vue3dScene({
     placement: placed(scene),
     solved: scene,
     rider: scene.rider,
     across: 0,
-    layers: DEFAULT_LAYERS,
   });
 
   test("bows the Ligne à vide sideways at the profil's altitudes, anchors fixed", () => {
@@ -258,7 +260,6 @@ describe("the Fils à plomb", () => {
     solved: scene,
     rider: scene.rider,
     across: 0,
-    layers: DEFAULT_LAYERS,
   });
 
   test.each([
@@ -291,7 +292,6 @@ describe("an anchor dragged in the Vue 3D (#97)", () => {
     solved: scene,
     rider: scene.rider,
     across: 10,
-    layers: DEFAULT_LAYERS,
   });
   /** Where the pointer meets the relief: 0,001° north and east of B, on ground at 1 500 m. */
   const FOOT = { lat: 46.847166, lon: 6.521783, altitude: 1500 };
@@ -321,12 +321,12 @@ describe("an anchor dragged in the Vue 3D (#97)", () => {
 
 describe("the coupe's layers in the Vue 3D (#111)", () => {
   const scene = solved(trial());
-  const drawn = (layers: LayerToggles, across = 0) =>
-    vue3dScene({ placement: placed(scene), solved: scene, rider: scene.rider, across, layers });
-  const ALL = { unloadedLine: true, chordAB: true, riderTip: true, trajectory: true };
+  const drawn = (across = 0) =>
+    vue3dScene({ placement: placed(scene), solved: scene, rider: scene.rider, across });
+  const ALL: LayerToggles = { unloadedLine: true, chordAB: true, riderTip: true, trajectory: true };
 
   test("follow the View Strip's defaults: Ligne à vide off, Ligne A–B on, Trajectoire off", () => {
-    expect(drawn(DEFAULT_LAYERS).layers).toEqual({
+    expect(vue3dLayers(DEFAULT_LAYERS)).toEqual({
       unloaded: false,
       ligneAB: true,
       trajectory: false,
@@ -340,26 +340,30 @@ describe("the coupe's layers in the Vue 3D (#111)", () => {
   ] as const)(
     "the View Strip's %s shows or hides the Vue 3D's %s, and only it",
     (toggle, layer) => {
-      const off = drawn({ ...ALL, [toggle]: false }).layers;
+      const off = vue3dLayers({ ...ALL, [toggle]: false });
       expect(off[layer]).toBe(false);
       expect(Object.values(off).filter((shown) => !shown)).toHaveLength(1);
-      expect(drawn(ALL).layers[layer]).toBe(true);
+      expect(vue3dLayers(ALL)[layer]).toBe(true);
     },
   );
 
   test("« distances » has no counterpart in the Vue 3D", () => {
-    expect(drawn({ ...ALL, riderTip: false }).layers).toEqual(drawn(ALL).layers);
+    expect(vue3dLayers({ ...ALL, riderTip: false })).toEqual(vue3dLayers(ALL));
+  });
+
+  test("with no View Strip beside it — the Page Terrain — the Vue 3D keeps the lines it drew before", () => {
+    // #95 and #96: the Ligne à vide with its Banane and the loaded line; the Ligne A–B only under a
+    // drag, which Terrain never starts; no Trajectoire.
+    expect(NO_VIEW_STRIP_LAYERS).toEqual({ unloaded: true, ligneAB: false, trajectory: false });
   });
 
   test("the Ligne A–B stands from anchor to anchor without a solve", () => {
-    const { ligneAB, layers } = vue3dScene({
+    const { ligneAB } = vue3dScene({
       placement: placed(scene),
       solved: null,
       rider: null,
       across: 0,
-      layers: DEFAULT_LAYERS,
     });
-    expect(layers.ligneAB).toBe(true);
     // A: 1 453,7 + 1,5 = 1 455,2 m. B: 1 438,7 + 1 = 1 439,7 m.
     expect(ligneAB[0].lon).toBe(TRIAL_ENDS.A.lon);
     expect(ligneAB[0].lat).toBe(TRIAL_ENDS.A.lat);
@@ -375,13 +379,12 @@ describe("the coupe's layers in the Vue 3D (#111)", () => {
       solved: null,
       rider: null,
       across: 0,
-      layers: ALL,
     });
     expect(none.trajectory).toBeNull();
   });
 
   test("the loaded line touches the Trajectoire at the passager's node, wherever the passager is", () => {
-    const [run] = drawn(DEFAULT_LAYERS).trajectory ?? [];
+    const [run] = drawn().trajectory ?? [];
     const engine = scene.trajectory[0];
     if (run === undefined || engine === undefined)
       throw new Error("the trial line has a Trajectoire");
@@ -397,7 +400,6 @@ describe("the coupe's layers in the Vue 3D (#111)", () => {
         solved: scene,
         rider: placeRider(scene, xD),
         across: 0,
-        layers: DEFAULT_LAYERS,
       }).loaded;
       const node = there?.reduce((near, point) =>
         Math.hypot(point.lon - at.lon, point.lat - at.lat) <
@@ -413,6 +415,6 @@ describe("the coupe's layers in the Vue 3D (#111)", () => {
   });
 
   test("the Banane bows the Ligne à vide, never the Trajectoire", () => {
-    expect(drawn(DEFAULT_LAYERS, 10).trajectory).toEqual(drawn(DEFAULT_LAYERS, 0).trajectory);
+    expect(drawn(10).trajectory).toEqual(drawn(0).trajectory);
   });
 });

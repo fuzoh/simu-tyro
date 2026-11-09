@@ -26,7 +26,8 @@
  *   the canvas or off it, a `pointercancel`, the window losing the focus — ends the gesture and
  *   re-enables the camera's gestures, once.
  * - **The coupe's layers decide what is shown, never what is drawn** (#111): every line of the
- *   scene is an entity, and the View Strip's toggles and a drag only flip their `show`.
+ *   scene is an entity, drawn when the scene is new; the layers come beside the scene, not in it,
+ *   so the View Strip's toggles and a drag only flip their `show`.
  * - **The camera moves as `@/lib/map/vue-3d-camera.ts` says**: the Vues prédéfinies are its
  *   poses, flown to in under a second; the Gimbal's and the keys' steps are its amounts. The canvas
  *   takes the focus on a press, so the keys reach the view only once it has been chosen.
@@ -72,7 +73,7 @@ import type { MapDisplay } from "@/lib/map/display.ts";
 import type { Anchor, MapEvent } from "@/lib/map/gesture.ts";
 import type { WmtsLayer } from "@/lib/map/style.ts";
 import type { CameraPose, Lens, Vue3dCommand } from "@/lib/map/vue-3d-camera.ts";
-import type { EarthPoint, Vue3dFollowing, Vue3dScene } from "@/lib/map/vue-3d.ts";
+import type { EarthPoint, Vue3dFollowing, Vue3dLayers, Vue3dScene } from "@/lib/map/vue-3d.ts";
 
 import {
   LINE_CASING,
@@ -111,13 +112,15 @@ const NORTH_FLIGHT_S = 0.5;
 /** An open Vue 3D. */
 export type Vue3d = {
   /**
-   * Draws this scene over this display; called again whenever any of the three changes.
+   * Draws this scene over this display; called again whenever any of the four changes. Only a new
+   * scene is drawn anew: new layers show or hide what is already drawn.
    *
    * @param idle the gesture machine waits for a gesture: only then may an anchor be taken, and only
    *   then does a dragged anchor give way to the scene's — the line its release loaded, or the one
    *   it could not replace.
+   * @param layers which of the scene's lines the View Strip shows.
    */
-  show(scene: Vue3dScene, display: MapDisplay, idle: boolean): void;
+  show(scene: Vue3dScene, display: MapDisplay, idle: boolean, layers: Vue3dLayers): void;
   /** Moves the camera as a Gimbal button or a key asks. */
   command(command: Vue3dCommand): void;
   destroy(): void;
@@ -192,7 +195,12 @@ export async function openVue3d(
       clientWidth > 0 ? (buffer * cesium.drawingBufferWidth) / clientWidth : 0;
   });
 
-  let shown: { scene: Vue3dScene; display: MapDisplay; idle: boolean } | null = null;
+  let shown: {
+    scene: Vue3dScene;
+    display: MapDisplay;
+    idle: boolean;
+    layers: Vue3dLayers;
+  } | null = null;
   let drawn: Drawn | null = null;
   // The anchor under a press; `moved` once it has left its Position, which is when the gesture
   // starts — a press and release on an anchor is no new line.
@@ -210,7 +218,7 @@ export async function openVue3d(
       shown === null || pose === null ? null : vue3dFollowing(shown.scene, pose.anchor, pose.foot);
     if (drawn === null || shown === null) return;
     const still = following === null;
-    const { layers } = shown.scene;
+    const { layers } = shown;
     for (const entity of drawn.loaded) entity.show = still;
     for (const entity of drawn.unloaded) entity.show = still && layers.unloaded;
     for (const entity of drawn.trajectory) entity.show = still && layers.trajectory;
@@ -285,9 +293,9 @@ export async function openVue3d(
   pointer.setInputAction(release, ScreenSpaceEventType.LEFT_UP);
 
   return {
-    show(scene, display, idle) {
+    show(scene, display, idle, layers) {
       const before = shown;
-      shown = { scene, display, idle };
+      shown = { scene, display, idle, layers };
       if (
         before === null ||
         before.display.fond !== display.fond ||
@@ -309,12 +317,12 @@ export async function openVue3d(
       // the reader cannot see them — a typed Position, an imported CSV. A line dragged in the view
       // is already in it, so the camera stays where the reader put it.
       if (before === null || (!sameEnds(before.scene.ends, scene.ends) && !inView(cesium, scene))) {
-        cesium.camera.setView(cesiumPose(lateralPose(cesium, scene)));
+        cesium.camera.setView(cesiumPose(lateralPose(cesium, scene, layers)));
       }
     },
     command(command) {
       if (shown === null || widget.isDestroyed()) return;
-      moveCamera(cesium, shown.scene, line.center, command);
+      moveCamera(cesium, shown, line.center, command);
     },
     destroy() {
       pointer.destroy();
@@ -586,9 +594,14 @@ function lensOf(cesium: Scene): Lens {
   };
 }
 
-/** The Vue latérale of `scene`: the view the Vue 3D opens on, and key 2. */
-function lateralPose(cesium: Scene, scene: Vue3dScene): CameraPose {
-  return vueLaterale(scene, lensOf(cesium), [scene.loaded, scene.unloaded]);
+/**
+ * The Vue latérale of `scene`: the view the Vue 3D opens on, and key 2. It frames every line that
+ * may be drawn — the Trajectoire when its layer is on, whose low point, the passager at mid-span,
+ * can lie well below a loaded line drawn for a passager near an anchor.
+ */
+function lateralPose(cesium: Scene, scene: Vue3dScene, layers: Vue3dLayers): CameraPose {
+  const trajectory = layers.trajectory ? (scene.trajectory ?? []) : [];
+  return vueLaterale(scene, lensOf(cesium), [scene.loaded, scene.unloaded, ...trajectory]);
 }
 
 /** CesiumJS's form of a pose: the destination in world coordinates, the angles in radians. */
@@ -624,9 +637,15 @@ function levelAhead(cesium: Scene): Cartesian3 {
 /**
  * One step of the Gimbal or of a key.
  *
+ * @param shown the scene on screen and the layers it shows, which the Vues prédéfinies frame.
  * @param centre the line's centre, which the orbit turns around.
  */
-function moveCamera(cesium: Scene, scene: Vue3dScene, centre: Cartesian3, command: Vue3dCommand) {
+function moveCamera(
+  cesium: Scene,
+  { scene, layers }: { scene: Vue3dScene; layers: Vue3dLayers },
+  centre: Cartesian3,
+  command: Vue3dCommand,
+) {
   const { camera } = cesium;
   camera.cancelFlight();
   const looked = middleOfView(cesium);
@@ -677,7 +696,9 @@ function moveCamera(cesium: Scene, scene: Vue3dScene, centre: Cartesian3, comman
       return;
     case "view":
       camera.flyTo({
-        ...cesiumPose(command.view === "depart" ? vueDuDepart(scene) : lateralPose(cesium, scene)),
+        ...cesiumPose(
+          command.view === "depart" ? vueDuDepart(scene) : lateralPose(cesium, scene, layers),
+        ),
         duration: CAMERA_STEP.flightS,
       });
       return;

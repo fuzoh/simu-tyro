@@ -27,8 +27,10 @@
  *   drawn, rather than drawn between ends they were not solved for.
  * - **The coupe's layers are the Vue 3D's** (#111): the View Strip's « ligne à vide », « corde A–B »
  *   and « trajectoire » show or hide the Ligne à vide, the Ligne A–B and the Trajectoire here too,
- *   with no picker of the Vue 3D's own; the loaded line is always drawn, as on the coupe. The Ligne
- *   A–B and the Fils à plomb need no solve, so they stand under « Aucun résultat » as well.
+ *   with no picker of the Vue 3D's own; the loaded line is always drawn, as on the coupe. The layers
+ *   are no part of the scene (`vue3dLayers`): a toggle shows or hides what is drawn, and redraws
+ *   nothing. The Ligne A–B and the Fils à plomb need no solve, so they stand under « Aucun
+ *   résultat » as well.
  */
 
 import type { Polyline, SceneBase, SceneFrame, SceneRider } from "@/lib/chart/scene.ts";
@@ -155,6 +157,18 @@ export function vue3dLayers({ unloadedLine, chordAB, trajectory }: LayerToggles)
   return { unloaded: unloadedLine, ligneAB: chordAB, trajectory };
 }
 
+/**
+ * The layers of a Vue 3D with no View Strip beside it — the Page Terrain's, whose coupe, and the
+ * strip with it, hides while the 3D is shown: toggles the reader cannot reach there decide nothing,
+ * and the view draws what it drew before the layers came to it (#95, #96), the Ligne à vide with its
+ * Banane and the loaded line.
+ */
+export const NO_VIEW_STRIP_LAYERS: Vue3dLayers = {
+  unloaded: true,
+  ligneAB: false,
+  trajectory: false,
+};
+
 /** Everything the Vue 3D draws over the relief. */
 export type Vue3dScene = {
   readonly ends: TraceEnds;
@@ -174,8 +188,6 @@ export type Vue3dScene = {
    * loaded line it hangs from: the Banane is the Ligne à vide's.
    */
   readonly trajectory: readonly (readonly EarthPoint[])[] | null;
-  /** The View Strip's layers, as this view draws them. */
-  readonly layers: Vue3dLayers;
   /**
    * One shift per Brin porteur, px, down positive — the coupe's (`SceneBase.members`): two members
    * are one solve drawn twice, told apart on screen and nowhere else (#4).
@@ -189,20 +201,17 @@ export type Vue3dScene = {
  * @param solved the solved half, or `null` under « Aucun résultat ».
  * @param rider the passager placed at the Scenario's `x_D`, or `null`.
  * @param across the wind's cross component, m/s: the Ligne à vide's bow, nil without it.
- * @param layers the View Strip's toggles.
  */
 export function vue3dScene({
   placement: { ends, frame, bases },
   solved,
   rider,
   across,
-  layers,
 }: {
   placement: Vue3dPlacement;
   solved: SceneBase | null;
   rider: SceneRider | null;
   across: number;
-  layers: LayerToggles;
 }): Vue3dScene {
   const { L, h, anchors } = frame;
   const topA = bases.zBaseA + anchors.zA;
@@ -221,7 +230,6 @@ export function vue3dScene({
         ? null
         : alongLine(onEarth, throughNode(rider.cable, rider.step.xD, rider.step.zD)),
     trajectory: solved === null ? null : solved.trajectory.map((run) => alongLine(onEarth, run)),
-    layers: vue3dLayers(layers),
     membersPx: solved?.members.map((member) => member.offsetPx) ?? [0],
   };
 }

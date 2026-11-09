@@ -36,7 +36,10 @@
  * - **The Vue 3D's camera is the reader's, and its keys are its own** (#111): the Gimbal
  *   (`./vue-3d-gimbal.tsx`) sits over its corner, and a key reaches it only from inside the view —
  *   its canvas or a Gimbal button — where an arrow no longer scrolls the page. The View Strip's
- *   layers are read from the store, so the Vue 3D shows the curves the coupe shows.
+ *   layers are read from the store, so the Vue 3D shows the curves the coupe shows; they reach the
+ *   renderer beside the scene, never in it, so a toggle redraws nothing. On the Page Terrain, whose
+ *   coupe hides while the 3D is shown, no strip stands beside it, and the view keeps its own lines
+ *   (`NO_VIEW_STRIP_LAYERS`).
  * - **One gesture machine for both views** (#97): an anchor dragged in the Vue 3D is sent to the
  *   same `send` as a marker, so its release is the same new line, recomputed by the same rule.
  * - **On the Page Terrain the map writes nothing** (#101): no click places an anchor, no anchor is
@@ -61,7 +64,7 @@ import type { Fond, MapDisplay } from "@/lib/map/display.ts";
 import type { Anchor, MapEvent, MapGesture } from "@/lib/map/gesture.ts";
 import type { MeasurePoints, MeasureReading } from "@/lib/map/measure.ts";
 import type { FondHealth, MapStyle, MeasureDrawing } from "@/lib/map/style.ts";
-import type { Vue3dBlock, Vue3dScene } from "@/lib/map/vue-3d.ts";
+import type { Vue3dBlock, Vue3dLayers, Vue3dScene } from "@/lib/map/vue-3d.ts";
 import type { Position, Positions } from "@/lib/scenario/types.ts";
 import type { Fetch } from "@/lib/terrain/geoadmin.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
@@ -116,7 +119,13 @@ import {
   SWISSTOPO_COVERAGE,
 } from "@/lib/map/style.ts";
 import { vue3dKeyCommand } from "@/lib/map/vue-3d-camera.ts";
-import { drapedAttribution, vue3dPlacement, vue3dScene } from "@/lib/map/vue-3d.ts";
+import {
+  drapedAttribution,
+  NO_VIEW_STRIP_LAYERS,
+  vue3dLayers,
+  vue3dPlacement,
+  vue3dScene,
+} from "@/lib/map/vue-3d.ts";
 import { roseReference } from "@/lib/map/wind-rose.ts";
 import { windBearing } from "@/lib/rail/gates.ts";
 import { geoadminNotice, loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
@@ -157,7 +166,7 @@ export function TopMap({
   windCause: string | null;
   readOnly?: { readonly coupe: ReactNode };
 }) {
-  const { scenario, map: display, trace } = useAppState();
+  const { scenario, map: display, trace, layers } = useAppState();
   const dispatch = useAppDispatch();
   const { positions } = scenario;
   // `trace` stays cached behind manual geometry, where it is no ground of the line's.
@@ -183,6 +192,12 @@ export function TopMap({
   const bearing = windBearing({ positions: drawn });
   const across = bananeAcross(wind, bearing);
   const scene3d = useVue3dScene(shows3d, frame, profil, solved, across);
+  // The View Strip's layers where the strip stands beside the Vue 3D; on the Page Terrain it hides
+  // with the coupe while the 3D is shown, and toggles out of reach decide nothing.
+  const layers3d = useMemo(
+    () => (locked ? NO_VIEW_STRIP_LAYERS : vue3dLayers(layers)),
+    [locked, layers],
+  );
 
   const plain = failed ? plainDrawing(drawn, across) : null;
   const measure = useMeasure(browserFetch, profil);
@@ -244,7 +259,7 @@ export function TopMap({
   const bananeShown =
     across !== 0 &&
     (shows3d
-      ? scene3d?.unloaded != null && scene3d.layers.unloaded && gesture.kind === "idle"
+      ? scene3d?.unloaded != null && layers3d.unloaded && gesture.kind === "idle"
       : drawn.A !== null && drawn.B !== null);
   // A release loads its profil the same way in both views, and says so under either.
   const gestureLine = measuring
@@ -305,6 +320,7 @@ export function TopMap({
                 display={display}
                 // A view that never idles takes no anchor: the Page Terrain only looks at the line.
                 idle={!locked && gesture.kind === "idle"}
+                layers={layers3d}
                 onGesture={send}
                 onUnavailable={lose3d}
                 renderer={renderer}
@@ -498,12 +514,14 @@ function Vue3dLoading() {
  * closed when the vue de dessus comes back.
  *
  * @param idle the gesture machine waits for a gesture, so an anchor may be taken.
+ * @param layers which of the scene's lines are shown: a change shows or hides, and draws nothing.
  */
 function Vue3dHost({
   renderer,
   scene,
   display,
   idle,
+  layers,
   onGesture,
   onUnavailable,
 }: {
@@ -511,6 +529,7 @@ function Vue3dHost({
   scene: Vue3dScene;
   display: MapDisplay;
   idle: boolean;
+  layers: Vue3dLayers;
   onGesture: (event: MapEvent) => void;
   onUnavailable: () => void;
 }) {
@@ -554,8 +573,8 @@ function Vue3dHost({
   }, [renderer]);
 
   useEffect(() => {
-    view?.show(scene, display, idle);
-  }, [view, scene, display, idle]);
+    view?.show(scene, display, idle, layers);
+  }, [view, scene, display, idle, layers]);
 
   // The keys reach the view only from inside it: the canvas — a focusable `application` once pressed
   // or tabbed to — or a Gimbal button. Handled, a key's default, the page scrolling under an arrow,
@@ -600,18 +619,15 @@ function useVue3dScene(
   solved: SceneBase | null,
   across: number,
 ) {
-  const {
-    scenario: { positions, rider },
-    layers,
-  } = useAppState();
+  const { positions, rider } = useAppState().scenario;
   const { xD } = rider;
   return useMemo(() => {
     if (!shown) return null;
     const at = vue3dPlacement(positions, frame, profil);
     if (!at.ok) return null;
     const placed = solved === null ? null : placeRider(solved, xD);
-    return vue3dScene({ placement: at.placement, solved, rider: placed, across, layers });
-  }, [shown, positions, frame, profil, solved, xD, across, layers]);
+    return vue3dScene({ placement: at.placement, solved, rider: placed, across });
+  }, [shown, positions, frame, profil, solved, xD, across]);
 }
 
 function MapControls({
