@@ -420,7 +420,13 @@ export function RailInputs({
 
   const parameters = (
     <RailSection title="Paramètres">
-      <div className="mt-2 flex flex-col gap-3">
+      {/* From B3 (`WIDE_RAIL_PX`, the `wide-rail` variant, #112) the left column is 576 px and the
+          groups stand on **two columns** — CSS columns, not a grid, because a column box flows the
+          groups in the DOM's order, down the left column then down the right: the order on screen
+          is the reading order and the Tab order, with no `order` to keep in step. `gap-3` is then
+          the gap between the two columns, `space-y-3` the one between groups, and no group is ever
+          cut across them (`break-inside-avoid` on each). The heading above stays across both. */}
+      <div className="wide-rail:block wide-rail:columns-2 wide-rail:space-y-3 wide-rail:*:break-inside-avoid mt-2 flex flex-col gap-3">
         <Group title="Installation et régime">
           <UsageRow />
           <RegimeRow />

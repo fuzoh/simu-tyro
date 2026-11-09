@@ -21,6 +21,14 @@
 @custom-variant dark (&:is(.dark *));
 
 /**
+ * B3 — `WIDE_RAIL_PX` in `src/lib/layout/contract.ts`, declared here once rather than retyped as a
+ * `min-[1920px]:` at every call site (#112). From it Avancé's left column is 576 px (`w-144`, the
+ * contract's `WIDE_RAIL_WIDTH`) and `Paramètres` stands its groups on two columns, the left one
+ * read first. `contract.test.ts` holds the number to the constant.
+ */
+@custom-variant wide-rail (@media (width >= 1920px));
+
+/**
  * § 5's Pinned Safety Header, applied. The **state is derived in TypeScript** — scroll, focus, fit
  * and the keyboard, `src/lib/layout/collapse.ts` — and lands on the shell as `data-collapse` plus
  * `data-fit`; **which bands that costs is decided here**, so the reflow stays « CSS over a finished

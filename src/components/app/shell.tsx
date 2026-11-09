@@ -208,8 +208,9 @@ export const AVANCE_LAYOUT_VARS = {
  * height there, and the Rail is the chart column's sibling.
  *
  * **Which of the two absorbs the residual flips at B2, and that is § 5's budget A, not styling.**
- * In a row the two Rail columns are the fixed 288 px each (`min-[1024px]:w-72`) and the chart
- * column takes the rest of the *width* (`min-[1024px]:flex-1`). **The scroller wrapper is
+ * In a row the two Rail columns are the fixed 288 px each (`min-[1024px]:w-72`) — the left one
+ * 576 px from B3 (`wide-rail:w-144`, `WIDE_RAIL_PX`, #112), where `Paramètres` stands its groups on
+ * two columns — and the chart column takes the rest of the *width* (`min-[1024px]:flex-1`). **The scroller wrapper is
  * `display: contents` there**, so the two columns are the chart's own flex siblings and each scrolls
  * itself, while below B2 the same wrapper is the one Rail scroller the collapse reads. A focus or
  * blur inside either column still bubbles to it. In a column the Chart Block keeps its **budgeted height**
@@ -305,9 +306,10 @@ export function Shell({
       }
     >
       {strip}
-      {/* **No shell cap** (#110): the shell spans the window, and every pixel past the two 288 px
-          columns goes to the middle one, so the vue de dessus widens with it, and the Chart Block
-          up to `AVANCE_BLOCK_MAX_PX` (1984 px, the column at 2560), where it letterboxes. It was
+      {/* **No shell cap** (#110): the shell spans the window, and every pixel past the two side
+          columns (288 px each, the left one 576 from B3, #112) goes to the middle one, so the vue
+          de dessus widens with it, and the Chart Block up to `AVANCE_BLOCK_MAX_PX` (1984 px, the
+          column at 2848), where it letterboxes. It was
           capped at 1728 px (`SHELL_MAX_PX`, the other Pages' cap) while the plot's ceiling was
           amendment F's; Avancé's is raised now (`AVANCE_PLOT_MAX`), and the block's own cap is what
           keeps it whole in a 1440 px window. */}
@@ -378,7 +380,7 @@ export function Shell({
         >
           <aside
             aria-label="Paramètres"
-            className="border-border flex w-full shrink-0 flex-col min-[1024px]:order-first min-[1024px]:min-h-0 min-[1024px]:w-72 min-[1024px]:scroll-pb-[var(--kb,0px)] min-[1024px]:overflow-y-auto min-[1024px]:border-r min-[1024px]:pb-[var(--kb,0px)]"
+            className="border-border wide-rail:w-144 flex w-full shrink-0 flex-col min-[1024px]:order-first min-[1024px]:min-h-0 min-[1024px]:w-72 min-[1024px]:scroll-pb-[var(--kb,0px)] min-[1024px]:overflow-y-auto min-[1024px]:border-r min-[1024px]:pb-[var(--kb,0px)]"
           >
             {left}
           </aside>
@@ -429,8 +431,9 @@ export function Shell({
               what its bands are a function of. `max-w-[1984px]` is `AVANCE_BLOCK_MAX_PX` (#110):
               past it the block **letterboxes**, centred (`mx-auto`) in the column with the surplus
               empty either side, so the plot keeps its 0,42 inside the Plot Aspect Band and the whole
-              block stays 1239,2 px tall at most — whole in a 1440 px window. Below 2560 px of
-              viewport the cap does not bind and the block is the column, as below B2. */}
+              block stays 1239,2 px tall at most — whole in a 1440 px window. Below 2848 px of
+              viewport (`AVANCE_BLOCK_VIEWPORT_PX`) the cap does not bind and the block is the
+              column, as below B2. */}
           <div
             className="compact:h-[var(--pinned-cell)] compact:flex-row compact:items-center @container mx-auto flex w-full max-w-[1984px] flex-col"
             ref={chartRef}

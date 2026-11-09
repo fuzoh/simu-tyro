@@ -16,6 +16,7 @@ import { formatValue } from "@/lib/format/quantity.ts";
 
 import {
   AVANCE_BLOCK_MAX_PX,
+  AVANCE_BLOCK_VIEWPORT_PX,
   AVANCE_PLOT_MAX,
   avanceBlockWidth,
   AXIS_LABEL_INSET,
@@ -48,6 +49,7 @@ import {
   profilePlotHeight,
   PROFILE_PLOT_MAX,
   RAIL_WIDTH,
+  railWidth,
   READ_OUT_SPANS,
   REFERENCE_COLUMN_PX,
   REFERENCE_DESKTOP_PX,
@@ -62,6 +64,8 @@ import {
   VE_BAND,
   veBadgeLabel,
   VIEW_STRIP,
+  WIDE_RAIL_PX,
+  WIDE_RAIL_WIDTH,
   X_MARGIN,
   Z_MARGIN,
 } from "./contract.ts";
@@ -668,36 +672,76 @@ describe("Avancé's three columns — the middle column is the chart column", ()
   /**
    * #110 — Avancé spends the whole width. ADR-0001's « correctness over byte-compatibility » re-pins
    * what this suite held until then: the middle column frozen at the 1152 px reference from 1728 px
-   * of viewport, and `max-w-[1728px]` on the shell. The column is the viewport less the two 288 px
-   * columns at every width from B2, by hand below.
+   * of viewport, and `max-w-[1728px]` on the shell. The column is the viewport less the two side
+   * columns at every width from B2, by hand below. #112 re-pins it once more, the same way: from
+   * 1920 the left column is 576 px, so the column is `viewport − 576 − 288` there — 1344 → 1056 at
+   * 1920, 1984 → 1696 at 2560, 2864 → 2576 at 3440.
    */
-  it("Avancé has no shell cap: the middle column is the viewport less the two side columns (#110)", () => {
+  it("Avancé has no shell cap: the middle column is the viewport less the two side columns (#110, #112)", () => {
     const measured = [
-      { viewport: 1728, column: 1152 },
-      { viewport: 1920, column: 1344 },
-      // The brief's « 2560 − 576 px »: no empty margin either side.
-      { viewport: 2560, column: 1984 },
-      { viewport: 3440, column: 2864 },
+      { viewport: 1728, column: 1728 - 288 - 288 },
+      { viewport: 1919, column: 1919 - 288 - 288 },
+      // The brief's « largeur de fenêtre − 576 − 288 » from 1920 (#112).
+      { viewport: 1920, column: 1920 - 576 - 288 },
+      { viewport: 2560, column: 2560 - 576 - 288 },
+      { viewport: 3440, column: 3440 - 576 - 288 },
     ];
-    for (const row of measured) expect(chartColumnWidth(row.viewport)).toBe(row.column);
-    // Strictly growing past the old cap, pixel for pixel: the width gained goes to the middle column.
-    for (let viewport = SHELL_MAX_PX; viewport < 3440; viewport += 97) {
-      expect(chartColumnWidth(viewport + 1) - chartColumnWidth(viewport)).toBe(1);
+    for (const row of measured) {
+      expect({ viewport: row.viewport, column: chartColumnWidth(row.viewport) }).toStrictEqual(row);
+    }
+    // Growing pixel for pixel on either side of B3: the width gained goes to the middle column. At
+    // B3 itself the left column takes the 288 px it doubles by, and only there.
+    for (let viewport = SHELL_MAX_PX; viewport < 3440; viewport += 1) {
+      const step = viewport + 1 === 1920 ? 1 - 288 : 1;
+      expect({
+        viewport,
+        step: chartColumnWidth(viewport + 1) - chartColumnWidth(viewport),
+      }).toStrictEqual({ viewport, step });
     }
   });
 
-  it("Avancé's Chart Block is the column up to 2560 px of viewport, then 1984 px (#110)", () => {
-    // The column at 2560 is the brief's own `2560 − 576`: the block fills it there, with no empty
-    // margin, and letterboxes only past it.
+  /**
+   * #112's acceptance criteria 1 and 3, by hand: 288 px at 1919, 576 px from 1920, and the right
+   * column 288 px either side of the step.
+   */
+  it("Avancé's left column doubles from 1920 px, and the right one does not move (#112)", () => {
+    expect(WIDE_RAIL_PX).toBe(1920);
+    expect(WIDE_RAIL_WIDTH).toBe(576);
+    const measured = [
+      { viewport: 1024, left: 288 },
+      { viewport: 1440, left: 288 },
+      { viewport: 1919, left: 288 },
+      { viewport: 1920, left: 576 },
+      { viewport: 2560, left: 576 },
+      { viewport: 3440, left: 576 },
+    ];
+    for (const row of measured) {
+      expect({ viewport: row.viewport, left: railWidth(row.viewport) }).toStrictEqual(row);
+      // Left, middle and right are the whole viewport: what the other two leave the right is 288.
+      expect(row.viewport - railWidth(row.viewport) - chartColumnWidth(row.viewport)).toBe(288);
+    }
+    expect(RIGHT_COLUMN_WIDTH).toBe(288);
+  });
+
+  /**
+   * #110 capped the block at the column at 2560 with the 288 px left column, `2560 − 576 = 1984`.
+   * #112 keeps the cap — it bounds the block's height, which the left column does not change — and
+   * ADR-0001's « correctness over byte-compatibility » re-pins where it is reached: the column is
+   * 1984 px at `1984 + 576 + 288 = 2848` now, so at 2560 the block is the 1696 px column, unboxed.
+   */
+  it("Avancé's Chart Block is the column up to 2848 px of viewport, then 1984 px (#110, #112)", () => {
     expect(AVANCE_BLOCK_MAX_PX).toBe(1984);
+    expect(AVANCE_BLOCK_VIEWPORT_PX).toBe(2848);
     const measured = [
       { viewport: 390, block: 390 },
       { viewport: 1023, block: 1023 },
       { viewport: 1024, block: 448 },
-      { viewport: 1920, block: 1344 },
-      { viewport: 2559, block: 1983 },
-      { viewport: 2560, block: 1984 },
-      { viewport: 2561, block: 1984 },
+      { viewport: 1919, block: 1343 },
+      { viewport: 1920, block: 1056 },
+      { viewport: 2560, block: 1696 },
+      { viewport: 2847, block: 1983 },
+      { viewport: 2848, block: 1984 },
+      { viewport: 2849, block: 1984 },
       { viewport: 3440, block: 1984 },
       { viewport: 5120, block: 1984 },
     ];
@@ -713,9 +757,11 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     const measured = [
       { viewport: 1024, wInner: 424, plot: 178.08 },
       { viewport: 1440, wInner: 840, plot: 352.8 },
-      { viewport: 1920, wInner: 1320, plot: 554.4 },
-      { viewport: 2560, wInner: 1960, plot: 823.2 },
-      // Letterboxed: the block, and so the plot, are 2560's.
+      // From 1920 the left column is 576 px (#112): the block is 288 px narrower than #110's.
+      { viewport: 1920, wInner: 1032, plot: 433.44 },
+      { viewport: 2560, wInner: 1672, plot: 702.24 },
+      { viewport: 2848, wInner: 1960, plot: 823.2 },
+      // Letterboxed: the block, and so the plot, are 2848's.
       { viewport: 3440, wInner: 1960, plot: 823.2 },
     ];
     for (const row of measured) {
@@ -748,21 +794,24 @@ describe("Avancé's three columns — the middle column is the chart column", ()
   });
 
   it("without the letterbox the raised ceiling would leave the band at 3440: the block's cap holds it", () => {
-    // The plot ceiling alone is not enough — drawn across the whole 2864 px column, an 823,2 px plot
-    // is `823,2 / 2840 = 0,290`, under the band's 0,35 floor. This is why the block, not only its
-    // plot, stops at 1984 px.
+    // The plot ceiling alone is not enough — drawn across the whole 2576 px column (`3440 − 576 −
+    // 288` since #112), an 823,2 px plot is `823,2 / 2552 = 0,3226`, under the band's 0,35 floor.
+    // This is why the block, not only its plot, stops at 1984 px.
     const unboxed = plotAspect(innerWidth(chartColumnWidth(3440)), AVANCE_PLOT_MAX);
-    expect(unboxed).toBeCloseTo(0.2899, 4);
+    expect(unboxed).toBeCloseTo(0.3226, 4);
     expect(unboxed).toBeLessThan(PLOT_ASPECT_BAND.min);
   });
 
-  it("Avancé's whole Chart Block stands in the brief's windows once scrolled to (#110)", () => {
-    // The Chart Block is one co-visible unit. `44 + 76 + 0,42 × W_inner + 200 + 44 + 52` by hand,
-    // against the window less the 36 px navigation bar: the column scrolls the block into view, and
-    // then the banner slot, the coupe, « Garde min » and the cells are all on screen together.
+  it("Avancé's whole Chart Block stands in the brief's windows once scrolled to (#110, #112)", () => {
+    // The Chart Block is one co-visible unit. `44 + 76 + 0,42 × W_inner + strip + 44 + 52` by hand,
+    // the strip `0,16 × W_inner` up to its 200 px, against the window less the 36 px navigation bar:
+    // the column scrolls the block into view, and then the banner slot, the coupe, « Garde min » and
+    // the cells are all on screen together.
     const windows = [
-      { viewport: 1920, height: 1080, block: 970.4 },
-      { viewport: 2560, height: 1440, block: 1239.2 },
+      // The narrower middle column of #112: `W_inner` 1032 at 1920 — `44 + 76 + 433,44 + 165,12 +
+      // 44 + 52` — and 1672 at 2560, `416 + 702,24`, its strip at 200.
+      { viewport: 1920, height: 1080, block: 814.56 },
+      { viewport: 2560, height: 1440, block: 1118.24 },
       { viewport: 3440, height: 1440, block: 1239.2 },
     ];
     for (const row of windows) {
@@ -771,7 +820,7 @@ describe("Avancé's three columns — the middle column is the chart column", ()
       expect(block).toBeLessThanOrEqual(row.height - 36);
     }
     // Bounded: the block never passes its 1984 px plateau, however wide the window.
-    for (let viewport = 2560; viewport <= 7680; viewport += 160) {
+    for (let viewport = 2848; viewport <= 7680; viewport += 160) {
       const block = chartBlockHeight(avanceBlockWidth(viewport), undefined, AVANCE_PLOT_MAX);
       expect(block).toBeCloseTo(1239.2, 9);
     }
@@ -807,6 +856,22 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     for (const cls of ["flex-row", "contents", "w-72", "order-first", "order-last", "flex-1"]) {
       expect(shell).toContain(`${wide}${cls}`);
     }
+    // B3 (#112): `w-144` is 36 rem, the left column's 576 px, under the `wide-rail` variant — on
+    // the left column alone: the right one stays `w-72`.
+    expect(WIDE_RAIL_WIDTH).toBe(36 * 16);
+    const column = (label: string) =>
+      (new RegExp(`aria-label="${label}"\\s+className="([^"]*)"`).exec(shell)?.[1] ?? "").split(
+        " ",
+      );
+    expect(column("Paramètres")).toEqual(
+      expect.arrayContaining([`${wide}w-72`, "wide-rail:w-144"]),
+    );
+    expect(column("Valeurs déduites et résultats")).toContain(`${wide}w-72`);
+    expect(
+      column("Valeurs déduites et résultats").some((cls) => cls.startsWith("wide-rail:")),
+    ).toBe(false);
+    // And the shell's only `wide-rail:` class is the left column's.
+    expect(shell.match(/className="[^"]*\bwide-rail:[^"]*"/g)).toHaveLength(1);
     // No cap on Avancé's shell (#110) — its one `max-w-[` is the Chart Block's letterbox, never the
     // shell's 1728; the other Pages' frames keep `SHELL_MAX_PX`.
     expect(shell).not.toContain(`max-w-[${SHELL_MAX_PX}px]`);
@@ -814,6 +879,22 @@ describe("Avancé's three columns — the middle column is the chart column", ()
       expect(read(`src/components/${frame}`)).toContain(`max-w-[${SHELL_MAX_PX}px]`);
     }
     expect(styles).toContain(`@media (width < ${THREE_COLUMN_PX}px)`);
+  });
+
+  it("B3 is declared once, as the contract's constant and one CSS variant (#112)", () => {
+    // The brief's « pas en valeur arbitraire répétée »: the `wide-rail` variant of `styles.css`
+    // spells `WIDE_RAIL_PX`, and no class anywhere in `src/` retypes it as `min-[1920px]:`.
+    const root = fileURLToPath(new URL("../../..", import.meta.url));
+    const styles = readFileSync(join(root, "src/styles.css"), "utf8");
+    expect(styles).toContain(`@custom-variant wide-rail (@media (width >= ${WIDE_RAIL_PX}px));`);
+    expect(styles.match(/@custom-variant wide-rail\b/g)).toHaveLength(1);
+    const sources = readdirSync(join(root, "src"), { recursive: true, encoding: "utf8" }).filter(
+      (path) => /\.tsx?$/.test(path) && !path.endsWith(".test.ts"),
+    );
+    const retyped = sources.filter((path) =>
+      readFileSync(join(root, "src", path), "utf8").includes(`min-[${WIDE_RAIL_PX}px]`),
+    );
+    expect(retyped).toStrictEqual([]);
   });
 });
 

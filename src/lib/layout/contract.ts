@@ -188,9 +188,38 @@ export const COMPACT_HEIGHT_PX = 420;
 
 /**
  * The left column — `Paramètres` under the Rail Header. `w-72`, and it is **288 px, not 280** —
- * every narrow-screen symptom is downstream of it.
+ * every narrow-screen symptom is downstream of it. It is the left column's width from B2 up to
+ * {@link WIDE_RAIL_PX}; past it the column doubles ({@link WIDE_RAIL_WIDTH}, {@link railWidth}).
+ * § 5's reference column ({@link REFERENCE_COLUMN_PX}) is written against this one, at 1440.
  */
 export const RAIL_WIDTH = 288;
+
+/**
+ * B3 — the **viewport** width from which Avancé's left column is {@link WIDE_RAIL_WIDTH} and
+ * `Paramètres` stands its groups on two columns (#112). **1920, the brief's own.** There the middle
+ * column is `1920 − 864 = 1056` px, still wider than Avancé's at § 5's 1440 reference
+ * (`1440 − 576 = 864`). Declared once more in CSS, as the `wide-rail` custom variant of
+ * `src/styles.css`, which `contract.test.ts` holds to this number. **What it costs**: the middle
+ * column narrows by 287 px across the step — 1343 at 1919, 1056 at 1920 — and so does the Chart
+ * Block, whose bands follow its width; it widens pixel for pixel again from there, and is back to
+ * its 1919 width at 2207.
+ */
+export const WIDE_RAIL_PX = 1920;
+
+/**
+ * The left column from {@link WIDE_RAIL_PX} — `2 × 288 = 576` px, `w-144`: two columns of
+ * `Paramètres`' groups side by side, each at least as wide as a group in the 288 px column.
+ */
+export const WIDE_RAIL_WIDTH: number = 2 * RAIL_WIDTH;
+
+/**
+ * **The left column's width at a viewport width, in three columns** — {@link RAIL_WIDTH} from B2,
+ * {@link WIDE_RAIL_WIDTH} from {@link WIDE_RAIL_PX} (#112). Below B2 there is no left column: the
+ * Rail stacks under the Chart Block across the viewport, and {@link chartColumnWidth} does not ask.
+ */
+export function railWidth(viewportWidth: number): number {
+  return viewportWidth >= WIDE_RAIL_PX ? WIDE_RAIL_WIDTH : RAIL_WIDTH;
+}
 
 /** The right column — `Valeurs déduites`, `Résultats`, `Provenance`, `Ce que cet outil ne calcule pas`. */
 export const RIGHT_COLUMN_WIDTH = 288;
@@ -229,8 +258,10 @@ export const STATIQUE_TILE_MAX_PX = 180;
 /**
  * **Avancé's chart column's inline size at a viewport width** — the middle column from
  * {@link THREE_COLUMN_PX}, the whole viewport below it. **No cap** (#110): Avancé's shell spans the
- * viewport, so from B2 the column is `viewport − 576` at every width — 1984 px at 2560, 2864 at
- * 3440. It is the **column** — the vue de dessus's width; the Chart Block in it stops at
+ * viewport, so from B2 the column is the viewport less the two side columns at every width —
+ * `viewport − 576` up to {@link WIDE_RAIL_PX}, `viewport − 864` from it, where the left column
+ * doubles (#112): 1056 px at 1920, 1696 at 2560, 2576 at 3440. It is the **column** — the vue de
+ * dessus's width; the Chart Block in it stops at
  * {@link AVANCE_BLOCK_MAX_PX} ({@link avanceBlockWidth}), and that block is what the shell's
  * `ResizeObserver` measures. This is the same number from the contract's constants, for the budgets
  * and tests that have no DOM. It ignores the middle column's scrollbar gutter, which is the
@@ -238,7 +269,7 @@ export const STATIQUE_TILE_MAX_PX = 180;
  */
 export function chartColumnWidth(viewportWidth: number): number {
   return threeColumns(viewportWidth)
-    ? viewportWidth - RAIL_WIDTH - RIGHT_COLUMN_WIDTH
+    ? viewportWidth - railWidth(viewportWidth) - RIGHT_COLUMN_WIDTH
     : viewportWidth;
 }
 
@@ -280,42 +311,47 @@ export const REFERENCE_COLUMN_PX: number = REFERENCE_DESKTOP_PX - RAIL_WIDTH;
 export const PROFILE_PLOT_MAX: number = PROFILE_ASPECT * innerWidth(REFERENCE_COLUMN_PX);
 
 /**
- * **The viewport at which Avancé's Chart Block stops widening (#110)** — 2560 px, the brief's own
- * named width: there the block fills its 1984 px middle column, with no empty margin either side,
- * and past it the block letterboxes ({@link AVANCE_BLOCK_MAX_PX}).
+ * **Avancé's Chart Block inline-size ceiling, px — 1984** (#110). Past it the block
+ * **letterboxes**: it stays 1984 px wide, centred in the middle column, the column's surplus left
+ * empty either side, so its bands — every one a function of the block's inner width — stop growing
+ * with it. The vue de dessus above it keeps the whole column. The shell spells it `max-w-[1984px]`
+ * on the block's own box, which is the container and the app's single `ResizeObserver`'s target.
  *
  * **Why a ceiling at all**: the Chart Block is one co-visible unit, and an unbounded plot makes it
- * taller than any window — `416 + 0,42 × 2840 = 1608,8` px at 3440, against the 1404 px a 1440 px
- * window leaves under the navigation bar, so no scroll position of the middle column showed the
- * banner slot and « Garde min » together. **Why 2560**: it is the widest the block can be and still
- * stand whole in the 1440 px-tall windows the brief names (2560 × 1440, 3440 × 1440) — 1239,2 px
- * against 1404 — while the coupe widens with the window all the way to the brief's 2560. It is a
- * width, so nothing reads the window's height: the block is bounded by construction, not fitted.
- * **What it costs**: a window shorter than 1276 px at 2560 or wider (2560 × 1080) does not hold the
- * whole block, as 1600 × 900 already did not hold map and block together.
- */
-export const AVANCE_BLOCK_VIEWPORT_PX = 2560;
-
-/**
- * **Avancé's Chart Block inline-size ceiling, px** — the middle column at
- * {@link AVANCE_BLOCK_VIEWPORT_PX}, `2560 − 576 = 1984`. Past it the block **letterboxes**: it stays
- * 1984 px wide, centred in the middle column, the column's surplus left empty either side, so its
- * bands — every one a function of the block's inner width — stop growing with it. The vue de dessus
- * above it keeps the whole column. The shell spells it `max-w-[1984px]` on the block's own box,
- * which is the container and the app's single `ResizeObserver`'s target.
+ * taller than any window — `416 + 0,42 × 2840 = 1608,8` px in a 2864 px column, against the 1404 px
+ * a 1440 px window leaves under the navigation bar, so no scroll position of the middle column
+ * showed the banner slot and « Garde min » together. **Why 1984**: #110 set it at the middle column
+ * of the brief's 2560 px when the left column was 288 px (`2560 − 576`), and what it bounds is the
+ * block's *height* — `44 + 76 + 823,2 + 200 + 44 + 52 = 1239,2` px, whole in the 1440 px-tall
+ * windows the brief names (2560 × 1440, 3440 × 1440). The doubled left column of #112 changes no
+ * term of that, so the cap stays: lowering it to the new column at 2560 (1696) would shrink the
+ * coupe at 3440 for nothing. It is a width, so nothing reads the window's height: the block is
+ * bounded by construction, not fitted. **What it costs**: a window shorter than 1276 px does not
+ * hold the whole block once it is capped (2848 × 1080), as 1600 × 900 already did not hold map and
+ * block together.
  *
  * The letterbox is the **whole block's**, never the plot's alone: the profile and the clearance strip
  * share one x scale (`createSharedX`), so a plot narrowed inside its band would draw its anchors off
  * the strip's.
  */
-export const AVANCE_BLOCK_MAX_PX: number =
-  AVANCE_BLOCK_VIEWPORT_PX - RAIL_WIDTH - RIGHT_COLUMN_WIDTH;
+export const AVANCE_BLOCK_MAX_PX = 1984;
+
+/**
+ * **The viewport at which Avancé's Chart Block stops widening** — where the middle column reaches
+ * {@link AVANCE_BLOCK_MAX_PX}: `1984 + 576 + 288 = 2848` px since the left column doubles from
+ * {@link WIDE_RAIL_PX} (#112). It was 2560 under #110, with the 288 px left column. Below it the
+ * block is the column, with no empty margin either side; past it the block letterboxes.
+ */
+export const AVANCE_BLOCK_VIEWPORT_PX: number =
+  AVANCE_BLOCK_MAX_PX + WIDE_RAIL_WIDTH + RIGHT_COLUMN_WIDTH;
 
 /**
  * **Avancé's Chart Block inline size at a viewport width** — {@link chartColumnWidth} under
- * {@link AVANCE_BLOCK_MAX_PX}: the whole viewport below B2, `viewport − 576` from B2 to 2560 px,
- * then 1984 px at any width. It is what the shell's observer reports on Avancé (less a classic
- * scrollbar's gutter below the cap), for the budgets and tests that have no DOM.
+ * {@link AVANCE_BLOCK_MAX_PX}: the whole viewport below B2, the middle column from B2 —
+ * `viewport − 576`, then `viewport − 864` from {@link WIDE_RAIL_PX} (#112) — up to
+ * {@link AVANCE_BLOCK_VIEWPORT_PX}, then 1984 px at any width. It is what the shell's observer
+ * reports on Avancé (less a classic scrollbar's gutter below the cap), for the budgets and tests
+ * that have no DOM.
  */
 export function avanceBlockWidth(viewportWidth: number): number {
   return Math.min(chartColumnWidth(viewportWidth), AVANCE_BLOCK_MAX_PX);
@@ -333,8 +369,8 @@ export function avanceBlockWidth(viewportWidth: number): number {
  * Amendment F's reason for a ceiling — a block taller than the window — is answered by the block's
  * width cap rather than by freezing the plot: the whole block plateaus at
  * `44 + 76 + 823,2 + 200 + 44 + 52 = 1239,2` px ({@link chartBlockHeight} given this ceiling), so
- * from 2560 × 1440 up it stands whole in the window once the middle column is scrolled to it. The
- * height constraints themselves apply only where the Rail stands under the block
+ * in a 1440 px-tall window it stands whole at every width once the middle column is scrolled to
+ * it. The height constraints themselves apply only where the Rail stands under the block
  * (`heightBindsBlock` in `./collapse.ts`). The other Pages keep {@link PROFILE_PLOT_MAX}: the
  * default of every function below.
  */

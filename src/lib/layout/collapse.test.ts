@@ -570,10 +570,11 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
       fits: true,
     },
     {
-      // A 1344 px block since #110 (no shell cap). The block Avancé draws there,
-      // `chartBlockHeight(1344, undefined, AVANCE_PLOT_MAX)`, is `44 + 76 + 0,42 × 1320 + 200 + 44 +
-      // 52 = 970,4` px — `contract.test.ts` holds it under the 1044 px left — but this fit does not
-      // read it: from B2 it returns before any block height.
+      // A 1056 px block since #112 (the left column doubles from 1920, `1920 − 576 − 288`). The
+      // block Avancé draws there, `chartBlockHeight(1056, undefined, AVANCE_PLOT_MAX)`, is
+      // `44 + 76 + 0,42 × 1032 + 0,16 × 1032 + 44 + 52 = 814,56` px — `contract.test.ts` holds it
+      // under the 1044 px left — but this fit does not read it: from B2 it returns before any
+      // block height.
       name: "1920×1080 — entier, la colonne s'élargit",
       fit: {
         viewportWidth: 1920,
@@ -584,7 +585,7 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
       fits: true,
     },
     {
-      // A 1984 px block, the column at 2560: Avancé's is `416 + 0,42 × 1960 = 1239,2` px, under 1404.
+      // A 1696 px block, the column at 2560 since #112: `416 + 0,42 × 1672 = 1118,24` px, under 1404.
       name: "2560×1440 — entier",
       fit: {
         viewportWidth: 2560,
@@ -596,7 +597,7 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
     },
     {
       // The ultrawide the unbounded rule lost outright beside one Rail. Avancé's block letterboxes
-      // at 1984 px in the 2864 px column, so it is 2560's 1239,2 px again, under 1404 — and the fit
+      // at 1984 px in the 2576 px column, so it is 1239,2 px, its plateau, under 1404 — and the fit
       // answers « whole » without reading it, as at every width from B2.
       name: "3440×1440 ultra-large — entier, le bloc en letterbox",
       fit: {
