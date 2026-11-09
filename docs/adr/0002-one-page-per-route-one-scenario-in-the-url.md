@@ -74,3 +74,12 @@ gone. No Page stands that pair today. Avancé at 1440 × 900 is three columns �
 column, a 755,2 px block — and keeps it whole; it reaches the 1152 px column only from 1728 px of
 viewport, where it needs 907 px of height (915 under a 44 px bar). The plateau is 889,76 px. The
 36 px bar stands: it is still the Rail row's height, and 8 px cheaper than the Rail Header's.
+
+## Update — 2026-11-09, #110
+
+Avancé spans the whole window: no shell cap, the middle column is `viewport − 576` from 1024 px, and
+its plot has no ceiling, so it is `0,42 × W_inner` at every width. The window's height binds the
+Chart Block below 1024 only, where the Rail stands under it; from three columns the block stands
+under the vue de dessus in a column that scrolls and never pins. So the « 907 px of height » above
+no longer applies to Avancé, and the 36 px bar is owed to the fit below 1024 alone, where `MIN_RAIL`
+is paid under it. The bar's height stands.

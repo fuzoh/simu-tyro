@@ -366,8 +366,8 @@ in two columns either side of the Chart Block — `Paramètres` on the left, the
 report on the right; below it they stack into one scroll, Chart Block first, the Rail's
 sections after it in their own order. A right-hand column was once rejected because it steals
 the width a 1500 m span needs; 1024 px is the narrowest landscape tablet, where stacking would
-cost the chart its whole profile; the middle column is then 448 px, and the shell's cap keeps
-it at 1152 px beyond.
+cost the chart its whole profile; the middle column is then 448 px, and it takes every pixel of
+the window past the two 288 px columns beyond — Avancé has no width cap.
 _Avoid_: results panel, output half as a place, sidebar, form
 
 **Rail Header**:
@@ -382,9 +382,10 @@ _Avoid_: app bar, toolbar, navbar, page header, chrome
 
 **Chart Block**:
 The banner slot, profile chart, clearance strip, View Strip and five read-out cells as
-one co-visible unit sharing a single x scale and a single gutter constant. On Avancé it heads
-the middle column between the Rail's two, with Statique's vue de dessus under it — never a view
-of Avancé's own. It reflows and collapses as a whole; no member is ever hidden or occluded on
+one co-visible unit sharing a single x scale and a single gutter constant. On Avancé it stands
+in the middle column between the Rail's two, under Statique's vue de dessus, which heads that
+column from the three-column width — never a view of Avancé's own — and it widens with the
+window. It reflows and collapses as a whole; no member is ever hidden or occluded on
 its own.
 _Avoid_: chart area, main pane, canvas
 
@@ -408,7 +409,8 @@ _Avoid_: handle row, anchor bar, gutter, axis area
 **Pinned Safety Header**:
 What the Chart Block collapses to when the Rail scrolls, a field takes focus, or the
 block cannot fit: the banner slot plus one live « Garde min » cell, down to a single row
-while the soft keyboard is open. The banner slot carries whichever occupant precedence
+while the soft keyboard is open. Only where the Rail stands under the block — below the
+three-column width; Avancé's three columns never collapse it. The banner slot carries whichever occupant precedence
 gives it, never only a Verdict. Derived from scroll, focus and available height — never
 persisted, and never a toggle.
 _Avoid_: sticky header, mini banner, collapsed chart, HUD

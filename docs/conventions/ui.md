@@ -200,19 +200,25 @@ nationale drape the very tiles the vue de dessus shows.
 ## Avancé's three columns
 
 The Page Avancé (`/avance`) stands on **three columns from 1024 px of viewport** and on one below
-it. The numbers are `THREE_COLUMN_PX`, `RAIL_WIDTH` (left), `RIGHT_COLUMN_WIDTH` and
-`SHELL_MAX_PX` in `src/lib/layout/contract.ts`; the classes spell them as `min-[1024px]:` and
-`w-72`, and `contract.test.ts` holds the two together.
+it, and spans **the whole width of the window** (#110). The numbers are `THREE_COLUMN_PX`,
+`RAIL_WIDTH` (left), `RIGHT_COLUMN_WIDTH` and `AVANCE_PLOT_MAX` in `src/lib/layout/contract.ts`; the
+classes spell them as `min-[1024px]:` and `w-72`, and `contract.test.ts` holds the two together.
 
-- **Left** — the Rail Header and `Paramètres`. **Middle** — the Chart Block, then Statique's vue
-  de dessus (`TopMap`, the same component and the same gestures — #104). **Right** — `Valeurs
-  déduites`, `Résultats`, `Provenance`, `Ce que cet outil ne calcule pas`. Both side columns are
-  288 px, and all three scroll on their own.
-- **The middle column scrolls, block first** — the way Statique's right column does. Holding the
-  block still over a residual scroller was rejected: at 1024 × 768 it leaves the map 116 px. The
-  column reserves its scrollbar gutter (`scrollbar-gutter: stable`), so a scrollbar that comes and
-  goes cannot move the width every band is a function of; on a platform with classic scrollbars the
-  measured column is that gutter narrower than `chartColumnWidth()`.
+- **Left** — the Rail Header and `Paramètres`. **Middle** — Statique's vue de dessus (`TopMap`, the
+  same component and the same gestures — the rose des vents, the draggable anchors, « Mesure »,
+  « 3D » — #104), then the Chart Block under it (#110). **Right** — `Valeurs déduites`,
+  `Résultats`, `Provenance`, `Ce que cet outil ne calcule pas`. Both side columns are 288 px, run
+  the whole height, and all three columns scroll on their own.
+- **The middle column scrolls, vue de dessus first** — the way Statique's right column does. The
+  map is first in the DOM too, so the focus order is the order on screen; its hairline is under it,
+  between it and the block. Holding the block still over a residual scroller was rejected (#104): at
+  1024 × 768 it leaves the map 116 px. The column reserves its scrollbar gutter
+  (`scrollbar-gutter: stable`), so a scrollbar that comes and goes cannot move the width every band
+  is a function of; on a platform with classic scrollbars the measured column is that gutter
+  narrower than `chartColumnWidth()`. **What it costs**: the Chart Block starts under the map — at
+  677 px from the top of the window at 1440 and at 2560 (the map's 448 px cap plus its controls and
+  five caption lines), 534 px at 1024 —, so the banner and « Garde min » are one scroll down on any
+  window shorter than that plus the block.
 - **The vue de dessus is three columns only.** Below 1024 its box is `display: none`, and the map
   is not started there at all — `threeColumns()` in `contract.ts`, the same B2, decides what to
   *mount*, never a size: a MapLibre map started in a box with no size holds a WebGL context for
@@ -231,14 +237,36 @@ it. The numbers are `THREE_COLUMN_PX`, `RAIL_WIDTH` (left), `RIGHT_COLUMN_WIDTH`
   810 × 1080, 820 × 1180, 834 × 1194) clear it; a narrow desktop window such as 1000 × 900 does not
   and opens on the Pinned Safety Header alone until the window is taller. That is the collapse the
   ticket keeps (« le Pinned Safety Header reste »), accepted rather than capped around.
-- **Why the cap.** The shell stops at 1728 px, and `1728 − 576 = 1152` is `REFERENCE_COLUMN_PX`:
-  the middle column never outgrows the plot's ceiling, so the Plot Aspect Band holds at every
-  width (`contract.test.ts` walks it).
+- **No cap (#110).** The shell spans the window, and every pixel past the two side columns goes to
+  the middle one: `chartColumnWidth()` is `viewport − 576` from 1024, 1984 px at 2560 and 2864 at
+  3440, with no empty margin either side. Statique, Dynamique and Terrain keep `SHELL_MAX_PX`
+  (1728). The shell used to stop there too, because `1728 − 576 = 1152` is `REFERENCE_COLUMN_PX`
+  and kept the middle column under amendment F's plot ceiling (473,76 px). **Avancé's plot has no
+  ceiling now** (`AVANCE_PLOT_MAX`): it is `0,42 × W_inner` at every width, so the Plot Aspect Band
+  holds by construction — 0,42 at 1024, 1440, 1920, 2560 and 3440 (`contract.test.ts` walks it) —
+  and no letterbox is needed. Its height is read off the column's width alone: measured at 2560 the
+  coupe is the same 892,9 px at 1440, 900 and 500 px of window height. The Chart Block is told the
+  same ceiling (`plotMax`) that the shell's `--profile-plot` spells, so the drawn plot and its band
+  agree. Below 1024 nothing moves: the widest stacked column is 1023 px, a 419,58 px plot, which the
+  old ceiling never reached either. **What it costs**: at 3440 the plot is 1192,8 px tall and the
+  whole block about 1610, read by scrolling the column; the read-out cells spread across 2864 px.
+- **The vue de dessus keeps its frame**: 3 : 2 up to the frame's 448 px height cap
+  (`--top-view-max-h`, #115), then wider than 3 : 2 — 409 × 273 at 1024 (its region 422 px tall
+  with its controls and caption) and 1945 × 448 at 2560, with a classic scrollbar. A height read off
+  the width, capped, never off the window.
+- **The window's height binds the block below 1024 only** (#110, `heightBindsBlock` in
+  `src/lib/layout/collapse.ts`): from three columns neither (c) nor the `compact` row fires,
+  whatever the height or the keyboard, because the block stands under the map in a column that
+  scrolls — so the coupe's height never changes when only the window's does. Before #110 three
+  columns at 1440 × 500 pinned the block to the Pinned Safety Header; now they keep it whole and
+  scroll to it. The § 8 strip is no longer a term of (c): below 1024 the Rail pays it, which § 5
+  tolerates, and above it nothing is fitted to the window.
 - **Stacked, the order is the Chart Block, then the Rail's sections in their own order** — the
-  Pinned Safety Header and its collapse are unchanged, and now apply below 1024 instead of below 768
-  (the `width < 1024px` arm in `src/styles.css`). The one scroller is a wrapper that is
-  `display: contents` from 1024 up: both columns become the chart's flex siblings, and a focus
-  inside either still bubbles to the wrapper's handlers.
+  Pinned Safety Header and its collapse are unchanged, and apply below 1024 only (the
+  `width < 1024px` arm in `src/styles.css` for scroll and focus, `heightBindsBlock` for the
+  height). The one scroller is a wrapper that is `display: contents` from 1024 up: both columns
+  become the chart's flex siblings, and a focus inside either still bubbles to the wrapper's
+  handlers.
 - **`Valeurs déduites` holds editable rows**, so it shares `Paramètres`' field-row context: `RailInputs`
   owns the context and hands the two sections back through a render prop.
 
