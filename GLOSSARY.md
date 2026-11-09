@@ -386,7 +386,9 @@ one co-visible unit sharing a single x scale and a single gutter constant. On Av
 in the middle column between the Rail's two, under Statique's vue de dessus, which heads that
 column from the three-column width — never a view of Avancé's own — and it widens with the
 window. It reflows and collapses as a whole; no member is ever hidden or occluded on
-its own.
+its own. Co-visible means its members stand together, not that the block is in view: in
+Avancé's three columns it starts under the vue de dessus, so from the three-column width up
+whether it — and « Garde min » with it — is on screen depends on the middle column's scroll.
 _Avoid_: chart area, main pane, canvas
 
 **View Strip**:
@@ -410,9 +412,9 @@ _Avoid_: handle row, anchor bar, gutter, axis area
 What the Chart Block collapses to when the Rail scrolls, a field takes focus, or the
 block cannot fit: the banner slot plus one live « Garde min » cell, down to a single row
 while the soft keyboard is open. Only where the Rail stands under the block — below the
-three-column width; Avancé's three columns never collapse it. The banner slot carries whichever occupant precedence
-gives it, never only a Verdict. Derived from scroll, focus and available height — never
-persisted, and never a toggle.
+three-column width; in Avancé's three columns the Chart Block never collapses to it. The banner
+slot carries whichever occupant precedence gives it, never only a Verdict. Derived from scroll,
+focus and available height — never persisted, and never a toggle.
 _Avoid_: sticky header, mini banner, collapsed chart, HUD
 
 **Plot Aspect Band**:
