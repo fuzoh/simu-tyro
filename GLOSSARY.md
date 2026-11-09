@@ -444,7 +444,8 @@ _Avoid_: loader, loading state, placeholder, spinner, shell (the shell is the do
 
 **Fond de carte**:
 The swisstopo rendering under the vue de dessus: carte claire (default), orthophoto
-swissimage or carte nationale. A display choice, never part of the Scenario; without
+swissimage or carte nationale. A display choice, never part of the Scenario, kept beside the
+Couche pentes, the Vue 3D and the Repères; without
 network or outside swisstopo coverage the vue de dessus keeps its drawing on a plain
 background.
 _Avoid_: basemap, map layer, tiles, carte (for the rendering itself)
@@ -474,8 +475,23 @@ _Avoid_: pole, mast, drop line
 **Mesure**:
 The one-line ruler on the vue de dessus: two clicked points, a third click starts over.
 Reports the horizontal distance, the straight distance between the two points and the
-distance along the ground. Never saved.
+distance along the ground. Never saved. With a pointer that hovers — a mouse, a pen — the
+**aperçu** shows before each click: the dotted cross of the next point follows the pointer,
+and the click sets the point exactly where it stood. A finger has no aperçu. Points are not
+dragged once set.
 _Avoid_: measure tool, ruler, polyline, outil de distance
+
+**Repères**:
+The dotted crosses of the vue de dessus, one line north–south and one east–west across the
+whole frame: through each point of the Mesure, through its aperçu, and through A and through
+B as soon as each is placed. Those two are the **repères d'ancrage**: drawn in every mode,
+not only in the Mesure, they follow an anchor while it is dragged, so a point of the Mesure
+can be set in line with an anchor. The « Repères » button above the map hides or shows them
+all at once; shown by default. A display choice like the Fond de carte, never part of the
+Scenario nor of the link, and hiding them hides no point, no line and no reading of the
+Mesure. The Page Terrain and the Vue 3D have none: there the Mesure keeps the crosses of its
+points.
+_Avoid_: grille, guides, réticule, viseur, crosshair
 
 ### When something is wrong
 
