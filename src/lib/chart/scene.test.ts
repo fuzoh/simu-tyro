@@ -903,6 +903,56 @@ describe("the Zones d'ancrage — grey on the coupe, never red (#106)", () => {
     expect(scene(lowAtA(10, 145)).rider.inAnchorZone).toBe(true);
   });
 
+  describe("a rider on the platform over a line that fails just past the zone", () => {
+    /**
+     * A synthetic profil, flat but for an 8 m ridge one metre wide at x 11,5 — 1,5 m past A's 10 m
+     * zone — and B 18 m lower. The line over the ridge is under the envelope wherever the passager
+     * is, so a position on A's platform has a negative garde **outside** the zone: the one case
+     * where the zone guards themselves decide what is drawn. Structural — no number is measured.
+     */
+    const ridge: Trace = {
+      d: Float64Array.from([0, 11, 11.5, 12, 150]),
+      z: Float64Array.from([100, 100, 108, 100, 82]),
+      dev: null,
+      origin: { kind: "csv", fileName: "crete.csv" },
+    };
+    const onRidge = (xD: number): ScenarioDraft => {
+      const shipped = firstRunDefaults();
+      return {
+        ...shipped,
+        geometry: { source: "trace", trace: "p1.stub" },
+        rider: { ...shipped.rider, anchorZone: 10, xD },
+      };
+    };
+
+    it("a step on the platform reads the failing line, and is not judged", () => {
+      const built = scene(onRidge(8), ridge);
+      const onPlatform = built.traverse.steps.findIndex((step) => step.xD > 7 && step.xD < 9);
+      expect(onPlatform).toBeGreaterThanOrEqual(0);
+      expect(built.clearance.perStepJudged[onPlatform]).toBe(0);
+      expect(built.clearance.perStep[onPlatform]).toBeLessThan(0);
+    });
+
+    it("signal 3 starts past the zone: no red band reaches onto the platform", () => {
+      const built = scene(onRidge(8), ridge);
+      expect(built.violating.length).toBeGreaterThan(0);
+      for (const band of built.violating) {
+        expect(band.from).toBeGreaterThan(10);
+        expect(band.to).toBeLessThan(140);
+      }
+    });
+
+    it("signal 4 is silent on the platform although the line fails, and fires past the zone", () => {
+      const platform = scene(onRidge(8), ridge).rider;
+      expect(platform.worst.hClear).toBeLessThan(0);
+      expect(platform).toMatchObject({ inAnchorZone: true, inViolation: false });
+      expect(scene(onRidge(75), ridge).rider).toMatchObject({
+        inAnchorZone: false,
+        inViolation: true,
+      });
+    });
+  });
+
   it("a breach just outside a zone still draws its band", () => {
     // B lowered to 40 m: the passager now touches the ground beyond A's 10 m as well.
     const shipped = firstRunDefaults();

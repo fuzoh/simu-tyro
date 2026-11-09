@@ -782,6 +782,27 @@ describe("the Zones d'ancrage — nothing is judged within z of either anchor (#
     expect(outside.hMin).toBeLessThan(-5 - hRider);
   });
 
+  test("a cable in the ground past the zone, read while the rider is on the platform, is no contact", () => {
+    // The spike at x 15 is outside A's 10 m zone, and the cable is under it whoever rides. Reduced
+    // over the platform's steps alone, the line still records its cable contact step by step — it
+    // is drawn — but no judged rider position sees it, so the verdict holds none.
+    const onPlatform = traverse.steps.filter((step) => step.xD <= 10);
+    expect(onPlatform.length).toBeGreaterThan(0);
+    const zoned = evaluateClearance(
+      span,
+      given.P,
+      onPlatform,
+      valley({ x: 15, z: 5 }),
+      hRider,
+      CLEARANCE.samplesPerStep,
+      10,
+    );
+    expect(zoned.perStepJudged.every((flag) => flag === 0)).toBe(true);
+    expect(zoned.perStepCable.every((flag) => flag === 1)).toBe(true);
+    expect(zoned.contact).toBe("none");
+    expect(zoned.atStepIndex).toBe(-1);
+  });
+
   test("a rider contact only at an anchor is no contact once the zone covers it", () => {
     // Anchor A stands 1 m over its base and the ground drops 11 m in the next metre: at `x = 0`
     // the garde is exactly `1 − h_rider` on every step, and nowhere else is the envelope crossed.
