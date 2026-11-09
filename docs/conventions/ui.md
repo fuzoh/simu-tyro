@@ -229,7 +229,17 @@ and `max-w-[1984px]`, and `contract.test.ts` holds the two together.
   Chart Block, is 288 px narrower from 1920 — `viewport − 864` — so it drops from 1343 px at 1919
   to 1056 at 1920 before it widens again pixel for pixel, and the coupe takes the step with it — at
   1920 its plot is 120,5 px and its strip 34,9 px shorter than at 1919 (`0,42` and `0,16 × W_inner`,
-  `W_inner` 1319 → 1032); the column is back to its 1919 width at 2207.
+  `W_inner` 1319 → 1032); the column is back to its 1919 width at 2207. And the balance is
+  re-struck on every edit: a group that grows or shrinks near the split moves the groups after it
+  to the other column under the user's eyes. At 1920 × 1080 on the shipped line (review of #112,
+  agent-browser), « Installation temporaire » then « Corde » in `Ligne` take it from 398 to 702
+  px, and `Tension de la ligne` — the next group to fill — jumps from the foot of the left column
+  (x 12, y 980) to the head of the right one (x 294, y 117), the groups after it with it; the
+  focus stays on the radio and the DOM order, so the reading and Tab orders hold. The family, the
+  Pilote mode, a warning row or Position's LV95 read-outs can do the same. Accepted: a split fixed
+  by hand — two wrappers in DOM order on a two-column grid — would not move, but it is lopsided
+  whenever `Ligne` swings by its 300 px, and is a split point to re-choose every time a group
+  changes, where the columns rebalance on their own.
 - **The middle column scrolls, vue de dessus first** — the way Statique's right column does. The
   map is first in the DOM too, so the focus order is the order on screen; its hairline is under it,
   between it and the block. Holding the block still over a residual scroller was rejected (#104): at
