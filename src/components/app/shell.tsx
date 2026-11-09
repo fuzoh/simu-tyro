@@ -165,9 +165,9 @@ export const LAYOUT_VARS = {
  * Avancé's own: the same contract with **no plot ceiling** (#110). Its shell spans the whole width,
  * so its middle column widens with the window and the plot with it, at 0,42 — the Plot Aspect Band
  * holds at every width. The Chart Block is told the same ceiling (`plotMax`), so the drawn plot and
- * this band agree.
+ * this band agree. Exported for `shell.test.ts`, which reads the rule it spells.
  */
-const AVANCE_LAYOUT_VARS = {
+export const AVANCE_LAYOUT_VARS = {
   ...LAYOUT_VARS,
   "--profile-plot": profilePlotRule(AVANCE_PLOT_MAX),
 } as CSSProperties;

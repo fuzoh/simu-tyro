@@ -237,8 +237,10 @@ describe("§ 5 — the layout contract", () => {
     expect(READ_OUT_SPANS).toHaveLength(7);
     expect(READ_OUT_SPANS.reduce((sum, span) => sum + span, 0)).toBe(8);
     // Eight units are 992 px, to the pixel. That was a 1280 px laptop's chart column beside one Rail;
-    // in Avancé's three columns it is the shell's cap that reaches it, and 1280 gets two lines.
+    // in Avancé's three columns it is reached at 1568 px of viewport (`viewport − 576`, no cap since
+    // #110), and 1280 gets two lines.
     expect(CELL_BASIS_PX * 8).toBe(992);
+    expect(chartColumnWidth(1568)).toBe(992);
     expect(cellRows(992)).toBe(1);
     expect(cellRows(991)).toBe(2);
     expect(cellRows(REFERENCE_COLUMN_PX)).toBe(1);
@@ -561,6 +563,52 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     // The views' box: `display: none` until B2, and the same B2 the predicate reads. Its hairline
     // is under it since #110, between the vue de dessus and the Chart Block it now stands above.
     expect(shell).toContain(`hidden border-b px-3 py-3 min-[${THREE_COLUMN_PX}px]:block`);
+  });
+
+  it("the vue de dessus heads the middle column, above the Chart Block, in the DOM too (#110)", () => {
+    // AC3: above the block at every width from B2, and first in the DOM so the focus order is the
+    // order on screen. The border class above says which side the hairline is on, not the order;
+    // this reads the order itself, inside the chart column — the element holding `chartRef`.
+    const root = fileURLToPath(new URL("../../..", import.meta.url));
+    const shell = readFileSync(join(root, "src/components/app/shell.tsx"), "utf8");
+    // `{chart}` as a JSX child on a line of its own, not the word in a comment.
+    const chartChild = /^\s*\{chart\}\s*$/gm;
+    expect(shell.match(chartChild)).toHaveLength(1);
+    expect(shell.split("aria-label={SECTION.topView}")).toHaveLength(2);
+    const column = shell.indexOf("ref={chartRef}");
+    const views = shell.indexOf("aria-label={SECTION.topView}");
+    const chart = shell.search(chartChild);
+    expect(column).toBeGreaterThan(-1);
+    expect({ viewsAfterColumn: views > column, chartAfterViews: chart > views }).toStrictEqual({
+      viewsAfterColumn: true,
+      chartAfterViews: true,
+    });
+  });
+
+  it("Avancé's band and its drawn plot both read the uncapped ceiling (#110)", () => {
+    // AC4's aspect is held by the contract's functions *given* `AVANCE_PLOT_MAX`; this holds that
+    // Avancé gives it, in both places it is spent. Drop `plotMax` and the SVG is drawn capped at
+    // 473,76 px in a band reserving 0,42 × W_inner — at 2560 an aspect of 0,24, outside the Plot
+    // Aspect Band, the Skeleton's frame off the live plot. Spread `LAYOUT_VARS` on the Shell instead
+    // and the CSS band is capped under an uncapped plot. `shell.test.ts` reads the two rules.
+    const root = fileURLToPath(new URL("../../..", import.meta.url));
+    const read = (path: string) => readFileSync(join(root, path), "utf8");
+    const shell = read("src/components/app/shell.tsx");
+    const app = read("src/components/app/app.tsx");
+    // The Shell's root spreads Avancé's vars, and `LAYOUT_VARS` is spread only into them.
+    expect(shell.match(/style=\{\s*\{\s*\.\.\.AVANCE_LAYOUT_VARS,/g)).toHaveLength(1);
+    expect(shell.match(/\.\.\.LAYOUT_VARS\b/g)).toHaveLength(1);
+    expect(shell).toMatch(/const AVANCE_LAYOUT_VARS = \{\s*\.\.\.LAYOUT_VARS,/);
+    // Avancé's Chart Block is told the same ceiling, once, on the `<ChartBlock` element itself —
+    // up to its own `/>`, at its own indent, past the `<Banner … />` it holds.
+    const block = /^( *)<ChartBlock\b[\s\S]*?^\1\/>/m.exec(app)?.[0] ?? "";
+    expect(block).toContain("solved={solved}");
+    expect(block).toContain("plotMax={AVANCE_PLOT_MAX}");
+    expect(app.split("plotMax=")).toHaveLength(2);
+    // The other Pages pass none, so they keep the capped default their `LAYOUT_VARS` spells.
+    for (const page of ["statique/statique.tsx", "terrain-page/terrain.tsx"]) {
+      expect(read(`src/components/${page}`)).not.toContain("plotMax=");
+    }
   });
 
   it("the middle column's views are Statique's own component, so no view is Avancé's alone", () => {
@@ -1421,8 +1469,8 @@ describe("§ 5 — the two mechanisms the layout may not use", () => {
       scrollPadding: tokens.has("scroll-pb-[var(--kb,0px)]"),
     }).toStrictEqual({ padding: true, scrollPadding: true });
     // From B2 up the wrapper is `display: contents` and each of the three columns is its own
-    // scroller — the middle one since its views stand under the block (#104) — so each spends the
-    // same pair on itself.
+    // scroller — the middle one, which scrolls the vue de dessus and the block under it (#104,
+    // #110) — so each spends the same pair on itself.
     const wide = `min-[${THREE_COLUMN_PX}px]:`;
     expect(tokens.has(`${wide}contents`)).toBe(true);
     for (const token of ["pb-[var(--kb,0px)]", "scroll-pb-[var(--kb,0px)]", "overflow-y-auto"]) {
