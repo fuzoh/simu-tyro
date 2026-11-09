@@ -245,9 +245,11 @@ it. The numbers are `THREE_COLUMN_PX`, `RAIL_WIDTH` (left), `RIGHT_COLUMN_WIDTH`
 ## Statique's first row
 
 From **1024 px of viewport** — `THREE_COLUMN_PX`, Avancé's own switch — the right column of the
-Page Statique (`/`) is two rows (#109). The numbers are `FIELDS_WIDTH`, `STATIQUE_TILE_MAX_PX`,
-`STATIQUE_TILE_BLOCK_PX` and `statiqueTopViewWidth()` in `src/lib/layout/contract.ts`; the classes
-spell them as `min-[1024px]:` and `minmax(0,180px)`, and `contract.test.ts` holds the two together.
+Page Statique (`/`) is two rows (#109). The one number of it in `src/lib/layout/contract.ts` is
+`STATIQUE_TILE_MAX_PX`, which reaches the CSS as the block's own `--tile-max` (the
+`minmax(0, var(--tile-max))` of its two tracks), so no class spells it a second time. The switch is
+written `min-[1024px]:`, as Avancé's. The rest — what the row leaves the map — is arithmetic over the
+shell, measured by `agent-browser` (`docs/conventions/routing.md`, 2026-11-09), not modelled.
 
 - **Row 1: the vue de dessus, then `Résultats`.** The map takes the rest of the column; the tiles
   stand on its right as a **block of 2 × 3** — the four value tiles in a 2 × 2, the Verdict across
@@ -257,15 +259,24 @@ spell them as `min-[1024px]:` and `minmax(0,180px)`, and `contract.test.ts` hold
   edge are the coupe's (#115).
 - **Row 2: the coupe**, across the column — the same width, and so the same bands, as before.
 - **Below 1024 nothing moves.** The regions' wrapper is `display: contents` there, so `Résultats`,
-  the coupe and the vue de dessus stack in the column as they always have. The DOM keeps that
-  order at every width: from 1024 a screen reader reads the tiles before the map it sees first.
+  the coupe and the vue de dessus stack in the column as they always have — the brief keeps that
+  order below 1024, and the DOM keeps it at every width, because any one DOM order mismatches the
+  drawing at one of the two shapes. **What it costs from 1024**: a screen reader reads the tiles
+  before the map it sees first, and **keyboard focus goes from the coupe back up to the map** —
+  measured at 1440 on the trial line, Tab visits the coupe's controls (« Choisir une marge
+  exigée », « ligne à vide », « ×1 vraie échelle », « Afficher le profil ») before the vue de
+  dessus's (« Fond de carte », pentes, the map, its zoom, « Placer A », « Placer B », « Mesure »…),
+  so the focus order is row 2, then row 1 (WCAG 2.4.3). The tiles hold no control, so it is the only
+  jump. Accepted: reordering the DOM would move the phone's, which the brief keeps.
 - **The block is Statique's alone** (`<OutputGrid block>`, its Verdict `wide`): two columns at every
   width. Terrain's grid keeps its row of five from a 56 rem column. Statique dropped that arm with
   nothing lost below 1024 — its column, `md:w-80` short of the viewport, is 703 px at the most there.
 - **The vue de dessus keeps its frame**: 3 : 2 up to the 448 px height cap (#115), its height never
-  read off the window. **What it costs**: at the switch the map is 287 px wide (191 px tall),
-  narrower than the block; it is the wider from 1106 px of viewport, 703 px at 1440, and 991 px
-  from the shell's cap — wider than 3 : 2 there, under the cap.
+  read off the window. Its width is the column, `min(viewport, 1728) − 320`, less the block (368),
+  four `px-3` (48) and the hairline between the regions (1). **What it costs**: at the switch the
+  map is 287 px wide (191 px tall), narrower than the block; it is the wider from 1106 px of
+  viewport, 703 px at 1440, and **989 px** from the shell's cap — `1408 − 417 = 991` less the
+  shell's own two hairlines (`min-[1730px]:border-x`) — wider than 3 : 2 there, under the cap.
 - **The Skeleton is the same tree** (`StatiqueFrame`), so it lands in the same boxes at every width.
 
 ## Charts

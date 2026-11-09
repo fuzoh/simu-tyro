@@ -60,7 +60,9 @@ export function StatiqueFrame({
     <ColumnsFrame busy={busy} fields={fields} strip={strip}>
       {/* Below B2 the wrapper is `contents`: the three regions stack in the column as they always
           have. From B2 it is a grid — the vue de dessus, then the tiles as wide as their block, on
-          the first row; the coupe across the second. The DOM keeps the phone's reading order. */}
+          the first row; the coupe across the second. The DOM keeps the phone's reading order, so
+          from B2 focus visits the coupe before the map above it: the accepted cost, in ui.md's
+          « Statique's first row ». */}
       <div className="contents min-[1024px]:grid min-[1024px]:grid-cols-[minmax(0,1fr)_auto]">
         <Region
           className="min-[1024px]:col-start-2 min-[1024px]:row-start-1 min-[1024px]:border-l"
