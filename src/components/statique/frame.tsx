@@ -81,8 +81,14 @@ export function StatiqueFrame({
             {section}
           </div>
         </Region>
+        {/* From B2 the frame's two custom properties (`TopViewFrame`): no height cap, so the map
+            stays 3 : 2 beside the tiles — the brief's « format conservé » — and seven caption
+            lines, one per line the caption can hold in 2D (A, B, the Vent, the gesture, the fond
+            indisponible, the Banane, the Vue 3D). The caption sets this row's height, so the
+            narrow map's wrapped lines must land in the Skeleton's space, not push the coupe down:
+            ui.md's « Statique's first row ». */}
         <Region
-          className="min-[1024px]:col-start-1 min-[1024px]:row-start-1 min-[1024px]:min-w-0 min-[1024px]:last:border-b"
+          className="min-[1024px]:col-start-1 min-[1024px]:row-start-1 min-[1024px]:min-w-0 min-[1024px]:[--top-view-caption:7rem] min-[1024px]:[--top-view-max-h:none] min-[1024px]:last:border-b"
           title={SECTION.topView}
         >
           <div className="px-3">{topView}</div>
@@ -164,7 +170,8 @@ export function Region({
  * it into `index.html` and `404.html` (ADR-0002). **Containers, not controls**: the groups'
  * headings, the tiles' labels and scopes over their empty value and note lines, the Chart Block's
  * empty bands with the terrain cells' labels, and the vue de dessus's frame — its control row, the
- * map's box and its caption's five lines, all empty — no value, no control, never a « — ».
+ * map's box and its caption's lines (seven in the first row from B2), all empty — no value, no
+ * control, never a « — ».
  */
 export function StatiqueSkeleton() {
   return (

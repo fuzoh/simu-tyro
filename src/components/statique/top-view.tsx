@@ -139,6 +139,13 @@ function at({ x, y }: TopViewPoint): CSSProperties {
  * the tiles', the region titles' and the coupe's on every Page, and it stops growing taller at the
  * 448 px it had when it was capped at `max-w-2xl`. Past 672 px of width the map is wider than
  * 3 : 2; the plain drawing keeps its own 3 : 2, centred.
+ *
+ * **Both numbers are custom properties with these defaults** — `--top-view-max-h` (28 rem, the
+ * 448 px cap) and `--top-view-caption` (5 rem, five `text-xs` lines) — so a Page's layout can
+ * change them on the region around the frame without a prop through `TopMap`, whose mount the
+ * layout contract pins. Statique's first row (#109) is the one that does: it lifts the cap, so the
+ * map keeps its 3 : 2 beside the tiles, and reserves seven lines, since the caption sets that row's
+ * height and so the coupe's place under it.
  */
 export function TopViewFrame({
   controls,
@@ -152,10 +159,12 @@ export function TopViewFrame({
   return (
     <div className="flex w-full flex-col gap-2">
       <div className="flex h-7 items-center gap-2">{controls}</div>
-      <div className="border-border relative aspect-[3/2] max-h-112 w-full overflow-hidden border">
+      <div className="border-border relative aspect-[3/2] max-h-[var(--top-view-max-h,28rem)] w-full overflow-hidden border">
         {figure}
       </div>
-      <div className="text-muted-foreground flex min-h-20 flex-col text-xs">{caption}</div>
+      <div className="text-muted-foreground flex min-h-[var(--top-view-caption,5rem)] flex-col text-xs">
+        {caption}
+      </div>
     </div>
   );
 }
