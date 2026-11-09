@@ -881,6 +881,38 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     expect(styles).toContain(`@media (width < ${THREE_COLUMN_PX}px)`);
   });
 
+  /**
+   * #112's acceptance criteria 2 and 5, held at the source the way the shell's widths are: the
+   * wrapper right under `<RailSection title="Paramètres">` flows its groups in two CSS columns from
+   * B3, keeps every group whole, and carries no `order-` and no grid, so the DOM's order stays the
+   * order on screen, the reading order and the Tab order. Below B3 it is the one flex column it was.
+   */
+  it("Paramètres' groups stand on two columns from B3, none cut, in the DOM's order (#112)", () => {
+    const root = fileURLToPath(new URL("../../..", import.meta.url));
+    const inputs = readFileSync(join(root, "src/components/rail/inputs.tsx"), "utf8");
+    // The first element under the section's opening tag, past its JSX comment.
+    const wrapper =
+      /<RailSection title="Paramètres">\s*(?:\{\/\*[\s\S]*?\*\/\}\s*)?<div className="([^"]*)">/.exec(
+        inputs,
+      );
+    expect(wrapper).not.toBeNull();
+    const classes = (wrapper?.[1] ?? "").split(/\s+/);
+    expect(classes).toEqual(
+      expect.arrayContaining([
+        "wide-rail:block",
+        "wide-rail:columns-2",
+        "wide-rail:*:break-inside-avoid",
+        "flex",
+        "flex-col",
+      ]),
+    );
+    // Nothing that would let the order on screen drift from the DOM's.
+    const reordering = classes.filter((cls) => /(^|:)(order-|grid|col-span-|row-)/.test(cls));
+    expect(reordering).toStrictEqual([]);
+    // The only `wide-rail:` classes in the Rail are this wrapper's: no group is placed by hand.
+    expect(inputs.match(/className="[^"]*\bwide-rail:[^"]*"/g)).toHaveLength(1);
+  });
+
   it("B3 is declared once, as the contract's constant and one CSS variant (#112)", () => {
     // The brief's « pas en valeur arbitraire répétée »: the `wide-rail` variant of `styles.css`
     // spells `WIDE_RAIL_PX`, and no class anywhere in `src/` retypes it as `min-[1920px]:`.
