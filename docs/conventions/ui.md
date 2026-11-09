@@ -191,8 +191,10 @@ very literals from `style.ts` — the globe's background is `PLAIN`, the lines a
 under it are HTML, on the tokens.
 
 The Vue 3D's lines follow the coupe's strokes in those literals: the Ligne à vide dashed in
-`LINE_INK`, the Ligne A–B dashed and the Trajectoire dotted in `LINE_INK` at 60 % — the coupe's
-`/60` — and the loaded line solid. Which of them is shown is the View Strip's: the Vue 3D has no
+`LINE_INK`, the Ligne A–B dashed and the Trajectoire dotted in `LINE_INK` at 60 %, and the loaded
+line solid. The Trajectoire takes the coupe's `foreground/60`; the coupe draws its Ligne A–B in
+`muted-foreground/60`, a muted ink the Vue 3D has no literal for, so its chord takes the ink at
+60 % too and reads a shade darker than the coupe's. Which of them is shown is the View Strip's: the Vue 3D has no
 layer picker of its own (#111).
 
 **The Gimbal is HTML over the canvas, from `ui/`** (#111). CesiumJS has no navigation control and
