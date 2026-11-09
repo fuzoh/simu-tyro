@@ -46,6 +46,7 @@ import { formatQuantity } from "@/lib/format/quantity.ts";
 import { cn } from "@/lib/utils.ts";
 import { label } from "@/lib/vocabulary/labels.ts";
 
+import { AnchorZoneBands } from "./anchor-zones.tsx";
 import { HoverRule, HoverTip } from "./hover.tsx";
 import { metresOn, useHover } from "./use-hover.ts";
 
@@ -146,6 +147,7 @@ export function Profile({
           metres: hovered,
           reach: RIDER_REACH_PX / x.pxPerM,
           clearance,
+          anchorZone: scene?.anchorZone ?? 0,
         });
   const hover = bind(metresOn(x));
   const drag =
@@ -222,6 +224,16 @@ export function Profile({
 
       <g clipPath="url(#scoutech-plot)">
         {terrain !== null && <path className="fill-muted stroke-border" d={terrain} />}
+
+        {/* The two Zones d'ancrage (#106) — where nothing is judged — on the model of signal 3's
+            bands, in a neutral tint: the garde still draws through them, and no band of signal 3
+            ever starts inside one. Under them, so a violating band beside a zone keeps its red. */}
+        <AnchorZoneBands
+          bands={clearance ? (scene?.anchorZones ?? []) : []}
+          bottom={plotBottom}
+          top={plot.top}
+          x={x}
+        />
 
         {/* Signal 3 — a tint plus an edge over the **rider positions that violate**, never a
             texture over the subject: the hatched full-height band floods the chart exactly when

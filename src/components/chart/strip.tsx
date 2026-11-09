@@ -49,11 +49,14 @@ import { axisLabel, clearanceDomain, clearanceTickLabel } from "@/lib/layout/con
 import { zGroundAt } from "@/lib/sim";
 import { heading } from "@/lib/vocabulary/labels.ts";
 
+import { AnchorZoneBands } from "./anchor-zones.tsx";
+
 /**
- * One point of the curve: a rider position, the garde **under the rider** there (`y`), and the
- * line's envelope minimum at that same step (`envelope`) — or a hole where a step failed.
+ * One point of the curve: a rider position, the garde **under the rider** there (`y`), the line's
+ * envelope minimum at that same step (`envelope`), and whether that position is judged at all —
+ * `false` inside a Zone d'ancrage (#106) — or a hole where a step failed.
  */
-type Sample = { x: number; y: number | null; envelope: number | null };
+type Sample = { x: number; y: number | null; envelope: number | null; judged: boolean };
 
 /**
  * The curve, over the **grid** rather than over the solved steps. `sweep` copies each grid value
@@ -70,7 +73,13 @@ type Sample = { x: number; y: number | null; envelope: number | null };
 function samples(frame: SceneFrame, scene: ChartScene): Sample[] {
   const { grid, steps } = scene.traverse;
   const solved: { s: number; x: number }[] = [];
-  const out: { s: number; x: number | null; y: number | null; envelope: number | null }[] = [];
+  const out: {
+    s: number;
+    x: number | null;
+    y: number | null;
+    envelope: number | null;
+    judged: boolean;
+  }[] = [];
   let next = 0;
   for (let i = 0; i < grid.length; i++) {
     const step = steps[next];
@@ -82,11 +91,12 @@ function samples(frame: SceneFrame, scene: ChartScene): Sample[] {
         // this curve carries no scan error at all.
         y: step.zD - zGroundAt(frame.terrain, step.xD) - scene.hRider,
         envelope: scene.clearance.perStep[next],
+        judged: scene.clearance.perStepJudged[next] === 1,
       });
       solved.push({ s: grid[i], x: step.xD });
       next++;
     } else {
-      out.push({ s: grid[i], x: null, y: null, envelope: null });
+      out.push({ s: grid[i], x: null, y: null, envelope: null, judged: false });
     }
   }
 
@@ -94,15 +104,17 @@ function samples(frame: SceneFrame, scene: ChartScene): Sample[] {
   // at or before it. Both present ⇒ interpolate; one missing ⇒ the grid runs off an end.
   let at = 0;
   return out.map((point) => {
-    if (point.x !== null) return { x: point.x, y: point.y, envelope: point.envelope };
+    if (point.x !== null) {
+      return { x: point.x, y: point.y, envelope: point.envelope, judged: point.judged };
+    }
     while (at < solved.length && solved[at].s < point.s) at++;
     const after = solved[at];
     const before = at > 0 ? solved[at - 1] : undefined;
     if (before !== undefined && after !== undefined) {
       const t = (point.s - before.s) / (after.s - before.s);
-      return { x: before.x + t * (after.x - before.x), y: null, envelope: null };
+      return { x: before.x + t * (after.x - before.x), y: null, envelope: null, judged: false };
     }
-    return { x: (point.s / scene.span.L0) * scene.L, y: null, envelope: null };
+    return { x: (point.s / scene.span.L0) * scene.L, y: null, envelope: null, judged: false };
   });
 }
 
@@ -125,7 +137,12 @@ function withZeroCrossings(points: Sample[]): Sample[] {
       point.y !== 0
     ) {
       const t = previous.y / (previous.y - point.y);
-      out.push({ x: previous.x + t * (point.x - previous.x), y: 0, envelope: null });
+      out.push({
+        x: previous.x + t * (point.x - previous.x),
+        y: 0,
+        envelope: null,
+        judged: previous.judged && point.judged,
+      });
     }
     out.push(point);
   }
@@ -181,27 +198,29 @@ export function ClearanceStrip({
 
   // Two strokes over one point set, split at zero: `foreground` where the passenger is above the
   // ground, `destructive` where they are in it. The inserted crossings belong to both, so the two
-  // meet on the zero line.
+  // meet on the zero line. Inside a Zone d'ancrage nothing is judged (#106): the curve still draws,
+  // in `foreground` whatever its sign, and no red starts there.
   const above = line<Sample>()
-    .defined((point) => point.y !== null && point.y >= 0)
+    .defined((point) => point.y !== null && (point.y >= 0 || !point.judged))
     .x((point) => x.x(point.x))
     .y((point) => y(point.y ?? 0))(points);
   const below = line<Sample>()
-    .defined((point) => point.y !== null && point.y <= 0)
+    .defined((point) => point.y !== null && point.y <= 0 && point.judged)
     .x((point) => x.x(point.x))
     .y((point) => y(point.y ?? 0))(points);
 
   // Signal 2 — red fill below zero: « de combien, et où sur la traversée ? ».
   const deficit = area<Sample>()
-    .defined((point) => point.y !== null && point.y <= 0)
+    .defined((point) => point.y !== null && point.y <= 0 && point.judged)
     .x((point) => x.x(point.x))
     .y0(zero)
     .y1((point) => y(point.y ?? 0))(points);
 
   // The envelope's own negative parts — a cable-ground contact away from the passenger — in a
   // fainter red, so the verdict's failure never disappears from this chart. Voir the docblock.
+  // Outside the Zones d'ancrage only, as the verdict reads it.
   const envelopeDeficit = area<Sample>()
-    .defined((point) => point.envelope !== null && point.envelope < 0)
+    .defined((point) => point.envelope !== null && point.envelope < 0 && point.judged)
     .x((point) => x.x(point.x))
     .y0(zero)
     .y1((point) => y(point.envelope ?? 0))(points);
@@ -245,6 +264,14 @@ export function ClearanceStrip({
           `foreground` rather than in `border` — the token for gridlines that mean nothing — at a
           hairline, which keeps it visually under the `stroke-2` curve. */}
       <line className="stroke-foreground" x1={x.x(0)} x2={x.x(frame.L)} y1={zero} y2={zero} />
+
+      {/* The Zones d'ancrage, greyed under the curve that still runs through them (#106). */}
+      <AnchorZoneBands
+        bands={scene !== null && clearance ? scene.anchorZones : []}
+        bottom={bottom}
+        top={top}
+        x={x}
+      />
 
       {envelopeDeficit !== null && <path className="fill-destructive/10" d={envelopeDeficit} />}
       {deficit !== null && <path className="fill-destructive/25" d={deficit} />}

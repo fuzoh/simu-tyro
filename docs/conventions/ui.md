@@ -418,6 +418,12 @@ the two scales are *deliberately mismatched*, which is the whole point (« v1 bu
   at low anchors has every rider position violating at −0,36 m while the passenger flies a valley at
   +62,6 m — so one linear domain leaves the zero crossing **0,2 px** tall. Whatever the curve is,
   `clearanceDomain()` is fed **that** quantity and nothing else.
+- **The Zones d'ancrage are grey, never red** — #106. `SceneBase.anchorZones` holds the two bands
+  `[0, z]` and `[L − z, L]`, and `AnchorZoneBands` (`src/components/chart/anchor-zones.tsx`) draws
+  them full height on the profile and on the clearance strip, in `muted-foreground` at low opacity
+  with a dashed inner edge, under the red violating bands. Red — the violating bands, the strip's
+  below-zero stroke and its deficit fill — is drawn only where the garde is judged, outside the
+  zones; the garde itself stays drawn inside them. The coupe's hover says « garde non jugée » there.
 - What the charts draw comes from `@/lib/chart/scene.ts` — pure functions over the unloaded line
   `deriveUnloaded` returns (`@/lib/scenario/unloaded.ts`), so the questions worth testing are `node`
   tests and the components stay thin.

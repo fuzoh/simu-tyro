@@ -235,3 +235,34 @@ describe("the lines it prints", () => {
     expect(lines.at(-1)?.value).toBe("");
   });
 });
+
+describe("inside a Zone d'ancrage the hover says the garde is not judged (#106)", () => {
+  const { frame } = IMPORTED;
+  const at = (metres: number, anchorZone?: number, clearance = true) =>
+    read({ frame, cable: null, rider: null, metres, reach: REACH, clearance, anchorZone });
+
+  test("the zones are closed, `[0, z]` and `[L − z, L]`, and nothing beyond them is", () => {
+    expect(at(0, 10).inAnchorZone).toBe(true);
+    expect(at(10, 10).inAnchorZone).toBe(true);
+    expect(at(10.5, 10).inAnchorZone).toBe(false);
+    expect(at(frame.L - 10.5, 10).inAnchorZone).toBe(false);
+    expect(at(frame.L - 10, 10).inAnchorZone).toBe(true);
+    expect(at(frame.L, 10).inAnchorZone).toBe(true);
+  });
+
+  test("no zone, or a reader that judges nothing, prints no such line", () => {
+    expect(at(2).inAnchorZone).toBe(false);
+    expect(at(2, 0).inAnchorZone).toBe(false);
+    // Under a Clearance Gate breach no garde is read at all, so none is « non jugée » either.
+    expect(at(2, 10, false).inAnchorZone).toBe(false);
+  });
+
+  test("its line is the qualifier « zone d'ancrage : garde non jugée », standing alone", () => {
+    const lines = coupeLines(at(2, 10), "terrain");
+    expect(lines.map((line) => line.label)).toContain("zone d'ancrage : garde non jugée");
+    expect(lines.find((line) => line.label === COUPE_HOVER.anchorZone)?.value).toBe("");
+    expect(coupeLines(at(40, 10), "terrain").map((line) => line.label)).not.toContain(
+      COUPE_HOVER.anchorZone,
+    );
+  });
+});
