@@ -410,8 +410,8 @@
 
 /**
  * § 5's touch budget as **one** utility — « ≥ 44 px on a coarse pointer », a budget § 5 spends to the
- * pixel (`59 + 48 + 44 + 128 + 24 = 303` in the View Strip) against an app whose one control height
- * is **28 px visually**. It is the generalisation of the two places that already close that gap by
+ * pixel (`4 × 28 + 12 + 44 + 153 + 16 = 337` of 366 px in the View Strip) against an app whose one
+ * control height is **28 px visually**. It is the generalisation of the two places that already close that gap by
  * hand: `view-strip.tsx`'s `after:-inset-y-1.5` on a 32 px button, and `.chart-grab`'s transparent
  * stroke on the rider.
  *

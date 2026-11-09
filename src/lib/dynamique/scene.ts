@@ -289,8 +289,9 @@ function curveScene(
     y: (value: number) => number,
   ) => samples.map((sample): PxPoint => [x.x(sample.x), y(read(sample))]);
 
-  // The gutter holds four characters at the axis' 9 px: from 10 on the decimal is dropped, so
-  // « -12,3 » reads « -12 » rather than running past the SVG's edge.
+  // A tick label stands inside the plot (`axisLabel`, #115) and covers the curves' first or last
+  // metres, so it stays at four characters at the axis' 9 px: from 10 on the decimal is dropped, and
+  // « -12,3 » reads « -12 ».
   const tick = (
     value: number,
     y: (value: number) => number,

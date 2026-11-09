@@ -15,6 +15,8 @@ import { describe, expect, it } from "vitest";
 import { formatValue } from "@/lib/format/quantity.ts";
 
 import {
+  AXIS_LABEL_INSET,
+  axisLabel,
   BANNER,
   BANNER_TWO_LINES_PX,
   bannerBudget,
@@ -64,41 +66,47 @@ import {
  * § 5, *The three pixel budgets, each summing to the viewport*. The columns are the budgets' own:
  * B and C were written with one Rail beside the chart, and in Avancé's three columns they are
  * reached at 480 px and 1728 px of viewport (`chartColumnWidth`), not at 768 and 1440.
+ *
+ * **Re-derived for the 12 px gutter (#115)** — ADR-0001's « correctness over byte-compatibility »:
+ * `W_inner` is the column less 24 px rather than 48, so every row below is 24 px of `W_inner` wider
+ * than § 5 printed it, by hand: `0,42 × 366 = 153,72` · `76 + 76 + 229,72 + 96 + 44 + 3 × 52 =
+ * 601,72` at A; `0,42 × 456 = 191,52` · `60 + 267,52 + 96 + 44 + 156 = 623,52` at B; `0,42 × 1128 =
+ * 473,76`, `0,16 × 1128 = 180,48` · `44 + 549,76 + 180,48 + 44 + 52 = 870,24` at C.
  */
 const BUDGETS = [
   {
     name: "A · 390×664",
     column: 390,
-    wInner: 342,
-    plot: 144,
-    profile: 220,
+    wInner: 366,
+    plot: 154,
+    profile: 230,
     strip: 96,
-    // Three cell lines since the row became seven cells (2026-09-23): 540 + 52.
+    // Three cell lines since the row became seven cells (2026-09-23).
     rows: 3,
     banner: BANNER.threeLines,
-    block: 592,
+    block: 602,
   },
   {
     name: "B · 768×1024",
     column: 480,
-    wInner: 432,
-    plot: 181,
-    profile: 257,
+    wInner: 456,
+    plot: 192,
+    profile: 268,
     strip: 96,
     rows: 3,
     banner: BANNER.twoLines,
-    block: 613,
+    block: 624,
   },
   {
     name: "C · 1440×900",
     column: 1152,
-    wInner: 1104,
-    plot: 464,
-    profile: 540,
-    strip: 177,
+    wInner: 1128,
+    plot: 474,
+    profile: 550,
+    strip: 180,
     rows: 1,
     banner: BANNER.oneLine,
-    block: 857,
+    block: 870,
   },
 ] as const;
 
@@ -138,8 +146,8 @@ describe("§ 5 — the layout contract", () => {
 
       /**
        * The **whole block**, which is (c)'s left-hand side. § 5's table rounds each band and then
-       * sums; `chartBlockHeight` sums and rounds nowhere, so the two agree to within a pixel — 856,3
-       * against the table's 857 at desktop is the whole of the gap.
+       * sums; `chartBlockHeight` sums and rounds nowhere, so the two agree to within a pixel — 870,24
+       * against the table's 870 at desktop is the whole of the gap.
        */
       it("the block is the five bands, and it is the collapse's own left-hand side", () => {
         const height = chartBlockHeight(budget.column, budget.banner);
@@ -189,15 +197,17 @@ describe("§ 5 — the layout contract", () => {
     expect(chartBlockHeight(1152, BANNER.threeLines) - chartBlockHeight(1152)).toBe(32);
   });
 
-  it("budget A no longer clears MIN_RAIL: the third cell line spends the 4 px and 48 more", () => {
+  it("budget A no longer clears MIN_RAIL: the third cell line and the narrower gutter both spend it", () => {
     // « Those 124 px of resting rail clear `MIN_RAIL = 120` by 4 px » was the measurement the
-    // no-app-bar decision rested on. Seven read-out cells wrap to three lines at 390 px, and the
-    // third line's 52 px is the whole difference: the resting rail is 72 px, so (c) pins the block
-    // at 390 × 664 — the user's call of 2026-09-23, made knowing it.
+    // no-app-bar decision rested on. Seven read-out cells wrap to three lines at 390 px — the user's
+    // call of 2026-09-23, made knowing it — and the 12 px gutter (#115) adds `0,42 × 24 = 10,08` px
+    // of plot: `664 − 601,72 = 62,28` px of resting rail, so (c) pins the block at 390 × 664. Even
+    // with two cell lines the rail would now be 114,28, under the floor by itself.
     const rail = 664 - chartBlockHeight(390);
-    expect(Math.round(rail)).toBe(72);
+    expect(rail).toBeCloseTo(62.28, 9);
     expect(rail).toBeLessThan(MIN_RAIL);
-    expect(Math.round(rail + CELL_ROW)).toBe(124);
+    expect(rail + CELL_ROW).toBeCloseTo(114.28, 9);
+    expect(rail + CELL_ROW).toBeLessThan(MIN_RAIL);
   });
 
   it("the strip floor is 96 px, not the 72 px policy floor", () => {
@@ -246,7 +256,7 @@ describe("§ 5 — the layout contract", () => {
     // The invariant § 5 is built on, and **amendment F narrows its domain rather than its meaning**:
     // one rule still spans 390 px and 1440 px, with no viewport height anywhere in it. Past the
     // reference column the plot stops growing — voir the amendment F block below.
-    for (const wInner of [53, 342, 432, 1104]) {
+    for (const wInner of [53, 366, 456, 1128]) {
       expect(profilePlotHeight(wInner) / wInner).toBeCloseTo(PROFILE_ASPECT, 12);
       expect(plotAspect(wInner)).toBeCloseTo(PROFILE_ASPECT, 12);
     }
@@ -257,7 +267,7 @@ describe("§ 5 — the layout contract", () => {
     expect(STRIP.max).toBeLessThanOrEqual(STRIP_POLICY_BAND.max);
     // The 96 px floor sits 24 px above the policy floor **deliberately**: 96 px is a touch lane.
     expect(STRIP.min - STRIP_POLICY_BAND.min).toBe(24);
-    for (const wInner of [0, 53, 342, 432, 600, 1104, 1250, 4000]) {
+    for (const wInner of [0, 53, 366, 456, 600, 1128, 1250, 4000]) {
       expect(stripOuterHeight(wInner)).toBeGreaterThanOrEqual(STRIP_POLICY_BAND.min);
       expect(stripOuterHeight(wInner)).toBeLessThanOrEqual(STRIP_POLICY_BAND.max);
     }
@@ -271,7 +281,7 @@ describe("§ 5 — the layout contract", () => {
  *
  * The defect it answers: `0,42 × W_inner` grows without bound, so above § 5's own 1440 px reference
  * desktop the block outgrows every viewport height, and **five ordinary 16:9 desktops opened with no
- * chart at all**. The cap freezes the plot at the 463,68 px it reaches at a 1152 px column, so
+ * chart at all**. The cap freezes the plot at the 473,76 px it reaches at a 1152 px column, so
  * **nothing at or below the reference moves** — the three budgets above are asserted on the unclamped
  * rule, exactly — and the block plateaus instead of growing for ever.
  *
@@ -297,58 +307,70 @@ describe("amendment F — the plot's ceiling at wide widths", () => {
    * `uncapped` are the block's height; `height` is the viewport's, and above B2 the block owes no
    * `MIN_RAIL`, so fitting is `capped ≤ height` — asserted in `./collapse.test.ts` through the real
    * predicate.
+   *
+   * Re-derived by hand for the 12 px gutter (#115): `W_inner = column − 24`, so at 1224 px the
+   * uncapped block is `44 + 76 + 0,42 × 1200 + 0,16 × 1200 + 44 + 52 = 912` and the capped one swaps
+   * the `504` for the cap's `473,76`.
    */
   const WIDE = [
     // Below the reference column the cap is transparent, so these two are **unchanged** — and they
     // are the two rows the cap cannot rescue at any value, because rescuing them means lowering the
     // plot below the reference, which is budget C.
-    { name: "1280 × 720", width: 1280, height: 720, column: 992, uncapped: 763.52, capped: 763.52 },
-    { name: "1366 × 768", width: 1366, height: 768, column: 1078, uncapped: 813.4, capped: 813.4 },
+    { name: "1280 × 720", width: 1280, height: 720, column: 992, uncapped: 777.44, capped: 777.44 },
+    {
+      name: "1366 × 768",
+      width: 1366,
+      height: 768,
+      column: 1078,
+      uncapped: 827.32,
+      capped: 827.32,
+    },
     // Wider than the reference: the cap bites. 1512 × 850 is the one row it improves without saving
-    // — 30,24 px off, still 17,84 px short of a viewport that is itself 6,32 px shorter than budget
+    // — 30,24 px off, still 31,76 px short of a viewport that is itself 20,24 px shorter than budget
     // C's own block.
     {
       name: "1512 × 850",
       width: 1512,
       height: 850,
       column: 1224,
-      uncapped: 898.08,
-      capped: 867.84,
+      uncapped: 912,
+      capped: 881.76,
     },
     {
       name: "1600 × 900",
       width: 1600,
       height: 900,
       column: 1312,
-      uncapped: 946.88,
-      capped: 879.68,
+      uncapped: 956.96,
+      capped: 889.76,
     },
-    // The 1,3 px miss: § 5's most ordinary desktop, pinned by an arithmetic accident.
+    // § 5's most ordinary desktop, which the unbounded rule missed by 1,3 px at the 24 px gutter and
+    // would miss by 11,36 at 12.
     {
       name: "1920 × 1080",
       width: 1920,
       height: 1080,
       column: 1632,
-      uncapped: 1081.28,
-      capped: 879.68,
+      uncapped: 1091.36,
+      capped: 889.76,
     },
     {
       name: "2560 × 1440",
       width: 2560,
       height: 1440,
       column: 2272,
-      uncapped: 1350.08,
-      capped: 879.68,
+      uncapped: 1360.16,
+      capped: 889.76,
     },
     // An ultrawide is where the unbounded rule got absurd, and where a « keep the aspect inside the
-    // band » cap would have failed too: 0,35 × 3104 + 416 = 1502,4 against 1440 px of height.
+    // band » cap would have failed too: 0,35 × 3128 + 416 = 1510,8 against 1440 px of height.
     {
       name: "3440 × 1440",
       width: 3440,
       height: 1440,
       column: 3152,
-      uncapped: 1719.68,
-      capped: 879.68,
+      uncapped: 1729.76,
+      capped: 889.76,
     },
   ] as const;
 
@@ -356,18 +378,19 @@ describe("amendment F — the plot's ceiling at wide widths", () => {
     expect(REFERENCE_DESKTOP_PX).toBe(1440);
     expect(REFERENCE_COLUMN_PX).toBe(REFERENCE_DESKTOP_PX - RAIL_WIDTH);
     expect(REFERENCE_COLUMN_PX).toBe(1152);
-    expect(innerWidth(REFERENCE_COLUMN_PX)).toBe(1104);
-    expect(PROFILE_PLOT_MAX).toBeCloseTo(463.68, 9);
+    // `1152 − 2 × 12 = 1128`, and `0,42 × 1128 = 473,76` — the 12 px gutter of #115.
+    expect(innerWidth(REFERENCE_COLUMN_PX)).toBe(1128);
+    expect(PROFILE_PLOT_MAX).toBeCloseTo(473.76, 9);
     // Budget C is **on** the cap, not under it: that is what « nothing at or below the reference
     // moves » means, and it is the single assertion the whole amendment stands or falls on.
-    expect(profilePlotHeight(1104)).toBe(PROFILE_PLOT_MAX);
-    expect(chartBlockHeight(REFERENCE_COLUMN_PX)).toBeCloseTo(856.32, 9);
-    expect(900 - chartBlockHeight(REFERENCE_COLUMN_PX)).toBeCloseTo(43.68, 9);
+    expect(profilePlotHeight(1128)).toBe(PROFILE_PLOT_MAX);
+    expect(chartBlockHeight(REFERENCE_COLUMN_PX)).toBeCloseTo(870.24, 9);
+    expect(900 - chartBlockHeight(REFERENCE_COLUMN_PX)).toBeCloseTo(29.76, 9);
   });
 
   it("the cap cannot reach a phone's column, so the narrow budgets are untouchable by construction", () => {
-    // A phone's chart column *is* the viewport — 767 px at most — which is 719 of `W_inner` and a
-    // 302 px plot, 161 px under the cap. (Stacked tablets up to 1279 px do reach it; they are not
+    // A phone's chart column *is* the viewport — 767 px at most — which is 743 of `W_inner` and a
+    // 312 px plot, 162 px under the cap. (Stacked tablets up to 1279 px do reach it; they are not
     // the narrow budgets.)
     expect(profilePlotHeight(innerWidth(767))).toBeLessThan(PROFILE_PLOT_MAX);
     expect(profilePlotHeight(innerWidth(767))).toBe(PROFILE_ASPECT * innerWidth(767));
@@ -392,13 +415,13 @@ describe("amendment F — the plot's ceiling at wide widths", () => {
     expect(chartBlockHeight(column)).toBeLessThanOrEqual(uncappedBlock(column));
   });
 
-  it("the block plateaus at 879,68 px — bounded for the first time", () => {
-    // The two width-derived terms both have a ceiling now: the plot at 463,68 and the strip at 200.
-    // `44 + 76 + 463,68 + 200 + 44 + 52`, and it is the same number at a 1 600 px column and at a
+  it("the block plateaus at 889,76 px — bounded for the first time", () => {
+    // The two width-derived terms both have a ceiling now: the plot at 473,76 and the strip at 200.
+    // `44 + 76 + 473,76 + 200 + 44 + 52`, and it is the same number at a 1 600 px column and at a
     // 100 000 px one, which is what « the block can no longer outgrow a viewport » means.
     const plateau =
       BANNER.oneLine + PROFILE_CHROME_HEIGHT + PROFILE_PLOT_MAX + STRIP.max + VIEW_STRIP + CELL_ROW;
-    expect(plateau).toBeCloseTo(879.68, 9);
+    expect(plateau).toBeCloseTo(889.76, 9);
     for (const column of [1600, 2272, 3152, 100_000]) {
       expect(chartBlockHeight(column)).toBeCloseTo(plateau, 9);
     }
@@ -426,25 +449,26 @@ describe("amendment F — the plot's ceiling at wide widths", () => {
     // Below the band's floor, deliberately — voir `PLOT_ASPECT_BAND`'s own note. The cap can only
     // *lower* the aspect, and lowering it can only lower VE: the ceiling of the band, which is the
     // over-exaggeration half, is unreachable by construction.
+    // `473,76 / W_inner`, by hand, at the desktops' inner widths beside one Rail (`viewport − 312`).
     const measured = [
-      { wInner: 1104, aspect: 0.42 },
-      { wInner: 1176, aspect: 0.3943 },
-      { wInner: 1264, aspect: 0.3668 },
-      { wInner: 1584, aspect: 0.2927 },
-      { wInner: 2224, aspect: 0.2085 },
+      { wInner: 1128, aspect: 0.42 },
+      { wInner: 1200, aspect: 0.3948 },
+      { wInner: 1288, aspect: 0.3678 },
+      { wInner: 1608, aspect: 0.2946 },
+      { wInner: 2248, aspect: 0.2107 },
     ];
     for (const row of measured) {
       expect(plotAspect(row.wInner)).toBeCloseTo(row.aspect, 4);
       expect(plotAspect(row.wInner)).toBeLessThanOrEqual(PROFILE_ASPECT);
     }
-    // The band's floor is crossed at `463,68 / 0,35` = **1324,8 px of `W_inner`**, i.e. a 1372,8 px
-    // column and a ~1661 px viewport: below that the obtained aspect is still inside the band, above
-    // it the cap has taken it out — deliberately, and only ever downward.
-    expect(plotAspect(1324)).toBeGreaterThanOrEqual(PLOT_ASPECT_BAND.min);
-    expect(plotAspect(1325)).toBeLessThan(PLOT_ASPECT_BAND.min);
-    expect(plotAspect(1584)).toBeLessThan(PLOT_ASPECT_BAND.min);
-    // Frozen, not merely slower: the same plot height at a 1264 px and a 2224 px inner width.
-    expect(profilePlotHeight(2224)).toBe(profilePlotHeight(1264));
+    // The band's floor is crossed at `473,76 / 0,35` = **1353,6 px of `W_inner`**, i.e. a 1377,6 px
+    // column and a ~1666 px viewport beside one Rail: below that the obtained aspect is still inside
+    // the band, above it the cap has taken it out — deliberately, and only ever downward.
+    expect(plotAspect(1353)).toBeGreaterThanOrEqual(PLOT_ASPECT_BAND.min);
+    expect(plotAspect(1354)).toBeLessThan(PLOT_ASPECT_BAND.min);
+    expect(plotAspect(1608)).toBeLessThan(PLOT_ASPECT_BAND.min);
+    // Frozen, not merely slower: the same plot height at a 1288 px and a 2248 px inner width.
+    expect(profilePlotHeight(2248)).toBe(profilePlotHeight(1288));
     // A width with no aspect of its own answers the target rather than dividing by zero.
     expect(plotAspect(0)).toBe(PROFILE_ASPECT);
   });
@@ -459,12 +483,13 @@ describe("amendment F — the plot's ceiling at wide widths", () => {
         xSpan: (1 + 2 * X_MARGIN) * 150,
         zDataSpan: 30,
       });
-    expect(firstRun(1104).ve).toBeCloseTo(1.8629, 4);
-    expect(veBadgeLabel(firstRun(1584))).toBe("Éch. verticale ×1,3");
-    // 2560 px of viewport: auto-fit ×0,92, so the floor holds the drawing at ×1 — and the ±12 %
-    // margin still absorbs it, so the cable stays **inside** the frame. Clamped, not clipped.
-    const wide = firstRun(2224);
-    expect(wide.autofit).toBeCloseTo(0.92475, 5);
+    expect(firstRun(1128).ve).toBeCloseTo(1.8629, 4);
+    expect(veBadgeLabel(firstRun(1608))).toBe("Éch. verticale ×1,3");
+    // 2560 px of viewport: auto-fit ×0,93 — `(473,76 / 2248) × 165 / 37,2 = 0,93477` — so the floor
+    // holds the drawing at ×1, and the ±12 % margin still absorbs it, so the cable stays **inside**
+    // the frame. Clamped, not clipped.
+    const wide = firstRun(2248);
+    expect(wide.autofit).toBeCloseTo(0.93477, 5);
     expect(wide.ve).toBe(1);
     expect(wide.clamped).toBe(true);
     expect(wide.state).toBe("true-scale");
@@ -473,7 +498,7 @@ describe("amendment F — the plot's ceiling at wide widths", () => {
     // **VE never compresses, at any width** — the guarantee the cap may not touch. § 5's seven all
     // stay inside the published band, and the flattest-drawing of them (the `k` 3,696 row) is the one
     // that reaches « ligne hors cadre » at 2560 px.
-    for (const wInner of [342, 432, 1104, 1264, 1584, 2224, 10_000]) {
+    for (const wInner of [366, 456, 1128, 1288, 1608, 2248, 10_000]) {
       for (const scenario of SCENARIOS) {
         const ve = veAt(plotAspect(wInner), scenario);
         expect(ve.ve).toBeGreaterThanOrEqual(VE_BAND.min);
@@ -481,13 +506,13 @@ describe("amendment F — the plot's ceiling at wide widths", () => {
       }
     }
     // At the reference and below, every one of the seven still auto-fits with no clamp at all.
-    for (const scenario of SCENARIOS) expect(veAt(plotAspect(1104), scenario).clamped).toBe(false);
+    for (const scenario of SCENARIOS) expect(veAt(plotAspect(1128), scenario).clamped).toBe(false);
     // Past it the clamp becomes reachable from the *box* again, on the steepest row — disclosed by
     // badge row 3 and by the printed « Garde min », and recorded as amendment F's cost 2, which is
     // where § 5's « reachable from the data, not from the box » is amended. The onset is closed-form:
-    // `plotAspect < 1 / (1,24 k)`, i.e. `wInner > 574,96 k` — 2125,1 for this row, so 2224 clips.
+    // `plotAspect < 1 / (1,24 k)`, i.e. `wInner > 587,46 k` — 2171,3 for this row, so 2248 clips.
     const flattest = SCENARIOS.reduce((a, b) => (a.k < b.k ? a : b));
-    expect(veAt(plotAspect(2224), flattest).state).toBe("true-scale-clipped");
+    expect(veAt(plotAspect(2248), flattest).state).toBe("true-scale-clipped");
   });
 });
 
@@ -767,8 +792,8 @@ describe("§ 5 — vertical exaggeration", () => {
  * `"fit"` hold does what it is for — put the whole cable back inside the frame.
  */
 describe("amendment F, cost 2 — the peek where the cap cuts the cable (décision 4)", () => {
-  /** § 5's `k` 3,696 row, at the 2560 × 1440 column amendment F measured: `W_inner` 2224. */
-  const boxClipped = veAt(plotAspect(2224), SCENARIOS[1]);
+  /** § 5's `k` 3,696 row, at the 2560 × 1440 column beside one Rail: `W_inner` 2248 (#115). */
+  const boxClipped = veAt(plotAspect(2248), SCENARIOS[1]);
 
   it("peekMode is a pure function of the clamp state, and total over its four inputs", () => {
     // Two bits in, one of three modes out — no width, no scenario, no badge string.
@@ -782,7 +807,7 @@ describe("amendment F, cost 2 — the peek where the cap cuts the cable (décisi
   });
 
   it("`peekEnabled` is the mode's own answer, never a second decision", () => {
-    for (const wInner of [342, 432, 1104, 1264, 1584, 2224, 3104]) {
+    for (const wInner of [366, 456, 1128, 1288, 1608, 2248, 3128]) {
       for (const scenario of [...SCENARIOS, DEEP_SLACK]) {
         const ve = veAt(plotAspect(wInner), scenario);
         expect(ve.peek).toBe(peekMode(ve));
@@ -820,8 +845,8 @@ describe("amendment F, cost 2 — the peek where the cap cuts the cable (décisi
       expect(ve.peek).toBe("off");
     }
     // And under the cap too: a data clip stays a data clip at any width.
-    expect(veAt(plotAspect(2224), DEEP_SLACK).clipCause).toBe("data");
-    expect(veAt(plotAspect(2224), DEEP_SLACK).peekEnabled).toBe(false);
+    expect(veAt(plotAspect(2248), DEEP_SLACK).clipCause).toBe("data");
+    expect(veAt(plotAspect(2248), DEEP_SLACK).peekEnabled).toBe(false);
   });
 
   it("the cap's clip is `box`, and it is the one case that re-enables the control", () => {
@@ -846,8 +871,9 @@ describe("amendment F, cost 2 — the peek where the cap cuts the cable (décisi
     // bounds it is the badge, which names « sous la vraie échelle » in every case, and
     // `chart-block.tsx`, which clears the flag when the mode stops being peekable.
     const xSpan = (1 + 2 * X_MARGIN) * SCENARIOS[1].L;
-    const shownAtFit = (plotAspect(2224) * xSpan) / boxClipped.autofit;
-    expect(boxClipped.autofit).toBeCloseTo(0.7706, 4);
+    const shownAtFit = (plotAspect(2248) * xSpan) / boxClipped.autofit;
+    // `(473,76 / 2248) × 132 / (28,8 × 1,24) = 0,77897`, by hand.
+    expect(boxClipped.autofit).toBeCloseTo(0.779, 4);
     expect(boxClipped.autofit).toBeLessThan(1);
     expect(shownAtFit).toBeCloseTo(SCENARIOS[1].zSpan * (1 + 2 * Z_MARGIN), 6);
     expect(shownAtFit).toBeGreaterThan(SCENARIOS[1].zSpan);
@@ -867,7 +893,7 @@ describe("amendment F, cost 2 — the peek where the cap cuts the cable (décisi
     // A `"fit"` factor can never round to « ×0,0 »: the mode requires the line to be whole at 0,42,
     // i.e. `k ≥ 1 / (1,24 × 0,42)` = 1,92, so the factor is bounded below by `plotAspect × 1,92`.
     expect(1 / ((1 + 2 * Z_MARGIN) * PROFILE_ASPECT)).toBeCloseTo(1.92, 2);
-    for (const wInner of [1372, 2224, 3104, 5000]) {
+    for (const wInner of [1372, 2248, 3128, 5000]) {
       const ve = veAt(plotAspect(wInner), SCENARIOS[1]);
       if (ve.peek !== "fit") continue;
       expect(Number(ve.autofit.toFixed(1))).toBeGreaterThan(0);
@@ -876,23 +902,24 @@ describe("amendment F, cost 2 — the peek where the cap cuts the cable (décisi
 
   it("the mode's onset is the cap's own, closed-form in the width", () => {
     // `plotAspect × xSpan < zDataSpan` with the cap holding the plot at PROFILE_PLOT_MAX gives
-    // `W_inner > PROFILE_PLOT_MAX × xSpan / zDataSpan` — **2125,2** for this row, which is amendment
-    // F's `574,96 k` read at its own rounded `k` 3,696 (2125,1). It is a function of the **box**
-    // alone, which is the sentence in § 5 the amendment struck.
+    // `W_inner > PROFILE_PLOT_MAX × xSpan / zDataSpan` — `473,76 × 132 / 28,8` = **2171,4** for this
+    // row, which is `1,24 × 473,76 k` = `587,46 k` read at its own rounded `k` 3,696 (2171,3). It is a
+    // function of the **box** alone, which is the sentence in § 5 the amendment struck.
     const xSpan = (1 + 2 * X_MARGIN) * SCENARIOS[1].L;
     const onset = (PROFILE_PLOT_MAX * xSpan) / SCENARIOS[1].zSpan;
-    expect(onset).toBeCloseTo(2125.2, 1);
+    expect(onset).toBeCloseTo(2171.4, 1);
     expect(onset).toBeCloseTo((1 + 2 * Z_MARGIN) * PROFILE_PLOT_MAX * SCENARIOS[1].k, 0);
     expect(veAt(plotAspect(Math.floor(onset)), SCENARIOS[1]).peek).toBe("off");
     expect(veAt(plotAspect(Math.ceil(onset)), SCENARIOS[1]).peek).toBe("fit");
     // The control's three modes as the column widens, and they arrive in this order: § 5's row-1 peek
-    // until the clamp bites (`plotAspect < 1/k`, `W_inner` > 463,68 k = 1713,8), then row 2's disabled
-    // control while the ±12 % margin still holds the cable in, then `"fit"` from the clip onset.
-    expect(PROFILE_PLOT_MAX * SCENARIOS[1].k).toBeCloseTo(1713.8, 1);
-    expect(veAt(plotAspect(1713), SCENARIOS[1]).peek).toBe("true-scale");
-    expect(veAt(plotAspect(1714), SCENARIOS[1]).peek).toBe("off");
+    // until the clamp bites (`plotAspect < 1/k`, `W_inner` > 473,76 k = 1751,0 at the rounded `k`,
+    // 1751,1 at the exact 3,69624), then row 2's disabled control while the ±12 % margin still holds
+    // the cable in, then `"fit"` from the clip onset.
+    expect(PROFILE_PLOT_MAX * SCENARIOS[1].k).toBeCloseTo(1751.0, 1);
+    expect(veAt(plotAspect(1751), SCENARIOS[1]).peek).toBe("true-scale");
+    expect(veAt(plotAspect(1752), SCENARIOS[1]).peek).toBe("off");
     // Below § 5's reference column the cap is transparent, so no width can reach `"fit"` there.
-    for (const wInner of [342, 432, 1104]) {
+    for (const wInner of [366, 456, 1128]) {
       for (const scenario of SCENARIOS) {
         expect(veAt(plotAspect(wInner), scenario).peek).not.toBe("fit");
       }
@@ -907,15 +934,59 @@ describe("§ 5 — SharedX, one object for both charts", () => {
     expect(scale.domain[1] - scale.domain[0]).toBeCloseTo(1.1 * 1500, 9);
   });
 
-  it("GUTTER is 24 on both sides, and the plot is exactly W_inner wide", () => {
+  it("GUTTER is 12 on both sides — the containers' px-3 — and the plot is exactly W_inner wide", () => {
+    // #115: one container margin, so the coupe's frame stands on the same verticals as the tiles,
+    // the region titles and the vue de dessus, all `px-3`.
     for (const width of [390, 480, 1152]) {
       const scale = createSharedX({ width, L: 150 });
-      expect(scale.gutter).toBe(24);
+      expect(scale.gutter).toBe(12);
+      expect(innerWidth(width)).toBe(width - 24);
       expect(scale.x(scale.domain[0])).toBe(GUTTER);
       expect(scale.x(scale.domain[1])).toBeCloseTo(width - GUTTER, 9);
       // The one number every band height is also a function of — one gutter each side, no second
       // padding anywhere. This is the alignment mechanism, not a margin.
       expect(scale.pxPerM * (scale.domain[1] - scale.domain[0])).toBeCloseTo(innerWidth(width), 9);
+    }
+  });
+
+  it("the pointer inverse lands on anchor A where the 12 px gutter draws it", () => {
+    // By hand, at a 390 px column and a 150 m span: the domain is [−7,5 ; 157,5], 165 m over
+    // `390 − 24 = 366` px, so A (0 m) stands `12 + 7,5 × 366 / 165 = 12 + 366 / 22` px into the SVG.
+    // A pointer there reads 0 m wherever the SVG sits on the screen; at the old 24 px gutter the same
+    // pixel read −5,26 m.
+    const scale = createSharedX({ width: 390, L: 150 });
+    for (const rectLeft of [0, 320, 1036.5]) {
+      expect(scale.toMetres(rectLeft + 12 + 366 / 22, rectLeft)).toBeCloseTo(0, 9);
+      expect(scale.toMetres(rectLeft + 390 - 12, rectLeft)).toBeCloseTo(157.5, 9);
+    }
+  });
+
+  it("the y-axis labels stand inside the plot, so the 12 px gutter never cuts one", () => {
+    // By hand: the left column starts 3 px right of the plot's left edge, the right one ends 3 px
+    // left of its right edge.
+    expect(AXIS_LABEL_INSET).toBe(3);
+    expect(axisLabel(createSharedX({ width: 390, L: 150 }), "left")).toEqual({
+      x: 15,
+      anchor: "start",
+    });
+    expect(axisLabel(createSharedX({ width: 390, L: 150 }), "right")).toEqual({
+      x: 375,
+      anchor: "end",
+    });
+    // The widest tick the strip prints, « 0,25 m », at 9 px and the 0,62 em advance `CELL_WRAP_PX`
+    // budgets: `6 × 9 × 0,62 = 33,48` px. At the three widths #115 names it stays inside
+    // `[gutter, width − gutter]` on both sides — never in the margin, never past the SVG's edge.
+    const label = 6 * 9 * 0.62;
+    for (const width of [375, 1024, 2560]) {
+      const scale = createSharedX({ width, L: 150 });
+      const left = axisLabel(scale, "left");
+      const right = axisLabel(scale, "right");
+      expect(left.anchor).toBe("start");
+      expect(left.x).toBeGreaterThanOrEqual(scale.gutter);
+      expect(left.x + label).toBeLessThanOrEqual(width - scale.gutter);
+      expect(right.anchor).toBe("end");
+      expect(right.x).toBeLessThanOrEqual(width - scale.gutter);
+      expect(right.x - label).toBeGreaterThanOrEqual(scale.gutter);
     }
   });
 
@@ -1313,5 +1384,48 @@ describe("§ 5 — the two mechanisms the layout may not use", () => {
         hit: /\(orientation\s*:|screen\.orientation|orientationchange/.test(read(path)),
       }).toStrictEqual({ path, hit: false });
     }
+  });
+});
+
+/**
+ * #115 — **one container margin**. The coupe's frame is `GUTTER` in from its column's edges and every
+ * other container on the simplified Pages is `px-3` in from the same edges, so the two must be one
+ * number: Tailwind's spacing step is 4 px, and `px-3` is 12. The pixel alignment itself is
+ * `agent-browser`'s to measure (`docs/conventions/testing.md`); what is source is the spelling.
+ */
+describe("#115 — the coupe's gutter is the containers' margin", () => {
+  const root = fileURLToPath(new URL("../../..", import.meta.url));
+  const read = (path: string) => readFileSync(join(root, path), "utf8");
+
+  it("GUTTER is px-3, the margin of the titles, the tiles and the vue de dessus", () => {
+    expect(GUTTER).toBe(3 * 4);
+    const statique = read("src/components/statique/frame.tsx");
+    // The region titles, and the boxes the tiles and the vue de dessus stand in.
+    expect(statique).toContain('<h2 className="font-heading text-muted-foreground px-3');
+    expect(statique.match(/<div className="px-3">/g)).toHaveLength(2);
+    expect(read("src/components/statique/top-view.tsx")).toContain(
+      '<div className="px-3">{map}</div>',
+    );
+  });
+
+  it("the vue de dessus spans its region, so its right edge is the tiles' and the coupe's", () => {
+    // It was `max-w-2xl`: 672 px wide in a 1096 px region at 1440, its right edge 424 px short of
+    // every other one. The box now takes the region's width and caps its height instead.
+    const frame = /export function TopViewFrame[\s\S]*?\n}\n/.exec(
+      read("src/components/statique/top-view.tsx"),
+    )?.[0];
+    expect(frame).toBeDefined();
+    expect(frame).not.toMatch(/max-w-/);
+    expect(frame).toContain("w-full");
+  });
+
+  it("Terrain's tiles have Statique's vertical padding", () => {
+    // Statique's tiles stand in a `Region`, `py-3`; Terrain's in their own section, which was `py-2`.
+    expect(read("src/components/statique/frame.tsx")).toContain(
+      '<section className="border-border flex flex-col gap-2 border-b py-3',
+    );
+    expect(read("src/components/terrain-page/frame.tsx")).toContain(
+      'className="border-border @container shrink-0 border-t px-3 py-3"',
+    );
   });
 });

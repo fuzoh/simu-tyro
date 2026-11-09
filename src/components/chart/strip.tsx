@@ -45,7 +45,7 @@ import { area, line } from "d3-shape";
 import type { ChartScene, SceneFrame } from "@/lib/chart/scene.ts";
 import type { SharedX } from "@/lib/layout/contract.ts";
 
-import { clearanceDomain, clearanceTickLabel } from "@/lib/layout/contract.ts";
+import { axisLabel, clearanceDomain, clearanceTickLabel } from "@/lib/layout/contract.ts";
 import { zGroundAt } from "@/lib/sim";
 import { heading } from "@/lib/vocabulary/labels.ts";
 
@@ -177,6 +177,7 @@ export function ClearanceStrip({
   const y = (metres: number) =>
     bottom - ((metres - domain.floor) / (domain.top - domain.floor)) * (bottom - top);
   const zero = y(0);
+  const axis = axisLabel(x, "left");
 
   // Two strokes over one point set, split at zero: `foreground` where the passenger is above the
   // ground, `destructive` where they are in it. The inserted crossings belong to both, so the two
@@ -244,32 +245,29 @@ export function ClearanceStrip({
           `foreground` rather than in `border` — the token for gridlines that mean nothing — at a
           hairline, which keeps it visually under the `stroke-2` curve. */}
       <line className="stroke-foreground" x1={x.x(0)} x2={x.x(frame.L)} y1={zero} y2={zero} />
-      <text
-        className="fill-muted-foreground text-[9px]"
-        textAnchor="end"
-        x={x.gutter - 4}
-        y={zero - 2}
-      >
-        0
-      </text>
-      {/* The grid's ticks, right-aligned **inside** the gutter — the previous labels ran on the
-          implicit `start` anchor from x = 18 and overlaid the first metres of the curve. Round
-          labels are ≤ 20 px at 9 px, so 24 px of gutter now holds them; `profile.tsx` sets its own
-          anchor at every tick for the same reason. A tick that would collide with the zero label is
+      {/* The y axis' labels stand **inside** the plot, from its left edge (#115): the 12 px gutter
+          is the containers' margin and holds no label, and a label right-aligned in it would be cut
+          by the SVG's edge. They sit over the curve's first metres, so each is drawn on a halo of
+          the background, as the rider's tip is. A tick that would collide with the zero label is
           dropped rather than drawn twice. */}
-      {domain.ticks
-        .filter((tick) => Math.abs(y(tick) - zero) > 8)
-        .map((tick, index) => (
-          <text
-            className="fill-muted-foreground text-[9px]"
-            key={tick}
-            textAnchor="end"
-            x={x.gutter - 4}
-            y={y(tick) + 3}
-          >
-            {clearanceTickLabel(tick, index === 0)}
-          </text>
-        ))}
+      <g
+        className="fill-muted-foreground stroke-background pointer-events-none text-[9px]"
+        paintOrder="stroke"
+        strokeLinejoin="round"
+        strokeWidth={3}
+        textAnchor={axis.anchor}
+      >
+        <text x={axis.x} y={zero - 2}>
+          0
+        </text>
+        {domain.ticks
+          .filter((tick) => Math.abs(y(tick) - zero) > 8)
+          .map((tick, index) => (
+            <text key={tick} x={axis.x} y={y(tick) + 3}>
+              {clearanceTickLabel(tick, index === 0)}
+            </text>
+          ))}
+      </g>
 
       {envelopeDeficit !== null && <path className="fill-destructive/10" d={envelopeDeficit} />}
       {deficit !== null && <path className="fill-destructive/25" d={deficit} />}

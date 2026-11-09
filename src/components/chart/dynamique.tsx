@@ -34,7 +34,7 @@ import { type CoupeReading, coupeLines, coupeReading, RIDER_REACH_PX } from "@/l
 import { CHART_TITLE, CURVE_CAPTION } from "@/lib/dynamique/copy.ts";
 import { curveHover } from "@/lib/dynamique/hover.ts";
 import { dynamiqueScene } from "@/lib/dynamique/scene.ts";
-import { CELL_WRAP_PX } from "@/lib/layout/contract.ts";
+import { axisLabel, CELL_WRAP_PX } from "@/lib/layout/contract.ts";
 import { cn } from "@/lib/utils.ts";
 
 /** A path through pixel points, `null` for none. */
@@ -338,27 +338,33 @@ function Curve({
         y1={scene.zero}
         y2={scene.zero}
       />
-      {scene.speedTicks.map((tick) => (
-        <text
-          className="fill-muted-foreground text-[9px]"
-          key={tick.text + tick.y}
-          textAnchor="end"
-          x={x.gutter - 4}
-          y={tick.y + 3}
-        >
-          {tick.text}
-        </text>
-      ))}
-      {scene.accelerationTicks.map((tick) => (
-        <text
-          className="fill-muted-foreground text-[9px]"
-          key={tick.text + tick.y}
-          x={x.width - x.gutter + 2}
-          y={tick.y + 3}
-        >
-          {tick.text}
-        </text>
-      ))}
+      {/* Speed reads on the left, acceleration on the right, both **inside** the plot (#115): the
+          12 px gutter is the containers' margin and holds no label. On a halo of the background,
+          because they sit over the curves' first and last metres. */}
+      {(
+        [
+          ["left", scene.speedTicks],
+          ["right", scene.accelerationTicks],
+        ] as const
+      ).map(([side, ticks]) => {
+        const axis = axisLabel(x, side);
+        return (
+          <g
+            className="fill-muted-foreground stroke-background pointer-events-none text-[9px]"
+            key={side}
+            paintOrder="stroke"
+            strokeLinejoin="round"
+            strokeWidth={3}
+            textAnchor={axis.anchor}
+          >
+            {ticks.map((tick) => (
+              <text key={tick.text + tick.y} x={axis.x} y={tick.y + 3}>
+                {tick.text}
+              </text>
+            ))}
+          </g>
+        );
+      })}
 
       {/* The ride without wind only when the Vent entered makes it differ: then it is the lighter. */}
       {separate && (

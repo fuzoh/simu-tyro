@@ -111,7 +111,7 @@ export const NOSCRIPT_LINE = "Ce simulateur nécessite JavaScript pour fonctionn
 
 /**
  * The layout contract as CSS custom properties. `100cqi` is the **chart column's** inline size —
- * the column is the query container, so `--w-inner` is exactly § 5's `W_inner = col − 48`, and
+ * the column is the query container, so `--w-inner` is exactly § 5's `W_inner = col − 24`, and
  * every band below is a function of it and of nothing else. Exported for the other Pages that
  * stand the Chart Block in a column of their own — Statique — so its bands read the same contract.
  */
@@ -122,8 +122,8 @@ export const LAYOUT_VARS = {
   "--handle-lane": `${PROFILE_CHROME.handleLane}px`,
   "--x-labels": `${PROFILE_CHROME.xLabels}px`,
   // § 5's aspect rule under **amendment F**'s ceiling, as one `min()` rather than a JS branch: the
-  // plot is `0,42 × W_inner` up to § 5's reference chart column (1152 px, `W_inner` 1104) and frozen
-  // at the 463,68 px it reaches there past it. Both terms come from `contract.ts`, so the rendered
+  // plot is `0,42 × W_inner` up to § 5's reference chart column (1152 px, `W_inner` 1128) and frozen
+  // at the 473,76 px it reaches there past it. Both terms come from `contract.ts`, so the rendered
   // band and `chartBlockHeight()`'s own term are the same arithmetic — and the whole rule stays a
   // function of the container's inline size, so the Skeleton is still correct before any measurement.
   // Without it the plot grew linearly for ever and five ordinary 16:9 desktops opened with no chart.
@@ -370,7 +370,7 @@ export function Shell({
         </div>
         {/* No horizontal padding here: `GUTTER` lives **inside** the two SVGs, as the x scale's own
             range `[gutter, width − gutter]`, so that one object aligns both charts. Padding the
-            column instead would inset the SVGs *and* the scale, spending 48 px a side — and it
+            column instead would inset the SVGs *and* the scale, spending 24 px a side — and it
             would inset the read-out cells, which § 5 spans across the **full column width**
             because aligning them to the plot would imply a correspondence that does not exist.
 

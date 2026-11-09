@@ -17,8 +17,38 @@
  * ×1 floor; it does not re-declare a constant that is already here.
  */
 
-/** Both charts, both sides. One gutter, so the two x axes cannot be misaligned by construction. */
-export const GUTTER = 24;
+/**
+ * Both charts, both sides. One gutter, so the two x axes cannot be misaligned by construction.
+ *
+ * **12 px, the containers' own `px-3`** (#115). It was 24, twice the margin of the vue de dessus,
+ * the tiles and the region titles, so the coupe's frame stood 12 px in from every other left edge
+ * on every Page. At 12 the frame's edges are the other containers' edges. What the old gutter held
+ * — the y-axis labels of the strip and of Dynamique's curve — now stands **inside** the plot,
+ * voir {@link axisLabel}: a label may take room from the drawing, never from the margin.
+ */
+export const GUTTER = 12;
+
+/** The gap between a y-axis label and the plot edge it reads against, px — inside the plot. */
+export const AXIS_LABEL_INSET = 3;
+
+/** Where one y-axis label column stands, in the SVG's own user units, and which way it runs. */
+export type AxisLabel = { readonly x: number; readonly anchor: "start" | "end" };
+
+/**
+ * **A y-axis label column, inside the plot** — the left one runs right from the plot's left edge,
+ * the right one runs left from its right edge, {@link AXIS_LABEL_INSET} in. A label therefore never
+ * reaches the gutter, whatever the gutter is, and is never cut by the SVG's edge: at 12 px the
+ * gutter could not hold « -12 » or « 10 m » at 9 px, which is why it no longer has to (#115).
+ *
+ * One function for the strip and for Dynamique's curve, so their labels stand at the same offset.
+ * The labels then sit over the drawing's first and last pixels; their call sites draw them on a
+ * background halo, the way the rider's tip is drawn, so a curve under one stays readable.
+ */
+export function axisLabel(x: Pick<SharedX, "gutter" | "width">, side: "left" | "right"): AxisLabel {
+  return side === "left"
+    ? { x: x.gutter + AXIS_LABEL_INSET, anchor: "start" }
+    : { x: x.width - x.gutter - AXIS_LABEL_INSET, anchor: "end" };
+}
 
 /** The profile's non-plot rows, px: the VE badge, the handle lane, the x-axis labels. */
 export const PROFILE_CHROME = { badge: 28, handleLane: 24, xLabels: 24 } as const;
@@ -117,8 +147,8 @@ export const CELL_WRAP_PX = 624;
  *
  * **1024, because that is the narrowest width a landscape tablet has**, and a stacked block is
  * sized from the *whole* viewport width while owing {@link MIN_RAIL} under it. At 1024 × 768 the
- * three columns leave a 448 px middle column and a 616 px block against 732 px of height, so the
- * profile stays; stacked, the same screen would owe a 782 px block plus the Rail's floor, and open
+ * three columns leave a 448 px middle column and a 626 px block against 732 px of height, so the
+ * profile stays; stacked, the same screen would owe a 796 px block plus the Rail's floor, and open
  * on the Pinned Safety Header alone. A 1280 switch did exactly that to 1180 × 820 and 1194 × 834
  * too. **What it costs**: the middle column is 448 px at the switch — a three-line banner and the
  * short View Strip labels (under B1 and under 768) — and it clears B1 (624) only from 1200.
@@ -132,8 +162,11 @@ export const RAIL_HEADER = 44;
 
 /**
  * The navigation bar above every app Page (ADR-0002): one row of the app's 28 px controls inside
- * `py-1`, the same 36 px as a Rail row. **Not 44 like the Rail Header**: budget C's letterbox is
- * 43,68 px, so a 44 px bar would pin the Chart Block on § 5's own reference desktop. It is paid at
+ * `py-1`, the same 36 px as a Rail row. **Not 44 like the Rail Header**: budget C's letterbox was
+ * 43,68 px when the bar was chosen, so a 44 px bar would have pinned the Chart Block on § 5's own
+ * reference desktop. Since the 12 px {@link GUTTER} (#115) budget C's block is 870,24 px and pins
+ * under either bar at 900 px of height; Avancé reaches that 1152 px column only from 1728 px of
+ * viewport, where it needs 907 px of height under this bar and 915 under a 44 px one. It is paid at
  * every width and never dismissed — voir `ViewportFit.navigationHeight` in `./collapse.ts`.
  */
 export const NAV_BAR = 36;
@@ -196,11 +229,11 @@ export function chartColumnWidth(viewportWidth: number): number {
  */
 export const REFERENCE_DESKTOP_PX = 1440;
 
-/** Budget C's own chart column: `1440 − 288 = 1152`, `W_inner` **1104**. */
+/** Budget C's own chart column: `1440 − 288 = 1152`, `W_inner` **1128**. */
 export const REFERENCE_COLUMN_PX: number = REFERENCE_DESKTOP_PX - RAIL_WIDTH;
 
 /**
- * **The plot height's ceiling — amendment F, 2026-08-14.** `0,42 × 1104 = 463,68 px`, the value § 5's
+ * **The plot height's ceiling — amendment F, 2026-08-14.** `0,42 × 1128 = 473,76 px`, the value § 5's
  * aspect rule reaches at {@link REFERENCE_COLUMN_PX}.
  *
  * § 5 asserts two things that collide above its own reference desktop: « every band height is a
@@ -212,10 +245,12 @@ export const REFERENCE_COLUMN_PX: number = REFERENCE_DESKTOP_PX - RAIL_WIDTH;
  * item 1).
  *
  * The cap is the smallest edit that answers it: **nothing at or below the reference moves** — budget A
- * (`W_inner` 342), budget B (432) and budget C (1104) are byte-identical, letterbox margins included —
- * and only wider columns stop growing. Above it the block is bounded for the first time: its only
+ * (`W_inner` 366), budget B (456) and budget C (1128) are byte-identical to the unclamped rule — and
+ * only wider columns stop growing. Above it the block is bounded for the first time: its only
  * remaining growth is the strip, which § 5 had already bounded at 200 px, so the whole block plateaus
- * at `44 + 76 + 463,68 + 200 + 44 + 52 = 879,68 px` at any width. **What it costs**: the obtained
+ * at `44 + 76 + 473,76 + 200 + 44 + 52 = 889,76 px` at any width. (Amendment F was written against
+ * the 24 px gutter, where the cap was 463,68 px and the plateau 879,68; the 12 px {@link GUTTER} of
+ * #115 widens `W_inner` by 24 px at every column, and the cap follows it.) **What it costs**: the obtained
  * aspect falls with the width past the reference, and with it VE — down to the ×1 floor on a wide
  * enough screen, which is a **disclosed** badge state and never a silent compression. Voir
  * {@link plotAspect} and {@link PLOT_ASPECT_BAND}.
@@ -264,7 +299,7 @@ export function innerWidth(columnWidth: number): number {
 }
 
 /**
- * The profile's **plot** height: `min(0,42 × W_inner, 463,68)` — § 5's aspect rule under
+ * The profile's **plot** height: `min(0,42 × W_inner, 473,76)` — § 5's aspect rule under
  * **amendment F**'s ceiling, voir {@link PROFILE_PLOT_MAX}. Below § 5's reference column the `min`
  * is transparent, so all three budgets are the rule's own untouched arithmetic.
  *
@@ -336,12 +371,12 @@ export function cellRows(columnWidth: number): number {
  * (`./collapse.ts`), and it is the one place where a height and a viewport meet. **The invariant
  * survives it**: nothing here reads a window height, the result sizes no band — every band is
  * already `var(--w-inner)`-derived in CSS — and what (c) does with the number is pick a *state*.
- * The three budgets it reproduces are the spec's own: 540 at a 390 px column, 561 at 480, 857 at
- * 1152.
+ * The three budgets it reproduces are the spec's table, re-derived for the seven read-out cells
+ * and the 12 px {@link GUTTER} (#115): 602 at a 390 px column, 624 at 480, 870 at 1152.
  *
  * **It is monotone in the width and, since amendment F, bounded**: both of its width-derived terms
  * have a ceiling now — the plot at {@link PROFILE_PLOT_MAX} and the strip at `STRIP.max` — so the
- * block plateaus at **879,68 px** and stops being able to outgrow every desktop. Below the reference
+ * block plateaus at **889,76 px** and stops being able to outgrow every desktop. Below the reference
  * column nothing about it moved.
  *
  * @param columnWidth the chart column's inline size, px — the same number `SharedX` is built from.

@@ -80,8 +80,8 @@ import {
 
 /**
  * Vertices minus one on a drawn cable. Nothing downstream is measured against it — it is a drawing
- * resolution, not a physical grid — and 240 puts a vertex every ~4,6 px on the 1104 px desktop plot
- * and every ~1,4 px at 390. The clearance reducer keeps its own `CLEARANCE.samplesPerStep`.
+ * resolution, not a physical grid — and 240 puts a vertex every ~4,7 px on the 1128 px desktop plot
+ * and every ~1,5 px at 390. The clearance reducer keeps its own `CLEARANCE.samplesPerStep`.
  */
 export const CABLE_SAMPLES = 240;
 

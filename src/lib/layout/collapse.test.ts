@@ -361,8 +361,9 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
   }[] = [
     {
       // Budget A: the block was 540 and the rail's 124 px cleared `MIN_RAIL` by 4 px. Seven read-out
-      // cells wrap to three lines at 390 px (2026-09-23), the block is 592 and the rail 72: (c)
-      // pins it at rest, and 390 × 844 below is the phone that still opens whole.
+      // cells wrap to three lines at 390 px (2026-09-23) and the gutter is 12 px (#115), so the
+      // block is 601,72 and the rail 62,28: (c) pins it at rest, and 390 × 844 below is the phone
+      // that still opens whole.
       name: "A · 390×664 au repos",
       fit: {
         viewportWidth: 390,
@@ -417,8 +418,8 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
       fits: true,
     },
     {
-      // Budget C sums to the viewport with 43 px of letterbox at the one-line banner; the rule
-      // reserves the three-line one and still fits.
+      // Avancé's chart column at 1440 is the middle one, 864 px: a 755,2 px block at the one-line
+      // banner, and the rule reserves the three-line one and still fits.
       name: "1440×900 trois colonnes",
       fit: {
         viewportWidth: 1440,
@@ -441,8 +442,8 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
       fits: false,
     },
     // ─── The landscape tablets and the switch width (B2 = 1024) ──────────────────────────────────
-    // Stacked, these three owed a 782–863 px block plus MIN_RAIL under it and opened on the Pinned
-    // Safety Header alone. In three columns the block is 613–616 px and owes the Rail nothing.
+    // Stacked, these three owed a 796–877 px block plus MIN_RAIL under it and opened on the Pinned
+    // Safety Header alone. In three columns the block is 624–629 px and owes the Rail nothing.
     {
       name: "1024×768 paysage — entier, trois colonnes",
       fit: {
@@ -477,7 +478,7 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
       fits: true,
     },
     {
-      // Stacked, the block (768 px at a 1000 px column) owes MIN_RAIL and the bar: this is the
+      // Stacked, the block (782,08 px at a 1000 px column) owes MIN_RAIL and the bar: this is the
       // narrow desktop window that opens on the Pinned Safety Header, accepted in `ui.md`.
       name: "1000×900 empilé — épinglé, le bloc et MIN_RAIL ne tiennent pas",
       fit: {
@@ -511,8 +512,8 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
     // shorter: every one of them opens whole. The block heights come from `chartColumnWidth`;
     // what is asserted here is the *state* each one opens in.
     {
-      // Block 648,48 at a 704 px column — 71,52 px of height to spare, where beside one Rail the
-      // same window was 43,52 px short.
+      // Block 662,4 at a 704 px column — 57,6 px of height to spare, where beside one Rail the
+      // same window would be 57,44 px short.
       name: "1280×720 — entier, la colonne du milieu est plus basse que celle d'un seul rail",
       fit: {
         viewportWidth: 1280,
@@ -533,7 +534,7 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
       fits: true,
     },
     {
-      // Block 698,36 at a 790 px column, 69,64 px under its viewport.
+      // Block 712,28 at a 790 px column, 55,72 px under its viewport.
       name: "1366×768 — entier",
       fit: {
         viewportWidth: 1366,
@@ -544,7 +545,7 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
       fits: true,
     },
     {
-      // Block 783,04 at a 936 px column, uncapped: the plot's ceiling is not reached below 1152 px.
+      // Block 796,96 at a 936 px column, uncapped: the plot's ceiling is not reached below 1152 px.
       name: "1512×850 — entier, sous le plafond",
       fit: {
         viewportWidth: 1512,
@@ -555,7 +556,7 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
       fits: true,
     },
     {
-      // Block 782,08 at a 1024 px column.
+      // Block 796 at a 1024 px column.
       name: "1600×900 — entier",
       fit: {
         viewportWidth: 1600,
@@ -566,7 +567,7 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
       fits: true,
     },
     {
-      // The shell's cap leaves the 1152 px reference column here, block 856,32 — budget C's own.
+      // The shell's cap leaves the 1152 px reference column here, block 870,24 — budget C's own.
       name: "1920×1080 — entier, sur la colonne de référence",
       fit: {
         viewportWidth: 1920,
@@ -622,7 +623,7 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
     // **The cap is a width rule; `MIN_RAIL` is about who the Rail sits under.** Below B2 the widest
     // column that arm can reach is 1023 px, so the ceiling never applies there at all — every narrow
     // viewport is decided by exactly the term it was before, and dropping it would claim a fit with
-    // a 48 px Rail: at 390 × 640 the block is 591,64 and the residual 48,36 against a floor of 120.
+    // a 38 px Rail: at 390 × 640 the block is 601,72 and the residual 38,28 against a floor of 120.
     const narrow: ViewportFit = {
       viewportWidth: 390,
       viewportHeight: 640,
@@ -633,7 +634,7 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
     expect(fitsWholeBlock(narrow)).toBe(false);
     expect(640 - chartBlockHeight(390)).toBeLessThan(MIN_RAIL);
     // And the *other* arm may not gain the term either — that is the rejected option (ii). With
-    // `MIN_RAIL` spent above B2 as well, budget C's 856,32 against `900 − 120 = 780` collapses the
+    // `MIN_RAIL` spent above B2 as well, budget C's 870,24 against `900 − 120 = 780` collapses the
     // spec's **own reference desktop**, and 1600 × 900 — the row the cap just rescued — goes straight
     // back to pinned.
     for (const [width, height, column] of [
@@ -650,8 +651,8 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
       // The literal every-width reading of the acceptance item, as arithmetic rather than as prose.
       expect(chartBlockHeight(column) <= height - MIN_RAIL).toBe(false);
     }
-    // What the cap *did* do to the disagreement is shrink it: with the block bounded at 879,68 the
-    // two readings now agree on every viewport at least 999,68 px tall, 1920 × 1080 included. They
+    // What the cap *did* do to the disagreement is shrink it: with the block bounded at 889,76 the
+    // two readings now agree on every viewport at least 1009,76 px tall, 1920 × 1080 included. They
     // still part company over budget C, which is why the ternary stays.
     expect(chartBlockHeight(1632) <= 1080 - MIN_RAIL).toBe(true);
   });
@@ -707,11 +708,12 @@ describe("(c) — le bloc tient-il avec un rail utilisable ?", () => {
       keyboardInset: 0,
       columnWidth: 1152,
     };
-    // Budget C's own letterbox is 43 px, so any band above the columns taller than that takes the
-    // block below its 857 — and the block is what stops fitting, not the strip.
+    // Budget C's own letterbox is 29,76 px since the 12 px gutter (#115), so any band above the
+    // columns taller than that takes the block below its 870,24 — and the block is what stops
+    // fitting, not the strip.
     expect(fitsWholeBlock({ ...desktop, chromeHeight: 0 })).toBe(true);
     expect(fitsWholeBlock({ ...desktop, chromeHeight: 85 })).toBe(false);
-    // The threshold is the letterbox, to the pixel: 900 − 856,3 = 43,7.
+    // The threshold is the letterbox, to the pixel: 900 − 870,24 = 29,76.
     const letterbox = 900 - chartBlockHeight(1152);
     expect(fitsWholeBlock({ ...desktop, chromeHeight: Math.floor(letterbox) })).toBe(true);
     expect(fitsWholeBlock({ ...desktop, chromeHeight: Math.ceil(letterbox) })).toBe(false);
@@ -760,13 +762,28 @@ describe("la barre de navigation se paie sur toute largeur", () => {
     );
   });
 
-  test("le budget C reste entier sous elle, et ne le resterait pas sous 44 px", () => {
-    // Block 856,32 at a 1152 px column: 900 − 36 = 864 holds it, 900 − 44 = 856 does not.
-    expect(fitsWholeBlock({ ...desktop, navigationHeight: NAV_BAR })).toBe(true);
-    expect(fitsWholeBlock({ ...desktop, navigationHeight: RAIL_HEADER })).toBe(false);
+  test("le budget C ne tient plus entier sous elle à 900 px, et il lui faut 907 px de haut", () => {
+    // ADR-0001, a budget edge re-pinned: at the 24 px gutter the block was 856,32 and `900 − 36 =
+    // 864` held it with 7,68 px to spare. The 12 px gutter (#115) makes it 870,24, so 864 no longer
+    // does — under this bar or a 44 px one. Avancé reaches that 1152 px column only from 1728 px of
+    // viewport; there the whole block needs `870,24 + 36 = 906,24` px of height, so 907, and a
+    // 44 px bar would still cost it 8 more.
+    expect(fitsWholeBlock({ ...desktop, navigationHeight: NAV_BAR })).toBe(false);
+    expect(fitsWholeBlock({ ...desktop, viewportHeight: 907, navigationHeight: NAV_BAR })).toBe(
+      true,
+    );
+    expect(fitsWholeBlock({ ...desktop, viewportHeight: 906, navigationHeight: NAV_BAR })).toBe(
+      false,
+    );
+    expect(fitsWholeBlock({ ...desktop, viewportHeight: 907, navigationHeight: RAIL_HEADER })).toBe(
+      false,
+    );
+    expect(fitsWholeBlock({ ...desktop, viewportHeight: 915, navigationHeight: RAIL_HEADER })).toBe(
+      true,
+    );
   });
 
-  test("1600×900 se replie de nouveau : le plateau de 879,68 dépasse 864", () => {
+  test("1600×900 se replie de nouveau : le plateau de 889,76 dépasse 864", () => {
     const wide: ViewportFit = { ...desktop, viewportWidth: 1600, columnWidth: 1600 - 288 };
     expect(fitsWholeBlock(wide)).toBe(true);
     expect(fitsWholeBlock({ ...wide, navigationHeight: NAV_BAR })).toBe(false);
