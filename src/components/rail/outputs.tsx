@@ -193,19 +193,26 @@ function HeadlineRow({ row }: { row: ResultRow }) {
 /** One detail row. « ↳ majoration au départ » is a decomposition of the row above it. */
 function DetailRow({ row }: { row: ResultRow }) {
   return (
-    <div className={cn("flex items-baseline gap-1", row.indent && "pl-3")}>
-      <span className="flex min-w-0 flex-1 items-center gap-1">
+    <div className={cn("flex flex-wrap items-baseline gap-x-1", row.indent && "pl-3")}>
+      {/* The label's basis is its own one-line width (`flex-auto`, not `flex-1`'s zero): where it
+          and the value do not fit on one line, the value drops under it instead of squeezing it —
+          « Garde min (traversée), zones d'ancrage comprises » beside « non jugée, passager à x … »
+          left the label a 39 px column six lines tall (#106). */}
+      <span className="flex min-w-0 flex-auto items-center gap-1">
         <span className="text-muted-foreground min-w-0 text-xs" title={row.label}>
           {row.label}
         </span>
         <InfoTip label={row.label} text={RESULT_HELP[row.id]} />
       </span>
       {/* The label takes the slack, so the value sits flush right — that *is* amendment L's
-          right-aligned column, and it is reached without a `min-w` reservation. */}
-      <span className="font-mono text-xs">{row.value}</span>
-      {row.qualifier !== null && (
-        <span className="text-muted-foreground shrink-0 text-xs">{row.qualifier}</span>
-      )}
+          right-aligned column, and it is reached without a `min-w` reservation. `ml-auto` keeps
+          it there on the line it drops to. */}
+      <span className="ml-auto flex min-w-0 items-baseline gap-1">
+        <span className="shrink-0 font-mono text-xs">{row.value}</span>
+        {row.qualifier !== null && (
+          <span className="text-muted-foreground min-w-0 text-xs">{row.qualifier}</span>
+        )}
+      </span>
     </div>
   );
 }
