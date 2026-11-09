@@ -9,7 +9,7 @@ import type { Register } from "@/lib/vocabulary/labels.ts";
 import { errorSurfaces, gatedRides } from "@/lib/app/surfaces.ts";
 import { buildSceneBase, buildSceneFrame } from "@/lib/chart/scene.ts";
 import { ridesUnder } from "@/lib/dynamique/__fixtures__/rides.ts";
-import { INCOMPLETE } from "@/lib/dynamique/copy.ts";
+import { INCOMPLETE, NO_ARRIVAL } from "@/lib/dynamique/copy.ts";
 import { dynamiqueOutputs } from "@/lib/dynamique/outputs.ts";
 import { formatAtX, KGF } from "@/lib/format/quantity.ts";
 import { deducedFrom, deducedRows } from "@/lib/rail/deduced.ts";
@@ -146,7 +146,7 @@ describe.each(CANONICAL_LINKS.map((fixture) => [fixture.name, fixture.scenario] 
         estimation: arrival.notes.includes("estimation"),
       }).toEqual({
         scope: "avec le vent saisi",
-        value: windy === null ? null : (windy.arrival?.kmh ?? "pas d'arrivée"),
+        value: windy === null ? null : (windy.arrival?.kmh ?? NO_ARRIVAL),
         estimation: windy !== null,
       });
     });
@@ -237,18 +237,18 @@ describe("the vitesse d'arrivée", () => {
     });
   });
 
-  test("a head wind that stops the passager: « pas d'arrivée », and the Point d'arrêt", () => {
+  test(`a head wind that stops the passager: « ${NO_ARRIVAL} », and the Point d'arrêt`, () => {
     const { reading } = ridesUnder(50, 0);
     if (reading.windy.end.kind !== "stop") throw new Error("a 50 km/h head wind stops the ride");
     const { terrain } = pagesOn({ ...SHIPPED, wind: { speedKmh: 50, directionDeg: 0 } });
     expect(tile(terrain, "arrival")).toMatchObject({
       kind: "word",
-      value: "pas d'arrivée",
+      value: NO_ARRIVAL,
       notes: [`point d'arrêt ${formatAtX(reading.windy.end.x)}`, "estimation"],
     });
   });
 
-  test("a ride that never settles: « pas d'arrivée », and that it keeps swinging", () => {
+  test(`a ride that never settles: « ${NO_ARRIVAL} », and that it keeps swinging`, () => {
     const { reading } = ridesUnder(0, 0);
     const swinging: Ride = { ...reading.calm, end: { kind: "unsettled", t: 120 } };
     const view = terrainView({
@@ -261,7 +261,7 @@ describe("the vitesse d'arrivée", () => {
     });
     expect(tile(view, "arrival")).toMatchObject({
       kind: "word",
-      value: "pas d'arrivée",
+      value: NO_ARRIVAL,
       notes: ["oscille sans s'arrêter", "estimation"],
     });
   });
