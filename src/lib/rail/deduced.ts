@@ -44,6 +44,8 @@ import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { resolveSteelValues, STEEL, steelFormula, TEXTILE } from "@/lib/sim";
 import { heading } from "@/lib/vocabulary/labels.ts";
 
+import type { Results } from "./results.ts";
+
 import { strengthSymbol, TIGHTNESS_FIELD } from "./fields.ts";
 import { warningLadder } from "./provenance.ts";
 import { pretensionOf } from "./tensioning.ts";
@@ -213,6 +215,8 @@ export type ReadOutRow = {
  *   an emptied `m_p`, so under a Solve Gate breach it still resolves — and printing `L₀ 151,64 m`
  *   beside « aucun résultat » is the stale number invariant 3 forbids. The solve rows go and
  *   `ligne A–B` and `w`, which need no solve, stay.
+ * @param results the traverse aggregate, which the prétension row's limite de tension warning
+ *   reads « T max » off; `null` is no result, and no warning.
  *
  * Of the five Tightness Driver quantities, the four that are not driving are rows (#85): `L₀`, the
  * prétension and the tension horizontale side by side, the flèche, and the rapport V.
@@ -221,10 +225,11 @@ export function deducedRows(
   scenario: ScenarioDraft,
   deduced: Deduced,
   cause: string | null,
+  results: Results | null = null,
 ): readonly ReadOutRow[] {
   const { material, span, solve } = deduced;
   const { unit } = scenario;
-  const ladder = warningLadder(scenario, deduced);
+  const ladder = warningLadder(scenario, deduced, results);
   const rows: ReadOutRow[] = [];
   const push = (
     id: DeducedRowId,

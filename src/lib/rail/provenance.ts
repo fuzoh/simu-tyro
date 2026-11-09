@@ -48,10 +48,11 @@ import { lineWarnings, REGIMES, TERMINATIONS } from "@/lib/sim";
 import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 import type { StrengthSymbol } from "./fields.ts";
+import type { Results } from "./results.ts";
 
 import { strengthSymbol } from "./fields.ts";
 import { presetProvenance } from "./presets.ts";
-import { demandedPretension, deviceOnCableWarning, overLimitWarning } from "./tensioning.ts";
+import { deviceOnCableWarning, overLimitWarning, tmaxAtTensioningAnchor } from "./tensioning.ts";
 
 /**
  * The popover copy, one entry per provenance surface. §0.2's fine-grained tag and the
@@ -340,8 +341,9 @@ export const WARNING_LADDER: Record<LadderId, { tier: WarningTier; owner: Ladder
   "terrain-grossier": { tier: "avertissement", owner: "terrain" },
   // §10.2's `[REGULATOR]` prohibition. It survives an ample margin, so it cannot be a warning.
   "serre-cables-refuse": { tier: "verdict", owner: "banner" },
-  // Conditional on the device and the diameter the user chose. The limit is a charge d'utilisation,
-  // so it warns and never blocks: nothing downstream reads the device.
+  // Conditional on the device and the diameter the user chose, and read on the line's « T max »
+  // at the anchor carrying the device. The limit is a charge d'utilisation, so it warns and never
+  // blocks: nothing downstream reads the device.
   "tension-sur-limite-du-dispositif": { tier: "avertissement", owner: "rail-row" },
   // A Maestro that arrived on a câble: kept as given (ADR-0001), said once, with a Fix Action.
   "maestro-sur-cable": { tier: "avertissement", owner: "rail-row" },
@@ -404,7 +406,11 @@ const LINE_WARNING_RUNGS: Record<
  * `lineWarnings` rather than from `evaluateVerdict`: the verdict is not called at all on a
  * régime-less screen, and « flèche / portée 2,4 % » is true whatever the user has selected.
  */
-export function warningLadder(scenario: ScenarioDraft, deduced: Deduced): readonly LadderWarning[] {
+export function warningLadder(
+  scenario: ScenarioDraft,
+  deduced: Deduced,
+  results: Results | null = null,
+): readonly LadderWarning[] {
   const warnings: LadderWarning[] = [];
   const spec = scenario.material;
 
@@ -417,8 +423,7 @@ export function warningLadder(scenario: ScenarioDraft, deduced: Deduced): readon
     });
   }
 
-  // Before the solve guard: a Maestro on a câble is a fact of the Scenario, and a demanded
-  // prétension is a fact of the field even where the line does not solve.
+  // Before the solve guard: a Maestro on a câble is a fact of the Scenario.
   const onCable = deviceOnCableWarning(scenario);
   if (onCable !== null) {
     warnings.push({
@@ -428,7 +433,7 @@ export function warningLadder(scenario: ScenarioDraft, deduced: Deduced): readon
       text: onCable,
     });
   }
-  const overLimit = overLimitWarning(scenario, demandedPretension(scenario, deduced.solve));
+  const overLimit = overLimitWarning(scenario, tmaxAtTensioningAnchor(scenario, results));
   if (overLimit !== null) {
     warnings.push({
       id: "tension-sur-limite-du-dispositif",

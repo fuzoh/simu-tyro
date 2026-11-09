@@ -10,6 +10,7 @@ import { KGF } from "@/lib/format/quantity.ts";
 import { deducedFrom, deducedRows } from "@/lib/rail/deduced.ts";
 import { evaluateGates } from "@/lib/rail/gates.ts";
 import { applyMaterialPreset } from "@/lib/rail/presets.ts";
+import { warningLadder } from "@/lib/rail/provenance.ts";
 import { drivingField, railValues } from "@/lib/rail/values.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { sweepRiderOf, traverseInputs, traverseScenario } from "@/lib/scenario/traverse.ts";
@@ -55,7 +56,13 @@ function pagesOn(scenario: ScenarioDraft) {
   const avance = surfacesIn("exact");
   const { results, cause } = surfacesIn("terrain");
   const statique = statiqueOutputs({ scenario, deduced, results, cause });
-  return { deduced, cause, avance, statique, field: pretensionField({ scenario, deduced, cause }) };
+  return {
+    deduced,
+    cause,
+    avance,
+    statique,
+    field: pretensionField({ scenario, deduced, results, cause }),
+  };
 }
 
 function output(outputs: readonly StatiqueOutput[], id: StatiqueOutputId): StatiqueOutput {
@@ -199,29 +206,58 @@ describe("the tension de pose field warns as Avancé does", () => {
     tensioningDevice: "maestro-s",
     ...patch,
   });
-  const overLimit = { mode: "anchor", T_target: 300 * KGF } as const;
+  // Under the limit at rest, over it once loaded: the default 120 kg rider on 150 m.
+  const loaded = { tightness: { mode: "anchor", T_target: 100 * KGF } } as const;
   // A rope in a permanent installation: a Solve Gate breach that has nothing to do with tension.
   const unrelatedCause = { usage: "PERMANENTE" } as const;
+  const SENTENCE = /^la tension maximale au passage \(ancrage A, par ligne\) dépasse/;
+  /** What Avancé's ladder says on its tension de pose row, for the same Scenario and results. */
+  const avanceWarning = (scenario: ScenarioDraft) => {
+    const { deduced, avance } = pagesOn(scenario);
+    return (
+      warningLadder(scenario, deduced, avance.results).find((rung) => rung.row === "pretension")
+        ?.text ?? null
+    );
+  };
 
-  test("a typed tension over the limit is warned on the field and on the tile", () => {
-    const { field, statique, cause } = pagesOn(onMaestro({ tightness: overLimit }));
+  test("a loaded line over the limit is warned on the field and on the tile, as Avancé does", () => {
+    const scenario = onMaestro(loaded);
+    const { field, statique, cause } = pagesOn(scenario);
     expect(cause).toBeNull();
-    expect(field.warning).toMatch(/^la tension demandée dépasse/);
+    expect(field.warning).toMatch(SENTENCE);
     expect(output(statique.outputs, "pretension").warning).toBe(field.warning);
+    expect(avanceWarning(scenario)).toBe(field.warning);
   });
 
-  test("under an unrelated cause the field keeps it, where the tile has nothing to print", () => {
-    const { field, statique, cause } = pagesOn(
-      onMaestro({ tightness: overLimit, ...unrelatedCause }),
-    );
+  test("a light loaded line under the limit warns nothing, on any of the three", () => {
+    const scenario = onMaestro({
+      tightness: { mode: "anchor", T_target: 50 * KGF },
+      rider: { ...firstRunDefaults().rider, mp: 10 },
+    });
+    const { field, statique } = pagesOn(scenario);
+    expect(field.warning).toBeNull();
+    expect(output(statique.outputs, "pretension").warning).toBeNull();
+    expect(avanceWarning(scenario)).toBeNull();
+  });
+
+  test("the warning follows the anchor carrying the device", () => {
+    const onB = onMaestro({ ...loaded, tensioningSide: "B" });
+    const { field } = pagesOn(onB);
+    // The same line is under the limit at B, or warned there: Avancé and Statique agree either way.
+    expect(field.warning).toBe(avanceWarning(onB));
+    expect(field.warning ?? "ancrage B").toContain("ancrage B");
+  });
+
+  test("under an unrelated cause there is no T max: no warning, on the field or the tile", () => {
+    const { field, statique, cause } = pagesOn(onMaestro({ ...loaded, ...unrelatedCause }));
     expect(cause).toMatch(/^Aucun résultat — /);
-    expect(field.warning).toMatch(/^la tension demandée dépasse/);
+    expect(field.warning).toBeNull();
     expect(output(statique.outputs, "pretension").warning).toBeNull();
   });
 
   test("another driver's read-out goes with the solve, and its warning with it", () => {
     const tight = { tightness: { mode: "sag", D_target: 0.5 } } as const;
-    expect(pagesOn(onMaestro(tight)).field.warning).toMatch(/^la tension demandée dépasse/);
+    expect(pagesOn(onMaestro(tight)).field.warning).toMatch(SENTENCE);
     const { field, cause } = pagesOn(onMaestro({ ...tight, ...unrelatedCause }));
     expect(cause).toMatch(/^Aucun résultat — /);
     expect(field).toEqual({ readOut: null, warning: null });

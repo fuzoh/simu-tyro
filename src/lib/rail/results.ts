@@ -174,6 +174,12 @@ export type Results = {
   readonly banner: VerdictBanner | null;
   /** The engine's own verdict, for a caller that needs more than the rendered rows. */
   readonly verdict: VerdictResult | null;
+  /**
+   * « T max ancrage A/B » as numbers, N per member — the amplified envelope the rows above print,
+   * for a reader that compares it with something (the limite de tension). `null` where those rows
+   * are absent: a `DAF` the Verdict Gate refused is never multiplied into a figure.
+   */
+  readonly anchorTmax: Readonly<Record<"A" | "B", number>> | null;
 };
 
 /** Channel one of the scope discipline: the block header, above every row. */
@@ -496,6 +502,7 @@ export function deriveResults({
     prompt: noRegime ? REGIME_PROMPT : null,
     banner,
     verdict,
+    anchorTmax: amplify ? { A: envelope.A.Tdaf, B: envelope.B.Tdaf } : null,
   };
 }
 

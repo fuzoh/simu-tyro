@@ -69,7 +69,7 @@ function Live({ page }: { page: string }) {
 
   return (
     <StatiqueFrame
-      fields={<StatiqueFields cause={cause} deduced={deduced} rail={rail} />}
+      fields={<StatiqueFields cause={cause} deduced={deduced} rail={rail} results={results} />}
       outputs={<StatiqueOutputTiles model={model} />}
       section={
         <ChartBlock

@@ -106,7 +106,14 @@ function Live({ page }: { page: string }) {
   return (
     // `RailInputs` owns the Rail's field rows and hands back the two sections they live in, so the
     // shell can stand them in different columns without the rows losing their one context.
-    <RailInputs cause={cause} deduced={deduced} dynamics={rides} rail={rail} rideCause={rideCause}>
+    <RailInputs
+      cause={cause}
+      deduced={deduced}
+      dynamics={rides}
+      rail={rail}
+      results={results}
+      rideCause={rideCause}
+    >
       {(sections) => (
         <Shell
           chartRef={ref}

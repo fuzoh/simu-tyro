@@ -46,7 +46,7 @@ export type TerrainTile = {
   readonly tone: Tone;
   /** The lines under the value, read as one: where it is read, « estimation », the prohibition. */
   readonly notes: readonly string[];
-  /** The limite de tension's Avertissement, without its glyph — the tension de pose's alone. */
+  /** The limite de tension's Avertissement, without its glyph — on the tension de pose's tile alone. */
   readonly warning: string | null;
 };
 

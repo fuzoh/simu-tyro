@@ -1,6 +1,6 @@
 /**
  * **Mise en tension** — the device that tensions the line, and the one number it adds: the tension
- * limit the prétension is read against (#86).
+ * limit the line's greatest tension at the device's anchor is read against (#86).
  *
  * The device is **descriptive**: nothing here feeds a solve, a sweep or a verdict, so a Scenario
  * with and without an exceeded limit produces the same results to the digit. The limit is the
@@ -20,6 +20,7 @@ import { formatQuantity, KGF } from "@/lib/format/quantity.ts";
 import { label } from "@/lib/vocabulary/labels.ts";
 
 import type { DeducedSolve } from "./deduced.ts";
+import type { Results } from "./results.ts";
 
 import { TENSIONING_DEVICE_LABEL } from "./fields.ts";
 
@@ -120,26 +121,45 @@ function diameterBand({ from, to }: TensionLimit["diameter"]): string {
 }
 
 /**
- * § 6's Avertissement for a prétension over the device's limit, without its glyph — or `null`
- * when the Scenario has no limit, no demanded tension, or stays under it.
+ * The greatest tension one line carries at the anchor holding the Mise en tension, over the whole
+ * traverse, N — the « T max ancrage A/B » Avancé prints, majoration au départ included, in the
+ * normal split between the Brins porteurs. Never the « cas défavorable » of a single line. `null`
+ * where the engine has no such figure: no result (a Blocking Error gates the solve) or a `DAF`
+ * the Verdict Gate refused.
+ */
+export function tmaxAtTensioningAnchor(
+  { tensioningSide }: Pick<ScenarioDraft, "tensioningSide">,
+  results: Pick<Results, "anchorTmax"> | null,
+): number | null {
+  return results?.anchorTmax?.[tensioningSide] ?? null;
+}
+
+/**
+ * § 6's Avertissement for a tension over the device's limit, without its glyph — or `null` when
+ * the Scenario has no limit, there is no `Tmax` to read, or it stays under the limit.
  *
- * The copy names the figure and its provenance, so the number is checkable where it is read.
+ * The device holds the line while the rider is on it, so what is compared is the line's greatest
+ * tension at its anchor over the traverse ({@link tmaxAtTensioningAnchor}), not the tension de
+ * pose. The copy names that figure's anchor and the limit with its provenance, so the number is
+ * checkable where it is read.
+ *
+ * @param Tmax per line, N, at the anchor carrying the device.
  */
 export function overLimitWarning(
-  scenario: Pick<ScenarioDraft, "material" | "tensioningDevice">,
-  demanded: number | null,
+  scenario: Pick<ScenarioDraft, "material" | "tensioningDevice" | "tensioningSide">,
+  Tmax: number | null,
 ): string | null {
-  const { material, tensioningDevice } = scenario;
+  const { material, tensioningDevice, tensioningSide } = scenario;
   const limit = tensionLimit(
     tensioningDevice,
     material.family === "textile" ? material.d : undefined,
   );
-  if (limit === null || demanded === null || demanded <= limit.kg * KGF) return null;
+  if (limit === null || Tmax === null || Tmax <= limit.kg * KGF) return null;
   return (
-    "la tension demandée dépasse la charge d'utilisation du dispositif " +
-    `(${TENSIONING_DEVICE_LABEL[tensioningDevice]}, ${limit.kg} kg pour une corde de ` +
-    `${diameterBand(limit.diameter)} — ${limit.source}). Ce n'est pas le seuil de glissement, ` +
-    "et le glissement n'est pas un fusible."
+    `la tension maximale au passage (ancrage ${tensioningSide}, par ligne) dépasse la charge ` +
+    `d'utilisation du dispositif (${TENSIONING_DEVICE_LABEL[tensioningDevice]}, ${limit.kg} kg ` +
+    `pour une corde de ${diameterBand(limit.diameter)} — ${limit.source}). Ce n'est pas le seuil ` +
+    "de glissement, et le glissement n'est pas un fusible."
   );
 }
 

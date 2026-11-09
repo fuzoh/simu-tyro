@@ -18,6 +18,7 @@
 import type { RailFormState } from "@/components/app/use-rail-form.ts";
 import type { Deduced } from "@/lib/rail/deduced.ts";
 import type { FieldId } from "@/lib/rail/fields.ts";
+import type { Results } from "@/lib/rail/results.ts";
 
 import { AvanceNotice } from "@/components/app/avance-notice.tsx";
 import { useAppState } from "@/components/app/store.tsx";
@@ -56,11 +57,14 @@ export function StatiqueFields({
   cause,
   deduced,
   rail,
+  results,
 }: {
   /** « Aucun résultat — … »: no read-out stands in the tension de pose under it. */
   cause: string | null;
   deduced: Deduced;
   rail: RailFormState;
+  /** The traverse aggregate: the limite de tension's warning reads « T max » off it. */
+  results: Results | null;
 }) {
   const { scenario, trace } = useAppState();
   const lastGoodSolve = useLastGoodSolve(deduced);
@@ -76,7 +80,7 @@ export function StatiqueFields({
   const provenance = material.family === "textile" ? presetProvenance(material) : {};
   const deviceWarning =
     warningLadder(scenario, deduced).find((rung) => rung.row === "tensioningDevice")?.text ?? null;
-  const pretension = pretensionField({ scenario, deduced, cause });
+  const pretension = pretensionField({ scenario, deduced, results, cause });
   const span = deduced.span;
   // Which alternatives show follows the Scenario; the notice and the banner's jump read the same.
   const shows = (id: FieldId) => shownOnStatique(id, scenario);

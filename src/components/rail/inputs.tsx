@@ -45,6 +45,7 @@ import type { FieldContext, FieldId } from "@/lib/rail/fields.ts";
 import type { BlockingError, FixActionId } from "@/lib/rail/gates.ts";
 import type { PresetProvenance } from "@/lib/rail/presets.ts";
 import type { LadderRow } from "@/lib/rail/provenance.ts";
+import type { Results } from "@/lib/rail/results.ts";
 import type { DriverTakeOver, NumericFieldId, RailValues } from "@/lib/rail/values.ts";
 import type { DynamicsReading } from "@/lib/scenario/dynamics.ts";
 import type { ForceUnit, ScenarioDraft, UseClass } from "@/lib/scenario/types.ts";
@@ -319,6 +320,7 @@ export function RailInputs({
   deduced,
   dynamics,
   rail,
+  results,
   rideCause,
   children,
 }: {
@@ -334,6 +336,8 @@ export function RailInputs({
    */
   dynamics: DynamicsReading | null;
   rail: RailFormState;
+  /** The traverse aggregate; the limite de tension's warning reads « T max » off it. */
+  results: Results | null;
   /** Why the gates withhold the rides from a line that stands — said on §12.1's row — or `null`. */
   rideCause: string | null;
   /**
@@ -365,10 +369,10 @@ export function RailInputs({
   // § 6's warning ladder, on the rows it qualifies. The terrain rung renders inside the terrain
   // disclosure block and the verdict rung is a banner state — neither is here, so nothing is said
   // twice.
-  const ladder = warningLadder(scenario, deduced);
+  const ladder = warningLadder(scenario, deduced, results);
   const rung = (row: LadderRow): string | null =>
     ladder.find((warning) => warning.row === row)?.text ?? null;
-  const readOuts = deducedRows(scenario, deduced, cause);
+  const readOuts = deducedRows(scenario, deduced, cause, results);
   const row = useFieldRows({
     rail,
     register: "exact",

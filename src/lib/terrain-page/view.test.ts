@@ -192,18 +192,24 @@ describe("the tension de pose takes the warning colour exactly when the limite w
     tightness: { mode: "anchor", T_target: T },
   });
 
+  // Light rider: the loaded line at the anchor stays under 250 kg. Default rider: it goes over.
+  const light = { ...firstRunDefaults().rider, mp: 10 };
+
   test.each([
-    ["under the limit", "maestro-s", 2400, false],
-    ["just over it", "maestro-s", 2452, true],
-    ["well over it", "maestro-s", 300 * KGF, true],
-    ["on a mouflage, which has no published limit", "pulley", 300 * KGF, false],
-  ] as const)("%s", (_name, device, T, warned) => {
-    const { cause, terrain } = pagesOn(onDevice(device, T));
+    ["a light loaded line under the limit", "maestro-s", 50 * KGF, light, false],
+    ["a loaded line over it, from a tension de pose under it", "maestro-s", 100 * KGF, null, true],
+    ["a loaded line well over it", "maestro-s", 300 * KGF, null, true],
+    ["on a mouflage, which has no published limit", "pulley", 300 * KGF, null, false],
+  ] as const)("%s", (_name, device, T, rider, warned) => {
+    const { cause, terrain } = pagesOn({
+      ...onDevice(device, T),
+      ...(rider === null ? {} : { rider }),
+    });
     expect(cause).toBeNull();
     const pretension = tile(terrain, "pretension");
     expect(pretension.kind).toBe("quantity");
     expect(pretension.tone === "warning").toBe(warned);
-    expect(pretension.warning?.startsWith("la tension demandée dépasse") ?? false).toBe(warned);
+    expect(pretension.warning?.startsWith("la tension maximale au passage") ?? false).toBe(warned);
   });
 
   test("with no value to print, neither the warning nor its colour", () => {

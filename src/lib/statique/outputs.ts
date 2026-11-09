@@ -19,7 +19,11 @@ import type { VerdictState } from "@/lib/sim";
 import { formatAtX, formatQuantity } from "@/lib/format/quantity.ts";
 import { GATE_CONSEQUENCE } from "@/lib/rail/gates.ts";
 import { NO_REGIME_BANNER_BY_REGISTER, refusalReason, TRAVERSE_SCOPE } from "@/lib/rail/results.ts";
-import { demandedPretension, overLimitWarning } from "@/lib/rail/tensioning.ts";
+import {
+  demandedPretension,
+  overLimitWarning,
+  tmaxAtTensioningAnchor,
+} from "@/lib/rail/tensioning.ts";
 import { label } from "@/lib/vocabulary/labels.ts";
 
 import { OUTPUT_LABEL, pretensionWhere } from "./copy.ts";
@@ -110,7 +114,7 @@ export function statiqueOutputs({
     value: demanded === null ? null : formatQuantity("T_target", demanded, unit),
     qualifier: pretensionWhere(scenario.tensioningSide),
     absent: demanded === null ? missing : null,
-    warning: overLimitWarning(scenario, demanded),
+    warning: overLimitWarning(scenario, tmaxAtTensioningAnchor(scenario, results)),
   };
 
   // The flèche à vide the line was set to, or the one it hangs at — the field or the read-out,
@@ -142,22 +146,26 @@ export function statiqueOutputs({
 export type PretensionField = {
   /** The read-out another driver's line stands at, N per member; the target on this driver. */
   readonly readOut: number | null;
-  /** The limite de tension's Avertissement on what the field holds, without its glyph. */
+  /** The limite de tension's Avertissement, without its glyph. */
   readonly warning: string | null;
 };
 
 /**
- * The tension de pose field, warned as Avancé warns it: a typed tension is a fact of the field, so
- * its Avertissement stays under « Aucun résultat » where the tile goes blank, while another
- * driver's read-out — Avancé's `Valeurs déduites` row — goes with the solve.
+ * The tension de pose field, warned as Avancé warns it: the limite de tension is read against the
+ * traverse's « T max » at the device's anchor, so under « Aucun résultat » there is none and the
+ * Avertissement goes with it — as another driver's read-out does, with the solve.
  */
 export function pretensionField({
   scenario,
   deduced,
+  results,
   cause,
-}: Omit<StatiqueInput, "results">): PretensionField {
+}: StatiqueInput): PretensionField {
   const readOut = demandedPretension(scenario, cause === null ? deduced.solve : null);
-  return { readOut, warning: overLimitWarning(scenario, readOut) };
+  return {
+    readOut,
+    warning: overLimitWarning(scenario, tmaxAtTensioningAnchor(scenario, results)),
+  };
 }
 
 function blankTile(id: StatiqueOutputId, results: Results | null): StatiqueOutput {
