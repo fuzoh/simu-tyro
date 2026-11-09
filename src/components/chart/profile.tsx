@@ -329,12 +329,13 @@ export function Profile({
                 **below** the ground rather than collapsing to nothing: it is the always-on layer
                 that states the magnitude of the violation, and clamping it to zero would delete it
                 exactly when the other three signals fire. It is absent — never zeroed — when the
-                Clearance Gate has refused the number it measures. */}
+                Clearance Gate has refused the number it measures. Its red **is** signal 4's, read
+                off `inViolation` like the cable's and the rider's: a passager inside a Zone
+                d'ancrage is not judged (#106), so the dimension a negative garde past the zone
+                draws stays grey with the other three. */}
             {clearance && (
               <line
-                className={cn(
-                  rider.worst.hClear < 0 ? "stroke-destructive" : "stroke-muted-foreground",
-                )}
+                className={cn(inViolation ? "stroke-destructive" : "stroke-muted-foreground")}
                 strokeDasharray="2 2"
                 {...dimension(rider.worst.atX, rider.worst.hClear)}
               />
@@ -355,9 +356,11 @@ export function Profile({
                 together.
 
                 **Never red on its own account**, and § 5's four coordinated signals gain no fifth
-                member here: `underRider` is one candidate in `worst.hClear`'s own minimum, so a
-                negative garde under the rider means a negative `worst.hClear`, and signal 4 has
-                already turned the cable and the rider red. That used to hold *in exact arithmetic
+                member here: outside the Zones d'ancrage `underRider` is one candidate in
+                `worst.hClear`'s own minimum, so a negative garde under the rider means a negative
+                `worst.hClear`, and signal 4 has already turned the cable and the rider red. Inside a
+                zone `x_D` is left out of `worst` and nothing there is judged (#106), so a negative
+                `underRider` is the platform's, and no signal fires for it. That used to hold *in exact arithmetic
                 only* — the shipped scan could report `worst.hClear` up to 99 mm above `underRider`,
                 the kink its grid never landed on, leaving a sub-decimetre window where this line
                 dipped below the ground while the cable was still black. Ticket 37 closed it: the
