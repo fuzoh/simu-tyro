@@ -23,6 +23,7 @@ import {
   groundDistance,
   horizontalDistance,
   loadMeasureProfile,
+  measureAim,
   ON_PROFILE_TOLERANCE_M,
   profileFor,
   readMeasure,
@@ -48,6 +49,24 @@ describe("the clicks", () => {
     const second = clickMeasure(first, B);
     expect(second).toEqual([A, B]);
     expect(clickMeasure(second, { lat: 46.85, lon: 6.5 })).toEqual([{ lat: 46.85, lon: 6.5 }]);
+  });
+});
+
+describe("the pixel of the aperçu (#107)", () => {
+  const at = [120, 80] as const;
+
+  test("a mouse or a pen over the canvas draws it at its pixel", () => {
+    expect(measureAim({ kind: "mouse", onCanvas: true, at })).toEqual([120, 80]);
+    expect(measureAim({ kind: "pen", onCanvas: true, at })).toEqual([120, 80]);
+  });
+
+  test("over the zoom buttons, where a click places no point, there is none", () => {
+    expect(measureAim({ kind: "mouse", onCanvas: false, at })).toBeNull();
+    expect(measureAim({ kind: "pen", onCanvas: false, at })).toBeNull();
+  });
+
+  test("a finger never has one, even over the canvas", () => {
+    expect(measureAim({ kind: "touch", onCanvas: true, at })).toBeNull();
   });
 });
 

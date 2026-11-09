@@ -52,6 +52,31 @@ export function clickMeasure(points: MeasurePoints, at: Position): MeasurePoints
   return points.length === 1 ? [points[0], at] : [at];
 }
 
+/** A pointer over the map's box, as the aperçu of the Mesure (#107) reads it. */
+export type MeasurePointer = {
+  /** The event's `pointerType`: `"mouse"`, `"pen"`, `"touch"`, or what a browser adds. */
+  readonly kind: string;
+  /**
+   * Whether it is over the map's canvas — where a click places a point — and not over a control
+   * the map holds above it, such as the zoom buttons, where a click places nothing.
+   */
+  readonly onCanvas: boolean;
+  /** Where, in the canvas's own pixels. */
+  readonly at: readonly [number, number];
+};
+
+/**
+ * The pixel the aperçu is drawn at, or `null` for none: a finger never hovers, and a pointer off
+ * the canvas is where no click would land.
+ */
+export function measureAim({
+  kind,
+  onCanvas,
+  at,
+}: MeasurePointer): readonly [number, number] | null {
+  return kind !== "touch" && onCanvas ? at : null;
+}
+
 /**
  * The offset of `to` from `from` in metres, east and north — the ellipsoid's local radii of
  * curvature at the mid-latitude. For the few kilometres a zip line spans this is exact to well

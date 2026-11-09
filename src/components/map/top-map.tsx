@@ -94,6 +94,7 @@ import {
 import { FONDS } from "@/lib/map/display.ts";
 import { clickTarget, drawnPositions, IDLE, stepGesture } from "@/lib/map/gesture.ts";
 import { type LineEnds, type LinePick, pointerOnLine } from "@/lib/map/hover.ts";
+import { measureAim } from "@/lib/map/measure.ts";
 import {
   BANANE_SOURCE,
   bananeData,
@@ -859,11 +860,19 @@ function MapCanvas({
     // The pixel is read here too, from the DOM and against the canvas as MapLibre reads a click's:
     // its own `mousemove` is held back while a drag pans the map, and the cross would stay where
     // the pan began, away from where the next click lands.
+    // The box also holds the zoom buttons, off the canvas MapLibre listens on: a pointer there, or
+    // a finger anywhere — a pan sends no mouse event to clear a cross a mouse left — has none.
     const sense = (event: PointerEvent) => {
       hovers.current = event.pointerType !== "touch";
-      if (!hovers.current || event.type !== "pointermove") return;
       const box = created.getCanvas().getBoundingClientRect();
-      aim.current = [event.clientX - box.left, event.clientY - box.top];
+      const was = aim.current;
+      aim.current = measureAim({
+        kind: event.pointerType,
+        onCanvas:
+          event.target instanceof Node && created.getCanvasContainer().contains(event.target),
+        at: [event.clientX - box.left, event.clientY - box.top],
+      });
+      if (was !== null && aim.current === null && measures.current) redrawMeasure();
     };
     node.addEventListener("pointerdown", sense, true);
     node.addEventListener("pointermove", sense, true);
