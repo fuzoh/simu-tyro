@@ -470,7 +470,12 @@ The camera's controls over the corner of the Vue 3D: a north needle that turns w
 camera and puts north up when pressed, a turn left or right around the line's centre, the
 inclinaison up or down, the zoom, and the two Vues prédéfinies. Each button has its key, and
 its hover names it. It moves the camera and nothing else: no anchor, no Scenario.
-_Avoid_: boussole (the Rose des vents's word), navigation control, widget
+_Avoid_: boussole (avoided for the Rose des vents too), navigation control, widget
+
+**Vue prédéfinie**:
+One of the Vue 3D's two set camera poses, each a Gimbal button and a key: the Vue du départ
+(key 1) and the Vue latérale (key 2). Geometry on the anchors, never a fit the engine picks.
+_Avoid_: preset, bookmark, saved view
 
 **Vue du départ**:
 The Vue prédéfinie on the platform at A: the eye 4,5 m to the left of A when one looks
@@ -481,9 +486,8 @@ _Avoid_: vue passager, vue subjective
 **Vue latérale**:
 The Vue prédéfinie square across the line, A on the left of the screen as on the coupe, looking
 10° down, just far enough back for the whole line, both anchors and both feet included, to fit
-with a margin. The camera stands on the right of A → B, the side that puts A on the left: the
-brief of #111 asked for « du côté gauche » and for A on the left, which no camera gives at once,
-and A on the left — the coupe's reading — won. The view the Vue 3D opens on. Key 2.
+with a margin. The camera stands on the right of A → B, the side that puts A on the left of the
+screen. The view the Vue 3D opens on. Key 2.
 _Avoid_: vue de profil, vue de côté
 
 **Rose des vents**:
