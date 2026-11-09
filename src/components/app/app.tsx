@@ -145,8 +145,9 @@ function Live({ page }: { page: string }) {
               // Sweep on screen is stale by definition, so scrubbing would let the user *generate* new
               // stale numbers rather than read the ones already there.
               inert={saisie !== null}
-              // Avancé's plot has no ceiling (#110): its middle column widens with the window, and
-              // the plot with it at 0,42, the shell's `--profile-plot` spelling the same rule.
+              // Avancé's plot ceiling is raised (#110): the block widens with the middle column up to
+              // its 1984 px letterbox, and the plot with it at 0,42, the shell's `--profile-plot`
+              // spelling the same rule.
               plotMax={AVANCE_PLOT_MAX}
               onPositionFocus={collapse.onPositionFocus}
               onReveal={collapse.reveal}

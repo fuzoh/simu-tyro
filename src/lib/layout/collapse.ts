@@ -158,7 +158,10 @@ export type ViewportFit = {
   readonly viewportHeight: number;
   /** `--kb`, px — the soft-keyboard inset the shell publishes, and **0 with no keyboard up**. */
   readonly keyboardInset: number;
-  /** The chart column's inline size, or `null` before the single `ResizeObserver`'s first report. */
+  /**
+   * The Chart Block's inline size — the chart column's below B2, at most `AVANCE_BLOCK_MAX_PX` on
+   * Avancé from it — or `null` before the single `ResizeObserver`'s first report.
+   */
   readonly columnWidth: number | null;
   /**
    * The navigation bar above the shell, px — `NAV_BAR` on every app Page (ADR-0002), `0` for a

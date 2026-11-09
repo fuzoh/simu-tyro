@@ -69,9 +69,11 @@ export const PROFILE_ASPECT = 0.42;
  * is the one direction the band's floor was minted against but the ×1 floor already refuses
  * absolutely: a shallower aspect can only lower VE, never inflate it, and VE never compresses — it
  * clamps at ×1 and **says so in the badge**. The dangerous half of this band is its ceiling, and a
- * cap cannot reach it. **On Avancé the band holds at every width** (#110): its plot has no ceiling
- * ({@link AVANCE_PLOT_MAX}), so its obtained aspect is 0,42 from the phone to 3440 px and beyond —
- * `contract.test.ts` walks it. The frozen arm is the other Pages'.
+ * cap cannot reach it. **On Avancé the band holds at every width** (#110): its plot's ceiling
+ * ({@link AVANCE_PLOT_MAX}) is the plot of a Chart Block {@link AVANCE_BLOCK_MAX_PX} wide, and past
+ * that width the block **letterboxes** in the middle column rather than widen, so its obtained
+ * aspect is 0,42 from the phone to 3440 px and beyond — `contract.test.ts` walks it. The frozen arm
+ * is the other Pages'.
  */
 export const PLOT_ASPECT_BAND = { min: 0.35, max: 0.5 } as const;
 
@@ -169,8 +171,7 @@ export const RAIL_HEADER = 44;
  * reference desktop. Since the 12 px {@link GUTTER} (#115) budget C's block is 870,24 px and pins
  * under either bar at 900 px of height. No Page stands that pair today, and since #110 Avancé's three
  * columns fit no block to the window at all: the bar binds the fit only below B2, where `MIN_RAIL`
- * is owed under it. It is paid at every width and never dismissed — voir
- * `ViewportFit.navigationHeight` in `./collapse.ts`.
+ * is owed under it. It is never dismissed — voir `ViewportFit.navigationHeight` in `./collapse.ts`.
  */
 export const NAV_BAR = 36;
 
@@ -199,8 +200,9 @@ export const RIGHT_COLUMN_WIDTH = 288;
  * past it. **Avancé has none since #110**: it spends the whole width, and every pixel past its two
  * 288 px columns goes to the middle one, so the coupe and the vue de dessus widen with the window.
  * The cap was Avancé's too while `1728 − 576 = 1152` = {@link REFERENCE_COLUMN_PX} kept its middle
- * column under the plot's ceiling; Avancé's plot has no ceiling now ({@link AVANCE_PLOT_MAX}), so
- * nothing on it is left for the cap to protect.
+ * column under the plot's ceiling; Avancé's ceiling is raised now ({@link AVANCE_PLOT_MAX}), and
+ * what bounds its Chart Block is the block's own inline size ({@link AVANCE_BLOCK_MAX_PX}), not the
+ * shell's — the vue de dessus above it keeps the whole column.
  */
 export const SHELL_MAX_PX = 1728;
 
@@ -228,9 +230,11 @@ export const STATIQUE_TILE_MAX_PX = 180;
  * **Avancé's chart column's inline size at a viewport width** — the middle column from
  * {@link THREE_COLUMN_PX}, the whole viewport below it. **No cap** (#110): Avancé's shell spans the
  * viewport, so from B2 the column is `viewport − 576` at every width — 1984 px at 2560, 2864 at
- * 3440. The shell measures its own column with a `ResizeObserver`; this is the same number from the
- * contract's constants, for the budgets and tests that have no DOM. It ignores the middle column's
- * scrollbar gutter, which is the platform's (0 where scrollbars overlay).
+ * 3440. It is the **column** — the vue de dessus's width; the Chart Block in it stops at
+ * {@link AVANCE_BLOCK_MAX_PX} ({@link avanceBlockWidth}), and that block is what the shell's
+ * `ResizeObserver` measures. This is the same number from the contract's constants, for the budgets
+ * and tests that have no DOM. It ignores the middle column's scrollbar gutter, which is the
+ * platform's (0 where scrollbars overlay).
  */
 export function chartColumnWidth(viewportWidth: number): number {
   return threeColumns(viewportWidth)
@@ -243,7 +247,7 @@ export function chartColumnWidth(viewportWidth: number): number {
  * which the plot stops growing (**amendment F**, `../../../.scratch/zipline-simulator-v1-build/AMENDMENTS.md`).
  * It is a width and never a height: what budget C contributes here is its *column*, not its 900 px.
  * With one column beside the chart that column is reached at 1440; with Avancé's two, at 1728 — where
- * Avancé's plot no longer stops ({@link AVANCE_PLOT_MAX}).
+ * Avancé's plot no longer stops: its own ceiling is raised to {@link AVANCE_PLOT_MAX}.
  */
 export const REFERENCE_DESKTOP_PX = 1440;
 
@@ -276,21 +280,65 @@ export const REFERENCE_COLUMN_PX: number = REFERENCE_DESKTOP_PX - RAIL_WIDTH;
 export const PROFILE_PLOT_MAX: number = PROFILE_ASPECT * innerWidth(REFERENCE_COLUMN_PX);
 
 /**
- * **Avancé's plot ceiling: none (#110).** Its plot is `0,42 × W_inner` at every width, so the
- * obtained aspect *is* {@link PROFILE_ASPECT}, inside {@link PLOT_ASPECT_BAND}, from the phone to
- * 3440 px and beyond, and the coupe widens with the window with no letterbox. Below 1728 px of
- * viewport nothing moves: the middle column never reached the 1152 px reference there, so
- * {@link PROFILE_PLOT_MAX} never bound on Avancé.
+ * **The viewport at which Avancé's Chart Block stops widening (#110)** — 2560 px, the brief's own
+ * named width: there the block fills its 1984 px middle column, with no empty margin either side,
+ * and past it the block letterboxes ({@link AVANCE_BLOCK_MAX_PX}).
  *
- * Amendment F's reason for a ceiling — a block taller than the window pinned to the Pinned Safety
- * Header — no longer reaches Avancé's three columns: the middle column scrolls, the vue de dessus
- * stands above the Chart Block, and the height constraints apply only where the Rail stands under
- * the block (`fitsWholeBlock` and `compactRequired` in `./collapse.ts`), below B2, where the column
- * is at most 1023 px and the ceiling cannot bind either. **What it costs**: at 3440 px the plot is
- * `0,42 × 2840 = 1192,8` px, so the whole coupe is taller than most windows, read by scrolling the
- * column. The other Pages keep {@link PROFILE_PLOT_MAX}: the default of every function below.
+ * **Why a ceiling at all**: the Chart Block is one co-visible unit, and an unbounded plot makes it
+ * taller than any window — `416 + 0,42 × 2840 = 1608,8` px at 3440, against the 1404 px a 1440 px
+ * window leaves under the navigation bar, so no scroll position of the middle column showed the
+ * banner slot and « Garde min » together. **Why 2560**: it is the widest the block can be and still
+ * stand whole in the 1440 px-tall windows the brief names (2560 × 1440, 3440 × 1440) — 1239,2 px
+ * against 1404 — while the coupe widens with the window all the way to the brief's 2560. It is a
+ * width, so nothing reads the window's height: the block is bounded by construction, not fitted.
+ * **What it costs**: a window shorter than 1276 px at 2560 or wider (2560 × 1080) does not hold the
+ * whole block, as 1600 × 900 already did not hold map and block together.
  */
-export const AVANCE_PLOT_MAX = Number.POSITIVE_INFINITY;
+export const AVANCE_BLOCK_VIEWPORT_PX = 2560;
+
+/**
+ * **Avancé's Chart Block inline-size ceiling, px** — the middle column at
+ * {@link AVANCE_BLOCK_VIEWPORT_PX}, `2560 − 576 = 1984`. Past it the block **letterboxes**: it stays
+ * 1984 px wide, centred in the middle column, the column's surplus left empty either side, so its
+ * bands — every one a function of the block's inner width — stop growing with it. The vue de dessus
+ * above it keeps the whole column. The shell spells it `max-w-[1984px]` on the block's own box,
+ * which is the container and the app's single `ResizeObserver`'s target.
+ *
+ * The letterbox is the **whole block's**, never the plot's alone: the profile and the clearance strip
+ * share one x scale (`createSharedX`), so a plot narrowed inside its band would draw its anchors off
+ * the strip's.
+ */
+export const AVANCE_BLOCK_MAX_PX: number =
+  AVANCE_BLOCK_VIEWPORT_PX - RAIL_WIDTH - RIGHT_COLUMN_WIDTH;
+
+/**
+ * **Avancé's Chart Block inline size at a viewport width** — {@link chartColumnWidth} under
+ * {@link AVANCE_BLOCK_MAX_PX}: the whole viewport below B2, `viewport − 576` from B2 to 2560 px,
+ * then 1984 px at any width. It is what the shell's observer reports on Avancé (less a classic
+ * scrollbar's gutter below the cap), for the budgets and tests that have no DOM.
+ */
+export function avanceBlockWidth(viewportWidth: number): number {
+  return Math.min(chartColumnWidth(viewportWidth), AVANCE_BLOCK_MAX_PX);
+}
+
+/**
+ * **Avancé's plot ceiling: raised (#110)** — `0,42 × 1960 = 823,2` px, the value § 5's aspect rule
+ * reaches in a block {@link AVANCE_BLOCK_MAX_PX} wide, against amendment F's 473,76. Its plot is
+ * `0,42 × W_inner` at every width it is drawn at, and the block never grows past the width where the
+ * two meet, so the obtained aspect *is* {@link PROFILE_ASPECT}, inside {@link PLOT_ASPECT_BAND},
+ * from the phone to 3440 px and beyond: past the ceiling the block letterboxes rather than let the
+ * plot leave the band. Below 1728 px of viewport nothing moves: the middle column never reached the
+ * 1152 px reference there, so {@link PROFILE_PLOT_MAX} never bound on Avancé.
+ *
+ * Amendment F's reason for a ceiling — a block taller than the window — is answered by the block's
+ * width cap rather than by freezing the plot: the whole block plateaus at
+ * `44 + 76 + 823,2 + 200 + 44 + 52 = 1239,2` px ({@link chartBlockHeight} given this ceiling), so
+ * from 2560 × 1440 up it stands whole in the window once the middle column is scrolled to it. The
+ * height constraints themselves apply only where the Rail stands under the block
+ * (`heightBindsBlock` in `./collapse.ts`). The other Pages keep {@link PROFILE_PLOT_MAX}: the
+ * default of every function below.
+ */
+export const AVANCE_PLOT_MAX: number = PROFILE_ASPECT * innerWidth(AVANCE_BLOCK_MAX_PX);
 
 /**
  * The banner slot's height by line count: 44 px at one line … 76 px at three, which is the 390 px
@@ -343,7 +391,7 @@ export function innerWidth(columnWidth: number): number {
  * consumers, no measurement before the first paint.
  *
  * @param ceiling the Page's ceiling, px: {@link PROFILE_PLOT_MAX} unless the Page says otherwise —
- *   Avancé passes {@link AVANCE_PLOT_MAX}, none (#110).
+ *   Avancé passes {@link AVANCE_PLOT_MAX}, raised to its letterboxed block's plot (#110).
  */
 export function profilePlotHeight(wInner: number, ceiling: number = PROFILE_PLOT_MAX): number {
   return Math.min(PROFILE_ASPECT * wInner, ceiling);
@@ -413,25 +461,30 @@ export function cellRows(columnWidth: number): number {
  * and the 12 px {@link GUTTER} (#115): 602 at a 390 px column, 624 at 480, 870 at 1152.
  *
  * **It is monotone in the width and, since amendment F, bounded**: both of its width-derived terms
- * have a ceiling now — the plot at {@link PROFILE_PLOT_MAX} and the strip at `STRIP.max` — so the
- * block plateaus at **889,76 px** and stops being able to outgrow every desktop. Below the reference
- * column nothing about it moved. **(c) reads it below B2 only** since #110, where the column is at
- * most 1023 px and {@link PROFILE_PLOT_MAX} cannot bind, so it is Avancé's block there whichever
- * ceiling it is given.
+ * have a ceiling now — the plot at the Page's `ceiling` and the strip at `STRIP.max` — so on the
+ * other Pages the block plateaus at **889,76 px** (amendment F's {@link PROFILE_PLOT_MAX}) and stops
+ * being able to outgrow every desktop, and on Avancé, given {@link AVANCE_PLOT_MAX}, at **1239,2 px**,
+ * which its letterboxed block reaches at {@link AVANCE_BLOCK_MAX_PX}. Below the reference column
+ * nothing about it moved. **(c) reads it below B2 only** since #110, where the column is at most
+ * 1023 px and neither ceiling can bind, so the default is Avancé's block there too.
  *
  * @param columnWidth the chart column's inline size, px — the same number `SharedX` is built from.
  * @param bannerHeight the banner slot's height, px. Defaults to {@link bannerBudget}, which is § 5's
  *   own table row for this width — the tallest occupant that width can produce, so (c) cannot claim
  *   the block fits and then let a blocking summary push the Rail below `MIN_RAIL`.
+ * @param ceiling the Page's plot ceiling, px — {@link PROFILE_PLOT_MAX} unless the Page says
+ *   otherwise, as {@link profilePlotHeight}'s: Avancé's block is `chartBlockHeight(w, undefined,
+ *   AVANCE_PLOT_MAX)`.
  */
 export function chartBlockHeight(
   columnWidth: number,
   bannerHeight: number = bannerBudget(columnWidth),
+  ceiling: number = PROFILE_PLOT_MAX,
 ): number {
   const wInner = innerWidth(columnWidth);
   return (
     bannerHeight +
-    profileOuterHeight(wInner) +
+    profileOuterHeight(wInner, ceiling) +
     stripOuterHeight(wInner) +
     VIEW_STRIP +
     cellRows(columnWidth) * CELL_ROW

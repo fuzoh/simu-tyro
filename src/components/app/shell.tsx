@@ -111,20 +111,21 @@ export const READ_OUT_CELLS: Record<CellId, { readonly basis: string; readonly p
 export const NOSCRIPT_LINE = "Ce simulateur nécessite JavaScript pour fonctionner.";
 
 /**
- * § 5's aspect rule as CSS, under a Page's plot ceiling: `min(0,42 × W_inner, ceiling)`, or the
- * bare rule where the Page has none — Avancé's {@link AVANCE_PLOT_MAX} (#110). One function, so
- * the band the CSS reserves and the `profilePlotHeight()` the SVG is drawn at cannot spell two
- * ceilings.
+ * § 5's aspect rule as CSS, under a Page's plot ceiling: `min(0,42 × W_inner, ceiling)` —
+ * amendment F's {@link PROFILE_PLOT_MAX}, or Avancé's raised {@link AVANCE_PLOT_MAX} (#110). One
+ * function, so the band the CSS reserves and the `profilePlotHeight()` the SVG is drawn at cannot
+ * spell two ceilings. The ceiling is printed to 0,1 µm, so `0,42 × 1960`'s float noise
+ * (823,1999…) is not spelled into the stylesheet.
  */
 function profilePlotRule(ceiling: number): string {
-  const rule = `calc(${PROFILE_ASPECT} * var(--w-inner))`;
-  return Number.isFinite(ceiling) ? `min(${rule}, ${ceiling}px)` : rule;
+  return `min(calc(${PROFILE_ASPECT} * var(--w-inner)), ${Number(ceiling.toFixed(4))}px)`;
 }
 
 /**
- * The layout contract as CSS custom properties. `100cqi` is the **chart column's** inline size —
- * the column is the query container, so `--w-inner` is exactly § 5's `W_inner = col − 24`, and
- * every band below is a function of it and of nothing else. Exported for the other Pages that
+ * The layout contract as CSS custom properties. `100cqi` is the **Chart Block's** inline size —
+ * its box is the query container (on Avancé the middle column's, under its 1984 px letterbox), so
+ * `--w-inner` is exactly § 5's `W_inner = col − 24`, and every band below is a function of it and
+ * of nothing else. Exported for the other Pages that
  * stand the Chart Block in a column of their own — Statique — so its bands read the same contract.
  */
 export const LAYOUT_VARS = {
@@ -162,10 +163,12 @@ export const LAYOUT_VARS = {
 } as CSSProperties;
 
 /**
- * Avancé's own: the same contract with **no plot ceiling** (#110). Its shell spans the whole width,
- * so its middle column widens with the window and the plot with it, at 0,42 — the Plot Aspect Band
- * holds at every width. The Chart Block is told the same ceiling (`plotMax`), so the drawn plot and
- * this band agree. Exported for `shell.test.ts`, which reads the rule it spells.
+ * Avancé's own: the same contract under its **raised plot ceiling** (#110). Its shell spans the whole
+ * width, so its middle column widens with the window and the Chart Block with it up to
+ * `AVANCE_BLOCK_MAX_PX`, where the plot reaches this ceiling; past it the block letterboxes, so the
+ * plot stays at 0,42 and the Plot Aspect Band holds at every width. The Chart Block is told the same
+ * ceiling (`plotMax`), so the drawn plot and this band agree. Exported for `shell.test.ts`, which
+ * reads the rule it spells.
  */
 export const AVANCE_LAYOUT_VARS = {
   ...LAYOUT_VARS,
@@ -302,12 +305,12 @@ export function Shell({
       }
     >
       {strip}
-      {/* **No cap** (#110): the shell spans the window, and every pixel past the two 288 px
-          columns goes to the middle one, so the coupe and the vue de dessus widen with it. It was
-          capped at 1728 px (`SHELL_MAX_PX`, the other Pages' cap) while the plot had a ceiling to
-          stay under; Avancé's has none now (`AVANCE_PLOT_MAX`), so the aspect holds at every width.
-          What the cap also held — the read-out cells and the banner within reach of each other —
-          is spent: at 3440 px they spread across a 2864 px column. */}
+      {/* **No shell cap** (#110): the shell spans the window, and every pixel past the two 288 px
+          columns goes to the middle one, so the vue de dessus widens with it, and the Chart Block
+          up to `AVANCE_BLOCK_MAX_PX` (1984 px, the column at 2560), where it letterboxes. It was
+          capped at 1728 px (`SHELL_MAX_PX`, the other Pages' cap) while the plot's ceiling was
+          amendment F's; Avancé's is raised now (`AVANCE_PLOT_MAX`), and the block's own cap is what
+          keeps it whole in a 1440 px window. */}
       <div className="flex min-h-0 w-full flex-1 flex-col min-[1024px]:flex-row">
         {/* The Rail is not becoming interactive: `focusin`, `focusout` and `scroll` are **observed**
             here, on the one element that is both the collapse's scroller (below B2) and the ancestor
@@ -402,10 +405,7 @@ export function Shell({
             leave the map 116 px at 1024 × 768 (#104). The gutter is reserved so a scrollbar that
             comes and goes cannot move the width every band is a function of. It spends the `--kb`
             pair like the two side columns. */}
-        <div
-          className="@container min-w-0 flex-none overflow-hidden min-[1024px]:min-h-0 min-[1024px]:flex-1 min-[1024px]:scroll-pb-[var(--kb,0px)] min-[1024px]:[scrollbar-gutter:stable] min-[1024px]:overflow-y-auto min-[1024px]:pb-[var(--kb,0px)]"
-          ref={chartRef}
-        >
+        <div className="min-w-0 flex-none overflow-hidden min-[1024px]:min-h-0 min-[1024px]:flex-1 min-[1024px]:scroll-pb-[var(--kb,0px)] min-[1024px]:[scrollbar-gutter:stable] min-[1024px]:overflow-y-auto min-[1024px]:pb-[var(--kb,0px)]">
           {/* The vue de dessus heads the column from B2 (#110), above the Chart Block, in the DOM
               too, so the focus order is the order on screen. Below B2 there is no middle column and
               the box is `display: none`, so the stacked shape — the block over the Rail — is the
@@ -422,8 +422,19 @@ export function Shell({
               soft keyboard, or below 420 px of available height, the banner slot and the live
               « Garde min » share a single 44 px line — `664 − 336 − 44 = 284 px` of usable form.
               Every other band is already gone by then, dropped by the same `pinned` variant, so this
-              turns two survivors into one row rather than hiding anything. */}
-          <div className="compact:h-[var(--pinned-cell)] compact:flex-row compact:items-center flex flex-col">
+              turns two survivors into one row rather than hiding anything.
+
+              **This box is the Chart Block's**: the query container every band's `100cqi` reads and
+              the app's single `ResizeObserver`'s target, so the block's width, not the column's, is
+              what its bands are a function of. `max-w-[1984px]` is `AVANCE_BLOCK_MAX_PX` (#110):
+              past it the block **letterboxes**, centred (`mx-auto`) in the column with the surplus
+              empty either side, so the plot keeps its 0,42 inside the Plot Aspect Band and the whole
+              block stays 1239,2 px tall at most — whole in a 1440 px window. Below 2560 px of
+              viewport the cap does not bind and the block is the column, as below B2. */}
+          <div
+            className="compact:h-[var(--pinned-cell)] compact:flex-row compact:items-center @container mx-auto flex w-full max-w-[1984px] flex-col"
+            ref={chartRef}
+          >
             {chart}
           </div>
         </div>

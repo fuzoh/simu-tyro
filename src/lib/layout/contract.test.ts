@@ -15,7 +15,9 @@ import { describe, expect, it } from "vitest";
 import { formatValue } from "@/lib/format/quantity.ts";
 
 import {
+  AVANCE_BLOCK_MAX_PX,
   AVANCE_PLOT_MAX,
+  avanceBlockWidth,
   AXIS_LABEL_INSET,
   axisLabel,
   BANNER,
@@ -568,29 +570,55 @@ describe("Avancé's three columns — the middle column is the chart column", ()
   it("the vue de dessus heads the middle column, above the Chart Block, in the DOM too (#110)", () => {
     // AC3: above the block at every width from B2, and first in the DOM so the focus order is the
     // order on screen. The border class above says which side the hairline is on, not the order;
-    // this reads the order itself, inside the chart column — the element holding `chartRef`.
+    // this reads the order itself: the views' section, then the Chart Block's own box — the element
+    // holding `chartRef` — then `{chart}` inside it.
     const root = fileURLToPath(new URL("../../..", import.meta.url));
     const shell = readFileSync(join(root, "src/components/app/shell.tsx"), "utf8");
     // `{chart}` as a JSX child on a line of its own, not the word in a comment.
     const chartChild = /^\s*\{chart\}\s*$/gm;
     expect(shell.match(chartChild)).toHaveLength(1);
     expect(shell.split("aria-label={SECTION.topView}")).toHaveLength(2);
-    const column = shell.indexOf("ref={chartRef}");
+    expect(shell.split("ref={chartRef}")).toHaveLength(2);
     const views = shell.indexOf("aria-label={SECTION.topView}");
+    const block = shell.indexOf("ref={chartRef}");
     const chart = shell.search(chartChild);
-    expect(column).toBeGreaterThan(-1);
-    expect({ viewsAfterColumn: views > column, chartAfterViews: chart > views }).toStrictEqual({
-      viewsAfterColumn: true,
-      chartAfterViews: true,
+    expect({ blockAfterViews: block > views, chartAfterBlock: chart > block }).toStrictEqual({
+      blockAfterViews: true,
+      chartAfterBlock: true,
     });
   });
 
-  it("Avancé's band and its drawn plot both read the uncapped ceiling (#110)", () => {
+  it("Avancé's Chart Block letterboxes at 1984 px, centred, on its own container box (#110)", () => {
+    // The review's finding: with no ceiling the block outgrew every window — no scroll position
+    // showed the banner slot and « Garde min » together at 3440 × 1440. The cap is the block's own
+    // box: the query container its bands' `100cqi` reads and the observer's target, so the plot,
+    // the strip, the View Strip and the cells all stop with it. Drop `max-w-[1984px]` and the CSS
+    // bands grow past `avanceBlockWidth()`; move it to the column and the vue de dessus stops too.
+    const root = fileURLToPath(new URL("../../..", import.meta.url));
+    const shell = readFileSync(join(root, "src/components/app/shell.tsx"), "utf8");
+    const box = /<div\s+className="([^"]*)"\s+ref=\{chartRef\}/.exec(shell)?.[1] ?? "";
+    expect(box.split(" ")).toEqual(
+      expect.arrayContaining([
+        "@container",
+        "mx-auto",
+        "w-full",
+        `max-w-[${AVANCE_BLOCK_MAX_PX}px]`,
+      ]),
+    );
+    // The one container in the shell is the block's: the column holding the views is not one, so
+    // nothing above the block reads the block's width or the block the column's.
+    expect(shell.match(/"[^"]*@container\b[^"]*"/g)).toHaveLength(1);
+    // The letterbox is the block's and nobody else's: one class string with a `max-w-[` in it.
+    expect(shell.match(/"[^"]*max-w-\[[^"]*"/g)).toHaveLength(1);
+  });
+
+  it("Avancé's band and its drawn plot both read the raised ceiling (#110)", () => {
     // AC4's aspect is held by the contract's functions *given* `AVANCE_PLOT_MAX`; this holds that
     // Avancé gives it, in both places it is spent. Drop `plotMax` and the SVG is drawn capped at
     // 473,76 px in a band reserving 0,42 × W_inner — at 2560 an aspect of 0,24, outside the Plot
     // Aspect Band, the Skeleton's frame off the live plot. Spread `LAYOUT_VARS` on the Shell instead
-    // and the CSS band is capped under an uncapped plot. `shell.test.ts` reads the two rules.
+    // and the CSS band is capped at 473,76 under an 823,2 px plot. `shell.test.ts` reads the two
+    // rules.
     const root = fileURLToPath(new URL("../../..", import.meta.url));
     const read = (path: string) => readFileSync(join(root, path), "utf8");
     const shell = read("src/components/app/shell.tsx");
@@ -643,7 +671,7 @@ describe("Avancé's three columns — the middle column is the chart column", ()
    * of viewport, and `max-w-[1728px]` on the shell. The column is the viewport less the two 288 px
    * columns at every width from B2, by hand below.
    */
-  it("Avancé has no cap: the middle column is the viewport less the two side columns (#110)", () => {
+  it("Avancé has no shell cap: the middle column is the viewport less the two side columns (#110)", () => {
     const measured = [
       { viewport: 1728, column: 1152 },
       { viewport: 1920, column: 1344 },
@@ -658,18 +686,40 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     }
   });
 
-  it("Avancé's plot widens with its column at 0,42, with no ceiling (#110)", () => {
-    // `0,42 × W_inner` by hand, `W_inner` = column − 24: the plot is never frozen at amendment F's
-    // 473,76 on Avancé, and its height is a function of the width alone.
+  it("Avancé's Chart Block is the column up to 2560 px of viewport, then 1984 px (#110)", () => {
+    // The column at 2560 is the brief's own `2560 − 576`: the block fills it there, with no empty
+    // margin, and letterboxes only past it.
+    expect(AVANCE_BLOCK_MAX_PX).toBe(1984);
+    const measured = [
+      { viewport: 390, block: 390 },
+      { viewport: 1023, block: 1023 },
+      { viewport: 1024, block: 448 },
+      { viewport: 1920, block: 1344 },
+      { viewport: 2559, block: 1983 },
+      { viewport: 2560, block: 1984 },
+      { viewport: 2561, block: 1984 },
+      { viewport: 3440, block: 1984 },
+      { viewport: 5120, block: 1984 },
+    ];
+    for (const row of measured) {
+      expect({ viewport: row.viewport, block: avanceBlockWidth(row.viewport) }).toStrictEqual(row);
+    }
+  });
+
+  it("Avancé's plot widens with its block at 0,42, up to the raised 823,2 px ceiling (#110)", () => {
+    // `0,42 × W_inner` by hand, `W_inner` = block − 24: never frozen at amendment F's 473,76 on
+    // Avancé, and a function of the width alone.
+    expect(AVANCE_PLOT_MAX).toBeCloseTo(823.2, 9);
     const measured = [
       { viewport: 1024, wInner: 424, plot: 178.08 },
       { viewport: 1440, wInner: 840, plot: 352.8 },
       { viewport: 1920, wInner: 1320, plot: 554.4 },
       { viewport: 2560, wInner: 1960, plot: 823.2 },
-      { viewport: 3440, wInner: 2840, plot: 1192.8 },
+      // Letterboxed: the block, and so the plot, are 2560's.
+      { viewport: 3440, wInner: 1960, plot: 823.2 },
     ];
     for (const row of measured) {
-      const wInner = innerWidth(chartColumnWidth(row.viewport));
+      const wInner = innerWidth(avanceBlockWidth(row.viewport));
       expect(wInner).toBe(row.wInner);
       expect(profilePlotHeight(wInner, AVANCE_PLOT_MAX)).toBeCloseTo(row.plot, 9);
       expect(profileOuterHeight(wInner, AVANCE_PLOT_MAX)).toBeCloseTo(76 + row.plot, 9);
@@ -678,18 +728,18 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     expect(profilePlotHeight(1960)).toBeCloseTo(473.76, 9);
   });
 
-  it("the Plot Aspect Band holds in Avancé's chart column at every viewport width, stacked or in three columns", () => {
-    // The brief's five widths, by name, then every 8 px from 768 to 3440 so the stacked widths —
-    // where the column is the whole viewport — are walked too.
+  it("the Plot Aspect Band holds in Avancé's Chart Block at every viewport width, stacked or in three columns", () => {
+    // The brief's five widths, by name, then every 8 px from 768 to 5120 so the stacked widths —
+    // where the block is the whole viewport — are walked too, and on past 3440.
     for (const viewport of [1024, 1440, 1920, 2560, 3440]) {
-      const aspect = plotAspect(innerWidth(chartColumnWidth(viewport)), AVANCE_PLOT_MAX);
+      const aspect = plotAspect(innerWidth(avanceBlockWidth(viewport)), AVANCE_PLOT_MAX);
       expect({ viewport, aspect: Number(aspect.toFixed(12)) }).toStrictEqual({
         viewport,
         aspect: 0.42,
       });
     }
-    for (let viewport = 768; viewport <= 3440; viewport += 8) {
-      const aspect = plotAspect(innerWidth(chartColumnWidth(viewport)), AVANCE_PLOT_MAX);
+    for (let viewport = 768; viewport <= 5120; viewport += 8) {
+      const aspect = plotAspect(innerWidth(avanceBlockWidth(viewport)), AVANCE_PLOT_MAX);
       expect({
         viewport,
         ok: aspect >= PLOT_ASPECT_BAND.min && aspect <= PLOT_ASPECT_BAND.max,
@@ -697,16 +747,51 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     }
   });
 
-  it("below B2 Avancé's plot is the one it always was: the ceiling could not bind there", () => {
+  it("without the letterbox the raised ceiling would leave the band at 3440: the block's cap holds it", () => {
+    // The plot ceiling alone is not enough — drawn across the whole 2864 px column, an 823,2 px plot
+    // is `823,2 / 2840 = 0,290`, under the band's 0,35 floor. This is why the block, not only its
+    // plot, stops at 1984 px.
+    const unboxed = plotAspect(innerWidth(chartColumnWidth(3440)), AVANCE_PLOT_MAX);
+    expect(unboxed).toBeCloseTo(0.2899, 4);
+    expect(unboxed).toBeLessThan(PLOT_ASPECT_BAND.min);
+  });
+
+  it("Avancé's whole Chart Block stands in the brief's windows once scrolled to (#110)", () => {
+    // The Chart Block is one co-visible unit. `44 + 76 + 0,42 × W_inner + 200 + 44 + 52` by hand,
+    // against the window less the 36 px navigation bar: the column scrolls the block into view, and
+    // then the banner slot, the coupe, « Garde min » and the cells are all on screen together.
+    const windows = [
+      { viewport: 1920, height: 1080, block: 970.4 },
+      { viewport: 2560, height: 1440, block: 1239.2 },
+      { viewport: 3440, height: 1440, block: 1239.2 },
+    ];
+    for (const row of windows) {
+      const block = chartBlockHeight(avanceBlockWidth(row.viewport), undefined, AVANCE_PLOT_MAX);
+      expect(block).toBeCloseTo(row.block, 9);
+      expect(block).toBeLessThanOrEqual(row.height - 36);
+    }
+    // Bounded: the block never passes its 1984 px plateau, however wide the window.
+    for (let viewport = 2560; viewport <= 7680; viewport += 160) {
+      const block = chartBlockHeight(avanceBlockWidth(viewport), undefined, AVANCE_PLOT_MAX);
+      expect(block).toBeCloseTo(1239.2, 9);
+    }
+    // The default ceiling is still the other Pages' 889,76 px plateau.
+    expect(chartBlockHeight(1984)).toBeCloseTo(889.76, 9);
+  });
+
+  it("below B2 Avancé's plot is the one it always was: neither ceiling could bind there", () => {
     // The widest stacked column is 1023 px, `W_inner` 999, a 419,58 px plot under the 473,76 cap —
-    // so dropping the ceiling moves nothing under 1024 px, which the brief keeps identical.
+    // so raising the ceiling moves nothing under 1024 px, which the brief keeps identical.
     expect(PROFILE_ASPECT * innerWidth(chartColumnWidth(THREE_COLUMN_PX - 1))).toBeCloseTo(
       419.58,
       9,
     );
     for (let viewport = 320; viewport < THREE_COLUMN_PX; viewport += 7) {
-      const wInner = innerWidth(chartColumnWidth(viewport));
+      const wInner = innerWidth(avanceBlockWidth(viewport));
       expect(profilePlotHeight(wInner, AVANCE_PLOT_MAX)).toBe(profilePlotHeight(wInner));
+      expect(chartBlockHeight(avanceBlockWidth(viewport), undefined, AVANCE_PLOT_MAX)).toBe(
+        chartBlockHeight(viewport),
+      );
     }
   });
 
@@ -722,8 +807,9 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     for (const cls of ["flex-row", "contents", "w-72", "order-first", "order-last", "flex-1"]) {
       expect(shell).toContain(`${wide}${cls}`);
     }
-    // No cap on Avancé's shell (#110); the other Pages' frames keep `SHELL_MAX_PX`.
-    expect(shell).not.toMatch(/max-w-\[/);
+    // No cap on Avancé's shell (#110) — its one `max-w-[` is the Chart Block's letterbox, never the
+    // shell's 1728; the other Pages' frames keep `SHELL_MAX_PX`.
+    expect(shell).not.toContain(`max-w-[${SHELL_MAX_PX}px]`);
     for (const frame of ["statique/frame.tsx", "terrain-page/frame.tsx"]) {
       expect(read(`src/components/${frame}`)).toContain(`max-w-[${SHELL_MAX_PX}px]`);
     }

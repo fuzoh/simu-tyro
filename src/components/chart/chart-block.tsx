@@ -134,7 +134,7 @@ export function ChartBlock({
   onReveal: () => void;
   /**
    * The Page's plot ceiling, px — amendment F's {@link PROFILE_PLOT_MAX} unless the Page says
-   * otherwise. Avancé passes `AVANCE_PLOT_MAX`, none (#110). It must be the ceiling the Page's own
+   * otherwise. Avancé passes `AVANCE_PLOT_MAX`, raised (#110). It must be the ceiling the Page's own
    * `--profile-plot` spells, or the drawn plot and its CSS band would disagree.
    */
   plotMax?: number;
