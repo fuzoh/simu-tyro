@@ -191,6 +191,28 @@ describe("the curve", () => {
   });
 });
 
+describe("the speed axis' « 0 » stands above the zero line (#115)", () => {
+  test("the line passes under its halo instead of reading as a minus sign", () => {
+    const curve = scene.curve;
+    if (curve === null) throw new Error("a solved line has a curve");
+    const zeroTick = curve.speedTicks.find((tick) => tick.text === "0");
+    if (zeroTick === undefined) throw new Error("the speed axis names its zero");
+    // The label starts 3 px inside the plot, on a 3 px stroke halo (1,5 px below the baseline) and
+    // the zero line is a 1 px hairline (0,5 px above `zero`): the baseline must clear both, 2 px.
+    expect(curve.zero - zeroTick.baseline).toBeGreaterThanOrEqual(2);
+  });
+
+  test("every other tick is centred on its value at the axis' 9 px", () => {
+    const curve = scene.curve;
+    if (curve === null) throw new Error("a solved line has a curve");
+    const others = [...curve.speedTicks, ...curve.accelerationTicks].filter(
+      (tick) => tick.text !== "0",
+    );
+    expect(others.length).toBeGreaterThan(0);
+    for (const tick of others) expect(tick.baseline - tick.y).toBeCloseTo(3, 9);
+  });
+});
+
 describe("the axes' labels fit the gutter", () => {
   test("no tick runs past four characters, however steep the line", () => {
     const steep = ridesUnder(0, 0, { ...SHIPPED, geometry: { source: "manual", L: 150, h: -60 } });

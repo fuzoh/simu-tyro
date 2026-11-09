@@ -64,8 +64,13 @@ export type StopMarker = {
   readonly row: 0 | 1;
 };
 
-/** One tick of a y axis. */
-export type Tick = { readonly y: number; readonly text: string };
+/**
+ * One tick of a y axis: `y` is the value's pixel, `baseline` where its glyphs stand — centred on
+ * `y` at the axis' 9 px, except the speed axis' « 0 », which stands just **above** the zero line as
+ * the clearance strip's does. Centred on it, the line would run out from under the label's halo
+ * and read as a minus sign (« -0 »), since a label stands inside the plot (#115).
+ */
+export type Tick = { readonly y: number; readonly baseline: number; readonly text: string };
 
 export type CoupeScene = {
   /** The whole band: badge + plot + handle lane + x labels. */
@@ -150,6 +155,12 @@ const LABEL_ROW = { calm: 0, windy: 1 } as const satisfies Record<RideId, 0 | 1>
 
 /** A tick closer than this to the zero line is dropped rather than drawn over it. */
 const TICK_CLEARANCE = 9;
+
+/** A 9 px label's baseline below the pixel it reads, so the glyphs are centred on it. */
+const TICK_CENTRED = 3;
+
+/** The zero label's baseline above the zero line, so the line passes under the glyph. */
+const ZERO_ABOVE = 2;
 
 /**
  * @param width the chart column's inline size — the single `ResizeObserver`'s.
@@ -298,7 +309,12 @@ function curveScene(
     quantity: "speed" | "acceleration",
   ) => {
     const text = formatValue(quantity, value);
-    return { y: y(value), text: Math.abs(value) >= 10 ? text.replace(/,\d+$/, "") : text };
+    const at = y(value);
+    return {
+      y: at,
+      baseline: at + TICK_CENTRED,
+      text: Math.abs(value) >= 10 ? text.replace(/,\d+$/, "") : text,
+    };
   };
   const apart = (ticks: readonly Tick[]) =>
     ticks.filter((one) => Math.abs(one.y - zero) > TICK_CLEARANCE);
@@ -313,7 +329,7 @@ function curveScene(
     acceleration: path(passes.windy, (sample) => sample.a, yAcceleration),
     zero,
     speedTicks: [
-      { y: zero, text: "0" },
+      { y: zero, baseline: zero - ZERO_ABOVE, text: "0" },
       ...apart([tick(speed.pos, ySpeed, "speed"), tick(-speed.neg, ySpeed, "speed")]),
     ],
     accelerationTicks: apart([

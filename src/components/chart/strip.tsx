@@ -245,29 +245,6 @@ export function ClearanceStrip({
           `foreground` rather than in `border` — the token for gridlines that mean nothing — at a
           hairline, which keeps it visually under the `stroke-2` curve. */}
       <line className="stroke-foreground" x1={x.x(0)} x2={x.x(frame.L)} y1={zero} y2={zero} />
-      {/* The y axis' labels stand **inside** the plot, from its left edge (#115): the 12 px gutter
-          is the containers' margin and holds no label, and a label right-aligned in it would be cut
-          by the SVG's edge. They sit over the curve's first metres, so each is drawn on a halo of
-          the background, as the rider's tip is. A tick that would collide with the zero label is
-          dropped rather than drawn twice. */}
-      <g
-        className="fill-muted-foreground stroke-background pointer-events-none text-[9px]"
-        paintOrder="stroke"
-        strokeLinejoin="round"
-        strokeWidth={3}
-        textAnchor={axis.anchor}
-      >
-        <text x={axis.x} y={zero - 2}>
-          0
-        </text>
-        {domain.ticks
-          .filter((tick) => Math.abs(y(tick) - zero) > 8)
-          .map((tick, index) => (
-            <text key={tick} x={axis.x} y={y(tick) + 3}>
-              {clearanceTickLabel(tick, index === 0)}
-            </text>
-          ))}
-      </g>
 
       {envelopeDeficit !== null && <path className="fill-destructive/10" d={envelopeDeficit} />}
       {deficit !== null && <path className="fill-destructive/25" d={deficit} />}
@@ -287,6 +264,31 @@ export function ClearanceStrip({
           y2={bottom}
         />
       )}
+
+      {/* The y axis' labels stand **inside** the plot, from its left edge (#115): the 12 px gutter
+          is the containers' margin and holds no label, and a label right-aligned in it would be cut
+          by the SVG's edge. They sit over the curve's first metres, so each is drawn on a halo of
+          the background, as the rider's tip is — and **after** every series, because SVG paints in
+          document order and a halo only masks what was drawn before it. A tick that would collide
+          with the zero label is dropped rather than drawn twice. */}
+      <g
+        className="fill-muted-foreground stroke-background pointer-events-none text-[9px]"
+        paintOrder="stroke"
+        strokeLinejoin="round"
+        strokeWidth={3}
+        textAnchor={axis.anchor}
+      >
+        <text x={axis.x} y={zero - 2}>
+          0
+        </text>
+        {domain.ticks
+          .filter((tick) => Math.abs(y(tick) - zero) > 8)
+          .map((tick, index) => (
+            <text key={tick} x={axis.x} y={y(tick) + 3}>
+              {clearanceTickLabel(tick, index === 0)}
+            </text>
+          ))}
+      </g>
     </svg>
   );
 }
