@@ -46,4 +46,13 @@ describe("the fields the Page Statique shows", () => {
     const shown = FIELD_ORDER.filter((id) => shownOnStatique(id, { geometry, material }));
     expect(new Set(shown)).toEqual(new Set([...ALWAYS, ...own]));
   });
+
+  test("the Zone d'ancrage's length is Avancé's alone, beside a Garde exigée Statique shows (#106)", () => {
+    for (const geometry of [MANUAL, IMPORTED]) {
+      for (const material of [STEEL, TEXTILE]) {
+        expect(shownOnStatique("anchorZone", { geometry, material })).toBe(false);
+        expect(shownOnStatique("hClearMin", { geometry, material })).toBe(true);
+      }
+    }
+  });
 });

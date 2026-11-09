@@ -93,6 +93,8 @@ describe("the key table and canonical order", () => {
       "mp",
       "hr",
       "gm",
+      // #106: the Zones d'ancrage, beside the garde exigée they exempt.
+      "zan",
       "daf",
       "ws",
       "wd",

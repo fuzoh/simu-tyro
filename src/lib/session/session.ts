@@ -320,6 +320,8 @@ const SCENARIO: v.GenericSchema<unknown, Scenario> = v.object({
     // Added 2026-09-23. **Optional with the shipped default**, so a Session written before it is
     // not discarded for lacking a key nobody could have set.
     hClearMin: v.optional(FINITE, FIRST_RUN_SCENARIO.rider.hClearMin),
+    // Added with #106, optional with the shipped 10 m for the same reason.
+    anchorZone: v.optional(FINITE, FIRST_RUN_SCENARIO.rider.anchorZone),
     DAF: FINITE,
     xD: FINITE,
   }),

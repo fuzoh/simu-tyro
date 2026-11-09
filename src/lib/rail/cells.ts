@@ -101,6 +101,8 @@ export type PlacedRider = {
   readonly worst: { readonly hClear: number; readonly atX: number };
   /** Is {@link worst} far enough from the rider that the cell names where it is? */
   readonly relabel: boolean;
+  /** Is the rider inside a Zone d'ancrage, where nothing is judged? */
+  readonly inAnchorZone: boolean;
   /** The passenger's own garde, at `x_D`. */
   readonly underRider: number;
   /** The loaded cable's drop below the unloaded one, at `x_D`. */
@@ -151,7 +153,8 @@ export function readOutCells(
             : CELL_LABEL.clearance,
           value: formatQuantity("clearance", rider.worst.hClear),
           note: false,
-          breach: clearanceBreached(rider.worst.hClear, hClearMin),
+          // A rider on the platform is not judged (#106): the garde reads, and turns no cell red.
+          breach: !rider.inAnchorZone && clearanceBreached(rider.worst.hClear, hClearMin),
         }
       : { label: CELL_LABEL.clearance, ...refused },
     TA: cell("TA", formatQuantity("Tstatic", rider.step.TA, unit)),

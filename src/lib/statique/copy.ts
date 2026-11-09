@@ -30,7 +30,12 @@ import {
 import { GATE_CONSEQUENCE, TEXTILE_UNAVAILABLE_REASON, WIND_UNPLACED } from "@/lib/rail/gates.ts";
 import { FIELD_NOTE } from "@/lib/rail/help.ts";
 import { MATERIAL_PRESETS, PRESET_LABEL, SHEET_CHIP, VALUE_CHIP } from "@/lib/rail/presets.ts";
-import { NO_REGIME_BANNER_BY_REGISTER, TRAVERSE_SCOPE } from "@/lib/rail/results.ts";
+import {
+  CLEARANCE_PER_LINE_SCOPE,
+  CLEARANCE_SCOPE,
+  NO_REGIME_BANNER_BY_REGISTER,
+  TRAVERSE_SCOPE,
+} from "@/lib/rail/results.ts";
 import { MAESTRO_ROPE_ONLY, PASS_TO_PULLEY } from "@/lib/rail/tensioning.ts";
 import { REGIMES } from "@/lib/sim";
 import {
@@ -146,6 +151,8 @@ export function statiqueLabelTable(): readonly string[] {
     ...Object.values(REGIMES).map((regime) => regime.label),
     ...Object.values(OUTPUT_LABEL),
     TRAVERSE_SCOPE,
+    CLEARANCE_SCOPE,
+    CLEARANCE_PER_LINE_SCOPE,
     ...STATIQUE_GATES.map((gate) => GATE_CONSEQUENCE[gate]),
     ...cellsOf("terrain").map((id) => cellLabel(id, "terrain")),
     READ_OUT_SCOPE,
@@ -155,6 +162,7 @@ export function statiqueLabelTable(): readonly string[] {
     ...Object.values(COUPE_HOVER.line),
     COUPE_HOVER.lineGap,
     COUPE_HOVER.fromFoot,
+    COUPE_HOVER.anchorZone,
     label("distance", "terrain"),
     label("groundClearance", "terrain"),
     veBadgeLabel({ state: "auto", ve: 4.7 }),

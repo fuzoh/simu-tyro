@@ -71,6 +71,9 @@ export const BRANCHES = [
   "positions-off-profil",
   "positions-off-profil-unplaced",
   "trace-full-profil",
+  "anchor-zone-absent",
+  "anchor-zone-off-default",
+  "anchor-zone-default-explicit",
 ] as const;
 
 export type Branch = (typeof BRANCHES)[number];
@@ -90,7 +93,8 @@ export type CanonicalLinkFixture = {
     | typeof MEASURED_90
     | typeof MEASURED_103
     | typeof MEASURED_PH
-    | typeof MEASURED_WIND;
+    | typeof MEASURED_WIND
+    | typeof MEASURED_106;
   covers: readonly Branch[];
   scenario: Scenario;
   link: string;
@@ -115,7 +119,8 @@ export type DecodeOnlyFixture = {
     | typeof MEASURED_89
     | typeof MEASURED_90
     | typeof MEASURED_103
-    | typeof MEASURED_PH;
+    | typeof MEASURED_PH
+    | typeof MEASURED_106;
   covers: readonly Branch[];
   link: string;
 } & ({ scenario: Scenario; canonical: string } | { scenario: ScenarioDraft; canonical: null });
@@ -132,6 +137,7 @@ const MEASURED_90 = "[MEASURED] issue #90, codec as of 2026-11-08";
 const MEASURED_103 = "[MEASURED] issue #103, codec as of 2026-11-08";
 const MEASURED_PH = "[MEASURED] map #1's review of `ph`, codec as of 2026-11-09";
 const MEASURED_WIND = "[MEASURED] geographic `wd`, codec as of 2026-11-09";
+const MEASURED_106 = "[MEASURED] issue #106, codec as of 2026-11-09";
 
 /** Three samples `(0,0) (50,-4) (100,-9)`, as `encodeP1` writes them — a 100 m profil. */
 export const TRACE_P1 = "p1.AwCQTpBOAJ8G5wcA";
@@ -158,7 +164,7 @@ const STEEL: Scenario = {
     A: { id: "cosse-oeil-flamand", eta: 0.9 },
     B: { id: "cosse-oeil-flamand", eta: 0.9 },
   },
-  rider: { mp: 120, hRider: 2.1, hClearMin: 1, DAF: 1.2, xD: 75 },
+  rider: { mp: 120, hRider: 2.1, hClearMin: 1, anchorZone: 10, DAF: 1.2, xD: 75 },
   wind: { speedKmh: 0, directionDeg: 0 },
   dynamics: { CdA: 0.45, rho: null, F0: 15, kv: 1.5, mu: 0.015 },
   positions: { A: null, B: null },
@@ -210,9 +216,28 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
       "wind-absent",
       "dynamics-absent",
       "positions-absent",
+      "anchor-zone-absent",
     ],
     scenario: STEEL,
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "Zones d'ancrage of 25 m: `zan` after `gm`, before `daf`",
+    source: MEASURED_106,
+    covers: ["anchor-zone-off-default"],
+    scenario: { ...STEEL, rider: { ...STEEL.rider, anchorZone: 25 } },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&zan=25&daf=1.2&x=75",
+  },
+  {
+    name: "no Zone d'ancrage: `zan=0` is stated, since 0 is not the shipped 10 m",
+    source: MEASURED_106,
+    covers: ["anchor-zone-off-default"],
+    scenario: { ...STEEL, rider: { ...STEEL.rider, anchorZone: 0 } },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&zan=0&daf=1.2&x=75",
   },
   {
     name: "two Brins porteurs: `bp=2`, after the driver",
@@ -630,6 +655,16 @@ export const DECODE_ONLY_LINKS: readonly DecodeOnlyFixture[] = [
     canonical:
       `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
       "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&x=0",
+  },
+  {
+    name: "`zan=10` is the shipped Zones d'ancrage, and the canonical link says so by omitting it",
+    source: MEASURED_106,
+    covers: ["anchor-zone-default-explicit"],
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&zan=10&daf=1.2&x=75",
+    scenario: STEEL,
+    canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
   },
   {
     name: "`bp=1` is one Brin porteur, and the canonical link says so by omitting it",

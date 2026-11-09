@@ -49,4 +49,6 @@ export const COUPE_HOVER = {
   line: { absolute: "altitude de la ligne chargée", fromFoot: "hauteur de la ligne chargée" },
   lineGap: "écart ligne – sol",
   fromFoot: "hauteurs depuis le pied de A",
+  /** A position inside a Zone d'ancrage (#106): the garde is read there, and judged nowhere. */
+  anchorZone: `${label("anchorZone", "terrain")} : garde non jugée`,
 } as const;

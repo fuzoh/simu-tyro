@@ -106,9 +106,11 @@ export const FIRST_RUN_SCENARIO = {
    * itself — **and** the profile draws one clearance dimension
    * rather than two, since ticket 41 gates its second one on the same bit. `h_clear,min` 1,0 m is a
    * `[CONVENTION]` of 2026-09-23 — no reference publishes a minimum garde — and the shipped line's
-   * 2,42 m clears it, so the first screen carries no clearance breach.
+   * 2,42 m clears it, so the first screen carries no clearance breach. The Zones d'ancrage are
+   * 10 m at each end, a `[CONVENTION]` of #106 — no reference publishes one — and `zan` **absent**,
+   * so the shipped link did not change; the shipped line's minimum is mid-span, outside both.
    */
-  rider: { mp: 120, hRider: 2.1, hClearMin: 1, DAF: 1.2, xD: 75 },
+  rider: { mp: 120, hRider: 2.1, hClearMin: 1, anchorZone: 10, DAF: 1.2, xD: 75 },
   /** No wind, which is `ws` and `wd` **absent**: the shipped link did not change either. */
   wind: { speedKmh: 0, directionDeg: 0 },
   /**

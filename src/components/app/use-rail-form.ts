@@ -77,7 +77,7 @@ export function useRailForm(
   traverse: TraverseScenario,
   register: Register = "exact",
 ): RailFormState {
-  const { scenario } = useAppState();
+  const { scenario, trace } = useAppState();
 
   const [focused, setFocused] = useState<FieldId | null>(null);
   const values = useMemo(() => railValues(scenario, deduced), [scenario, deduced]);
@@ -117,8 +117,8 @@ export function useRailForm(
   // the banner all hang off it, and a fresh object per render would re-run `evaluateVerdict` over
   // 260 steps on every keystroke and every scrub frame — the one measured cost in the app.
   const report = useMemo(
-    () => evaluateGates({ scenario: traverse, issues, register }),
-    [traverse, issues, register],
+    () => evaluateGates({ scenario: traverse, trace, issues, register }),
+    [traverse, trace, issues, register],
   );
 
   return { form, text, focused, setFocused, issues, report };

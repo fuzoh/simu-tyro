@@ -35,6 +35,7 @@ export function useTraverse(): TraverseScenario {
     mp,
     hRider,
     hClearMin,
+    anchorZone,
     DAF,
   } = traverseInputs(useAppState().scenario);
   return useMemo(
@@ -56,6 +57,7 @@ export function useTraverse(): TraverseScenario {
         mp,
         hRider,
         hClearMin,
+        anchorZone,
         DAF,
       }),
     [
@@ -75,6 +77,7 @@ export function useTraverse(): TraverseScenario {
       mp,
       hRider,
       hClearMin,
+      anchorZone,
       DAF,
     ],
   );

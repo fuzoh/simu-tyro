@@ -90,6 +90,7 @@ describe("« Résultats sans régime » — the reduced row set", () => {
     expect(rowIds(results)).toEqual([
       "Tmax",
       "clearance",
+      "clearanceWhole",
       "TmaxA",
       "TmaxB",
       "Tstatic",
@@ -135,12 +136,13 @@ describe("« Résultats sans régime » — the reduced row set", () => {
 describe("the thirteen reported values, on the shipped line under EN 15567-1", () => {
   const results = resultsOf({ regime: "en15567" });
 
-  test("four headline rows, nine detail rows, no accordion", () => {
+  test("four headline rows, ten detail rows, no accordion", () => {
     expect(rowIds(results)).toEqual([
       "verdict",
       "FS",
       "Tmax",
       "clearance",
+      "clearanceWhole",
       "reserve",
       "TadmA",
       "TadmB",
@@ -152,7 +154,8 @@ describe("the thirteen reported values, on the shipped line under EN 15567-1", (
       "coverage",
     ]);
     expect(results.rows.filter((row) => row.rank === "headline")).toHaveLength(4);
-    expect(results.rows.filter((row) => row.rank === "detail")).toHaveLength(9);
+    // Ten with the Zones d'ancrage's unjudged garde (#106), which the shipped 10 m switches on.
+    expect(results.rows.filter((row) => row.rank === "detail")).toHaveLength(10);
   });
 
   test("§ 9's canonical sketch, row by row", () => {
@@ -290,7 +293,13 @@ describe("the app's envelope against the engine's", () => {
     // the standing tension — optimistic in the one direction that kills — so the amplified rows
     // are absent while « T max statique » and the garde, which need no DAF, stay.
     const results = resultsOf({ rider: { ...SHIPPED.rider, DAF: -1 } });
-    expect(rowIds(results)).toEqual(["clearance", "Tstatic", "loadedSag", "coverage"]);
+    expect(rowIds(results)).toEqual([
+      "clearance",
+      "clearanceWhole",
+      "Tstatic",
+      "loadedSag",
+      "coverage",
+    ]);
   });
 
   test("the surviving static row is picked by the static ordering, not by a DAF-derived one", () => {
@@ -588,6 +597,7 @@ describe("two Brins porteurs — values per line, the pair, and the « cas défa
       "FS",
       "Tmax",
       "clearance",
+      "clearanceWhole",
       "reserve",
       "TadmA",
       "TadmB",
@@ -728,5 +738,58 @@ describe("a scrub re-derives nothing — `vi.mock` on the engine barrel", () => 
 
     vi.doUnmock("@/lib/sim");
     vi.resetModules();
+  });
+});
+
+describe("the Zones d'ancrage on Avancé's `Résultats` (#106)", () => {
+  /**
+   * A low anchor A, its top 2,5 m over its foot, and a high B: the passager touches the ground a
+   * few metres from A only — on the platform — and clears it everywhere else.
+   */
+  const lowAtA = (anchorZone: number, hClearMin: number) =>
+    resultsOf({
+      anchors: { zA: 2.5, zB: 50 },
+      rider: { ...SHIPPED.rider, anchorZone, hClearMin },
+    });
+  const clearanceRow = (results: Results) => results.rows.find((row) => row.id === "clearance");
+
+  test("without zones there is one garde row, over the whole traverse", () => {
+    const results = resultsOf({ rider: { ...SHIPPED.rider, anchorZone: 0 } });
+    expect(rowIds(results)).toContain("clearance");
+    expect(rowIds(results)).not.toContain("clearanceWhole");
+    expect(results.clearanceScope).toBe(TRAVERSE_SCOPE);
+  });
+
+  test("on the shipped line the zones change nothing: both rows read the 2,42 m at x 74,4", () => {
+    // § 9's minimum is at mid-span, sixty metres from either zone.
+    const results = resultsOf();
+    expect(valueOf(results, "clearance")).toBe("2,42 m");
+    expect(valueOf(results, "clearanceWhole")).toBe("2,42 m");
+    expect(results.rows.find((row) => row.id === "clearanceWhole")).toMatchObject({
+      label: "Garde min (traversée), zones d'ancrage comprises",
+      qualifier: "non jugée, passager à x 74,4 m",
+      state: null,
+      rank: "detail",
+    });
+    expect(results.clearanceScope).toBe("sur la traversée, hors zones d'ancrage");
+  });
+
+  test("a contact on the platform alone is no « Hors limites », and the unjudged row shows it", () => {
+    // 0,30 m exigés, under the garde the line keeps outside its zones.
+    expect(clearanceRow(lowAtA(0, 0.3))?.state).toBe("hors-limites");
+    const zoned = lowAtA(10, 0.3);
+    expect(clearanceRow(zoned)?.state).toBeNull();
+    // The contact is still printed — negative, the bare line's own garde, on the row judged by
+    // nothing.
+    expect(valueOf(zoned, "clearanceWhole")).toMatch(/^-/);
+    expect(valueOf(zoned, "clearanceWhole")).toBe(valueOf(lowAtA(0, 0.3), "clearance"));
+    expect(zoned.rows.find((row) => row.id === "clearanceWhole")?.state).toBeNull();
+  });
+
+  test("the same line, with too little garde just past A's zone, stays « Hors limites »", () => {
+    const zoned = lowAtA(10, 1);
+    expect(clearanceRow(zoned)?.state).toBe("hors-limites");
+    // The first sweep step past x = 10 m: the minimum sits right at the zone's edge.
+    expect(clearanceRow(zoned)?.qualifier).toBe("sous la garde exigée 1,0 m, passager à x 10,4 m");
   });
 });

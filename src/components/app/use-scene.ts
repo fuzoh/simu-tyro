@@ -15,7 +15,8 @@
  * textile `MBL` is « Aucun résultat », where terrain, both anchors and the span markers still draw,
  * while an invalid `L` is the *exception géométrique* that collapses both plots.
  *
- * **`x_D` is deliberately not a dependency.** The unloaded line, `mp` and `hRider` omit it, which
+ * **`x_D` is deliberately not a dependency.** The unloaded line, `mp`, `hRider` and the Zones
+ * d'ancrage omit it, which
  * is what makes a drag cheap: `placeRider` is the only half a `pointermove` re-runs, and it stays
  * in the Chart Block where the rider lives. Keying this on the whole Scenario would undo that — a
  * scrub dispatches a new Scenario on every frame.
@@ -68,7 +69,7 @@ export type Scene = {
  */
 export function useScene(unloaded: Unloaded): Scene {
   const { rider, carryingLines } = useAppState().scenario;
-  const { mp, hRider } = rider;
+  const { mp, hRider, anchorZone } = rider;
 
   // Every dependency survives a scrub untouched: `scénario/modifié` merges its patch shallowly, so
   // a rider patch leaves the placement and the unloaded line identical.
@@ -76,8 +77,8 @@ export function useScene(unloaded: Unloaded): Scene {
   const frame = useMemo(() => buildSceneFrame(placed), [placed]);
 
   const solved = useMemo(
-    () => buildSceneBase(frame, unloaded, { mp, hRider, carryingLines }),
-    [frame, unloaded, mp, hRider, carryingLines],
+    () => buildSceneBase(frame, unloaded, { mp, hRider, anchorZone, carryingLines }),
+    [frame, unloaded, mp, hRider, anchorZone, carryingLines],
   );
 
   return { frame, solved };

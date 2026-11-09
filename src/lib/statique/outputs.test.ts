@@ -138,7 +138,8 @@ describe("what the Page prints in place of a value", () => {
       pretension: null,
       sag: null,
       loadedSag: "sur toute la traversée",
-      clearance: "sur toute la traversée",
+      // The garde is judged outside the Zones d'ancrage, and its tile says so (#106).
+      clearance: "sur la traversée, hors zones d'ancrage",
     });
   });
 
@@ -267,4 +268,81 @@ describe("the tension de pose field warns as Avancé does", () => {
 test("the Page prints its four outputs in the order the Skeleton reserves them", () => {
   const { statique } = pagesOn(firstRunDefaults() as ScenarioDraft);
   expect(statique.outputs.map((tile) => tile.id)).toEqual(STATIQUE_OUTPUT_IDS);
+});
+
+/**
+ * #106 on the trial line: the profil geo.admin of 2026-11-08, two lines of Courant Bandit 11 mm
+ * posed at 140 daN, a 95 kg passager, anchors 12 m over their feet. In its V valley the garde's
+ * minimum fell beside anchor A, where the passager is still on the platform.
+ *
+ * `[MEASURED]` issue #106 for `z = 0`: the tile read « 9,67 m, passager à x 3,3 m » before the zones.
+ * The `z = 10` figures are a regression pin recorded through this chain on 2026-11-09, after the
+ * zones: 11,25 m, passager à x 15,0 m — no independent source has them.
+ */
+describe("the trial line's garde leaves its Zones d'ancrage out (#106)", () => {
+  const geoadmin = CANONICAL_LINKS.find((fixture) => fixture.name.startsWith("a profil geo.admin"));
+  if (geoadmin === undefined) throw new Error("the profil geo.admin fixture exists");
+  const shipped = firstRunDefaults() as ScenarioDraft;
+  const trial = (anchorZone: number, hClearMin = shipped.rider.hClearMin): ScenarioDraft => ({
+    ...applyMaterialPreset(
+      { ...shipped, usage: "TEMPORAIRE", material: { ...FIRST_RUN_RETAINED_TEXTILE.spec } },
+      "courant-bandit-11",
+    ),
+    geometry: geoadmin.scenario.geometry,
+    positions: geoadmin.scenario.positions,
+    anchors: { zA: 12, zB: 12 },
+    carryingLines: 2,
+    tightness: { mode: "anchor", T_target: 1400 },
+    rider: { ...shipped.rider, mp: 95, hClearMin, anchorZone },
+  });
+  const avanceRow = (pages: ReturnType<typeof pagesOn>, id: "clearance" | "clearanceWhole") =>
+    pages.avance.results?.rows.find((row) => row.id === id) ?? null;
+
+  test("without zones the issue's figure: 9,67 m, the passager 3,3 m from A", () => {
+    const pages = pagesOn(trial(0));
+    expect(output(pages.statique.outputs, "clearance")).toMatchObject({
+      value: "9,67 m",
+      qualifier: "passager à x 3,3 m",
+      // No zone, nothing left out: the scope is every other row's.
+      scope: "sur toute la traversée, par ligne",
+    });
+    // And no second, unjudged row: without zones it would be the same number twice.
+    expect(avanceRow(pages, "clearanceWhole")).toBeNull();
+  });
+
+  test("with 10 m zones the minimum is outside [0, 10] ∪ [425,2, 435,2]: 11,25 m at x 15,0", () => {
+    const pages = pagesOn(trial(10));
+    expect(output(pages.statique.outputs, "clearance")).toMatchObject({
+      value: "11,25 m",
+      qualifier: "passager à x 15,0 m",
+      scope: "sur la traversée, hors zones d'ancrage, par ligne",
+    });
+    expect(avanceRow(pages, "clearance")?.value).toBe("11,25 m");
+  });
+
+  test("Avancé still shows the minimum the zones leave out, as a reading judged by nothing", () => {
+    const pages = pagesOn(trial(10, 10));
+    expect(avanceRow(pages, "clearanceWhole")).toMatchObject({
+      label: "Garde min (traversée), zones d'ancrage comprises",
+      value: "9,67 m",
+      qualifier: "non jugée, passager à x 3,3 m",
+      state: null,
+      rank: "detail",
+    });
+  });
+
+  test("a garde under the Garde exigée only in a zone is not « Hors limites »", () => {
+    // 10,00 m exigés: 9,67 m beside A breaches it without zones, and nothing outside them does.
+    expect(output(pagesOn(trial(0, 10)).statique.outputs, "clearance").breach).toBe(true);
+    const zoned = pagesOn(trial(10, 10));
+    expect(output(zoned.statique.outputs, "clearance").breach).toBe(false);
+    expect(avanceRow(zoned, "clearance")?.state).toBeNull();
+  });
+
+  test("the same line with too little garde just outside a zone stays « Hors limites »", () => {
+    // 12,00 m exigés: 11,25 m at x 15,0, five metres past A's zone.
+    const zoned = pagesOn(trial(10, 12));
+    expect(output(zoned.statique.outputs, "clearance").breach).toBe(true);
+    expect(avanceRow(zoned, "clearance")?.state).toBe("hors-limites");
+  });
 });

@@ -248,7 +248,19 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
   Partial<
     Pick<
       SearchValues,
-      "reg" | "bp" | "cp" | "mt" | "ws" | "wd" | "cda" | "rho" | "lata" | "lona" | "latb" | "lonb"
+      | "reg"
+      | "bp"
+      | "cp"
+      | "mt"
+      | "zan"
+      | "ws"
+      | "wd"
+      | "cda"
+      | "rho"
+      | "lata"
+      | "lona"
+      | "latb"
+      | "lonb"
     >
   > &
   CompletedTerrain &
@@ -259,8 +271,8 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
  * The keys whose **absence is meaning**, never completed. `reg` absent is « — choisir — »,
  * `mbf`/`ea`/`mu` absent is « non surchargée », which differs from « equal to the formula value »,
  * `mbl` absent — with `mu`, under `fam=tx` — is § 9's rope nobody typed, `bp` absent is one
- * Brin porteur, `cp` absent is the Mise en tension at A, `mt` absent is the mouflage, `ws` / `wd`
- * absent is no wind, `cda` / `f0` / `kv` / `mur` / `rho` absent is §12.2's default for the ride, the
+ * Brin porteur, `cp` absent is the Mise en tension at A, `mt` absent is the mouflage, `zan` absent
+ * is the shipped Zones d'ancrage, `ws` / `wd` absent is no wind, `cda` / `f0` / `kv` / `mur` / `rho` absent is §12.2's default for the ride, the
  * four coordinates absent are Positions unknown and `ph` absent is a profil that runs between them:
  * completing any would rewrite, and name in the strip, every link older than the key.
  */
@@ -269,6 +281,7 @@ const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>([
   "bp",
   "cp",
   "mt",
+  "zan",
   "ws",
   "wd",
   "cda",
@@ -322,7 +335,7 @@ export type Completion = {
  *
  * Three groups are exempt, all of them § 7's meanings of absence:
  *
- * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, `cp`, `mt`, `ws`, `wd`, the ride's constants, the
+ * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, `cp`, `mt`, `zan`, `ws`, `wd`, the ride's constants, the
  *    Positions and `ph`, the Overrides and the textile blanks. Under `fam=tx`
  *    **no rope is invented**: § 9 ships `MBL` and `μ` « vides et requis », because one made-up
  *    `MBL` decides the verdict, and those two blocking errors are the correct arrival state.
@@ -539,6 +552,8 @@ export function searchToScenario(search: CompletedSearch): ScenarioDraft {
       mp: search.mp,
       hRider: search.hr,
       hClearMin: search.gm,
+      // Absent **is** the shipped Zones d'ancrage — a link older than the key reads them.
+      anchorZone: search.zan ?? FIRST_RUN_SCENARIO.rider.anchorZone,
       DAF: search.daf,
       xD: clampX(search.x, spanOf(search)),
     },
@@ -643,6 +658,9 @@ export function scenarioToSearch(scenario: Scenario): CompletedSearch {
   out.mp = rider.mp;
   out.hr = rider.hRider;
   out.gm = rider.hClearMin;
+  // The shipped Zones d'ancrage are `zan` **absent**, so the links written before the key stay
+  // string-identical.
+  if (rider.anchorZone !== FIRST_RUN_SCENARIO.rider.anchorZone) out.zan = rider.anchorZone;
   out.daf = rider.DAF;
   // Each is written only off its default, because no wind is both keys **absent**.
   if (scenario.wind.speedKmh !== 0) out.ws = scenario.wind.speedKmh;

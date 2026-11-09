@@ -634,6 +634,31 @@ describe("Brins porteurs in the Session (#84)", () => {
   });
 });
 
+describe("the Zones d'ancrage in the Session (#106)", () => {
+  test("a length off the shipped 10 m survives a write and a read", () => {
+    const storage = memoryStorage();
+    const defaults = firstRunDefaults();
+    writeSession(storage, {
+      ...bareSession(),
+      scenario: { ...defaults, rider: { ...defaults.rider, anchorZone: 4.5 } },
+    });
+    expect(readSession(storage)?.scenario.rider.anchorZone).toBe(4.5);
+  });
+
+  test("a Session stored before the key is kept, and reads the shipped 10 m", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const scenario = { ...(blob.scenario as Record<string, unknown>) };
+    const rider = { ...(scenario.rider as Record<string, unknown>) };
+    delete rider.anchorZone;
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: { ...scenario, rider } }));
+
+    const restored = readSession(storage);
+    expect(restored?.trace).not.toBeNull();
+    expect(restored?.scenario.rider.anchorZone).toBe(10);
+  });
+});
+
 describe("the tensioning side and the prétension driver in the Session (#85)", () => {
   test("side B and a prétension driver survive a write and a read", () => {
     const storage = memoryStorage();

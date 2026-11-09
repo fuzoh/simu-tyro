@@ -8,6 +8,7 @@ import type { AggregateEntryId } from "./provenance.ts";
 
 import { deduceValues } from "./deduced.ts";
 import {
+  anchorZoneChip,
   LOAD_COMBINATION_FORMULA,
   NOT_COMPUTED_LINES,
   provenanceAggregate,
@@ -206,6 +207,26 @@ describe("membership, rule by rule", () => {
     // count itself; assert the string rule rather than contrive a one-entry Scenario.
     expect(aggregateOf().summary.startsWith("4 valeurs")).toBe(true);
     expect(provenanceAggregate({ ...SHIPPED }).count).toBeGreaterThan(1);
+  });
+});
+
+describe("the Zone d'ancrage's length carries its own chip (#106)", () => {
+  test("« non confirmé » at the shipped 10 m, and « valeur utilisateur » once typed over", () => {
+    expect(anchorZoneChip(10)).toBe("non confirmé");
+    // Compared at display precision, one decimal of a metre: a link carrying 10,04 reads unedited.
+    expect(anchorZoneChip(10.04)).toBe("non confirmé");
+    expect(anchorZoneChip(10.1)).toBe("valeur utilisateur");
+    expect(anchorZoneChip(0)).toBe("valeur utilisateur");
+  });
+
+  test("its provenance is a [CONVENTION] that names the decision, and it stays out of the four", () => {
+    expect(PROVENANCE_COPY.anchorZone).toContain("[CONVENTION]");
+    expect(PROVENANCE_COPY.anchorZone).toContain("#106");
+    const edited = provenanceAggregate({
+      ...SHIPPED,
+      rider: { ...SHIPPED.rider, anchorZone: 25 },
+    });
+    expect(edited.count).toBe(4);
   });
 });
 

@@ -88,10 +88,11 @@ export function usePage({ page, register }: PageInput): PageModel {
 /** The Page Terrain's (#101): no field holds text, so the gates judge the Scenario alone. */
 export function useReadingPage({ page, register }: PageInput): ReadingPageModel {
   const base = usePageBase(register);
-  const { traverse } = base;
+  const { traverse, state } = base;
+  const { trace } = state;
   const report = useMemo(
-    () => evaluateGates({ scenario: traverse, register }),
-    [traverse, register],
+    () => evaluateGates({ scenario: traverse, trace, register }),
+    [traverse, trace, register],
   );
   return { ...base, ...usePublished({ page, register, base, focused: null, report }) };
 }

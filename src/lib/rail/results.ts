@@ -80,6 +80,8 @@ export type ResultRowId =
   | "FS"
   | "Tmax"
   | "clearance"
+  // The Zones d'ancrage (#106): the same minimum with them included, judged by nothing.
+  | "clearanceWhole"
   | "reserve"
   | "TadmA"
   | "TadmB"
@@ -162,6 +164,12 @@ export type RegimePrompt = {
 export type Results = {
   /** « sur toute la traversée » — channel one of § 6's three scope signals. */
   readonly scope: string;
+  /**
+   * The garde's own scope, which leaves the Zones d'ancrage out — « sur la traversée, hors zones
+   * d'ancrage » — and is {@link scope} itself where there is no zone. The simplified Pages print
+   * it over their garde tile; Avancé's block keeps one header and says it on the row's help.
+   */
+  readonly clearanceScope: string;
   /** « aucun régime choisi », beside the scope label, or `null`. */
   readonly aside: string | null;
   /** § 6's thirteen, minus whatever is absent. Headline rows first, in table order. */
@@ -187,6 +195,21 @@ export const TRAVERSE_SCOPE = "sur toute la traversée";
 
 /** With two Brins porteurs every row is one member's, and the header says so once (#4). */
 export const PER_LINE_SCOPE = `${TRAVERSE_SCOPE}, par ${label("line", "exact")}`;
+
+/** The garde's scope: the traverse less its two ends, where nothing is judged (#106). */
+export const CLEARANCE_SCOPE = `sur la ${label("traverse", "exact")}, hors ${label("anchorZones", "exact")}`;
+
+/** The same with two Brins porteurs, whose every row is one member's. */
+export const CLEARANCE_PER_LINE_SCOPE = `${CLEARANCE_SCOPE}, par ${label("line", "exact")}`;
+
+/**
+ * « Garde min (traversée), zones d'ancrage comprises » — the minimum the zones leave out, printed
+ * beside the judged one on Avancé (#106).
+ */
+export const CLEARANCE_WHOLE_LABEL = `${heading("traverseClearance", "exact")}, ${label("anchorZones", "exact")} comprises`;
+
+/** Its qualifier's first clause: the row is a reading, not a criterion. */
+export const NOT_JUDGED = "non jugée";
 
 /** « une seule ligne porte tout » — #69's label, verbatim: what the row is, not a verdict. */
 export const SOLE_CARRIER_LABEL = `Cas défavorable : une seule ${label("line", "exact")} porte tout`;
@@ -342,23 +365,40 @@ export function deriveResults({
 
   // A Clearance Gate breach removes the garde **and its curve alone** — the cable still draws and
   // every tension row stands. That is the whole reason Clearance is a gate of its own.
-  if (gates.passed.clearance) {
-    const breach = clearanceBreached(base.clearance.hMin, scenario.rider.hClearMin);
+  const { clearance } = base;
+  const zoned = scenario.rider.anchorZone > 0;
+  if (gates.passed.clearance && clearance.atStepIndex >= 0) {
+    // Judged outside the Zones d'ancrage only: a garde under the threshold inside one is no breach.
+    const breach = clearanceBreached(clearance.hMin, scenario.rider.hClearMin);
     rows.push({
       ...row(
         "clearance",
         heading("traverseClearance", "exact"),
-        formatQuantity("clearance", base.clearance.hMin),
+        formatQuantity("clearance", clearance.hMin),
         qualify(
           breach
             ? `sous la garde exigée ${formatQuantity("h_clear_min", scenario.rider.hClearMin)}`
             : null,
-          riderAt(base.traverse, base.clearance.atStepIndex),
+          riderAt(base.traverse, clearance.atStepIndex),
         ),
         "headline",
       ),
       state: breach ? "hors-limites" : null,
     });
+  }
+  // What the zones leave out, beside it: the minimum over every position, zones included. A
+  // reading and never a criterion — no state, whatever it is — and only where there are zones,
+  // since without them it is the row above.
+  if (gates.passed.clearance && zoned && clearance.whole.atStepIndex >= 0) {
+    rows.push(
+      row(
+        "clearanceWhole",
+        CLEARANCE_WHOLE_LABEL,
+        formatQuantity("clearance", clearance.whole.hMin),
+        qualify(NOT_JUDGED, riderAt(base.traverse, clearance.whole.atStepIndex)),
+        "detail",
+      ),
+    );
   }
 
   // ── The nine detail rows ──────────────────────────────────────────────────────────────────
@@ -491,8 +531,11 @@ export function deriveResults({
   // verdict » banner from landing directly above an invitation that denies it.
   const noRegime = scenario.regime === null;
 
+  const perLine = base.soleCarrier !== null;
+  const scope = perLine ? PER_LINE_SCOPE : TRAVERSE_SCOPE;
   return {
-    scope: base.soleCarrier === null ? TRAVERSE_SCOPE : PER_LINE_SCOPE,
+    scope,
+    clearanceScope: zoned ? (perLine ? CLEARANCE_PER_LINE_SCOPE : CLEARANCE_SCOPE) : scope,
     aside: noRegime ? NO_REGIME_ASIDE : null,
     rows,
     // **Five things absent, not four**: the criteria × ends grid goes with the four rows, because

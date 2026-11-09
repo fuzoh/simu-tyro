@@ -288,6 +288,10 @@ export const FIELD_ACCESS: FieldAccess = {
     read: ({ rider }) => rider.hClearMin,
     write: (s, hClearMin) => ({ ...s, rider: { ...s.rider, hClearMin } }),
   },
+  anchorZone: {
+    read: ({ rider }) => rider.anchorZone,
+    write: (s, anchorZone) => ({ ...s, rider: { ...s.rider, anchorZone } }),
+  },
   DAF: {
     read: ({ rider }) => rider.DAF,
     write: (s, DAF) => ({ ...s, rider: { ...s.rider, DAF } }),

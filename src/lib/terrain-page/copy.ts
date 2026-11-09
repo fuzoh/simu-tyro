@@ -24,7 +24,12 @@ import { mapLabelTable } from "@/lib/map/copy.ts";
 import { cellLabel, cellsOf, READ_OUT_SCOPE } from "@/lib/rail/cells.ts";
 import { lowerFirst } from "@/lib/rail/fields.ts";
 import { GATE_CONSEQUENCE } from "@/lib/rail/gates.ts";
-import { NO_REGIME_BANNER_BY_REGISTER, TRAVERSE_SCOPE } from "@/lib/rail/results.ts";
+import {
+  CLEARANCE_PER_LINE_SCOPE,
+  CLEARANCE_SCOPE,
+  NO_REGIME_BANNER_BY_REGISTER,
+  TRAVERSE_SCOPE,
+} from "@/lib/rail/results.ts";
 import { OUTPUT_LABEL, pretensionWhere } from "@/lib/statique/copy.ts";
 import { label } from "@/lib/vocabulary/labels.ts";
 
@@ -53,6 +58,8 @@ export function terrainLabelTable(): readonly string[] {
   return [
     ...Object.values(TILE_LABEL),
     TRAVERSE_SCOPE,
+    CLEARANCE_SCOPE,
+    CLEARANCE_PER_LINE_SCOPE,
     ARRIVAL_SCOPE,
     NO_ARRIVAL,
     label("stopPoint", "terrain"),
@@ -73,6 +80,7 @@ export function terrainLabelTable(): readonly string[] {
     ...Object.values(COUPE_HOVER.line),
     COUPE_HOVER.lineGap,
     COUPE_HOVER.fromFoot,
+    COUPE_HOVER.anchorZone,
     label("distance", "terrain"),
     label("groundClearance", "terrain"),
     veBadgeLabel({ state: "auto", ve: 4.7 }),

@@ -46,7 +46,7 @@ function riderOf(patch: (draft: ScenarioDraft) => void = () => {}): PlacedRider 
   const { input, state, span } = unloaded;
   const { L, h, terrain } = span;
   const { P } = swept;
-  const { hRider } = draft.rider;
+  const { hRider, anchorZone } = draft.rider;
 
   const exact = solveAtHorizontalPosition(input, P, clampX(draft.rider.xD, L));
   const sP = exact.ok ? exact.state.loads[0]?.s : undefined;
@@ -54,12 +54,13 @@ function riderOf(patch: (draft: ScenarioDraft) => void = () => {}): PlacedRider 
   const resolved = sweepStep(input, P, sP, { H: exact.state.H, V0: exact.state.V0 });
   if (!resolved.ok) throw new Error("expected the rider's step to solve");
   const { step } = resolved;
-  const at = evaluateClearance(input, P, [step], terrain, hRider);
+  const at = evaluateClearance(input, P, [step], terrain, hRider, 60, anchorZone);
   const worst = { hClear: at.perStep[0], atX: at.perStepX[0] };
   return {
     step,
     worst,
     relabel: Math.abs(worst.atX - step.xD) > Math.max(1, 0.01 * L),
+    inAnchorZone: at.perStepJudged[0] === 0,
     underRider: step.zD - zGroundAt(terrain, step.xD) - hRider,
     belowUnloaded: interleavedAt(sampleCable(state, CABLE_SAMPLES), step.xD) - step.zD,
     sagAtRider: (h * step.xD) / L - step.zD,
@@ -99,6 +100,20 @@ describe("`readOutCells` — every cell by id, as the chart block printed it", (
     expect(Object.entries(cells).filter(([, cell]) => cell.breach)).toEqual([
       ["clearance", expect.objectContaining({ value: "2,42 m" })],
     ]);
+  });
+
+  test("a rider inside a Zone d'ancrage turns no cell red; a metre outside it, the same garde does", () => {
+    // The shipped 10 m zones. At x 8 the passager is on A's platform; at x 11 they are not. Both
+    // read a garde over the line outside the zones, and a 30 m Garde exigée is above either.
+    const at = (xD: number) =>
+      readOutCells(
+        riderOf((draft) => {
+          draft.rider.xD = xD;
+        }),
+        { clearance: true, hClearMin: 30, unit: "daN" },
+      ).clearance;
+    expect(at(8).breach).toBe(false);
+    expect(at(11).breach).toBe(true);
   });
 
   test("a Clearance Gate breach replaces both garde cells with the clause, and no other", () => {

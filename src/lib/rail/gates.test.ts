@@ -21,6 +21,7 @@ import {
   WIND_UNPLACED,
   windBearing,
   windNotice,
+  zonesMeetMessage,
 } from "./gates.ts";
 import { applyRopeClass, applyShippedTerminations } from "./values.ts";
 
@@ -927,5 +928,73 @@ describe("the Vent needs Positions — one check for the link, the Session and t
     expect(report.errors.map((error) => [error.gate, error.field])).toEqual([
       ["wind", "windSpeed"],
     ]);
+  });
+});
+
+describe("two Zones d'ancrage that meet are a Blocking Error (#106)", () => {
+  const zoned = (anchorZone: number, L = 150) =>
+    scenario((draft) => {
+      draft.regime = "en15567";
+      draft.geometry = { source: "manual", L, h: -18 };
+      draft.rider.anchorZone = anchorZone;
+    });
+
+  test("2z = L — the two zones touch at mid-span — blocks the garde, naming the field", () => {
+    const report = evaluateGates({ scenario: zoned(75) });
+    expect(report.errors).toHaveLength(1);
+    expect(report.errors[0]).toMatchObject({
+      gate: "clearance",
+      kind: "invalid",
+      field: "anchorZone",
+      fixes: [],
+      message:
+        "⛔ Longueur de la zone d'ancrage — les deux zones d'ancrage couvrent toute la portée de 150,0 m, il n'y reste aucune garde à juger. Valeur : 75,0 m.",
+    });
+    expect(report.passed).toMatchObject({ solve: true, clearance: false, verdict: true });
+    expect(blockingSummary(report)).toBe("⛔ 1 erreur bloquante — garde au sol indisponible");
+  });
+
+  test("2z > L blocks too, and the message is the exported template's", () => {
+    const report = evaluateGates({ scenario: zoned(100) });
+    expect(report.errors.map((error) => error.message)).toEqual([zonesMeetMessage(100, 150)]);
+  });
+
+  test("2z just under L leaves a sliver to judge, and nothing blocks", () => {
+    expect(evaluateGates({ scenario: zoned(74.9) }).errors).toEqual([]);
+  });
+
+  test("the span it is measured against is the Scenario's: a shorter span under the same zones", () => {
+    expect(evaluateGates({ scenario: zoned(10, 20) }).errors[0]?.field).toBe("anchorZone");
+    expect(evaluateGates({ scenario: zoned(10, 20.5) }).errors).toEqual([]);
+  });
+
+  test("no zone is never a breach, whatever the span", () => {
+    expect(evaluateGates({ scenario: zoned(0, 0.5) }).errors).toEqual([]);
+  });
+
+  test("a negative length is tier one's « n'existe pas », filed under the Clearance Gate", () => {
+    const report = evaluateGates({ scenario: zoned(-1) });
+    expect(report.errors).toHaveLength(1);
+    expect(report.errors[0]).toMatchObject({
+      gate: "clearance",
+      field: "anchorZone",
+      message:
+        "⛔ Longueur de la zone d'ancrage — une longueur négative n'existe pas. Valeur : −1,0 m.",
+    });
+  });
+
+  test("on an imported profil the span is the profil's extent, read through the trace", () => {
+    const imported = scenario((draft) => {
+      draft.geometry = { source: "trace", trace: "p1.x" };
+      draft.rider.anchorZone = 30;
+    });
+    // Without the trace the span is unknown, and the check is not made.
+    expect(evaluateGates({ scenario: imported }).errors).toEqual([]);
+    expect(
+      evaluateGates({ scenario: imported, trace: { d: Float64Array.of(0, 40, 60) } }).errors[0],
+    ).toMatchObject({ gate: "clearance", field: "anchorZone" });
+    expect(
+      evaluateGates({ scenario: imported, trace: { d: Float64Array.of(0, 40, 61) } }).errors,
+    ).toEqual([]);
   });
 });

@@ -118,7 +118,7 @@ import {
   matchingPreset,
   presetProvenance,
 } from "@/lib/rail/presets.ts";
-import { PROVENANCE_COPY, warningLadder } from "@/lib/rail/provenance.ts";
+import { anchorZoneChip, PROVENANCE_COPY, warningLadder } from "@/lib/rail/provenance.ts";
 import { RETENSION } from "@/lib/rail/retension.ts";
 import { limitReading, MAESTRO_ROPE_ONLY, PASS_TO_PULLEY } from "@/lib/rail/tensioning.ts";
 import {
@@ -417,6 +417,7 @@ export function RailInputs({
   );
   const quasiStatic = quasiStaticRow(dynamics, rideCause);
   const muChip = trolleyMuChip(scenario.dynamics.mu);
+  const zoneChip = anchorZoneChip(scenario.rider.anchorZone);
 
   const parameters = (
     <RailSection title="Paramètres">
@@ -614,6 +615,19 @@ export function RailInputs({
           {/* The threshold the clearance read-outs are judged against (2026-09-23). Beside the
                 envelope because both are clearance inputs; a Clearance Gate field like it. */}
           <NumericRow hint="m" id="hClearMin" />
+          {/* The Zones d'ancrage (#106), beside the threshold they exempt: Avancé alone sets their
+                length, and every other Page reads the Scenario's. A Clearance Gate field too. */}
+          <NumericRow
+            chip={
+              <Chip
+                detail={PROVENANCE.anchorZone}
+                label={zoneChip}
+                tone={zoneChip === "non confirmé" ? "warning" : "neutral"}
+              />
+            }
+            hint="m"
+            id="anchorZone"
+          />
           <NumericRow
             chip={<Chip detail={PROVENANCE.DAF} label="§8.2" tone="neutral" />}
             id="DAF"
