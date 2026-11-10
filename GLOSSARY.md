@@ -213,8 +213,11 @@ The unstretched length. Simplified Pages say longueur à vide; Avancé says long
 _Avoid_: longueur de corde, longueur de corde à vide
 
 **Flèche**:
-The sag. Unqualified, the unloaded sag wanted on the line; Avancé also reads it as a share of the span, **flèche / portée**. **Flèche chargée** is the sag with the passager on the line. Avancé says flèche à vide for the unloaded one.
+The maximum vertical drop below the straight Ligne A–B, excluding lateral displacement. Unqualified, the unloaded sag wanted on the line; Avancé also reads it as a share of the span, **flèche / portée**. **Flèche chargée** is the sag with the passager on the line. Avancé says flèche à vide for the unloaded one.
 _Avoid_: cible, flèche cible
+
+**Écart maximal à A–B**:
+The maximum combined vertical and lateral offset of a line from the straight Ligne A–B, with both offsets measured at the same position along the horizontal span. Not the combination of separate maxima, nor the shortest perpendicular distance to an inclined A–B.
 
 **Écart à vide**:
 How far the passager hangs below the ligne à vide at the passager's own position, in metres — the loaded line's drop, read like a flèche. A read-out cell on every Page that has the coupe, and also in the coupe's tip beside the passager. Not a garde au sol, which is measured to the ground.
@@ -259,6 +262,9 @@ Positions is kept as given, never dropped, and the results read with it say it i
 why; it is not a Blocking Error and hides no result. No wind is speed 0 and direction 0, and it is
 what a link without `ws` and `wd` reads.
 _Avoid_: rafale, souffle, orientation du vent, direction relative à la ligne (as what is typed)
+
+**Zone centrale exposée**:
+The central plateau of the prescribed wind profile, where wind speed stays at its maximum before decreasing smoothly toward both anchors. Its exposed width is the length of that plateau along A–B, not the width of a bell-shaped peak.
 
 **Marge exigée**:
 The margin the chosen Safety Regime demands. Not the margin the line actually has — that
