@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.0.1](https://github.com/fuzoh/simu-tyro/compare/v2.0.0...v2.0.1) (2026-11-10)
+
+
+### Documentation
+
+* frame spatial wind contracts and decisions ([#135](https://github.com/fuzoh/simu-tyro/issues/135)) ([f0da795](https://github.com/fuzoh/simu-tyro/commit/f0da795e2c461ceea4a245e1153da1771cd7531d))
+* **sim:** archive verified aerodynamic and energy reviews ([c216fea](https://github.com/fuzoh/simu-tyro/commit/c216feadb7878d2a90af7d6e37540b3600e89e60))
+* **sim:** consolidate spatial wind triage decisions ([#136](https://github.com/fuzoh/simu-tyro/issues/136)) ([f861a4c](https://github.com/fuzoh/simu-tyro/commit/f861a4cef56d97e701ec137d46959a2ec1f0702a))
+* **sim:** document spatial equilibrium research and validation gaps ([147bcab](https://github.com/fuzoh/simu-tyro/commit/147bcab4dd2b847acc1813a4496b2667c1d94b96))
+
 ## [2.0.0](https://github.com/fuzoh/simu-tyro/compare/v1.0.1...v2.0.0) (2026-11-09)
 
 
