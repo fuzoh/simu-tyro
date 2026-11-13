@@ -36,7 +36,8 @@
  *   notice where the results would have read it. {@link windBearing} is the one check: the fields,
  *   the rose, the rides and the notice all read it, so a link, a Session and a click cannot
  *   disagree. Like an absent régime it is a flag on the report, never an entry on the blocking
- *   list: it hides no result.
+ *   list: it hides no result. One wind field is not disabled: the one whose value the gates
+ *   refuse, which stays typable so that its repair is on the Page ({@link fieldUnavailable}).
  * - **The passager's ride has two gates of its own**, past the three: the Wind Gate (the Vent, #87)
  *   and the Ride Gate (§12.2's constants, #89 and the ride-gates fix). Their fields reach no
  *   statics number, but ADR-0001 keeps them as they arrive **and** gates them, so a negative wind
@@ -230,7 +231,8 @@ export type GateReport = {
    * The line has no bearing — A or B is not on the map — so the Vent can be neither set nor
    * applied: {@link windBearing} is `null`. **Not an error and not a gate breach**: the rides run
    * without wind and every result stays, while the wind fields are disabled with
-   * {@link WIND_UNPLACED}'s reason and {@link windNotice} says a carried Vent is not applied.
+   * {@link WIND_UNPLACED}'s reason ({@link fieldUnavailable}) and {@link windNotice} says a carried
+   * Vent is not applied.
    */
   readonly windNeedsPositions: boolean;
 };
@@ -269,13 +271,27 @@ const WIND_FIELDS: ReadonlySet<FieldId> = new Set<FieldId>([
   ...WIND_PROFILE_FIELDS,
 ]);
 
-/** Why a field cannot be typed into, or `null` when it can: the Vent's own, without Positions. */
+/**
+ * Why a field cannot be typed into, or `null` when it can: the Vent's own, without Positions.
+ *
+ * **A field whose value the gates refuse is never disabled.** A link can carry `ww=95` or `ws=-5`
+ * without Positions; the breach withholds the rides whether or not the Vent is applied, and no
+ * Fix Action repairs a number out of its domain — it is retyped where its message stands.
+ * Disabled, nothing on the Page would lift it. The field stays typable until the caret leaves it
+ * — « 30 » over a refused « −5 » is accepted at its first digit — and is then the Vent's like the
+ * others: disabled, with the reason.
+ *
+ * @param focused the field the caret is in, or `null`. A disabled field takes no caret, so a wind
+ *   field is focused without Positions only through a value that was refused.
+ */
 export function fieldUnavailable(
   id: FieldId,
-  report: Pick<GateReport, "windNeedsPositions">,
+  report: Pick<GateReport, "windNeedsPositions" | "errors">,
+  focused: FieldId | null = null,
 ): string | null {
-  if (!WIND_FIELDS.has(id)) return null;
-  return report.windNeedsPositions ? WIND_UNPLACED.reason : null;
+  if (!WIND_FIELDS.has(id) || !report.windNeedsPositions) return null;
+  if (id === focused || report.errors.some((error) => error.field === id)) return null;
+  return WIND_UNPLACED.reason;
 }
 
 /**

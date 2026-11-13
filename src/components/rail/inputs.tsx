@@ -191,7 +191,7 @@ export type RailRowContext = {
   readonly outlined: ReadonlySet<FieldId>;
   /**
    * Why a field cannot be typed into, or `null` — the gates' `fieldUnavailable`, read off the same
-   * report: the Vent's two fields without Positions.
+   * report: the Vent's fields without Positions, but for one the gates refuse or the caret is in.
    */
   readonly unavailable: (id: FieldId) => string | null;
   /**
@@ -247,7 +247,7 @@ export function useFieldRows({
   const { scenario, trace } = useAppState();
   const dispatch = useAppDispatch();
   const regimePicker = useRef<HTMLSelectElement | null>(null);
-  const { form, text, setFocused, report } = rail;
+  const { form, text, focused, setFocused, report } = rail;
   const context = fieldContext(scenario, register);
 
   const breaches = new Map<FieldId, BlockingError>();
@@ -311,7 +311,7 @@ export function useFieldRows({
     register,
     breaches,
     outlined,
-    unavailable: (id) => fieldUnavailable(id, report),
+    unavailable: (id) => fieldUnavailable(id, report, focused),
     windProfileShown: (id) => isWindProfileFieldShown(id, report),
     commit,
     patch,

@@ -8,6 +8,7 @@ import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { uniformWind } from "@/lib/scenario/wind.ts";
 
 import type { FieldId, GateId } from "./fields.ts";
+import type { GateReport } from "./gates.ts";
 
 import { deduceValues } from "./deduced.ts";
 import {
@@ -940,6 +941,32 @@ describe("the Vent needs Positions — one check for the link, the Session and t
       ["wind", "windSpeed"],
     ]);
   });
+
+  test("the refused field stays typable — its repair has no other place — and the other does not", () => {
+    const report = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.wind = { ...draft.wind, speedKmh: -30, directionDeg: 264 };
+      }),
+    });
+    expect(report.errors[0].fixes).toEqual([]);
+    expect(fieldUnavailable("windSpeed", report)).toBeNull();
+    expect(fieldUnavailable("windDirection", report)).toBe(WIND_UNPLACED.reason);
+  });
+
+  test("it stays typable until the caret leaves it, then it is disabled like the others", () => {
+    // « 30 » typed over the refused « −30 »: the Scenario holds 3 km/h after the first digit.
+    const repaired = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.wind = { ...draft.wind, speedKmh: 3, directionDeg: 264 };
+      }),
+    });
+    expect(repaired.errors).toEqual([]);
+    expect(fieldUnavailable("windSpeed", repaired, "windSpeed")).toBeNull();
+    expect(fieldUnavailable("windDirection", repaired, "windSpeed")).toBe(WIND_UNPLACED.reason);
+    expect(fieldUnavailable("windSpeed", repaired, null)).toBe(WIND_UNPLACED.reason);
+    // The caret in a field that is not the Vent's opens none of them.
+    expect(fieldUnavailable("windSpeed", repaired, "mp")).toBe(WIND_UNPLACED.reason);
+  });
 });
 
 describe("two Zones d'ancrage that meet are a Blocking Error (#106)", () => {
@@ -1369,15 +1396,52 @@ describe("the Vent's profile is gated (#120)", () => {
   });
 
   describe("where the profile's fields stand", () => {
+    const unplaced = (widthPct: number, attenuationPct: number) => {
+      const arrived = profiled(widthPct, attenuationPct);
+      arrived.positions = { A: null, B: null };
+      return arrived;
+    };
+    const VENT = ["windSpeed", "windDirection", "windWidth", "windAttenuation"] as const;
+    const disabled = (report: GateReport) =>
+      VENT.filter((id) => fieldUnavailable(id, report) === WIND_UNPLACED.reason);
+
     test("without Positions the four fields of the Vent are disabled with the one reason", () => {
-      const unplaced = profiled(30, 40);
-      unplaced.positions = { A: null, B: null };
-      const report = evaluateGates({ scenario: unplaced });
-      for (const id of ["windSpeed", "windDirection", "windWidth", "windAttenuation"] as const) {
-        expect(fieldUnavailable(id, report)).toBe(WIND_UNPLACED.reason);
-      }
+      // An accepted Vent: uniform before the activation, any legal profile after it.
+      expect(disabled(evaluateGates({ scenario: unplaced(30, 0) }))).toEqual(VENT);
+      expect(
+        disabled(evaluateGates({ scenario: unplaced(30, 40), windProfileActive: true })),
+      ).toEqual(VENT);
       const placed = evaluateGates({ scenario: profiled(30, 40) });
       for (const id of WIND_PROFILE_FIELDS) expect(fieldUnavailable(id, placed)).toBeNull();
+    });
+
+    // `/dynamique?ww=95` and `?wa=110` with no Positions: the breach withholds the rides and no
+    // Fix Action repairs a percent out of its domain, so a disabled field would leave nothing on
+    // the Page to lift it.
+    test.each([false, true])(
+      "a percent the gates refuse stays typable without Positions (profile read: %s)",
+      (windProfileActive) => {
+        const tooWide = evaluateGates({ scenario: unplaced(95, 0), windProfileActive });
+        expect(tooWide.passed.wind).toBe(false);
+        expect(tooWide.errors.map((error) => error.fixes)).toEqual([[]]);
+        expect(disabled(tooWide)).toEqual(["windSpeed", "windDirection", "windAttenuation"]);
+
+        const tooDeep = evaluateGates({ scenario: unplaced(50, 110), windProfileActive });
+        expect(tooDeep.errors.map((error) => error.fixes)).toEqual([[]]);
+        expect(disabled(tooDeep)).toEqual(["windSpeed", "windDirection", "windWidth"]);
+
+        expect(disabled(evaluateGates({ scenario: unplaced(95, 110), windProfileActive }))).toEqual(
+          ["windSpeed", "windDirection"],
+        );
+      },
+    );
+
+    test("a profile no calculation reads is typable there too, beside its Fix Action", () => {
+      const unread = evaluateGates({ scenario: unplaced(30, 40) });
+      expect(unread.errors.map((error) => error.fixes.map((fix) => fix.id))).toEqual([
+        ["passer-au-vent-uniforme"],
+      ]);
+      expect(disabled(unread)).toEqual(["windSpeed", "windDirection", "windWidth"]);
     });
 
     test("before the activation, a field is on screen only while its value is refused", () => {

@@ -266,7 +266,9 @@ component along it (positive toward B, so a tail wind) and one across it (positi
 it is a vector, never a whole `±` along the line. Moving an anchor therefore changes those
 components and never the Vent. **The Vent needs Positions**: without A and B on the map the line
 has no bearing, so the wind fields and the Rose des vents' handle are disabled with that reason,
-and the passager's ride and the Banane run without wind. A Vent a link or a Session carries without
+and the passager's ride and the Banane run without wind. A wind field whose value is refused — a
+Blocking Error on the Wind Gate, Positions or not — stays typable, so that it can be repaired
+where its message stands. A Vent a link or a Session carries without
 Positions is kept as given, never dropped, and the results read with it say it is not applied and
 why; it is not a Blocking Error and hides no result. No wind is speed 0 and direction 0, and it is
 what a link without `ws` and `wd` reads. The Vent may carry a Profil du vent; without one it is a

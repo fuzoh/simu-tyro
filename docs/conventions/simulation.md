@@ -53,7 +53,9 @@ quotes and fails when they drift.
   rhumb line the north-up map draws — and reaches every reader through the gates' `windBearing`
   (`src/lib/rail/gates.ts`), the one check behind « the Vent needs Positions ». Without a bearing
   nothing is projected: the ride and the Banane run without wind, the wind fields are disabled, and
-  a carried Vent is kept as given with a notice — never a Blocking Error. Moving an anchor changes
+  a carried Vent is kept as given with a notice — never a Blocking Error. A wind value the Wind
+  Gate refuses (`ws=-5`, `ww=95`) is one with or without a bearing, and its field stays typable
+  so that the breach can be repaired (`fieldUnavailable`). Moving an anchor changes
   the components and never `wd`.
 - **The Vent's profile is a prescribed scenario, read locally, and refused until it is read**
   (#120, `docs/simulation-theory.md` §8.4). `windAt(field, x, L, bearing)`
