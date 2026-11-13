@@ -4,6 +4,7 @@ import type { ReachProposal, ReachReading, ReachRefusal, RideReach } from "@/lib
 import type { Scenario, ScenarioDraft } from "@/lib/scenario/types.ts";
 
 import { FIELD_ACCESS } from "@/lib/rail/values.ts";
+import { REACH } from "@/lib/scenario/reach.ts";
 import { traverseInputs, traverseScenario } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { completeFromDefaults, scenarioToSearch, searchToScenario } from "@/lib/url/scenario.ts";
@@ -31,14 +32,25 @@ function short(maxX: number, stopX: number): RideReach {
 
 const AT_B: RideReach = { maxX: L, remaining: 0, reachesB: true, stopX: null, end: "arrival" };
 
-/** The shipped line as the search reads it: the passager arrives, B 12 m up, 18 m under A. */
-const CURRENT = { windy: AT_B, calm: AT_B, h: -18, zB: 12, L0: 151.64 } as const;
+/**
+ * The shipped line as the search reads it: the passager arrives, B 12 m up, 18 m under A, the
+ * line laid at 2634 N at A — and, lighter by the weight of 18 m of line, 2494 N at B.
+ */
+const CURRENT = {
+  windy: AT_B,
+  calm: AT_B,
+  h: -18,
+  zB: 12,
+  L0: 151.64,
+  Tvide: { TA: 2634, TB: 2494 },
+} as const;
 
 const CANDIDATE: ReachProposal = {
   deltaB: 17.6,
   h: -0.4,
   zB: 29.6,
   L0: 150.54,
+  Tvide: { TA: 2634, TB: 2631 },
   windy: short(134.57, 79.84),
   calm: short(134.57, 79.84),
   clearance: 7.667,
@@ -65,8 +77,12 @@ const proposed = (over: Partial<ReachProposal> = {}) =>
   ({ ok: true, proposal: { ...CANDIDATE, ...over } }) as const;
 const refused = (refusal: ReachRefusal) => ({ ok: false, refusal }) as const;
 
-/** The shipped wording: the tension de pose drives, forces in daN. */
-const WORDING: ReachWording = { tightness: SHIPPED.tightness, unit: SHIPPED.unit };
+/** The shipped wording: the tension de pose drives, read at A, forces in daN. */
+const WORDING: ReachWording = {
+  tightness: SHIPPED.tightness,
+  unit: SHIPPED.unit,
+  tensioningSide: SHIPPED.tensioningSide,
+};
 
 function worded(
   outcome: ReachReading["outcome"],
@@ -283,28 +299,46 @@ describe("every proposal says what it is and what it stands on", () => {
   });
 
   test("the Tightness Driver is named as kept, with what it lets move", () => {
-    const second = (wording: ReachWording, over: Partial<ReachProposal> = {}) =>
-      proposalOf(worded(proposed(over), {}, wording)).assumptions[1];
-    // The shipped driver, 2634 N at the anchor: the length follows B.
-    expect(second(WORDING)).toBe(
+    const second = (wording: Partial<ReachWording>, over: Partial<ReachProposal> = {}) =>
+      proposalOf(worded(proposed(over), {}, { ...WORDING, ...wording })).assumptions[1];
+    // The shipped driver, 2634 N at the anchor: the length follows B, the tension is the driver's.
+    expect(second({})).toBe(
       "Tension de pose conservée : 263,4 daN ; longueur à vide 151,64 m → 150,54 m.",
-    );
-    expect(second({ tightness: { mode: "sag", D_target: 6 }, unit: "daN" })).toBe(
-      "Flèche conservée : 6,00 m ; longueur à vide 151,64 m → 150,54 m.",
-    );
-    // A typed length is not re-cut: the tension is what moves.
-    expect(second({ tightness: { mode: "length", L0: 151.64 }, unit: "daN" }, { L0: 151.64 })).toBe(
-      "Longueur à vide conservée : 151,64 m ; la tension de la ligne change avec la hauteur de B.",
     );
     // The two drivers only Avancé offers are not named on a simplified Page, nor is their value.
     for (const tightness of [
       { mode: "tension", H_target: 2535 },
       { mode: "ratio", ratio: 0.5 },
     ] as const) {
-      expect(second({ tightness, unit: "daN" })).toBe(
-        "Tension réglée sur la Page Avancé conservée ; longueur à vide 151,64 m → 150,54 m.",
+      expect(second({ tightness }, { Tvide: { TA: 2700, TB: 2697 } })).toBe(
+        "Tension réglée sur la Page Avancé conservée ; longueur à vide 151,64 m → 150,54 m ; tension de pose 263,4 daN → 270,0 daN.",
       );
     }
+  });
+
+  test("another driver kept: the tension de pose it leaves on the line is read before and after", () => {
+    const second = (wording: Partial<ReachWording>, over: Partial<ReachProposal> = {}) =>
+      proposalOf(worded(proposed(over), {}, { ...WORDING, ...wording })).assumptions[1];
+    // A typed length is not re-cut: B's whole move goes into the tension, and it is a figure.
+    const cut = { tightness: { mode: "length", L0: 151.64 } } as const;
+    const taut = { L0: 151.64, Tvide: { TA: 9120, TB: 9117 } };
+    expect(second(cut, taut)).toBe(
+      "Longueur à vide conservée : 151,64 m ; tension de pose 263,4 daN → 912,0 daN.",
+    );
+    // A flèche held: the length and the tension both follow B.
+    const sag = { tightness: { mode: "sag", D_target: 6 } } as const;
+    expect(second(sag, { Tvide: { TA: 2580, TB: 2577 } })).toBe(
+      "Flèche conservée : 6,00 m ; longueur à vide 151,64 m → 150,54 m ; tension de pose 263,4 daN → 258,0 daN.",
+    );
+    // Read at the anchor that carries the Mise en tension, as the Rail's own row is.
+    expect(second({ ...cut, tensioningSide: "B" }, taut)).toBe(
+      "Longueur à vide conservée : 151,64 m ; tension de pose 249,4 daN → 911,7 daN.",
+    );
+    // In the unit the selector holds, and printed once where the two read alike.
+    expect(second({ ...cut, unit: "kN" }, taut)).toContain("tension de pose 2,634 kN → 9,120 kN");
+    expect(second(cut, { L0: 151.64, Tvide: { TA: 2634.2, TB: 2494 } })).toBe(
+      "Longueur à vide conservée : 151,64 m ; tension de pose 263,4 daN.",
+    );
   });
 
   test("the force follows the unit selector, and two lengths that print alike are printed once", () => {
@@ -325,6 +359,21 @@ describe("every proposal says what it is and what it stands on", () => {
     expect(untouched).toBe(
       "Rien n'est modifié : ni les ancrages, ni le scénario. Ni le Verdict ni la garde exigée ne sont rejugés ici.",
     );
+  });
+
+  test("a target above the measured steady bound says how little it takes to reach B", () => {
+    const high =
+      "Cible haute : au-delà de 93 % de la portée, un vent arrière de 10 km/h non saisi ou une traînée plus faible ont suffi, sur certaines des lignes essayées, à amener le passager jusqu'à B.";
+    expect(REACH.steadyMax).toBe(93);
+    for (const target of [94, 96, 98]) {
+      const { warnings } = proposalOf(worded(proposed(), { target }));
+      expect(warnings, `${target} %`).toHaveLength(3);
+      expect(warnings[2]).toBe(high);
+    }
+    // Up to the bound — the shipped 90 % included — a proposal carries its two own warnings.
+    for (const target of [50, 90, 93]) {
+      expect(proposalOf(worded(proposed(), { target })).warnings, `${target} %`).toHaveLength(2);
+    }
   });
 
   test("a ride too swift for a frozen line says so under the proposal too", () => {
@@ -425,7 +474,7 @@ describe("a refusal explains itself and gives no height", () => {
     }
   });
 
-  test("a refused target is quoted as the Scenario holds it", () => {
+  test("a refused target is quoted as the search read it", () => {
     const out = worded(refused({ kind: "target" }), { target: 120, targetX: 180 });
     expect(out.refusal).toContain("la cible de 120 % sort du domaine 50 – 98 % de la portée");
     expect(out.target).toContain("à 120 % de la portée");
@@ -452,7 +501,9 @@ describe("the terrain register — no word the interface never says, none only A
         { mode: "tension", H_target: 2535 },
         { mode: "ratio", ratio: 0.5 },
       ] as const
-    ).flatMap((tightness) => sentences(worded(proposed(), {}, { tightness, unit: "kN" }))),
+    ).flatMap((tightness) =>
+      sentences(worded(proposed(), { target: 96 }, { ...WORDING, tightness, unit: "kN" })),
+    ),
     ...(
       [
         { kind: "target" },
@@ -524,7 +575,11 @@ describe("`reachSearch` — the search as the gates leave it", () => {
     expect(search?.input.unloaded).toBe(posed.unloaded);
     expect(search?.input.reading).toBe(posed.rides);
     expect(search?.input.scenario).toBe(posed.traverse);
-    expect(search?.wording).toEqual({ tightness: SHIPPED.tightness, unit: SHIPPED.unit });
+    expect(search?.wording).toEqual({
+      tightness: SHIPPED.tightness,
+      unit: SHIPPED.unit,
+      tensioningSide: SHIPPED.tensioningSide,
+    });
   });
 
   test("a withheld garde is handed on, so the search refuses rather than guess", () => {
@@ -591,6 +646,44 @@ describe("`reachProposal` — the shipped line, searched and worded", () => {
     expect(out.target).toContain("à 75 % de la portée, soit à x 112,5 m");
     // A target farther from B asks for a higher B than the shipped 90 %.
     expect(proposalOf(out).headline.action).toBe("Monter B de");
+  });
+
+  test("a typed longueur à vide: the tension de pose B's move leaves on the line is printed", () => {
+    const out = answer({ ...SHIPPED, tightness: { mode: "length", L0: 151.2 } });
+    // [MEASURED] 2026-11-13, the shipped line cut at 151,20 m: a less steep chord is shorter, so
+    // the same length hangs slacker — the tension de pose falls, and the proposal says by how much.
+    expect(proposalOf(out).headline).toEqual({ action: "Monter B de", amount: "18,4 m" });
+    expect(proposalOf(out).assumptions[1]).toBe(
+      "Longueur à vide conservée : 151,20 m ; tension de pose 438,1 daN → 185,1 daN.",
+    );
+  });
+
+  test("a link's fractional `cib` is read at the whole percent every Page shows", () => {
+    const linked = (cib: string) => {
+      const arrived = validateSearch(parseLinkSearch(`?L=150&h=-18&cib=${cib}`));
+      if (arrived.refused !== undefined) throw new Error("the link is readable");
+      return searchToScenario(completeFromDefaults(arrived).search);
+    };
+    // Kept as given in the Scenario (ADR-0001) …
+    expect(linked("98.4").dynamics.reachTarget).toBe(98.4);
+    // … and read as the 98 % it prints as: inside the domain, searched at 98 % of the span.
+    const inside = answer(linked("98.4"));
+    expect(inside.refusal).toBeNull();
+    expect(inside.target).toContain("à 98 % de la portée, soit à x 147,0 m");
+    expect(proposalOf(inside).headline).toEqual(proposalOf(answer(linked("98"))).headline);
+    const low = answer(linked("49.6"));
+    expect(low.refusal).toBeNull();
+    expect(low.target).toContain("à 50 % de la portée, soit à x 75,0 m");
+    // Half a percent past the domain prints as the percent that is out of it, and is refused as it.
+    const outside = answer(linked("98.5"));
+    expect(outside.proposal).toBeNull();
+    expect(outside.refusal).toContain("la cible de 99 % sort du domaine 50 – 98 % de la portée");
+    expect(answer(linked("49.4")).refusal).toContain("la cible de 49 % sort du domaine");
+    // Inside the domain too, the label and the search agree: 90,4 % is the shipped 90 %.
+    const shipped = answer(SHIPPED);
+    const near = answer(linked("90.4"));
+    expect(near.target).toBe(shipped.target);
+    expect(proposalOf(near)).toEqual(proposalOf(shipped));
   });
 
   test("a target out of its domain is refused on Dynamique, with the domain", () => {

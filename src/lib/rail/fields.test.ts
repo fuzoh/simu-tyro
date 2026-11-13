@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
+import { isReachTarget } from "@/lib/scenario/reach.ts";
 
 import type { FieldId } from "./fields.ts";
 
@@ -267,6 +268,20 @@ describe("the target of the farthest point (#121) — set here, read by Dynamiqu
         "cible hors du domaine (50 – 98 % de la portée) : aucune hauteur de B n'est proposée [CONVENTION]",
       );
     }
+  });
+
+  test("a link's target between whole percents: the field's warning and the proposal's domain agree", () => {
+    // The Scenario keeps `cib=98.4` as given; the row warns on the text it shows — « 98 » — and
+    // Dynamique judges the same whole percent (`isReachTarget`), so one never contradicts the other.
+    for (const held of [98.4, 97.5, 49.5, 49.6, 90.4, 98.5, 98.6, 49.4, 120.2]) {
+      const shown = displayField("reachTarget", held);
+      const warned = warningFor("reachTarget", Number(shown)) !== null;
+      expect(warned, `${held} → « ${shown} »`).toBe(!isReachTarget(held));
+    }
+    expect(displayField("reachTarget", 98.4)).toBe("98");
+    expect(warningFor("reachTarget", Number(displayField("reachTarget", 98.4)))).toBeNull();
+    expect(displayField("reachTarget", 98.5)).toBe("99");
+    expect(warningFor("reachTarget", Number(displayField("reachTarget", 98.5)))).not.toBeNull();
   });
 
   test("its label is the registry's, the same on every Page", () => {

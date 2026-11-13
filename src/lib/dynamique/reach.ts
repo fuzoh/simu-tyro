@@ -26,6 +26,7 @@ import { engineRefusal, REFUSAL_CAUSE } from "@/lib/app/refusals.ts";
 import { formatAtX, formatQuantity, formatValue } from "@/lib/format/quantity.ts";
 import { FIELDS } from "@/lib/rail/fields.ts";
 import { windBearing } from "@/lib/rail/gates.ts";
+import { pretensionOf } from "@/lib/rail/tensioning.ts";
 import { tightnessDriver } from "@/lib/rail/values.ts";
 import { proposeAnchorB, REACH } from "@/lib/scenario/reach.ts";
 import { heading, label } from "@/lib/vocabulary/labels.ts";
@@ -80,8 +81,11 @@ export type ReachOutputs = {
   readonly refusal: string | null;
 };
 
-/** What the sentences read of the Scenario beside the search's own reading. */
-export type ReachWording = Pick<ScenarioDraft, "tightness" | "unit">;
+/**
+ * What the sentences read of the Scenario beside the search's own reading: the Tightness Driver to
+ * name, the force unit, and the anchor the tension de pose is read at.
+ */
+export type ReachWording = Pick<ScenarioDraft, "tightness" | "unit" | "tensioningSide">;
 
 /** A length in prose: the field's `-` becomes the typographic minus, as in every message. */
 const prose = (text: string) => text.replace("-", "−");
@@ -96,7 +100,8 @@ function moved(delta: number): string {
 
 /**
  * @param reading the search's reading.
- * @param wording the Tightness Driver and the force unit, for the assumption that names the first.
+ * @param wording the Tightness Driver, the force unit and the side of the Mise en tension, for the
+ *   assumption that names the first and says what it does to the tension de pose.
  */
 export function reachOutputs(reading: ReachReading, wording: ReachWording): ReachOutputs {
   const { current, L, outcome, target, targetX, windless } = reading;
@@ -148,7 +153,7 @@ function rideOutput(id: RideId, title: string, reach: RideReach, L: number): Rea
 }
 
 function proposalOutput(
-  { current, L, windless }: ReachReading,
+  { current, L, target, windless }: ReachReading,
   proposal: ReachProposal,
   wording: ReachWording,
 ): ReachProposalOutput {
@@ -166,7 +171,7 @@ function proposalOutput(
     deltaB === 0
       ? `A et B là où ils sont : ${anchorHeight} ${formatQuantity("anchorHeight", current.zB)}, ${dropped} ${prose(formatQuantity("h", current.h))}.`
       : `A fixe, B ${deltaB < 0 ? "descendu" : "monté"} sur place : ${anchorHeight} ${formatQuantity("anchorHeight", current.zB)} → ${formatQuantity("anchorHeight", proposal.zB)}, ${dropped} ${prose(formatQuantity("h", current.h))} → ${prose(formatQuantity("h", proposal.h))}. Le ${label("profile", "terrain")} et les positions ne bougent pas.`,
-    tensionAssumption(wording, current.L0, proposal.L0),
+    tensionAssumption(wording, current, proposal),
     `${heading("passengerMass", "terrain")}, ${label("wind", "terrain")} saisi et réglages de la ${label("page", "terrain")} Avancé : ceux du scénario.`,
     `${heading("groundClearance", "terrain")} sur le ${label("profile", "terrain")} connu, hors ${label("anchorZones", "terrain")} : ${prose(formatQuantity("clearance", proposal.clearance))} au plus près.`,
     REACH_COPY.untouched,
@@ -175,6 +180,7 @@ function proposalOutput(
   const warnings = [
     REACH_COPY.noPromise,
     REACH_COPY.movedB,
+    ...(target > REACH.steadyMax ? [REACH_COPY.highTarget] : []),
     ...(!windless && proposal.calm.reachesB ? [REACH_COPY.calmReachesB] : []),
     ...(proposal.quasiStatic ? [WARNING_COPY["quasi-static"]] : []),
   ];
@@ -191,25 +197,49 @@ function proposalOutput(
   };
 }
 
+/** « longueur à vide 151,64 m → 150,54 m » — or the one value, when the two print alike. */
+function beforeAfter(name: string, before: string, after: string): string {
+  // Two values that print alike are printed once: an arrow between twins reads as a mistake.
+  return before === after ? `${name} ${before}` : `${name} ${before} → ${after}`;
+}
+
 /**
- * The Tightness Driver, kept: every trial height resolves the line again for the same target, so
- * the longueur à vide moves with B — unless it is the driver, and then the tension does.
+ * The Tightness Driver, kept, **and what keeping it does to the line**: every trial height resolves
+ * the line again for the same target, so the longueur à vide moves with B — unless it is the
+ * driver — and the tension de pose moves with it — unless *it* is the driver. Both are the
+ * candidate's own figures beside the Scenario's, so a typed length that B's move pulls tight or
+ * lets slack is read as a tension, not as « la tension change ».
  */
-function tensionAssumption({ tightness, unit }: ReachWording, from: number, to: number): string {
+function tensionAssumption(
+  wording: ReachWording,
+  current: ReachReading["current"],
+  proposal: ReachProposal,
+): string {
+  const { tightness, unit } = wording;
   const { field, value } = tightnessDriver({ tightness });
-  const length = label("unstretchedLength", "terrain");
+  const lengths = beforeAfter(
+    label("unstretchedLength", "terrain"),
+    formatQuantity("L0", current.L0),
+    formatQuantity("L0", proposal.L0),
+  );
+  // Read at the anchor of the Mise en tension, per member, as the Rail's own « prétension » row.
+  const tensions = beforeAfter(
+    label("pretension", "terrain"),
+    formatQuantity("T_target", pretensionOf(current, wording), unit),
+    formatQuantity("T_target", pretensionOf(proposal, wording), unit),
+  );
   if (field === "L0") {
-    return `${heading("unstretchedLength", "terrain")} ${REACH_COPY.kept} : ${formatQuantity("L0", value)} ; la tension de la ${label("line", "terrain")} change avec la hauteur de B.`;
+    return `${heading("unstretchedLength", "terrain")} ${REACH_COPY.kept} : ${formatQuantity("L0", value)} ; ${tensions}.`;
   }
-  // Two lengths that print alike are printed once: an arrow between twins reads as a mistake.
-  const [before, after] = [formatQuantity("L0", from), formatQuantity("L0", to)];
-  const lengths = before === after ? `${length} ${before}` : `${length} ${before} → ${after}`;
   // The two drivers only Avancé offers are not named here, and neither is their value.
   if (field === "H_target" || field === "vRatio") {
-    return `${REACH_COPY.avanceTension} ${REACH_COPY.kept} ; ${lengths}.`;
+    return `${REACH_COPY.avanceTension} ${REACH_COPY.kept} ; ${lengths} ; ${tensions}.`;
   }
-  const name = heading(field === "T_target" ? "pretension" : "sag", "terrain");
-  return `${name} ${REACH_COPY.kept} : ${formatQuantity(FIELDS[field].quantity, value, unit)} ; ${lengths}.`;
+  // The tension de pose is the driver: it is the one figure that does not move.
+  if (field === "T_target") {
+    return `${heading("pretension", "terrain")} ${REACH_COPY.kept} : ${formatQuantity(FIELDS[field].quantity, value, unit)} ; ${lengths}.`;
+  }
+  return `${heading("sag", "terrain")} ${REACH_COPY.kept} : ${formatQuantity(FIELDS[field].quantity, value, unit)} ; ${lengths} ; ${tensions}.`;
 }
 
 /** Why there is no height to propose — the reason, and never a height in its place. */
@@ -299,7 +329,11 @@ export function reachSearch({
       bearing: windBearing(traverse),
       clearanceJudged: clearance,
     },
-    wording: { tightness: traverse.tightness, unit: traverse.unit },
+    wording: {
+      tightness: traverse.tightness,
+      unit: traverse.unit,
+      tensioningSide: traverse.tensioningSide,
+    },
   };
 }
 

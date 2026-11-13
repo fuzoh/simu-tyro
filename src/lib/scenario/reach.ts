@@ -28,6 +28,9 @@
  * - **The proposal is on the grain a height is typed at** ({@link REACH.step}), rounded toward a
  *   higher B — the side where the passager stops shorter — and every figure it carries is recomputed
  *   at that rounded height, so what is printed is what the Scenario would give once edited.
+ * - **The target is read at the whole percent it prints as** ({@link reachTargetOf}). A link may
+ *   carry `cib=98.4`, kept as given (ADR-0001); what is judged against the domain and searched is
+ *   the 98 % the field on Avancé and the sentences on Dynamique show, never a value nobody reads.
  * - **A refusal is a value with its reason**, never a fallback height: the target outside its
  *   domain, a target no height of B reaches, a line that stops solving on the way, a predicted
  *   contact outside the Zones d'ancrage, a garde that is not judged.
@@ -36,6 +39,7 @@
 import type { Ride, RideEnd } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
+import { roundToDisplay } from "@/lib/format/quantity.ts";
 import { ride, ridePath, sweep } from "@/lib/sim";
 
 import type { DynamicsReading } from "./dynamics.ts";
@@ -70,7 +74,17 @@ export const REACH = {
    *   by tens of metres rather than questioned.
    */
   targetBand: { min: 50, max: 98 },
-  /** The grain of a proposed height, m — the Anchor Height's own (`QUANTITIES.anchorHeight`). */
+  /**
+   * The highest target, % of the span, whose proposal stayed short of B under both variations
+   * measured — a 10 km/h tail wind nobody entered, `C_dA` at the low end of its field's band — on
+   * each of the seven lines of `docs/simulation-theory.md` §12.2 `[MEASURED]`. Above it the domain
+   * still answers, and the proposal says that it stands within the model's own sensitivity of B.
+   */
+  steadyMax: 93,
+  /**
+   * The grain of a proposed height, m — the Anchor Height's own (`QUANTITIES.anchorHeight`). The
+   * search walks it: {@link STEPS_PER_METRE} is read off it.
+   */
   step: 0.1,
   /**
    * How far short of the target the proposed height may leave the farthest point, as a share of the
@@ -82,7 +96,7 @@ export const REACH = {
 } as const;
 
 /** How many {@link REACH.step}s make a metre: heights are counted in whole steps, never summed. */
-const STEPS_PER_METRE = 10;
+const STEPS_PER_METRE = Math.round(1 / REACH.step);
 
 /** One ride, read along the span — three quantities that are not one another. */
 export type RideReach = {
@@ -130,9 +144,23 @@ export function withinTarget(reach: RideReach, targetX: number): boolean {
   return !reach.reachesB && reach.maxX <= targetX;
 }
 
-/** Is the target one a proposal can be searched for — inside {@link REACH.targetBand}? */
+/**
+ * The target as it is read, % of the span: **the whole percent it prints as**. The field on Avancé
+ * commits whole percents, but a link or a Session may hold `98.4` (kept as given, ADR-0001), which
+ * every Page shows as « 98 % » — so 98 % is what the domain judges and the search is held to.
+ * Judged raw, that target would be refused as « 98 % », outside a domain that ends at 98 %.
+ */
+export function reachTargetOf(target: number): number {
+  return roundToDisplay("reachTarget", target);
+}
+
+/**
+ * Is the target one a proposal can be searched for — inside {@link REACH.targetBand}, read as
+ * {@link reachTargetOf} reads it?
+ */
 export function isReachTarget(target: number): boolean {
-  return target >= REACH.targetBand.min && target <= REACH.targetBand.max;
+  const read = reachTargetOf(target);
+  return read >= REACH.targetBand.min && read <= REACH.targetBand.max;
 }
 
 /** Why a trial height has no ride: the rider-free chain stopped, or the traverse has a hole. */
@@ -175,6 +203,19 @@ export type ReachRefusal =
   /** §11 judges nothing on this line — a Clearance Gate breach — so no contact can be ruled out. */
   | { readonly kind: "unjudged" };
 
+/**
+ * The unloaded line's tension at each anchor, N per member — what the Tightness Driver leaves on
+ * the line once it has resolved `L₀`. Carried for the Scenario as it stands and for the candidate,
+ * so a proposal says what moving B does to the tension de pose when another driver is kept: a
+ * typed `L₀` is not re-cut, and the whole variation of B then goes into the tension.
+ */
+export type StandingTension = { readonly TA: number; readonly TB: number };
+
+const standingTension = ({ state }: UnloadedLine): StandingTension => ({
+  TA: state.TA,
+  TB: state.TB,
+});
+
 /** A height of B that puts the farthest point on the target, and what it was recomputed to. */
 export type ReachProposal = {
   /**
@@ -188,6 +229,8 @@ export type ReachProposal = {
   readonly zB: number;
   /** The unstretched length the Tightness Driver resolves on the candidate, m. */
   readonly L0: number;
+  /** The candidate's unloaded tension at each anchor, N per member — see {@link StandingTension}. */
+  readonly Tvide: StandingTension;
   /** The candidate's ride with the Vent entered — the one the target is held to. */
   readonly windy: RideReach;
   /** The candidate's ride without wind, for comparison. `windy` itself when no wind pushes. */
@@ -202,7 +245,7 @@ export type ReachProposal = {
 export type ReachReading = {
   /** Like every dynamic output, an estimation (#6). */
   readonly estimate: true;
-  /** The target, % of the span, as the Scenario holds it. */
+  /** The target, % of the span, as it is read: a whole percent ({@link reachTargetOf}). */
   readonly target: number;
   /** The span, m. */
   readonly L: number;
@@ -217,6 +260,7 @@ export type ReachReading = {
     readonly h: number;
     readonly zB: number;
     readonly L0: number;
+    readonly Tvide: StandingTension;
   };
   readonly outcome:
     | { readonly ok: true; readonly proposal: ReachProposal }
@@ -334,7 +378,7 @@ export function proposeAnchorB({
 }: ReachInput): ReachReading {
   const { span } = unloaded;
   const { L } = span;
-  const target = scenario.dynamics.reachTarget;
+  const target = reachTargetOf(scenario.dynamics.reachTarget);
   const targetX = (target / 100) * L;
   const base = {
     estimate: true,
@@ -348,6 +392,7 @@ export function proposeAnchorB({
       h: span.h,
       zB: span.anchors.zB,
       L0: unloaded.L0,
+      Tvide: standingTension(unloaded),
     },
   } as const;
   const refuse = (refusal: ReachRefusal): ReachReading => ({
@@ -447,6 +492,7 @@ export function proposeAnchorB({
         h: within.line.span.h,
         zB: within.line.span.anchors.zB,
         L0: within.line.L0,
+        Tvide: standingTension(within.line),
         windy: rideReach(rides.windy, L),
         calm: rideReach(rides.calm, L),
         clearance: clearance.hMin,

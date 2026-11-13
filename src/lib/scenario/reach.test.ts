@@ -3,12 +3,21 @@ import { describe, expect, test, vi } from "vitest";
 import type { Ride, RideSample } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
+import { formatQuantity, QUANTITIES } from "@/lib/format/quantity.ts";
+
 import type { ReachProposal, ReachReading, ReachRefusal } from "./reach.ts";
 import type { ScenarioDraft } from "./types.ts";
 
 import { readDynamics } from "./dynamics.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "./first-run.ts";
-import { isReachTarget, proposeAnchorB, REACH, rideReach, withinTarget } from "./reach.ts";
+import {
+  isReachTarget,
+  proposeAnchorB,
+  REACH,
+  reachTargetOf,
+  rideReach,
+  withinTarget,
+} from "./reach.ts";
 import { sweepRider, sweepRiderOf, traverseInputs, traverseScenario } from "./traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "./unloaded.ts";
 
@@ -220,6 +229,41 @@ describe("the target's domain — 50 to 98 % of the span, B and beyond excluded"
     }
   });
 
+  test("a target between whole percents is read at the percent it prints as", () => {
+    // A link or a Session may hold one (ADR-0001); the field on Avancé commits whole percents.
+    for (const [held, read] of [
+      [98.4, 98],
+      [97.5, 98],
+      [49.5, 50],
+      [49.6, 50],
+      [90.4, 90],
+      [98.5, 99],
+      [49.4, 49],
+    ] as const) {
+      expect(reachTargetOf(held), `${held} %`).toBe(read);
+      expect(formatQuantity("reachTarget", held), `${held} %`).toBe(`${read} %`);
+      // What is judged is what is printed: never « 98 % sort du domaine 50 – 98 % ».
+      expect(isReachTarget(held), `${held} %`).toBe(read >= 50 && read <= 98);
+    }
+  });
+
+  test("the search is held to the target as read, and says which", () => {
+    const whole = propose(targeting(SHIPPED, 98));
+    const between = propose(targeting(SHIPPED, 98.4));
+    expect(between.target).toBe(98);
+    expect(between.targetX).toBe(whole.targetX);
+    expect(proposalOf(between)).toEqual(proposalOf(whole));
+    // Half a percent past the domain reads 99 %, and is refused as 99 %.
+    const past = propose(targeting(SHIPPED, 98.5));
+    expect(refusalOf(past)).toEqual({ kind: "target" });
+    expect(past.target).toBe(99);
+    // Just under the domain's foot it reads 50 %, and is searched there.
+    const foot = propose(targeting(SHIPPED, 49.6));
+    expect(foot.target).toBe(50);
+    expect(foot.targetX).toBe(75);
+    expect(proposalOf(foot)).toEqual(proposalOf(propose(targeting(SHIPPED, 50))));
+  });
+
   test.each([99, 100, 120, 49])("target %d: refused, and no height stands in", (t) => {
     const reading = propose(targeting(SHIPPED, t));
     expect(refusalOf(reading)).toEqual({ kind: "target" });
@@ -248,6 +292,19 @@ describe("`proposeAnchorB` — the inverse, checked against the forward chain", 
     expect(lower.atB || lower.maxX > reading.targetX).toBe(true);
     return { reading, proposal, steps, at };
   }
+
+  test("the grid the search walks is the grain an Anchor Height is typed at, read off `REACH.step`", () => {
+    expect(REACH.step).toBe(10 ** -QUANTITIES.anchorHeight.decimals);
+    for (const scenario of [SHIPPED, line(150, 0), targeting(SHIPPED, 61)]) {
+      const { deltaB } = proposalOf(propose(scenario));
+      // A whole number of steps, with no float left over from summing them.
+      const steps = Math.round(deltaB / REACH.step);
+      expect(deltaB).toBe(steps / Math.round(1 / REACH.step));
+      expect(formatQuantity("anchorHeight", deltaB)).toBe(
+        `${deltaB.toFixed(1).replace(".", ",")} m`,
+      );
+    }
+  });
 
   test("the shipped line carries the passager to B: B is to be raised", () => {
     const { reading, proposal } = expectTightest(SHIPPED);
@@ -303,6 +360,8 @@ describe("`proposeAnchorB` — the inverse, checked against the forward chain", 
     if (once.reading.windy.end.kind !== "stop") throw new Error("the candidate stops short");
     expect(proposal.windy.stopX).toBeCloseTo(once.reading.windy.end.x, 9);
     expect(proposal.L0).toBeCloseTo(once.unloaded.L0, 9);
+    expect(proposal.Tvide.TA).toBeCloseTo(once.unloaded.state.TA, 6);
+    expect(proposal.Tvide.TB).toBeCloseTo(once.unloaded.state.TB, 6);
     expect(proposal.clearance).toBeCloseTo(once.swept.clearance.hMin, 9);
     expect(proposal.quasiStatic).toBe(once.reading.quasiStatic.exceeded);
   });
@@ -383,6 +442,28 @@ describe("the Tightness Driver is kept, and resolved afresh at every height", ()
     const proposal = proposalOf(reading);
     expect(reading.current.L0).toBe(151.2);
     expect(proposal.L0).toBe(151.2);
+  });
+
+  test("the tension de pose the driver leaves is carried for the Scenario and for the candidate", () => {
+    // The shipped driver is the tension at A: it is the one figure B's move leaves alone.
+    const held = propose(SHIPPED);
+    expect(held.current.Tvide.TA).toBeCloseTo(2634, 1);
+    expect(proposalOf(held).Tvide.TA).toBeCloseTo(2634, 1);
+    // The line's own state, both ends: B hangs lower, so its tension is the lighter one.
+    const { unloaded } = solved(SHIPPED);
+    expect(held.current.Tvide).toEqual({ TA: unloaded.state.TA, TB: unloaded.state.TB });
+    expect(held.current.Tvide.TB).toBeLessThan(held.current.Tvide.TA);
+
+    // A typed length is not re-cut, so raising B goes into the tension — the consequence of the
+    // Tightness Driver the proposal has to show, since it re-judges no Verdict.
+    const cut: ScenarioDraft = { ...SHIPPED, tightness: { mode: "length", L0: 151.2 } };
+    const reading = propose(cut);
+    const proposal = proposalOf(reading);
+    expect(proposal.deltaB).toBeGreaterThan(0);
+    const once = solved(edited(cut, tenths(proposal.deltaB)));
+    expect(proposal.Tvide.TA).toBeCloseTo(once.unloaded.state.TA, 6);
+    expect(proposal.Tvide.TB).toBeCloseTo(once.unloaded.state.TB, 6);
+    expect(proposal.Tvide.TA).not.toBeCloseTo(reading.current.Tvide.TA, 0);
   });
 
   test.each([

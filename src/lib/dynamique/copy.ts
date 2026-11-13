@@ -14,9 +14,11 @@ import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 import { ASSUMED_NOTE, AVANCE_NOTICE, avanceNoticeText } from "@/lib/app/avance-copy.ts";
 import { refusalLabelTable } from "@/lib/app/refusal-copy.ts";
 import { COUPE_HOVER, NO_SPAN_LINE } from "@/lib/chart/copy.ts";
+import { formatQuantity } from "@/lib/format/quantity.ts";
 import { fieldLabel } from "@/lib/rail/fields.ts";
 import { GATE_CONSEQUENCE, WIND_UNPLACED } from "@/lib/rail/gates.ts";
 import { FIELD_NOTE } from "@/lib/rail/help.ts";
+import { REACH } from "@/lib/scenario/reach.ts";
 import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 /** The fields' groups, in the order the Page lists them. */
@@ -178,6 +180,11 @@ export const REACH_COPY = {
   movedB: `Déplacer réellement B peut changer le terrain sous la ${label("line", "terrain")} : le nouvel emplacement et son ${label("profile", "terrain")} sont à vérifier, puis tout le calcul à refaire avec eux.`,
   /** What the proposal leaves alone, and what it did not judge. */
   untouched: `Rien n'est modifié : ni les ${label("anchors", "terrain")}, ni le scénario. Ni le ${label("verdict", "terrain")} ni la ${label("requiredClearance", "terrain")} ne sont rejugés ici.`,
+  /**
+   * The target is above the highest one whose proposal stayed short of B under the two variations
+   * measured (`REACH.steadyMax`, §12.2): the domain still answers, and says what it is worth.
+   */
+  highTarget: `Cible haute : au-delà de ${formatQuantity("reachTarget", REACH.steadyMax)} de la ${label("span", "terrain")}, un ${label("wind", "terrain")} arrière de 10 km/h non saisi ou une traînée plus faible ont suffi, sur certaines des ${label("line", "terrain")}s essayées, à amener le ${label("passenger", "terrain")} jusqu'à B.`,
   /** The comparison without wind reaches B at the proposed height. */
   calmReachesB: `Sans vent, le ${label("passenger", "terrain")} ${ARRIVES_AT_END} à cette hauteur de B : la proposition ne tient que par le vent saisi.`,
   /** The Tightness Driver a simplified Page does not name. */
