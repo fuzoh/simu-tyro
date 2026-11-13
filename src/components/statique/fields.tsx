@@ -39,6 +39,7 @@ import {
   UsageRow,
   useFieldRows,
   useLastGoodSolve,
+  WindProfileRows,
 } from "@/components/rail/inputs.tsx";
 import { TerrainDisclosure } from "@/components/rail/outputs.tsx";
 import { ASSUMED_NOTE, breachedElsewhere } from "@/lib/app/avance-copy.ts";
@@ -171,6 +172,7 @@ export function StatiqueFields({
         <Group title={STATIQUE_GROUPS.wind}>
           <NumericRow hint="km/h" id="windSpeed" />
           <NumericRow hint="°" id="windDirection" />
+          <WindProfileRows />
         </Group>
 
         <Group title={STATIQUE_GROUPS.installation}>

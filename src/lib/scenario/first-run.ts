@@ -39,7 +39,7 @@
  *   is where those figures are locked.
  */
 
-import { DYNAMICS, TEXTILE } from "@/lib/sim";
+import { DYNAMICS, TEXTILE, WIND_PROFILE } from "@/lib/sim";
 
 import type { EndTermination, Scenario, TextileDraft } from "./types.ts";
 
@@ -113,8 +113,17 @@ export const FIRST_RUN_SCENARIO = {
    * so the shipped link did not change; the shipped line's minimum is mid-span, outside both.
    */
   rider: { mp: 120, hRider: 2.1, hClearMin: 1, anchorZone: 10, DAF: 1.2, xD: 75 },
-  /** No wind, which is `ws` and `wd` **absent**: the shipped link did not change either. */
-  wind: { speedKmh: 0, directionDeg: 0 },
+  /**
+   * No wind, which is `ws` and `wd` **absent**: the shipped link did not change either. Nor did
+   * its profile (#120): a uniform wind is `ww` and `wa` absent, §8.4's shipped width and none of
+   * its attenuation.
+   */
+  wind: {
+    speedKmh: 0,
+    directionDeg: 0,
+    widthPct: WIND_PROFILE.width.shipped,
+    attenuationPct: WIND_PROFILE.attenuation.shipped,
+  },
   /**
    * §12.2's defaults, which is the ride's keys **absent**: `C_dA` 0,45 m² `[FIELD:SSF]`, the
    * corde's SSF fit `F₀` 15 N and `k_v` 1,5 kg/s `[FIELD:SSF]`, the câble's constant `μ` 0,015 — an

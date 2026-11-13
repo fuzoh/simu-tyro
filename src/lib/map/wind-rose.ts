@@ -17,6 +17,8 @@
  *   parks the handle on the outer ring and stays what was typed.
  * - **What the handle writes is what a field can hold**: whole km/h and whole degrees, the display
  *   grain of the two fields, so a gesture and a typed value agree to the last digit.
+ * - **The handle writes its own fields and keeps the rest of the Vent** (#120): the profile stays
+ *   as it is, a speed of zero included.
  */
 
 import type { Wind } from "@/lib/scenario/types.ts";
@@ -71,7 +73,10 @@ export function azimuthOf(screen: number, { north }: RoseReference): number {
 }
 
 /** Where the handle stands for a wind: the centre without wind, the outer ring at the scale's end. */
-export function handleOffset(wind: Wind, reference: RoseReference): RoseOffset {
+export function handleOffset(
+  wind: Pick<Wind, "speedKmh" | "directionDeg">,
+  reference: RoseReference,
+): RoseOffset {
   const radius =
     (Math.min(Math.max(wind.speedKmh, 0), ROSE_MAX_KMH) / ROSE_MAX_KMH) * ROSE_RADIUS_PX;
   const bearing = radians(screenBearing(wind.directionDeg, reference));
@@ -80,8 +85,9 @@ export function handleOffset(wind: Wind, reference: RoseReference): RoseOffset {
 }
 
 /**
- * The Vent a handle dropped at `offset` writes. Without a whole km/h of speed there is no direction
- * to read off a point at the centre, so the previous one stays.
+ * The Vent a handle dropped at `offset` writes: its speed and its direction, **the profile kept as
+ * it was**. Without a whole km/h of speed there is no direction to read off a point at the centre,
+ * so the previous one stays.
  */
 export function windFromOffset(offset: RoseOffset, reference: RoseReference, previous: Wind): Wind {
   const distance = Math.hypot(offset.x, offset.y);
@@ -89,9 +95,10 @@ export function windFromOffset(offset: RoseOffset, reference: RoseReference, pre
     "windSpeed",
     Math.min((distance / ROSE_RADIUS_PX) * ROSE_MAX_KMH, ROSE_MAX_KMH),
   );
-  if (speedKmh === 0) return { speedKmh, directionDeg: previous.directionDeg };
+  if (speedKmh === 0) return { ...previous, speedKmh };
   const screen = mod360((Math.atan2(offset.x, -offset.y) * 180) / Math.PI);
   return {
+    ...previous,
     speedKmh,
     directionDeg: mod360(roundToDisplay("windDirection", azimuthOf(screen, reference))),
   };

@@ -545,15 +545,76 @@ describe("searchToScenario — the read side of § 7's key table", () => {
 
   it("reads `ws` and `wd` absent as no wind — and neither completes nor names them (#87)", () => {
     const { search, completed } = complete("?L=250&h=-40");
-    expect(searchToScenario(search).wind).toEqual({ speedKmh: 0, directionDeg: 0 });
+    expect(searchToScenario(search).wind).toMatchObject({ speedKmh: 0, directionDeg: 0 });
     expect(search.ws).toBeUndefined();
     expect(search.wd).toBeUndefined();
     expect(completed).not.toContain("ws");
     expect(completed).not.toContain("wd");
-    expect(decode("?L=250&ws=50&wd=45").wind).toEqual({ speedKmh: 50, directionDeg: 45 });
+    expect(decode("?L=250&ws=50&wd=45").wind).toMatchObject({ speedKmh: 50, directionDeg: 45 });
     // Each key stands alone: a direction without a speed, and a speed without a direction.
-    expect(decode("?L=250&wd=270").wind).toEqual({ speedKmh: 0, directionDeg: 270 });
-    expect(decode("?L=250&ws=30").wind).toEqual({ speedKmh: 30, directionDeg: 0 });
+    expect(decode("?L=250&wd=270").wind).toMatchObject({ speedKmh: 0, directionDeg: 270 });
+    expect(decode("?L=250&ws=30").wind).toMatchObject({ speedKmh: 30, directionDeg: 0 });
+  });
+
+  it("reads `ww` and `wa` absent as the uniform wind — and neither completes nor names them (#120)", () => {
+    // A link older than the keys: its wind is read whole, at the shipped width and unattenuated.
+    const { search, completed } = complete("?L=250&h=-40&ws=30&wd=264");
+    expect(searchToScenario(search).wind).toEqual({
+      speedKmh: 30,
+      directionDeg: 264,
+      widthPct: 50,
+      attenuationPct: 0,
+    });
+    for (const key of ["ww", "wa"] as const) {
+      expect(search[key]).toBeUndefined();
+      expect(completed).not.toContain(key);
+    }
+    // In percent, as the fields show them — `wa=50` is 50 %, never a fraction — and each alone.
+    expect(decode("?L=250&wa=50").wind).toMatchObject({ widthPct: 50, attenuationPct: 50 });
+    expect(decode("?L=250&ww=25").wind).toMatchObject({ widthPct: 25, attenuationPct: 0 });
+    expect(decode("?L=250&ww=30&wa=75").wind).toMatchObject({ widthPct: 30, attenuationPct: 75 });
+  });
+
+  it("keeps a profile out of its domain as it arrived, for the form to refuse (ADR-0001)", () => {
+    expect(decode("?L=250&ww=95&wa=110").wind).toMatchObject({ widthPct: 95, attenuationPct: 110 });
+    expect(decode("?L=250&ww=9&wa=-1").wind).toMatchObject({ widthPct: 9, attenuationPct: -1 });
+    // Nor is a value between two steps rounded on the way in or on the way out.
+    const between = decode("?L=250&ww=50.4&wa=0.4");
+    expect(between.wind).toMatchObject({ widthPct: 50.4, attenuationPct: 0.4 });
+    expect(scenarioToSearch({ ...firstRunDefaults(), wind: between.wind })).toMatchObject({
+      ww: 50.4,
+      wa: 0.4,
+    });
+    const out = scenarioToSearch({
+      ...firstRunDefaults(),
+      wind: { speedKmh: 30, directionDeg: 0, widthPct: 95, attenuationPct: -1 },
+    });
+    expect(out).toMatchObject({ ww: 95, wa: -1 });
+  });
+
+  it("writes `ww` and `wa` each only off what ships, so older links stay string-identical", () => {
+    const shipped = firstRunDefaults();
+    expect(scenarioToSearch(shipped)).not.toHaveProperty("ww");
+    expect(scenarioToSearch(shipped)).not.toHaveProperty("wa");
+    // A width kept through a uniform wind travels alone, and so does an attenuation at 50 %.
+    const narrow = scenarioToSearch({ ...shipped, wind: { ...shipped.wind, widthPct: 25 } });
+    expect(narrow.ww).toBe(25);
+    expect(narrow).not.toHaveProperty("wa");
+    const sheltered = scenarioToSearch({
+      ...shipped,
+      wind: { ...shipped.wind, attenuationPct: 60 },
+    });
+    expect(sheltered.wa).toBe(60);
+    expect(sheltered).not.toHaveProperty("ww");
+    // After `wd` and before `cda`, whatever the Page the link opens on.
+    const both = {
+      ...shipped,
+      wind: { speedKmh: 30, directionDeg: 264, widthPct: 30, attenuationPct: 75 },
+      dynamics: { ...shipped.dynamics, CdA: 0.5 },
+    };
+    expect(canonicalLink(scenarioToSearch(both), "/dynamique")).toContain(
+      "&ws=30&wd=264&ww=30&wa=75&cda=0.5&",
+    );
   });
 
   it("reads the four coordinates absent as Positions unknown — and neither completes nor names them (#90)", () => {

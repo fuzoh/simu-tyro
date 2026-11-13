@@ -488,7 +488,7 @@ describe("the Tightness Driver is kept, and resolved afresh at every height", ()
 describe("the Vent entered is in the search, and the ride without it is beside", () => {
   const blowing = (directionDeg: number, speedKmh = 30): ScenarioDraft => ({
     ...SHIPPED,
-    wind: { speedKmh, directionDeg },
+    wind: { ...SHIPPED.wind, speedKmh, directionDeg },
   });
   const calm = proposalOf(propose(SHIPPED));
 
@@ -569,7 +569,7 @@ describe("a refusal is a reason, never a height", () => {
     // one thing read here. The dénivelé may grow to the span: 150 − (−18) = 168 m.
     const gale: ScenarioDraft = {
       ...targeting(SHIPPED, 50),
-      wind: { speedKmh: 400, directionDeg: TAIL },
+      wind: { ...SHIPPED.wind, speedKmh: 400, directionDeg: TAIL },
     };
     expect(refusalOf(propose(gale))).toEqual({
       kind: "unreachable",

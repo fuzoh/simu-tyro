@@ -311,6 +311,15 @@ export const FIELD_ACCESS: FieldAccess = {
     read: ({ wind }) => wind.directionDeg,
     write: (s, directionDeg) => ({ ...s, wind: { ...s.wind, directionDeg } }),
   },
+  // The Vent's profile (#120): each lens writes its own percent and leaves the rest of the Vent.
+  windWidth: {
+    read: ({ wind }) => wind.widthPct,
+    write: (s, widthPct) => ({ ...s, wind: { ...s.wind, widthPct } }),
+  },
+  windAttenuation: {
+    read: ({ wind }) => wind.attenuationPct,
+    write: (s, attenuationPct) => ({ ...s, wind: { ...s.wind, attenuationPct } }),
+  },
   CdA: {
     read: ({ dynamics }) => dynamics.CdA,
     write: (s, CdA) => ({ ...s, dynamics: { ...s.dynamics, CdA } }),

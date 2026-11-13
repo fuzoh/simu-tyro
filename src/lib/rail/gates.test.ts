@@ -5,6 +5,7 @@ import type { ScenarioDraft, TextileDraft } from "@/lib/scenario/types.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { sweepRider, sweepRiderOf } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
+import { uniformWind } from "@/lib/scenario/wind.ts";
 
 import type { FieldId, GateId } from "./fields.ts";
 
@@ -17,13 +18,16 @@ import {
   fieldUnavailable,
   GATE_CONSEQUENCE,
   isFieldActive,
+  isWindProfileFieldShown,
   noRiderBetweenMessage,
   regimeUnavailableNote,
   saisieEnCours,
   terminationOptions,
+  WIND_PROFILE_FIELDS,
   WIND_UNPLACED,
   windBearing,
   windNotice,
+  windProfileUnreadMessage,
   zonesMeetMessage,
 } from "./gates.ts";
 import { applyRopeClass, applyShippedTerminations } from "./values.ts";
@@ -394,7 +398,11 @@ describe("the gate matrix, one input at a time", () => {
     ["DAF", "verdict", (d) => void (d.rider.DAF = 0)],
     ["terminaison A", "verdict", (d) => void (d.terminations.A = { ...d.terminations.A, eta: 0 })],
     ["terminaison B", "verdict", (d) => void (d.terminations.B = { ...d.terminations.B, eta: 0 })],
-    ["vitesse du vent", "wind", (d) => void (d.wind = { speedKmh: -60, directionDeg: 0 })],
+    [
+      "vitesse du vent",
+      "wind",
+      (d) => void (d.wind = { ...d.wind, speedKmh: -60, directionDeg: 0 }),
+    ],
     ["C_dA", "ride", (d) => void (d.dynamics = { ...d.dynamics, CdA: -0.45 })],
     ["ρ", "ride", (d) => void (d.dynamics = { ...d.dynamics, rho: -1.2 })],
   ];
@@ -432,7 +440,7 @@ describe("the gate matrix, one input at a time", () => {
     const report = evaluateGates({
       scenario: scenario((draft) => {
         draft.regime = "en15567";
-        draft.wind = { speedKmh: -60, directionDeg: 0 };
+        draft.wind = { ...draft.wind, speedKmh: -60, directionDeg: 0 };
       }),
     });
     expect(report.passed).toEqual({
@@ -879,7 +887,7 @@ describe("the Vent needs Positions — one check for the link, the Session and t
   };
   const windy = (positions: ScenarioDraft["positions"]) =>
     scenario((draft) => {
-      draft.wind = { speedKmh: 30, directionDeg: 264 };
+      draft.wind = { ...draft.wind, speedKmh: 30, directionDeg: 264 };
       draft.positions = positions;
     });
 
@@ -924,7 +932,7 @@ describe("the Vent needs Positions — one check for the link, the Session and t
   test("a negative speed without Positions is still the Wind Gate's breach (ADR-0001)", () => {
     const report = evaluateGates({
       scenario: scenario((draft) => {
-        draft.wind = { speedKmh: -30, directionDeg: 264 };
+        draft.wind = { ...draft.wind, speedKmh: -30, directionDeg: 264 };
       }),
     });
     expect(report.windNeedsPositions).toBe(true);
@@ -1082,5 +1090,332 @@ describe("the target of the farthest point (#121) is in no gate", () => {
     });
     expect(report.errors).toEqual([]);
     expect(report.passed).toEqual(ALL);
+  });
+});
+
+/**
+ * The Vent's profile (#120): two percents the Wind Gate judges, and — until a calculation reads the
+ * field — a profile that is not uniform **refused, never computed under a uniform wind**. A link
+ * or a Session brings it; it is kept as given (ADR-0001), and « Passer au vent uniforme » repairs
+ * it.
+ */
+describe("the Vent's profile is gated (#120)", () => {
+  const TRIAL = {
+    A: { lat: 46.843556, lon: 6.525035 },
+    B: { lat: 46.846166, lon: 6.520783 },
+  };
+  const profiled = (widthPct: number, attenuationPct: number) =>
+    scenario((draft) => {
+      draft.regime = "en15567";
+      draft.wind = { speedKmh: 30, directionDeg: 264, widthPct, attenuationPct };
+      draft.positions = TRIAL;
+    });
+  const ALL = { solve: true, clearance: true, verdict: true, wind: true, ride: true };
+  /** A Wind breach and nothing else: the statics, the garde and the Verdict stand. */
+  const WIND_ALONE = { ...ALL, wind: false };
+
+  const WIDTH_RULE =
+    "⛔ Largeur à mi-atténuation — une largeur entre 10 % et 90 % de la portée est requise.";
+  const ATTENUATION_RULE =
+    "⛔ Atténuation aux ancrages — une atténuation entre 0 % et 100 % est requise.";
+  const UNREAD =
+    "⛔ Atténuation aux ancrages — aucun calcul ne lit encore le profil du vent : seul le vent uniforme (0 %) est accepté.";
+  const TO_UNIFORM = { id: "passer-au-vent-uniforme", label: "Passer au vent uniforme" };
+
+  test("the two fields are the profile's, in rail order", () => {
+    expect(WIND_PROFILE_FIELDS).toEqual(["windWidth", "windAttenuation"]);
+  });
+
+  test("the shipped Vent is uniform and raises nothing", () => {
+    const report = evaluateGates({ scenario: scenario() });
+    expect(gateFor(report, "windWidth")).toBeUndefined();
+    expect(gateFor(report, "windAttenuation")).toBeUndefined();
+    expect(report.passed.wind).toBe(true);
+  });
+
+  test.each([10, 25, 50, 90])(
+    "a uniform wind passes whatever width it keeps: a width of %d",
+    (widthPct) => {
+      const report = evaluateGates({ scenario: profiled(widthPct, 0) });
+      expect(report.errors).toEqual([]);
+      expect(report.passed).toEqual(ALL);
+    },
+  );
+
+  describe("a percent outside its domain — refused whether or not the profile is read", () => {
+    test.each([false, true])("a width of 95 (profile read: %s)", (windProfileActive) => {
+      const report = evaluateGates({ scenario: profiled(95, 0), windProfileActive });
+      expect(report.errors).toEqual([
+        {
+          gate: "wind",
+          kind: "invalid",
+          field: "windWidth",
+          alsoOutlined: [],
+          message: `${WIDTH_RULE} Valeur : 95 %.`,
+          fixes: [],
+        },
+      ]);
+      expect(report.passed).toEqual(WIND_ALONE);
+      expect(blockingSummary(report)).toBe("⛔ 1 erreur bloquante — vent indisponible");
+    });
+
+    test.each([false, true])("an attenuation of 110 (profile read: %s)", (windProfileActive) => {
+      const report = evaluateGates({ scenario: profiled(50, 110), windProfileActive });
+      // The domain's own message, once: no second breach for « not uniform », and no Fix Action
+      // offered on a value whose repair is the user's to choose.
+      expect(report.errors).toEqual([
+        {
+          gate: "wind",
+          kind: "invalid",
+          field: "windAttenuation",
+          alsoOutlined: [],
+          message: `${ATTENUATION_RULE} Valeur : 110 %.`,
+          fixes: [],
+        },
+      ]);
+      expect(report.passed).toEqual(WIND_ALONE);
+    });
+
+    test("a negative attenuation is refused, not read as a wind stronger at the anchors", () => {
+      const report = evaluateGates({ scenario: profiled(50, -20), windProfileActive: true });
+      expect(report.errors.map((error) => error.message)).toEqual([
+        `${ATTENUATION_RULE} Valeur : −20 %.`,
+      ]);
+    });
+
+    test("both at once: two breaches in rail order, and the summary counts them", () => {
+      const report = evaluateGates({ scenario: profiled(95, 110) });
+      expect(report.errors.map((error) => [error.gate, error.field])).toEqual([
+        ["wind", "windWidth"],
+        ["wind", "windAttenuation"],
+      ]);
+      expect(blockingSummary(report)).toBe("⛔ 2 erreurs bloquantes — vent indisponible");
+    });
+
+    test("nothing is brought back into its domain: the Scenario stays as it arrived", () => {
+      const arrived = profiled(95, 110);
+      evaluateGates({ scenario: arrived });
+      expect(arrived.wind).toEqual({
+        speedKmh: 30,
+        directionDeg: 264,
+        widthPct: 95,
+        attenuationPct: 110,
+      });
+    });
+
+    test("the domain is judged as the percent prints: 90,4 % is 90 %, 90,5 % is 91 %", () => {
+      expect(
+        evaluateGates({ scenario: profiled(90.4, 0), windProfileActive: true }).errors,
+      ).toEqual([]);
+      expect(
+        evaluateGates({ scenario: profiled(90.5, 0), windProfileActive: true }).errors.map(
+          (error) => error.message,
+        ),
+      ).toEqual([`${WIDTH_RULE} Valeur : 91 %.`]);
+    });
+  });
+
+  describe("a profile that is not uniform, while no calculation reads it", () => {
+    test("it breaches the Wind Gate alone, with the Fix Action back to the uniform wind", () => {
+      const report = evaluateGates({ scenario: profiled(30, 40) });
+      expect(report.errors).toEqual([
+        {
+          gate: "wind",
+          kind: "invalid",
+          field: "windAttenuation",
+          alsoOutlined: [],
+          message: `${UNREAD} Valeur : 40 %.`,
+          fixes: [TO_UNIFORM],
+        },
+      ]);
+      expect(report.passed).toEqual(WIND_ALONE);
+      expect(blockingSummary(report)).toBe("⛔ 1 erreur bloquante — vent indisponible");
+    });
+
+    test("that refusal is the default: the activation is off unless a caller says otherwise", () => {
+      expect(evaluateGates({ scenario: profiled(30, 40) })).toEqual(
+        evaluateGates({ scenario: profiled(30, 40), windProfileActive: false }),
+      );
+    });
+
+    test("once the profile is read, the same Vent passes every gate", () => {
+      const report = evaluateGates({ scenario: profiled(30, 40), windProfileActive: true });
+      expect(report.errors).toEqual([]);
+      expect(report.passed).toEqual(ALL);
+    });
+
+    test("uniform is what the field prints: 0,4 % passes, 0,5 % reads 1 % and is refused", () => {
+      expect(evaluateGates({ scenario: profiled(50, 0.4) }).errors).toEqual([]);
+      expect(
+        evaluateGates({ scenario: profiled(50, 0.5) }).errors.map((error) => error.message),
+      ).toEqual([`${UNREAD} Valeur : 1 %.`]);
+    });
+
+    test("it is refused without Positions too: the Vent is not applied, and still not accepted", () => {
+      const unplaced = profiled(30, 40);
+      unplaced.positions = { A: null, B: null };
+      const report = evaluateGates({ scenario: unplaced });
+      expect(report.windNeedsPositions).toBe(true);
+      expect(report.errors.map((error) => [error.gate, error.field])).toEqual([
+        ["wind", "windAttenuation"],
+      ]);
+    });
+
+    test("the message states the rule and echoes the value, in the template of every breach", () => {
+      expect(windProfileUnreadMessage(40)).toBe(`${UNREAD} Valeur : 40 %.`);
+      expect(windProfileUnreadMessage(100)).toBe(`${UNREAD} Valeur : 100 %.`);
+      // The profile's words are the same in both registers.
+      expect(windProfileUnreadMessage(40, "terrain")).toBe(windProfileUnreadMessage(40));
+      expect(UNREAD).not.toMatch(/vous|maintenant|veuillez/i);
+    });
+
+    test("« Passer au vent uniforme » lifts it: the attenuation alone is written", () => {
+      const repaired = profiled(30, 40);
+      repaired.wind = uniformWind(repaired.wind);
+      expect(repaired.wind).toEqual({
+        speedKmh: 30,
+        directionDeg: 264,
+        widthPct: 30,
+        attenuationPct: 0,
+      });
+      const report = evaluateGates({ scenario: repaired });
+      expect(report.errors).toEqual([]);
+      expect(report.passed).toEqual(ALL);
+    });
+
+    test("it does not repair a width out of its domain: that breach stands, without a Fix Action", () => {
+      const arrived = profiled(95, 40);
+      expect(
+        evaluateGates({ scenario: arrived }).errors.map((error) => [
+          error.field,
+          error.fixes.map((fix) => fix.id),
+        ]),
+      ).toEqual([
+        ["windWidth", []],
+        ["windAttenuation", ["passer-au-vent-uniforme"]],
+      ]);
+      arrived.wind = uniformWind(arrived.wind);
+      expect(
+        evaluateGates({ scenario: arrived }).errors.map((error) => [
+          error.field,
+          error.fixes.map((fix) => fix.id),
+        ]),
+      ).toEqual([["windWidth", []]]);
+    });
+  });
+
+  describe("the Scenario's breach outlasts the form's text", () => {
+    const EMPTIED = { kind: "empty", message: "valeur requise" } as const;
+
+    test("an attenuation emptied over a refused profile is not « Saisie en cours »", () => {
+      const report = evaluateGates({
+        scenario: profiled(30, 40),
+        issues: [{ field: "windAttenuation", ...EMPTIED }],
+      });
+      expect(report.errors).toEqual([
+        {
+          gate: "wind",
+          kind: "invalid",
+          field: "windAttenuation",
+          alsoOutlined: [],
+          message: `${UNREAD} Valeur : 40 %.`,
+          fixes: [TO_UNIFORM],
+        },
+      ]);
+      expect(saisieEnCours(report, "windAttenuation", "40 %")).toBeNull();
+      expect(report.passed.wind).toBe(false);
+    });
+
+    test("a width emptied over a value out of its domain keeps that breach", () => {
+      const report = evaluateGates({
+        scenario: profiled(95, 0),
+        issues: [{ field: "windWidth", ...EMPTIED }],
+        windProfileActive: true,
+      });
+      expect(report.errors.map((error) => [error.kind, error.message])).toEqual([
+        ["invalid", `${WIDTH_RULE} Valeur : 95 %.`],
+      ]);
+      expect(saisieEnCours(report, "windWidth", "95 %")).toBeNull();
+    });
+
+    test("emptied over an accepted value, a profile field is mid-edit like any other", () => {
+      const state = profiled(30, 40);
+      const report = evaluateGates({
+        scenario: state,
+        issues: [{ field: "windAttenuation", ...EMPTIED }],
+        windProfileActive: true,
+      });
+      expect(report.errors.map((error) => [error.gate, error.kind, error.field])).toEqual([
+        ["wind", "empty", "windAttenuation"],
+      ]);
+      const committed = committedValue(state, "windAttenuation", deduceValues(state, null));
+      expect(saisieEnCours(report, "windAttenuation", committed)).toEqual({
+        field: "windAttenuation",
+        message: "Saisie en cours — ces valeurs correspondent à Atténuation aux ancrages 40 %.",
+      });
+    });
+
+    test("a text the form refuses on the field keeps its own message, and is not doubled", () => {
+      const unreadable = "⛔ Atténuation aux ancrages — nombre illisible. Saisie : « 4O ».";
+      const report = evaluateGates({
+        scenario: profiled(30, 40),
+        issues: [{ field: "windAttenuation", kind: "unreadable", message: unreadable }],
+      });
+      expect(report.errors.map((error) => [error.field, error.message])).toEqual([
+        ["windAttenuation", unreadable],
+      ]);
+      expect(report.passed.wind).toBe(false);
+    });
+  });
+
+  describe("where the profile's fields stand", () => {
+    test("without Positions the four fields of the Vent are disabled with the one reason", () => {
+      const unplaced = profiled(30, 40);
+      unplaced.positions = { A: null, B: null };
+      const report = evaluateGates({ scenario: unplaced });
+      for (const id of ["windSpeed", "windDirection", "windWidth", "windAttenuation"] as const) {
+        expect(fieldUnavailable(id, report)).toBe(WIND_UNPLACED.reason);
+      }
+      const placed = evaluateGates({ scenario: profiled(30, 40) });
+      for (const id of WIND_PROFILE_FIELDS) expect(fieldUnavailable(id, placed)).toBeNull();
+    });
+
+    test("before the activation, a field is on screen only while its value is refused", () => {
+      const uniform = evaluateGates({ scenario: profiled(30, 0) });
+      expect(WIND_PROFILE_FIELDS.filter((id) => isWindProfileFieldShown(id, uniform))).toEqual([]);
+
+      const unread = evaluateGates({ scenario: profiled(30, 40) });
+      expect(WIND_PROFILE_FIELDS.filter((id) => isWindProfileFieldShown(id, unread))).toEqual([
+        "windAttenuation",
+      ]);
+
+      const tooWide = evaluateGates({ scenario: profiled(95, 0) });
+      expect(WIND_PROFILE_FIELDS.filter((id) => isWindProfileFieldShown(id, tooWide))).toEqual([
+        "windWidth",
+      ]);
+
+      const both = evaluateGates({ scenario: profiled(95, 110) });
+      expect(WIND_PROFILE_FIELDS.filter((id) => isWindProfileFieldShown(id, both))).toEqual([
+        "windWidth",
+        "windAttenuation",
+      ]);
+    });
+
+    test("another field's breach does not bring the profile on screen", () => {
+      const report = evaluateGates({
+        scenario: scenario((draft) => {
+          draft.wind = { ...draft.wind, speedKmh: -60 };
+        }),
+      });
+      expect(gateFor(report, "windSpeed")).toBe("wind");
+      expect(WIND_PROFILE_FIELDS.filter((id) => isWindProfileFieldShown(id, report))).toEqual([]);
+    });
+
+    test("once the profile is read, both fields stand beside the Vent's other two", () => {
+      const uniform = evaluateGates({ scenario: profiled(50, 0), windProfileActive: true });
+      expect(
+        WIND_PROFILE_FIELDS.filter((id) => isWindProfileFieldShown(id, uniform, true)),
+      ).toEqual(["windWidth", "windAttenuation"]);
+    });
   });
 });

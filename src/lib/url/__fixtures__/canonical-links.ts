@@ -77,6 +77,12 @@ export const BRANCHES = [
   "reach-target-absent",
   "reach-target-off-default",
   "reach-target-default-explicit",
+  "wind-profile-absent",
+  "wind-profile-both",
+  "wind-profile-attenuation-only",
+  "wind-profile-width-only",
+  "wind-profile-out-of-domain",
+  "wind-profile-default-explicit",
 ] as const;
 
 export type Branch = (typeof BRANCHES)[number];
@@ -98,7 +104,8 @@ export type CanonicalLinkFixture = {
     | typeof MEASURED_PH
     | typeof MEASURED_WIND
     | typeof MEASURED_106
-    | typeof MEASURED_121;
+    | typeof MEASURED_121
+    | typeof MEASURED_120;
   covers: readonly Branch[];
   scenario: Scenario;
   link: string;
@@ -125,7 +132,8 @@ export type DecodeOnlyFixture = {
     | typeof MEASURED_103
     | typeof MEASURED_PH
     | typeof MEASURED_106
-    | typeof MEASURED_121;
+    | typeof MEASURED_121
+    | typeof MEASURED_120;
   covers: readonly Branch[];
   link: string;
 } & ({ scenario: Scenario; canonical: string } | { scenario: ScenarioDraft; canonical: null });
@@ -144,6 +152,7 @@ const MEASURED_PH = "[MEASURED] map #1's review of `ph`, codec as of 2026-11-09"
 const MEASURED_WIND = "[MEASURED] geographic `wd`, codec as of 2026-11-09";
 const MEASURED_106 = "[MEASURED] issue #106, codec as of 2026-11-09";
 const MEASURED_121 = "[MEASURED] issue #121, codec as of 2026-11-13";
+const MEASURED_120 = "[MEASURED] issue #120, codec as of 2026-11-13";
 
 /** Three samples `(0,0) (50,-4) (100,-9)`, as `encodeP1` writes them — a 100 m profil. */
 export const TRACE_P1 = "p1.AwCQTpBOAJ8G5wcA";
@@ -171,7 +180,7 @@ const STEEL: Scenario = {
     B: { id: "cosse-oeil-flamand", eta: 0.9 },
   },
   rider: { mp: 120, hRider: 2.1, hClearMin: 1, anchorZone: 10, DAF: 1.2, xD: 75 },
-  wind: { speedKmh: 0, directionDeg: 0 },
+  wind: { speedKmh: 0, directionDeg: 0, widthPct: 50, attenuationPct: 0 },
   dynamics: { CdA: 0.45, rho: null, F0: 15, kv: 1.5, mu: 0.015, reachTarget: 90 },
   positions: { A: null, B: null },
 };
@@ -209,8 +218,9 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
   {
     name: "first-run: steel, manual, sag driver, perm, no regime",
     source: MEASURED,
-    // No `bp`, `cp`, `mt`, `ws`, `wd`, ride key or `cib`, as before the keys existed: one Brin
-    // porteur, Mise en tension at A, by mouflage, no wind, §12.2's constants, the 90 % target.
+    // No `bp`, `cp`, `mt`, `ws`, `wd`, `ww`, `wa`, ride key or `cib`, as before the keys existed:
+    // one Brin porteur, Mise en tension at A, by mouflage, no wind and its uniform profile,
+    // §12.2's constants, the 90 % target.
     covers: [
       "steel",
       "manual",
@@ -224,6 +234,7 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
       "positions-absent",
       "anchor-zone-absent",
       "reach-target-absent",
+      "wind-profile-absent",
     ],
     scenario: STEEL,
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
@@ -342,7 +353,7 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
     name: "wind of 50 km/h from the north-east, 45°, no Positions: `ws`, `wd` after `daf`, before `x`",
     source: MEASURED_87,
     covers: ["wind-speed-and-direction", "wind-without-positions"],
-    scenario: { ...STEEL, wind: { speedKmh: 50, directionDeg: 45 } },
+    scenario: { ...STEEL, wind: { ...STEEL.wind, speedKmh: 50, directionDeg: 45 } },
     link:
       `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
       "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&ws=50&wd=45&x=75",
@@ -351,7 +362,7 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
     name: "a direction without a speed is kept: `wd` alone",
     source: MEASURED_87,
     covers: ["wind-direction-only"],
-    scenario: { ...STEEL, wind: { speedKmh: 0, directionDeg: 270 } },
+    scenario: { ...STEEL, wind: { ...STEEL.wind, speedKmh: 0, directionDeg: 270 } },
     link:
       `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
       "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&wd=270&x=75",
@@ -362,7 +373,7 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
     covers: ["dynamics-steel"],
     scenario: {
       ...STEEL,
-      wind: { speedKmh: 50, directionDeg: 45 },
+      wind: { ...STEEL.wind, speedKmh: 50, directionDeg: 45 },
       dynamics: { ...STEEL.dynamics, CdA: 0.5, rho: 1.069, mu: 0.02 },
     },
     link:
@@ -405,13 +416,65 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
     covers: ["wind-on-positions"],
     scenario: {
       ...STEEL,
-      wind: { speedKmh: 30, directionDeg: 264 },
+      wind: { ...STEEL.wind, speedKmh: 30, directionDeg: 264 },
       positions: { A: POSITION_A, B: POSITION_B },
     },
     link:
       `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
       "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&ws=30&wd=264&x=75" +
       "&lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783",
+  },
+  {
+    // The Vent's profile (#120), in percent as its fields show it: 30 % of the span between the
+    // half-gap points, the anchors 75 % under the speed at mid-span.
+    name: "a profile on the trial's wind: `ww`, `wa` after `wd`, before `cda`",
+    source: MEASURED_120,
+    covers: ["wind-profile-both"],
+    scenario: {
+      ...STEEL,
+      wind: { speedKmh: 30, directionDeg: 264, widthPct: 30, attenuationPct: 75 },
+      dynamics: { ...STEEL.dynamics, CdA: 0.5 },
+    },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2" +
+      "&ws=30&wd=264&ww=30&wa=75&cda=0.5&x=75",
+  },
+  {
+    name: "an attenuation at the shipped width: `wa` alone, the 50 % width absent",
+    source: MEASURED_120,
+    covers: ["wind-profile-attenuation-only"],
+    scenario: {
+      ...STEEL,
+      wind: { speedKmh: 50, directionDeg: 45, widthPct: 50, attenuationPct: 50 },
+    },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&ws=50&wd=45&wa=50&x=75",
+  },
+  {
+    name: "a width kept through a uniform wind: `ww` alone, and no `wa`",
+    source: MEASURED_120,
+    covers: ["wind-profile-width-only"],
+    scenario: {
+      ...STEEL,
+      wind: { speedKmh: 50, directionDeg: 45, widthPct: 25, attenuationPct: 0 },
+    },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&ws=50&wd=45&ww=25&x=75",
+  },
+  {
+    name: "a profile out of its domain is kept as given: `ww=95`, `wa=-1` travel, and the Wind Gate refuses them (ADR-0001)",
+    source: MEASURED_120,
+    covers: ["wind-profile-out-of-domain"],
+    scenario: {
+      ...STEEL,
+      wind: { speedKmh: 30, directionDeg: 0, widthPct: 95, attenuationPct: -1 },
+    },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&ws=30&ww=95&wa=-1&x=75",
   },
   {
     name: "only anchor B is known: its two coordinates, and none for A",
@@ -688,6 +751,16 @@ export const DECODE_ONLY_LINKS: readonly DecodeOnlyFixture[] = [
     link:
       `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
       "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&zan=10&daf=1.2&x=75",
+    scenario: STEEL,
+    canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "`ww=50` and `wa=0` are the uniform wind at the shipped width, and the canonical link says so by omitting them",
+    source: MEASURED_120,
+    covers: ["wind-profile-default-explicit"],
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&ww=50&wa=0&x=75",
     scenario: STEEL,
     canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
   },

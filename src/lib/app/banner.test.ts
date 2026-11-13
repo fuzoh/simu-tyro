@@ -444,7 +444,7 @@ describe("Statique prints no ride: a ride constant leaves its slot to the Verdic
   test("a negative wind speed is Statique's too: its vue de dessus draws the Vent", () => {
     const report = evaluateGates({
       scenario: scenario((draft) => {
-        draft.wind = { speedKmh: -60, directionDeg: 0 };
+        draft.wind = { ...draft.wind, speedKmh: -60, directionDeg: 0 };
       }),
     });
     expect(
@@ -460,13 +460,33 @@ describe("Statique prints no ride: a ride constant leaves its slot to the Verdic
       target: "windSpeed",
     });
   });
+
+  test("a profile of the Vent no calculation reads is Statique's too, and the jump lands on it (#120)", () => {
+    const report = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.wind = { ...draft.wind, speedKmh: 30, widthPct: 30, attenuationPct: 40 };
+      }),
+    });
+    expect(
+      banner({
+        report: pageReport(report, STATIQUE_GATES),
+        refusal: null,
+        saisie: null,
+        verdict: null,
+      }),
+    ).toMatchObject({
+      rank: 1,
+      text: "⛔ 1 erreur bloquante — vent indisponible",
+      target: "windAttenuation",
+    });
+  });
 });
 
 describe("what the Wind and Ride Gates withhold says why, where it would be read", () => {
   const reportOf = (patch: (draft: ScenarioDraft) => void, register: "exact" | "terrain") =>
     evaluateGates({ scenario: scenario(patch), register });
   const negativeWind = (draft: ScenarioDraft) => {
-    draft.wind = { speedKmh: -60, directionDeg: 0 };
+    draft.wind = { ...draft.wind, speedKmh: -60, directionDeg: 0 };
   };
   const negativeCdA = (draft: ScenarioDraft) => {
     draft.dynamics = { ...draft.dynamics, CdA: -0.45 };
@@ -502,6 +522,47 @@ describe("what the Wind and Ride Gates withhold says why, where it would be read
     }, "exact");
     expect(rideCause({ report, refusal: null })).toBeNull();
     expect(rideCause({ report: FIRST_RUN, refusal: REFUSAL })).toBeNull();
+  });
+
+  describe("a profile of the Vent that is not uniform, while no calculation reads it (#120)", () => {
+    const attenuated = (draft: ScenarioDraft) => {
+      draft.wind = { ...draft.wind, speedKmh: 30, widthPct: 30, attenuationPct: 40 };
+    };
+
+    test("it withholds the Vent and, through it, the rides — in both registers' same words", () => {
+      for (const register of ["exact", "terrain"] as const) {
+        const report = reportOf(attenuated, register);
+        expect(windCause({ report, register })).toBe(
+          "Vent indisponible — atténuation aux ancrages invalide.",
+        );
+        expect(rideCause({ report, refusal: null, register })).toBe(
+          "Aucune estimation — atténuation aux ancrages invalide.",
+        );
+      }
+    });
+
+    test("its field emptied under the caret is not mid-edit: the Vent stays withheld", () => {
+      const report = evaluateGates({
+        scenario: scenario(attenuated),
+        issues: [{ field: "windAttenuation", kind: "empty", message: "valeur requise" }],
+      });
+      const saisie = saisieEnCours(report, "windAttenuation", "40 %");
+      expect(saisie).toBeNull();
+      expect(windCause({ report, saisie })).toBe(
+        "Vent indisponible — atténuation aux ancrages invalide.",
+      );
+      expect(rideCause({ report, refusal: null, saisie })).toBe(
+        "Aucune estimation — atténuation aux ancrages invalide.",
+      );
+    });
+
+    test("the uniform wind — whatever width it keeps — withholds nothing", () => {
+      const report = reportOf((draft) => {
+        draft.wind = { ...draft.wind, speedKmh: 30, widthPct: 30, attenuationPct: 0 };
+      }, "terrain");
+      expect(windCause({ report, register: "terrain" })).toBeNull();
+      expect(rideCause({ report, refusal: null, register: "terrain" })).toBeNull();
+    });
   });
 
   test("a wind speed emptied under the caret is mid-edit: nothing is withheld", () => {

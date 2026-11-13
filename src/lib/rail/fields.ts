@@ -55,7 +55,7 @@ import type { LabelId, Register } from "@/lib/vocabulary/labels.ts";
 import { formatQuantity, formatValue, fromDisplay, roundToDisplay } from "@/lib/format/quantity.ts";
 import { clampX } from "@/lib/scenario/geometry.ts";
 import { REACH } from "@/lib/scenario/reach.ts";
-import { DYNAMICS, REGIMES } from "@/lib/sim";
+import { DYNAMICS, REGIMES, WIND_PROFILE } from "@/lib/sim";
 import { heading, isHiddenTerm, label } from "@/lib/vocabulary/labels.ts";
 
 /**
@@ -108,6 +108,8 @@ export type FieldId =
   | "xD"
   | "windSpeed"
   | "windDirection"
+  | "windWidth"
+  | "windAttenuation"
   | "CdA"
   | "F0"
   | "kv"
@@ -120,14 +122,26 @@ export type FieldId =
   | "lonB";
 
 /**
- * A field's tier-one hard rule — the whole of it. Two shapes, because § 7's message column has
- * two: a sign rule, and « the number must be readable at all ».
+ * A field's tier-one hard rule — the whole of it. Three shapes: a sign rule, a closed domain, and
+ * « the number must be readable at all ».
  */
 type HardRule =
   /** `> 0`. `sentence` is § 7's own wording of the rule, stated as a property of the world. */
   | { readonly kind: "positive"; readonly sentence: string }
   /** `≥ 0` — « une hauteur négative n'existe pas ». */
   | { readonly kind: "non-negative"; readonly sentence: string }
+  /**
+   * Inside `[min, max]`, both ends included, in the field's canonical unit — the Vent's profile
+   * (#120), whose shape has no value outside its domain. **Blocking, where a `band` warns**: a
+   * warning would let a reader evaluate the value. Judged **as the field prints it**, so the value
+   * the message echoes is the value refused and a link's `ww=90.4` is the 90 % it reads as.
+   */
+  | {
+      readonly kind: "within";
+      readonly min: number;
+      readonly max: number;
+      readonly sentence: string;
+    }
   /** Finite and nothing more: the only committed-invalid state is « nombre illisible ». */
   | { readonly kind: "finite" };
 
@@ -594,6 +608,36 @@ export const FIELDS = {
     warning: null,
     gate: "wind",
   },
+  // The Vent's profile (#120, §8.4): two percents with closed domains. Out of its domain a value
+  // is kept as given (ADR-0001) and refused — never clamped, and never read as a uniform wind.
+  windWidth: {
+    id: "windWidth",
+    label: heading("windWidth", "exact"),
+    errorLabel: heading("windWidth", "exact"),
+    quantity: "windWidth",
+    rule: {
+      kind: "within",
+      min: WIND_PROFILE.width.min,
+      max: WIND_PROFILE.width.max,
+      sentence: `une largeur entre ${formatQuantity("windWidth", WIND_PROFILE.width.min)} et ${formatQuantity("windWidth", WIND_PROFILE.width.max)} de la ${label("span", "exact")} est requise`,
+    },
+    warning: null,
+    gate: "wind",
+  },
+  windAttenuation: {
+    id: "windAttenuation",
+    label: heading("windAttenuation", "exact"),
+    errorLabel: heading("windAttenuation", "exact"),
+    quantity: "windAttenuation",
+    rule: {
+      kind: "within",
+      min: WIND_PROFILE.attenuation.min,
+      max: WIND_PROFILE.attenuation.max,
+      sentence: `une atténuation entre ${formatQuantity("windAttenuation", WIND_PROFILE.attenuation.min)} et ${formatQuantity("windAttenuation", WIND_PROFILE.attenuation.max)} est requise`,
+    },
+    warning: null,
+    gate: "wind",
+  },
   // The ride's constants (#89, #104): §12.2's, every one editable and labelled. The Ride Gate: only
   // the passager's ride reads them, so a bad one withholds it and nothing else.
   CdA: {
@@ -1041,6 +1085,16 @@ export function checkField(
         kind: "invalid",
         message: blocking(id, spec.rule.sentence, echo(id, shown, unit), context.register),
       };
+    case "within": {
+      // What the field would commit, which is what it prints: the canonical value on its grain.
+      const read = commitField(id, raw, context) ?? shown;
+      if (read >= spec.rule.min && read <= spec.rule.max) return null;
+      return {
+        field: id,
+        kind: "invalid",
+        message: blocking(id, spec.rule.sentence, echo(id, shown, unit), context.register),
+      };
+    }
   }
 }
 

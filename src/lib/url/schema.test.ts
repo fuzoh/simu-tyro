@@ -98,6 +98,9 @@ describe("the key table and canonical order", () => {
       "daf",
       "ws",
       "wd",
+      // #120: the Vent's profile, after the wind it shapes.
+      "ww",
+      "wa",
       "cda",
       "f0",
       "kv",

@@ -214,6 +214,13 @@ export const QUANTITIES = {
   windSpeed: { unit: "km/h", decimals: 0 },
   /** `Direction du vent`, ° — « 45 à 55° » is how the field trial reported it: whole degrees. */
   windDirection: { unit: "°", decimals: 0 },
+  /**
+   * `Largeur à mi-atténuation` of the Vent's profile, % of the span (#120) — §8.4's step of one
+   * point: one is 0,5 m on the shortest line the references cover.
+   */
+  windWidth: { unit: "%", decimals: 0 },
+  /** `Atténuation aux ancrages` of the Vent's profile, % (#120) — §8.4's step of one point. */
+  windAttenuation: { unit: "%", decimals: 0 },
   /** A Position's latitude or longitude, ° — six decimals is about 0,1 m, the grain of a typed point. */
   coordinate: { unit: "°", decimals: 6 },
   /** `C_dA`, m² — §12.2's 0,45 and its 0,30–0,60 band are two-decimal figures. */

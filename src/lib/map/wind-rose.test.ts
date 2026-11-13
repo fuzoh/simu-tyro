@@ -27,7 +27,8 @@ import {
   windFromOffset,
 } from "./wind-rose.ts";
 
-const CALM: Wind = { speedKmh: 0, directionDeg: 0 };
+/** No wind, under the profile that ships: uniform, the 50 % width kept. */
+const CALM: Wind = { speedKmh: 0, directionDeg: 0, widthPct: 50, attenuationPct: 0 };
 const TRIAL_BEARING = lineBearing(TRIAL_ENDS);
 /** The trial's line drawn level, A on the left — the plain drawing outside LV95. */
 const LEVEL_TRIAL = roseReference(TRIAL_BEARING, true);
@@ -98,14 +99,16 @@ describe("the handle", () => {
 
   test("dragged past the scale to the top of the map, writes the scale's end from the north", () => {
     expect(windFromOffset({ x: 0, y: -500 }, NORTH_UP, CALM)).toEqual({
+      ...CALM,
       speedKmh: ROSE_MAX_KMH,
       directionDeg: 0,
     });
   });
 
   test("dragged back to the centre, no wind — and the direction it had stays", () => {
-    const before: Wind = { speedKmh: 20, directionDeg: 264 };
+    const before: Wind = { ...CALM, speedKmh: 20, directionDeg: 264 };
     expect(windFromOffset({ x: 0, y: 0 }, NORTH_UP, before)).toEqual({
+      ...CALM,
       speedKmh: 0,
       directionDeg: 264,
     });
@@ -118,7 +121,7 @@ describe("the handle", () => {
   ])("every whole wind put down on %s is read back as written", (_name, reference) => {
     for (let speedKmh = 1; speedKmh <= ROSE_MAX_KMH; speedKmh += 3) {
       for (let directionDeg = 0; directionDeg < 360; directionDeg += 7) {
-        const wind = { speedKmh, directionDeg };
+        const wind = { ...CALM, speedKmh, directionDeg };
         expect(windFromOffset(handleOffset(wind, reference), reference, CALM)).toEqual(wind);
       }
     }
@@ -145,7 +148,7 @@ describe("the rose and the two fields write one Vent", () => {
   });
 
   test("a speed typed in its field moves the handle to that radius, in the same direction", () => {
-    const before = { speedKmh: 10, directionDeg: 264 };
+    const before = { ...CALM, speedKmh: 10, directionDeg: 264 };
     const typed = applyField({ ...start.scenario, wind: before }, "windSpeed", 40, null);
     const { x, y } = handleOffset(typed.wind, NORTH_UP);
     expect(Math.hypot(x, y)).toBeCloseTo((40 / ROSE_MAX_KMH) * ROSE_RADIUS_PX, 6);
@@ -154,7 +157,7 @@ describe("the rose and the two fields write one Vent", () => {
 
   test("a direction typed in its field turns the handle to that azimuth", () => {
     const typed = applyField(
-      { ...start.scenario, wind: { speedKmh: 30, directionDeg: 0 } },
+      { ...start.scenario, wind: { ...CALM, speedKmh: 30, directionDeg: 0 } },
       "windDirection",
       90,
       null,
@@ -168,17 +171,44 @@ describe("the rose and the two fields write one Vent", () => {
   test("moving an anchor leaves the Vent, and so the handle on the map, where they were", () => {
     const windy = appReducer(start, {
       type: "scénario/modifié",
-      patch: { wind: { speedKmh: 30, directionDeg: 264 } },
+      patch: { wind: { ...CALM, speedKmh: 30, directionDeg: 264 } },
     });
     const moved = appReducer(windy, {
       type: "scénario/modifié",
       patch: { positions: { ...TRIAL_ENDS, B: { lat: 46.846166, lon: 6.521045 } } },
     });
     expect(lineBearing(moved.scenario.positions)).not.toBeCloseTo(TRIAL_BEARING ?? 0, 1);
-    expect(moved.scenario.wind).toEqual({ speedKmh: 30, directionDeg: 264 });
+    expect(moved.scenario.wind).toEqual({ ...CALM, speedKmh: 30, directionDeg: 264 });
     expect(railValues(moved.scenario)).toMatchObject({ windSpeed: "30", windDirection: "264" });
     expect(handleOffset(moved.scenario.wind, NORTH_UP)).toEqual(
       handleOffset(windy.scenario.wind, NORTH_UP),
     );
+  });
+});
+
+describe("the handle keeps the rest of the Vent (#120)", () => {
+  /** The trial's west wind, under a profile: 30 % of the span, the anchors 75 % under mid-span. */
+  const shaped: Wind = { speedKmh: 20, directionDeg: 264, widthPct: 30, attenuationPct: 75 };
+
+  test("a direction drag keeps the profile as it was", () => {
+    const turned = windFromOffset({ x: 31, y: -17 }, NORTH_UP, shaped);
+    expect(turned.speedKmh).not.toBe(shaped.speedKmh);
+    expect(turned.directionDeg).not.toBe(shaped.directionDeg);
+    expect(turned).toMatchObject({ widthPct: 30, attenuationPct: 75 });
+  });
+
+  test("a drag back to the centre keeps it too, with the direction it had", () => {
+    expect(windFromOffset({ x: 0, y: 0 }, LEVEL_TRIAL, shaped)).toEqual({
+      speedKmh: 0,
+      directionDeg: 264,
+      widthPct: 30,
+      attenuationPct: 75,
+    });
+  });
+
+  test("it does not write into the Vent it was given", () => {
+    const before = { ...shaped };
+    windFromOffset({ x: 31, y: -17 }, NORTH_UP, shaped);
+    expect(shaped).toEqual(before);
   });
 });

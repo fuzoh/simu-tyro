@@ -342,7 +342,11 @@ export function describeRelative(relativeDeg: number): string {
  *   Vent is then not applied, and the reading says so — or, with no Vent, why the rose has no handle.
  * @param handle the rose has a handle to set the wind with — not on the Page Terrain (#101).
  */
-export function windReading(wind: Wind, bearing: number | null, handle = true): string {
+export function windReading(
+  wind: Pick<Wind, "speedKmh" | "directionDeg">,
+  bearing: number | null,
+  handle = true,
+): string {
   if (wind.speedKmh === 0) {
     if (!handle) return MAP_COPY.calm;
     return bearing === null ? WIND_UNPLACED.reason : MAP_COPY.roseCalm;

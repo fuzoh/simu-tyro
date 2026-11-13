@@ -52,7 +52,7 @@ describe("`traverseInputs` — the fields a memo keys on", () => {
   });
 
   test("a wind edit changes `wind` alone: the Wind Gate judges it, no statics number reads it", () => {
-    const wind = { speedKmh: 50, directionDeg: 45 };
+    const wind = { ...before.wind, speedKmh: 50, directionDeg: 45 };
     const windy = traverseInputs({ ...before, wind });
     expect(windy.wind).toBe(wind);
     for (const key of KEYS.filter((key) => key !== "wind")) expect(windy[key]).toBe(inputs[key]);

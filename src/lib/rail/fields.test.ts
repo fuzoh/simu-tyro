@@ -290,6 +290,101 @@ describe("the target of the farthest point (#121) — set here, read by Dynamiqu
   });
 });
 
+describe("the Vent's profile (#120) — two percents with closed domains, in the Wind Gate", () => {
+  const WIDTH_RULE =
+    "⛔ Largeur à mi-atténuation — une largeur entre 10 % et 90 % de la portée est requise.";
+  const ATTENUATION_RULE =
+    "⛔ Atténuation aux ancrages — une atténuation entre 0 % et 100 % est requise.";
+
+  test("they breach the Wind Gate, in either mode, like the speed and the direction", () => {
+    for (const mode of ["manual", "trace"] as const) {
+      expect(gateOf("windWidth", mode)).toBe("wind");
+      expect(gateOf("windAttenuation", mode)).toBe("wind");
+    }
+  });
+
+  test.each<[FieldId, string]>([
+    ["windWidth", "10"],
+    ["windWidth", "50"],
+    ["windWidth", "90"],
+    ["windAttenuation", "0"],
+    ["windAttenuation", "40"],
+    ["windAttenuation", "100"],
+  ])("%s at « %s » is inside its domain, both ends included", (field, raw) => {
+    expect(checkField(field, raw)).toBeNull();
+  });
+
+  test.each<[FieldId, string, string]>([
+    ["windWidth", "9", `${WIDTH_RULE} Valeur : 9 %.`],
+    ["windWidth", "0", `${WIDTH_RULE} Valeur : 0 %.`],
+    ["windWidth", "91", `${WIDTH_RULE} Valeur : 91 %.`],
+    ["windWidth", "100", `${WIDTH_RULE} Valeur : 100 %.`],
+    ["windAttenuation", "-1", `${ATTENUATION_RULE} Valeur : −1 %.`],
+    ["windAttenuation", "101", `${ATTENUATION_RULE} Valeur : 101 %.`],
+    ["windAttenuation", "110", `${ATTENUATION_RULE} Valeur : 110 %.`],
+  ])("%s at « %s » is refused, and the value is echoed", (field, raw, message) => {
+    expect(checkField(field, raw)).toEqual({ field, kind: "invalid", message });
+  });
+
+  test("the domain is judged as the field prints the value, so the echo is what is refused", () => {
+    // « 9,5 » commits and prints as 10 %, which is legal; « 9,4 » as 9 %, which is not.
+    expect(checkField("windWidth", "9,5")).toBeNull();
+    expect(checkField("windWidth", "9,4")?.message).toBe(`${WIDTH_RULE} Valeur : 9 %.`);
+    expect(checkField("windWidth", "90,4")).toBeNull();
+    expect(checkField("windWidth", "90,5")?.message).toBe(`${WIDTH_RULE} Valeur : 91 %.`);
+    expect(checkField("windAttenuation", "-0,4")).toBeNull();
+    expect(checkField("windAttenuation", "100,4")).toBeNull();
+    expect(checkField("windAttenuation", "100,5")?.message).toBe(
+      `${ATTENUATION_RULE} Valeur : 101 %.`,
+    );
+  });
+
+  test("out of its domain a value is blocking, never a warning a reader could compute past", () => {
+    expect(FIELDS.windWidth.warning).toBeNull();
+    expect(FIELDS.windAttenuation.warning).toBeNull();
+    expect(warningFor("windWidth", 95)).toBeNull();
+    expect(warningFor("windAttenuation", 110)).toBeNull();
+    expect(checkField("windWidth", "95")?.kind).toBe("invalid");
+    expect(checkField("windAttenuation", "110")?.kind).toBe("invalid");
+  });
+
+  test("an emptied field is required and an unreadable one says so: neither reads as a default", () => {
+    for (const id of ["windWidth", "windAttenuation"] as const) {
+      expect(checkField(id, "")).toEqual({ field: id, kind: "empty", message: REQUIRED_MESSAGE });
+      expect(checkField(id, "abc")?.kind).toBe("unreadable");
+    }
+    expect(checkField("windAttenuation", "4O")?.message).toBe(
+      "⛔ Atténuation aux ancrages — nombre illisible. Saisie : « 4O ».",
+    );
+  });
+
+  test("a commit is the whole percent the field shows, and it brings nothing back into a domain", () => {
+    expect(commitField("windWidth", "49,6")).toBe(50);
+    expect(commitField("windAttenuation", "39,5")).toBe(40);
+    expect(commitField("windWidth", "95")).toBe(95);
+    expect(commitField("windAttenuation", "-3")).toBe(-3);
+    expect(displayField("windWidth", 50)).toBe("50");
+    expect(displayField("windAttenuation", 0)).toBe("0");
+  });
+
+  test("the rule is stated as a property of the world, never as a reproach", () => {
+    for (const rule of [WIDTH_RULE, ATTENUATION_RULE]) {
+      expect(rule).not.toMatch(/vous|maintenant|veuillez/i);
+    }
+  });
+
+  test("their names are the registry's, the same on every Page — never a plateau's nor a Q", () => {
+    expect(fieldLabel("windWidth")).toBe("Largeur à mi-atténuation");
+    expect(fieldLabel("windAttenuation")).toBe("Atténuation aux ancrages");
+    for (const id of ["windWidth", "windAttenuation"] as const) {
+      expect(fieldLabel(id, "terrain")).toBe(fieldLabel(id));
+      expect(fieldErrorLabel(id, "terrain")).toBe(fieldErrorLabel(id));
+      expect(isHiddenOnTerrain(id)).toBe(false);
+      expect(fieldLabel(id)).not.toMatch(/plateau|\bQ\b|zone/i);
+    }
+  });
+});
+
 describe("§ 3's warning column — non-blocking, and it never withholds a number", () => {
   test("`L ∉ [50, 2000]`", () => {
     expect(warningFor("L", 150)).toBeNull();
@@ -488,6 +583,8 @@ describe("the Rail labels its fields in the exact register", () => {
     ["DAF", "Majoration au départ"],
     ["windSpeed", "Vitesse du vent"],
     ["windDirection", "Direction du vent"],
+    ["windWidth", "Largeur à mi-atténuation"],
+    ["windAttenuation", "Atténuation aux ancrages"],
     ["cst", "Construction"],
     ["ta", "Terminaison A"],
     ["etaA", "Rendement η"],

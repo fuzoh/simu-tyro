@@ -269,11 +269,45 @@ has no bearing, so the wind fields and the Rose des vents' handle are disabled w
 and the passager's ride and the Banane run without wind. A Vent a link or a Session carries without
 Positions is kept as given, never dropped, and the results read with it say it is not applied and
 why; it is not a Blocking Error and hides no result. No wind is speed 0 and direction 0, and it is
-what a link without `ws` and `wd` reads.
+what a link without `ws` and `wd` reads. The Vent may carry a Profil du vent; without one it is a
+Vent uniforme, which is what a link without `ww` and `wa` reads.
 _Avoid_: rafale, souffle, orientation du vent, direction relative à la ligne (as what is typed)
 
-**Zone centrale exposée**:
-The central plateau of the prescribed wind profile, where wind speed stays at its maximum before decreasing smoothly toward both anchors. Its exposed width is the length of that plateau along A–B, not the width of a bell-shaped peak.
+**Profil du vent**:
+How the speed of the Vent varies along A–B, as the user prescribes it: one symmetric bell, highest
+at mid-span — where it is the vitesse du vent entered — and falling to a residual speed at both
+anchors, with no plateau. Two percents set it, the Largeur à mi-atténuation and the Atténuation aux
+ancrages; the direction is the same along the whole line. It is the same at every height and every
+lateral position, and the line and the passager read the speed where they are — never its mean over
+the span. **A scenario that is typed, never a valley forecast**: no relief and no weather enters
+it. Its shape is `docs/simulation-theory.md` §8.4's. No computation reads it yet: until one does
+its controls are not offered, and a Vent that arrives with a profile that is not uniform is kept
+as given and refused — a Blocking Error on the Wind Gate, with « Passer au vent uniforme » — never
+computed as a uniform wind.
+_Avoid_: prévision, vent de vallée, plateau, zone centrale exposée, gaussienne, facteur Q
+
+**Largeur à mi-atténuation**:
+The width of the Profil du vent, in percent of the horizontal span: the distance between the two
+points where the wind speed is halfway between the speed at mid-span and the speed at the anchors
+— with 40 km/h at mid-span and 10 km/h at the anchors, where the wind is at 25 km/h. From 10 to
+90 %, in steps of one, 50 % shipped. Not the length of a plateau at the maximum speed, not a
+length stored in metres — the metres are a reading, the percent of the span on hand — and not an
+equaliser's Q. Under a Vent uniforme it is kept and has no effect.
+_Avoid_: largeur de plateau, zone centrale exposée, facteur Q, écart-type, largeur en mètres (as what is typed)
+
+**Atténuation aux ancrages**:
+How far the wind speed at both anchors sits below the speed at mid-span, in percent of that
+speed. 0 % is the Vent uniforme; 100 % is no wind at the anchors — an assumption that is typed,
+not a shelter that was observed. From 0 to 100 %, in steps of one. It scales a speed, never a
+force, and the speed at mid-span stays the vitesse du vent entered.
+_Avoid_: abri, rafale, réduction de force
+
+**Vent uniforme**:
+A Vent whose speed is the same along the whole line: an Atténuation aux ancrages of 0 %. It is
+what ships, and what a link or a Session older than the Profil du vent reads. « Vent uniforme »
+is also the command that sets that attenuation back to 0 % **and nothing else** — the speed, the
+direction and the Largeur à mi-atténuation stay. Not « pas de vent », which is a speed of 0.
+_Avoid_: vent constant, vent moyen
 
 **Marge exigée**:
 The margin the chosen Safety Regime demands. Not the margin the line actually has — that
@@ -535,7 +569,7 @@ controls.
 _Avoid_: vue passager, vue subjective, animation, simulation, VR
 
 **Rose des vents**:
-The compass rose drawn on the vue de dessus, with a handle that sets the Vent's direction and force by dragging. It edits the azimuth directly: on the north-up map the handle stands where the wind comes from. Its reading gives that azimuth and, from the line's bearing, where the wind comes from relative to the line A → B (« Vent d'ouest (264°), 30 km/h : par la gauche à l'avant, 312° par rapport à la ligne A → B »). Without A and B on the map it has no handle and says why. On Terrain it is read-only. It sets the wind that draws the Banane.
+The compass rose drawn on the vue de dessus, with a handle that sets the Vent's direction and force by dragging. It edits the azimuth directly: on the north-up map the handle stands where the wind comes from. Its reading gives that azimuth and, from the line's bearing, where the wind comes from relative to the line A → B (« Vent d'ouest (264°), 30 km/h : par la gauche à l'avant, 312° par rapport à la ligne A → B »). Without A and B on the map it has no handle and says why. On Terrain it is read-only. It sets the wind that draws the Banane. A second handle sets the Profil du vent, on a pad of its own whose axes are the screen's and do not turn with the wind: to the right the Largeur à mi-atténuation grows, upward the Atténuation aux ancrages does, and a diagonal sets both. Beside it a preview draws the speed from A, on the left, through mid-span to B, with the speed at mid-span, the speed at the anchors and the width; « Vent uniforme » is its one command. Each handle writes its own values and keeps the rest of the Vent. Neither that handle nor the preview is offered until a computation reads the Profil du vent, and never on Terrain.
 _Avoid_: boussole, anémomètre
 
 **Fil à plomb**:

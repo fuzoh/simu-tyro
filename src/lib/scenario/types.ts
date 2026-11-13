@@ -166,12 +166,30 @@ export type TensioningDevice = "pulley" | "maestro-s" | "maestro-l";
  * so moving an anchor turns the line under it and leaves it as it is; without both Positions it is
  * kept as given and not applied (`windBearing`). `ws` / `wd` in a link, **both absent for no wind**.
  * Only the passager's ride and the Banane read it (#89, #96): statics and the Verdict are unchanged.
+ *
+ * Its **profile** (#120) says how that speed varies along the line — `docs/simulation-theory.md`
+ * §8.4: a scenario the user prescribes, never a valley forecast. `speedKmh` is then the speed at
+ * mid-span. `ww` / `wa` in a link, **each absent at what ships** — a uniform wind — so a link or a
+ * Session older than the keys reads one. Both are read at the whole percent they print as
+ * (`windProfileOf`), and a value outside its domain is kept as given and refused by the Wind Gate.
+ * No reader consumes a non-uniform profile yet: `./wind.ts` is where that boundary stands.
  */
 export type Wind = {
-  /** Wind speed, km/h (≥ 0). */
+  /** Wind speed, km/h (≥ 0) — along the whole line when uniform, at mid-span under a profile. */
   speedKmh: number;
   /** The azimuth the wind comes from, degrees clockwise from north. */
   directionDeg: number;
+  /**
+   * Largeur à mi-atténuation, % of the span (10–90, 50 shipped): between the two points where the
+   * speed is halfway between the speed at mid-span and the speed at the anchors. Without
+   * attenuation it is kept and has no effect.
+   */
+  widthPct: number;
+  /**
+   * Atténuation aux ancrages, % (0–100, 0 shipped): how far the speed at both anchors sits below
+   * the speed at mid-span. `0` **is** the uniform wind.
+   */
+  attenuationPct: number;
 };
 
 /**

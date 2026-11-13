@@ -120,6 +120,10 @@ export type TermId =
   | "wind"
   | "windSpeed"
   | "windDirection"
+  | "windProfile"
+  | "windWidth"
+  | "windAttenuation"
+  | "uniformWind"
   | "dragArea"
   | "trolleyConstantFriction"
   | "trolleySpeedFriction"
@@ -283,6 +287,12 @@ export const LABELS = {
   wind: same("vent"),
   windSpeed: same("vitesse du vent"),
   windDirection: same("direction du vent"),
+  // The Vent's profile (#120): a prescribed scenario, so no word of a forecast. The width is read
+  // between the two half-gap points — never a plateau's, never an equaliser's Q.
+  windProfile: same("profil du vent"),
+  windWidth: same("largeur à mi-atténuation"),
+  windAttenuation: same("atténuation aux ancrages"),
+  uniformWind: same("vent uniforme"),
   // The ride's constants (#89) are set on Avancé only, in the SSF page's own words where it has some.
   dragArea: exactOnly("surface de traînée C_dA"),
   trolleyConstantFriction: exactOnly("frottement constant de la poulie F₀"),

@@ -84,6 +84,10 @@ export const FIELD_HELP: Record<FieldId, string> = {
     "Vitesse du vent, en km/h (0 ou plus). 0 est l'absence de vent, et c'est ce que lit un lien qui n'en porte pas. Elle ne change ni la statique, ni la garde au sol, ni le verdict. La dynamique du passager en projette la composante le long de la ligne (§12.2) : c'est le second point d'arrêt, avec le vent saisi. La composante de travers ne fait que dessiner la Banane, qui n'est pas une distance. La projection suit l'orientation de la ligne, lue sur les Positions : sans A et B placés sur la carte, le vent ne s'applique pas.",
   windDirection:
     "Direction du vent : d'où il vient, en degrés depuis le nord, dans le sens horaire — 0° vent du nord, 90° d'est, 180° du sud, 270° d'ouest. C'est la direction que donne une prévision météo. Elle est géographique, pas relative à la ligne : la dynamique la projette sur la ligne A → B, dont l'orientation se lit sur les Positions d'A et B. Déplacer un ancrage ne change donc pas le vent, seulement ses composantes le long de la ligne et en travers. Sans A et B placés sur la carte, la ligne n'a pas d'orientation : le vent ne s'applique pas et ses champs sont désactivés. Sans effet tant que la vitesse est nulle.",
+  windWidth:
+    "Largeur à mi-atténuation du profil du vent, en % de la portée (§8.4) : la distance entre les deux points où la vitesse du vent est à mi-chemin entre celle du milieu de la portée et celle des ancrages. Avec 40 km/h au milieu et 10 km/h aux ancrages, elle se lit là où le vent est à 25 km/h. Le profil est une cloche symétrique, maximale au milieu, qui décroît vers chaque ancrage sans palier. De 10 à 90 % de la portée, par pas de 1 ; 50 % au départ. Sans atténuation aux ancrages, le vent est uniforme : la largeur est conservée et n'a aucun effet. Hors de 10 – 90 %, la valeur est conservée et c'est une erreur bloquante. C'est un scénario saisi, pas une prévision de vallée. Aucun calcul ne lit encore ce profil : d'ici là, seul le vent uniforme est accepté.",
+  windAttenuation:
+    "Atténuation aux ancrages du profil du vent, en % (§8.4) : de combien la vitesse du vent aux deux ancrages est inférieure à la vitesse saisie, qui reste celle du milieu de la portée. Vitesse aux ancrages = vitesse saisie × (1 − atténuation). 0 % est le vent uniforme, et c'est ce que lit un lien qui ne porte pas cette valeur ; 100 % annule le vent aux ancrages — une hypothèse saisie, pas un abri mesuré. Entre le milieu et les ancrages, la vitesse suit une cloche symétrique dont la largeur à mi-atténuation fixe l'étendue. Elle module une vitesse, jamais une force. De 0 à 100 %, par pas de 1 ; hors de ces bornes, la valeur est conservée et c'est une erreur bloquante. C'est un scénario saisi, pas une prévision de vallée. Aucun calcul ne lit encore ce profil : d'ici là, seul le vent uniforme (0 %) est accepté.",
   CdA: "Surface de traînée C_dA du passager, en m² : la traînée vaut ½ · ρ · C_dA · v_rel · |v_rel|, v_rel étant la vitesse du passager par rapport à l'air (§12.2). 0,45 m² est l'ajustement de la SSF sur sa ligne instrumentée de 1109 m [FIELD:SSF] : une campagne, un spéléologue en harnais sur corde, pas un passager assis ni un câble. La plage 0,30–0,60 m² du champ n'est pas sur la page SSF : elle est [CONVENTION]. Elle ne change que la dynamique du passager, jamais la statique ni le verdict.",
   F0: "Frottement constant de la poulie F₀, sur corde : le terme fixe de F = F₀ + k_v · v, opposé au mouvement (§12.2). 15 N est l'ajustement mesuré par la SSF sur corde [FIELD:SSF], indépendant du poids du passager ; la page SSF ne nomme aucune poulie. Une seule poulie est comptée, quel que soit le nombre de Brins porteurs. Il ne change que la dynamique du passager.",
   kv: "Frottement de la poulie proportionnel à la vitesse k_v, sur corde, en kg/s : le terme k_v · v de F = F₀ + k_v · v, v en m/s (§12.2). 1,5 kg/s est l'ajustement mesuré par la SSF sur corde [FIELD:SSF]. Il ne change que la dynamique du passager.",
@@ -101,11 +105,17 @@ export const FIELD_HELP: Record<FieldId, string> = {
 /**
  * The line under a field **on every Page that types it**, where `FIELD_HELP` is Avancé's alone:
  * what the number means when the label alone would let a reader type the wrong one. A direction
- * read off a forecast is where the wind comes from, from the north.
+ * read off a forecast is where the wind comes from, from the north; a profile of the wind is a
+ * scenario typed, never a forecast, and its width is read between two points, not along a plateau.
  */
 export const FIELD_NOTE: Partial<Record<FieldId, string>> = {
   windDirection:
     "D'où vient le vent, en degrés depuis le nord : 0 nord, 90 est, 180 sud, 270 ouest.",
+  // The profile's limit is said on its fields (#120): a typed scenario, and where it is measured.
+  windWidth:
+    "Part de la portée entre les deux points où la vitesse est à mi-chemin entre le milieu et les ancrages. Ce n'est pas une prévision de vallée.",
+  windAttenuation:
+    "0 % : vent uniforme. 100 % : vitesse nulle aux ancrages, hypothèse saisie, pas un abri mesuré. Le milieu reste à la vitesse saisie.",
 };
 
 /**

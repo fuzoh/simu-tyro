@@ -328,8 +328,20 @@ const SCENARIO: v.GenericSchema<unknown, Scenario> = v.object({
     DAF: FINITE,
     xD: FINITE,
   }),
-  // Added with #87, optional with no wind: a Session written before it had no wind to carry.
-  wind: v.optional(v.object({ speedKmh: FINITE, directionDeg: FINITE }), FIRST_RUN_SCENARIO.wind),
+  // Added with #87, optional with no wind: a Session written before it had no wind to carry. A
+  // function, so a restored Session never shares the shipped object.
+  wind: v.optional(
+    v.object({
+      speedKmh: FINITE,
+      directionDeg: FINITE,
+      // The Vent's profile, added with #120: each optional with what ships, so a Session written
+      // before it restores its speed and its direction under a uniform wind. Unranged, like the
+      // link's `ww` / `wa`: a value out of its domain is kept as given and the Wind Gate refuses it.
+      widthPct: v.optional(FINITE, FIRST_RUN_SCENARIO.wind.widthPct),
+      attenuationPct: v.optional(FINITE, FIRST_RUN_SCENARIO.wind.attenuationPct),
+    }),
+    () => ({ ...FIRST_RUN_SCENARIO.wind }),
+  ),
   // Added with #89, optional for the same reason: a Session written before it rode on §12.2's
   // defaults. A function, so a restored Session never shares the shipped object.
   dynamics: v.optional(

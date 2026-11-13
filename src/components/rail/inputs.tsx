@@ -42,7 +42,7 @@ import { createContext, Fragment, use, useEffect, useRef, useState } from "react
 import type { RailFormApi, RailFormState } from "@/components/app/use-rail-form.ts";
 import type { Deduced, DeducedSolve, ReadOutRow } from "@/lib/rail/deduced.ts";
 import type { FieldContext, FieldId } from "@/lib/rail/fields.ts";
-import type { BlockingError, FixActionId } from "@/lib/rail/gates.ts";
+import type { BlockingError, FixActionId, WindProfileFieldId } from "@/lib/rail/gates.ts";
 import type { PresetProvenance } from "@/lib/rail/presets.ts";
 import type { LadderRow } from "@/lib/rail/provenance.ts";
 import type { Results } from "@/lib/rail/results.ts";
@@ -97,9 +97,11 @@ import {
 } from "@/lib/rail/fields.ts";
 import {
   fieldUnavailable,
+  isWindProfileFieldShown,
   regimeUnavailableNote,
   TEXTILE_UNAVAILABLE_REASON,
   terminationOptions,
+  WIND_PROFILE_FIELDS,
 } from "@/lib/rail/gates.ts";
 import {
   DEDUCED_HELP,
@@ -138,6 +140,7 @@ import {
   TERMINATION_FIELD,
 } from "@/lib/rail/values.ts";
 import { airDensityOf } from "@/lib/scenario/dynamics.ts";
+import { uniformWind } from "@/lib/scenario/wind.ts";
 import { clearSession } from "@/lib/session/session.ts";
 import { isFamilyAllowed, isRegimeAvailable, REGIMES, TERMINATIONS } from "@/lib/sim";
 import { parseFailureMessage, parseProfileCsv, readFailure } from "@/lib/terrain/csv.ts";
@@ -191,6 +194,11 @@ export type RailRowContext = {
    * report: the Vent's two fields without Positions.
    */
   readonly unavailable: (id: FieldId) => string | null;
+  /**
+   * Is this field of the Vent's profile on screen (#120)? The gates' `isWindProfileFieldShown`,
+   * read off the same report: before the profile is consumed, only a refused value has a row.
+   */
+  readonly windProfileShown: (id: WindProfileFieldId) => boolean;
   /** @returns the canonical value that **entered state**, or `null` when tier one refused. */
   readonly commit: (id: NumericFieldId, raw: string, settled: boolean) => number | null;
   /** A choice's write — a whole Scenario, through the store's one patch action. */
@@ -285,6 +293,10 @@ export function useFieldRows({
         return;
       case "passer-a-la-terminaison-de-depart":
         patch(applyShippedTerminations(scenario, breach));
+        return;
+      case "passer-au-vent-uniforme":
+        // The attenuation alone: the speed, the direction and the width stay as they are.
+        patch({ ...scenario, wind: uniformWind(scenario.wind) });
     }
   }
 
@@ -300,6 +312,7 @@ export function useFieldRows({
     breaches,
     outlined,
     unavailable: (id) => fieldUnavailable(id, report),
+    windProfileShown: (id) => isWindProfileFieldShown(id, report),
     commit,
     patch,
     runFix,
@@ -653,6 +666,7 @@ export function RailInputs({
         <Group title={heading("wind", "exact")}>
           <NumericRow hint="km/h" id="windSpeed" />
           <NumericRow hint="°" id="windDirection" />
+          <WindProfileRows />
         </Group>
 
         {/* §12.2's constants, each editable and labelled, none silent (#89, #104). Only the
@@ -967,6 +981,21 @@ export function NumericRow({
       }}
     </form.Field>
   );
+}
+
+/**
+ * The Vent's profile (#120) — its largeur à mi-atténuation and its atténuation aux ancrages, under
+ * the Vent's speed and direction on every Page that types them, each through {@link NumericRow}.
+ *
+ * Which rows stand is the gates' (`isWindProfileFieldShown`): none before the profile is consumed,
+ * but for a value a link or a Session brought and the Wind Gate refuses, whose row carries its
+ * message and its Fix Action.
+ */
+export function WindProfileRows() {
+  const { windProfileShown } = useRailRowContext();
+  return WIND_PROFILE_FIELDS.filter(windProfileShown).map((id) => (
+    <NumericRow hint="%" id={id} key={id} />
+  ));
 }
 
 /**

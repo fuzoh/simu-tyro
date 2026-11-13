@@ -27,8 +27,18 @@ export const DYNAMIQUE_GROUPS = {
   wind: heading("wind", "terrain"),
 } as const;
 
-/** The fields the Page edits, in screen order — each through the Rail's own row and gates. */
-export const DYNAMIQUE_FIELDS = ["mp", "windSpeed", "windDirection"] as const;
+/**
+ * The fields the Page edits, in screen order — each through the Rail's own row and gates. The
+ * Vent's profile (#120) has its two rows once it is consumed, and before that only while the gates
+ * refuse the value held (`isWindProfileFieldShown`).
+ */
+export const DYNAMIQUE_FIELDS = [
+  "mp",
+  "windSpeed",
+  "windDirection",
+  "windWidth",
+  "windAttenuation",
+] as const;
 
 /**
  * The gates whose outputs the Page prints: the line its rides run on, and the rides — which read

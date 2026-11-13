@@ -5,7 +5,11 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { DEFAULT_MAP_DISPLAY } from "@/lib/map/display.ts";
 import { evaluateGates } from "@/lib/rail/gates.ts";
-import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
+import {
+  FIRST_RUN_RETAINED_TEXTILE,
+  FIRST_RUN_SCENARIO,
+  firstRunDefaults,
+} from "@/lib/scenario/first-run.ts";
 import { encodeP1, URL_BUDGET_CHARS } from "@/lib/url/p1.ts";
 
 import type { Session, SessionStorage } from "./session.ts";
@@ -727,9 +731,9 @@ describe("the Mise en tension device in the Session (#86)", () => {
 });
 
 describe("the Vent in the Session (#87)", () => {
-  test("a wind survives a write and a read", () => {
+  test("a wind survives a write and a read, its profile with it (#120)", () => {
     const storage = memoryStorage();
-    const wind = { speedKmh: 50, directionDeg: 45 };
+    const wind = { speedKmh: 50, directionDeg: 45, widthPct: 30, attenuationPct: 75 };
     writeSession(storage, { ...bareSession(), scenario: { ...firstRunDefaults(), wind } });
     expect(readSession(storage)?.scenario.wind).toEqual(wind);
   });
@@ -743,7 +747,64 @@ describe("the Vent in the Session (#87)", () => {
 
     const restored = readSession(storage);
     expect(restored?.trace).not.toBeNull();
-    expect(restored?.scenario.wind).toEqual({ speedKmh: 0, directionDeg: 0 });
+    expect(restored?.scenario.wind).toEqual({
+      speedKmh: 0,
+      directionDeg: 0,
+      widthPct: 50,
+      attenuationPct: 0,
+    });
+  });
+});
+
+describe("the Vent's profile in the Session (#120)", () => {
+  /** A stored blob whose Vent is exactly `wind` — whatever keys it has. */
+  function storedWith(wind: Record<string, unknown>) {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const scenario = { ...(blob.scenario as Record<string, unknown>), wind };
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario }));
+    return storage;
+  }
+
+  test("a Session written before the profile keeps its wind and reads it uniform", () => {
+    const restored = readSession(storedWith({ speedKmh: 50, directionDeg: 45 }));
+    // Not discarded: the trace it carried is still there, and so are its speed and direction.
+    expect(restored?.trace).not.toBeNull();
+    expect(restored?.scenario.wind).toEqual({
+      speedKmh: 50,
+      directionDeg: 45,
+      widthPct: 50,
+      attenuationPct: 0,
+    });
+  });
+
+  test("each percent defaults on its own", () => {
+    const narrow = readSession(storedWith({ speedKmh: 50, directionDeg: 45, widthPct: 25 }));
+    expect(narrow?.scenario.wind).toMatchObject({ widthPct: 25, attenuationPct: 0 });
+    const sheltered = readSession(
+      storedWith({ speedKmh: 50, directionDeg: 45, attenuationPct: 60 }),
+    );
+    expect(sheltered?.scenario.wind).toMatchObject({ widthPct: 50, attenuationPct: 60 });
+  });
+
+  test("a profile out of its domain is restored as given: the gates refuse it, not the Session", () => {
+    const wind = { speedKmh: 50, directionDeg: 45, widthPct: 95, attenuationPct: -1 };
+    expect(readSession(storedWith(wind))?.scenario.wind).toEqual(wind);
+  });
+
+  test("the key the Session is stored under did not change", () => {
+    expect(SESSION_KEY).toBe("scoutech:session:v1");
+  });
+
+  test("a restored Session never shares the shipped Vent", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const older = { ...(blob.scenario as Record<string, unknown>) };
+    delete older.wind;
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: older }));
+    const restored = readSession(storage)?.scenario.wind;
+    expect(restored).toEqual(FIRST_RUN_SCENARIO.wind);
+    expect(restored).not.toBe(FIRST_RUN_SCENARIO.wind);
   });
 });
 

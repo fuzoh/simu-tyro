@@ -85,6 +85,9 @@ const ROWS: ReadonlyArray<{ id: QuantityId; value: number; expected: string }> =
   // The Vent (#87): whole km/h and whole degrees, in state exactly as typed.
   { id: "windSpeed", value: 50, expected: "50 km/h" },
   { id: "windDirection", value: 45, expected: "45 °" },
+  // Its profile (#120): §8.4's step of one point, so a link's `wa=74.6` prints the 75 % it is read at.
+  { id: "windWidth", value: 50, expected: "50 %" },
+  { id: "windAttenuation", value: 74.6, expected: "75 %" },
   // A Position's coordinate (#90): six decimals, the comma, the sign kept for a western longitude.
   { id: "coordinate", value: 46.843556, expected: "46,843556 °" },
   // The ride's constants (#89) at §12.2's defaults — `F₀` 15 N is a force, so daN like the rest.

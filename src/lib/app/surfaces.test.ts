@@ -213,7 +213,7 @@ describe("the Vent needs Positions", () => {
     for (const register of ["exact", "terrain"] as const) {
       const { scenario, surfaces, reading } = arrivedOn(LINE, register);
       // Kept: the Scenario and the link it writes back still carry it.
-      expect(scenario.wind).toEqual({ speedKmh: 30, directionDeg: 264 });
+      expect(scenario.wind).toMatchObject({ speedKmh: 30, directionDeg: 264 });
       expect(scenarioToSearch(scenario as Scenario)).toMatchObject({ ws: 30, wd: 264 });
       // Not applied: both rides are the ride without wind, and nothing is withheld.
       expect(reading).not.toBeNull();
@@ -239,12 +239,93 @@ describe("the Vent needs Positions", () => {
       },
       "terrain",
     );
-    expect(moved.scenario.wind).toEqual({ speedKmh: 30, directionDeg: 264 });
+    expect(moved.scenario.wind).toMatchObject({ speedKmh: 30, directionDeg: 264 });
     expect(scenarioToSearch(moved.scenario as Scenario)).toMatchObject({ ws: 30, wd: 264 });
     expect(moved.surfaces.windNotice).toBeNull();
     const calm = moved.reading?.calm.end;
     const windy = moved.reading?.windy.end;
     if (calm?.kind !== "arrival" || windy?.kind !== "arrival") throw new Error("both reach B");
     expect(windy.v).toBeGreaterThan(calm.v);
+  });
+});
+
+/**
+ * The Vent's profile (#120). Today's rides, Banane and rose take one speed for the whole line, so a
+ * link that carries a profile which is not uniform is **kept as given and withheld** — never read
+ * as the uniform wind it is not — until a calculation takes the field.
+ */
+describe("a profile of the Vent no calculation reads is never computed as a uniform wind", () => {
+  /** The browser trial's line: a west wind, ahead and from the left. */
+  const LINE =
+    "?L=200&h=-20&fl=6&ws=30&wd=264&lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783";
+
+  test("an older link carries no profile and opens on the uniform wind it always was", () => {
+    const { scenario, surfaces, reading } = arrivedOn(LINE, "terrain");
+    expect(scenario.wind).toEqual({
+      speedKmh: 30,
+      directionDeg: 264,
+      widthPct: 50,
+      attenuationPct: 0,
+    });
+    expect(surfaces).toMatchObject({ rideCause: null, windCause: null });
+    expect(reading?.windless).toBe(false);
+  });
+
+  test("a uniform wind that keeps a width is ridden exactly as the wind without one", () => {
+    const plain = arrivedOn(LINE, "terrain");
+    const kept = arrivedOn(`${LINE}&ww=30`, "terrain");
+    expect(kept.scenario.wind).toMatchObject({ widthPct: 30, attenuationPct: 0 });
+    expect(kept.surfaces).toMatchObject({ rideCause: null, windCause: null });
+    expect(kept.reading?.windy.end).toEqual(plain.reading?.windy.end);
+    expect(kept.reading?.windy.samples.at(-1)).toEqual(plain.reading?.windy.samples.at(-1));
+  });
+
+  test.each(["exact", "terrain"] as const)(
+    "a profile that is not uniform, on a Page in the %s register: no ride, no Vent, the statics stand",
+    (register) => {
+      const sound = arrivedOn(LINE, register);
+      const { scenario, surfaces, reading } = arrivedOn(`${LINE}&ww=30&wa=40`, register);
+      // Kept as given: the Scenario and the link it writes back still carry the profile.
+      expect(scenario.wind).toEqual({
+        speedKmh: 30,
+        directionDeg: 264,
+        widthPct: 30,
+        attenuationPct: 40,
+      });
+      expect(scenarioToSearch(scenario as Scenario)).toMatchObject({ ww: 30, wa: 40 });
+      // Withheld: nothing is integrated under 30 km/h along the whole line.
+      expect(reading).toBeNull();
+      expect(surfaces.rideCause).toBe("Aucune estimation — atténuation aux ancrages invalide.");
+      expect(surfaces.windCause).toBe("Vent indisponible — atténuation aux ancrages invalide.");
+      expect(surfaces.cause).toBeNull();
+      expect(surfaces.results?.rows).toEqual(sound.surfaces.results?.rows);
+    },
+  );
+
+  test("a width out of its domain is withheld the same way, and not brought back into it", () => {
+    const { scenario, surfaces, reading } = arrivedOn(`${LINE}&ww=95`, "terrain");
+    expect(scenario.wind.widthPct).toBe(95);
+    expect(scenarioToSearch(scenario as Scenario)).toMatchObject({ ww: 95 });
+    expect(reading).toBeNull();
+    expect(surfaces.windCause).toBe("Vent indisponible — largeur à mi-atténuation invalide.");
+    expect(surfaces.rideCause).toBe("Aucune estimation — largeur à mi-atténuation invalide.");
+    expect(surfaces.results).not.toBeNull();
+  });
+
+  test("without Positions it is refused all the same: the unplaced Vent's ride is not offered", () => {
+    const { surfaces, reading } = arrivedOn("?L=200&h=-20&fl=6&ws=30&wd=264&wa=40", "terrain");
+    expect(reading).toBeNull();
+    expect(surfaces.windCause).toBe("Vent indisponible — atténuation aux ancrages invalide.");
+  });
+
+  test("« Vent uniforme » — the attenuation at zero — brings the rides and the Vent back", () => {
+    const refused = arrivedOn(`${LINE}&ww=30&wa=40`, "terrain");
+    const repaired = readOn(
+      { ...refused.scenario, wind: { ...refused.scenario.wind, attenuationPct: 0 } },
+      "terrain",
+    );
+    expect(repaired.surfaces).toMatchObject({ rideCause: null, windCause: null });
+    expect(repaired.reading?.windless).toBe(false);
+    expect(repaired.scenario.wind.widthPct).toBe(30);
   });
 });

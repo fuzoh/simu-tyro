@@ -143,13 +143,13 @@ describe("the Vent fields (#87)", () => {
   test("typing a speed and a direction writes the wind, and nothing else", () => {
     const before = scenario();
     const typed = applyField(applyField(before, "windSpeed", 50, null), "windDirection", 45, null);
-    expect(typed.wind).toEqual({ speedKmh: 50, directionDeg: 45 });
+    expect(typed.wind).toEqual({ ...before.wind, speedKmh: 50, directionDeg: 45 });
     expect({ ...typed, wind: before.wind }).toEqual(before);
   });
 
   test("the fields show the wind in whole km/h and whole degrees", () => {
     const windy = scenario((draft) => {
-      draft.wind = { speedKmh: 50, directionDeg: 45 };
+      draft.wind = { ...draft.wind, speedKmh: 50, directionDeg: 45 };
     });
     expect(railValues(windy)).toMatchObject({ windSpeed: "50", windDirection: "45" });
     expect(railValues(scenario())).toMatchObject({ windSpeed: "0", windDirection: "0" });
@@ -159,6 +159,93 @@ describe("the Vent fields (#87)", () => {
     const shown = railValues(scenario());
     expect(sameGatedText(shown, { ...shown, windSpeed: "-5" })).toBe(false);
     expect(sameGatedText(shown, { ...shown, windDirection: "x" })).toBe(false);
+  });
+});
+
+describe("the Vent's profile (#120) — two percents, each written alone", () => {
+  const profiled = scenario((draft) => {
+    draft.wind = { speedKmh: 30, directionDeg: 264, widthPct: 30, attenuationPct: 40 };
+  });
+  const commit = (on: ScenarioDraft, id: "windWidth" | "windAttenuation", raw: string) =>
+    commitText({
+      scenario: on,
+      trace: null,
+      id,
+      raw,
+      settled: true,
+      text: railValues(on),
+      context: fieldContext(on),
+    });
+
+  test("typing a width writes the width, and nothing else of the Vent or of the Scenario", () => {
+    const typed = applyField(profiled, "windWidth", 70, null);
+    expect(typed.wind).toEqual({
+      speedKmh: 30,
+      directionDeg: 264,
+      widthPct: 70,
+      attenuationPct: 40,
+    });
+    expect({ ...typed, wind: profiled.wind }).toEqual(profiled);
+  });
+
+  test("typing an attenuation writes the attenuation, and nothing else", () => {
+    const typed = applyField(profiled, "windAttenuation", 15, null);
+    expect(typed.wind).toEqual({
+      speedKmh: 30,
+      directionDeg: 264,
+      widthPct: 30,
+      attenuationPct: 15,
+    });
+    expect({ ...typed, wind: profiled.wind }).toEqual(profiled);
+  });
+
+  test("a speed or a direction typed leaves the profile as it is", () => {
+    const typed = applyField(applyField(profiled, "windSpeed", 0, null), "windDirection", 90, null);
+    expect(typed.wind).toEqual({
+      speedKmh: 0,
+      directionDeg: 90,
+      widthPct: 30,
+      attenuationPct: 40,
+    });
+  });
+
+  test("the fields show whole percents: the shipped uniform wind reads 50 and 0", () => {
+    expect(railValues(scenario())).toMatchObject({ windWidth: "50", windAttenuation: "0" });
+    expect(railValues(profiled)).toMatchObject({ windWidth: "30", windAttenuation: "40" });
+  });
+
+  test("a link's percent out of its domain is shown as it arrived, never brought back", () => {
+    const arrived = scenario((draft) => {
+      draft.wind = { ...draft.wind, widthPct: 95, attenuationPct: 110 };
+    });
+    expect(railValues(arrived)).toMatchObject({ windWidth: "95", windAttenuation: "110" });
+  });
+
+  test("a text commits as the whole percent the field shows", () => {
+    expect(commit(profiled, "windWidth", "69,6")).toMatchObject({ value: 70, asked: 70 });
+    expect(commit(profiled, "windWidth", "69,6").next?.wind.widthPct).toBe(70);
+    expect(commit(profiled, "windAttenuation", "0").next?.wind).toEqual({
+      speedKmh: 30,
+      directionDeg: 264,
+      widthPct: 30,
+      attenuationPct: 0,
+    });
+  });
+
+  test("a text out of its domain writes nothing: the Scenario keeps what it held", () => {
+    const untouched = { next: null, value: null, asked: null };
+    expect(commit(profiled, "windWidth", "95")).toEqual(untouched);
+    expect(commit(profiled, "windWidth", "9")).toEqual(untouched);
+    expect(commit(profiled, "windAttenuation", "101")).toEqual(untouched);
+    expect(commit(profiled, "windAttenuation", "-1")).toEqual(untouched);
+    expect(commit(profiled, "windAttenuation", "")).toEqual(untouched);
+    expect(commit(profiled, "windAttenuation", "abc")).toEqual(untouched);
+  });
+
+  test("the profile's fields are in the Wind Gate, so their text reaches tier one (ADR-0001)", () => {
+    const shown = railValues(profiled);
+    expect(sameGatedText(shown, { ...shown, windWidth: "95" })).toBe(false);
+    expect(sameGatedText(shown, { ...shown, windAttenuation: "" })).toBe(false);
   });
 });
 
@@ -311,6 +398,8 @@ describe("FIELD_ACCESS — one lens per numeric field", () => {
       "xD",
       "windSpeed",
       "windDirection",
+      "windWidth",
+      "windAttenuation",
       "CdA",
       "F0",
       "kv",
