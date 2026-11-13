@@ -12,6 +12,23 @@ Recherche du 2026-11-09, préparation de #127, #120, #118 et #124. Point d'entr�
 | [Énergie](quasi-static-energy-review.md) | Énergie matérielle, lieu du passager, portée de `v/c` | Revue indépendante ; aucun défaut démontré sur les points contrôlés, limites explicites |
 | [Vallée](valley-wind-review.md) | Campagnes Perdigão, représentativité, charge quadratique | Sources primaires consultées ; aucun profil universel de vallée établi |
 
+## Expérience numérique
+
+| Rapport | Objet | Statut |
+| --- | --- | --- |
+| [Portance et traînée axiale](lift-axial-drag-experiment.md) | #134 : traînée normale seule contre l'ajout d'une portance et d'une traînée axiale, sur une matrice statique acier et textile | **Généré** par `bun experiments/spatial-aero-134/matrix.ts` ; contrat `docs/simulation-theory.md` §18 ; sondes de sensibilité, aucun coefficient adopté, décision de production ouverte |
+
+Ce rapport-là se rejoue : son code, ses tests et ses tableaux sont dans
+`experiments/spatial-aero-134/`. Les chiffres et les fichiers attribués à #134 dans les notes
+antérieures du dossier (`production-aerodynamics-followup.md` §4.5, `inversion-followup.md`,
+`triage-decisions-consolidated.md`, `descent-views-contract-followup.md`) décrivent un arbre de
+travail de recherche qui n'a pas été livré avec elles : **ils ne se rejouent pas et sont
+remplacés par ce rapport**, dont la matrice, les lignes et les conventions diffèrent. Deux écarts
+à connaître : la traînée axiale y suit l'air, à l'inverse du signe écrit dans
+`line-lift-axial-drag-significance.md` §3 et `production-aerodynamics-followup.md` §4.1 (§18.3
+l'explique, à confirmer par le mainteneur) ; et une seconde loi d'orientation de la portance,
+impaire en lacet, y est jouée à côté de la loi binormale.
+
 Ces rapports documentent observations, dérivations et accès partiels séparément. Ils examinent la
 note au commit `6bada50`, avant intégration de leurs compléments. Les recommandations ne sont pas
 une spécification d'implémentation ni un dimensionnement de sécurité.
