@@ -1069,6 +1069,8 @@ MBL` / `≈ 31 @ 30 % MBL`, but a zip line is strength-sized for shock and rescu
 13. Lateral wind model (blow-out corridor) — out of v1 scope, needed for EN compliance
     view [§8.4]. Preparatory evidence and limits, without new coefficients:
     `docs/references/equilibre spatial vent.md` (2026-11-09; issues #127, #120, #118, #124).
+    §18 is the contract of the isolated experiment that compares normal drag alone with an added
+    lift and an added axial drag on the line (#134): sensitivity probes, no coefficient adopted.
 14. Eddy-brake force–velocity curves (manufacturer data or bench measurement) [§12.3].
 15. Petzl Technical Institute quantified highline test reports; US Army FM rope-bridge
     sag-tension tables [R2 §7].
@@ -1084,3 +1086,255 @@ Staged plan stays as [ALGO §10]/handoff: parabola prototype → inclined rigid 
 inverse modes (§7) → clearance (§11) → dynamics & braking (§12)** — with §15 fixtures as
 the TDD seed and §14/§16 as the guard rails on every constant. Steel (§13.1) and textile
 (§13.2) stay separate modules behind the §10.4 use-class gate.
+
+---
+
+## 18. Experimental spatial statics under wind — lift and axial drag probes (#134)
+
+**Status.** The contract of one **isolated numerical experiment**, `experiments/spatial-aero-134/`,
+written before its code. It is **not part of the engine**: nothing under `src/` reads it, it
+replaces no solver, and it changes neither the descent drag of §12.2, the Verdict nor any safety
+factor. #127 owns the production spatial statics and adopted normal drag alone on the line; this
+section exists so that the effect of **adding** a lift and an axial drag can be compared with
+that choice on identical cases. No number below carries a trust tag of §0.2, because none is a
+value of the engine: §18.4 gives each its own class. Nothing here may be read as a product
+coefficient, a realistic interval, a conservative bound or a promise of safety.
+
+### 18.1 Scope
+
+- **Statics only.** One line between two fixed anchors, under its weight, a prescribed uniform
+  horizontal wind and, optionally, a static rider held at the trolley. No vibration, vortex
+  shedding, galloping, gust or inertial feedback of the descent (#124).
+- **One material law**: §4's constant `EA`. Steel and textile enter as two sets of `w`, `EA` and
+  declared diameter `d` — data, not two code paths of the engine.
+- **The rider's load is one prescribed vector**, identical in every aerodynamic model: its weight
+  share on the member computed. The experiment gives the rider no wind area, so it does not
+  depend on #127's ellipsoid.
+- **A uniform wind.** §8.4's profile is not exercised: every element reads the same velocity.
+- **Carrying members.** A line with two identical Brins porteurs is computed as **one** member
+  carrying its own weight and wind whole and half the rider's weight (§8.1's 50/50 sharing,
+  `[CONVENTION]`); no wake between the members is modelled.
+
+### 18.2 Frame and equilibrium
+
+§2's frame with a third axis: `x` horizontal from A to B, `z` up, and **`y` horizontal to the left
+of the travel A → B**, so that `(x, y, z)` is right-handed. A is the origin, B is `(L, 0, h)`. `S`
+is the unstretched material coordinate from A (§2's `s`), `0 ≤ S ≤ L₀`. SI throughout.
+
+`F(S)` is the internal force that the `S⁺` side exerts on the `S⁻` side; `T = |F|`, the unit
+tangent of the stretched line is `t = F/T` (pointing from A to B), and the stretch is
+`λ = 1 + T/EA`. With `q₀` the distributed external load **per unstretched metre**:
+
+```
+dF/dS = −q₀
+dr/dS = λ·t
+q₀    = (0, 0, −w) + λ·(f_n + f_L + f_a)
+```
+
+`f_n`, `f_L` and `f_a` are §18.3's forces **per stretched metre**, which is why they take the
+factor `λ`; `w` is per unstretched metre and does not. The boundary conditions are `r(0) = A` and
+`r(L₀) = B`. A static rider held at `S_P` puts the external force `P_ext` on the line there:
+
+```
+r(S_P⁺) = r(S_P⁻)
+F(S_P⁺) − F(S_P⁻) = −P_ext          P_ext = (0, 0, −m·g/n)
+```
+
+with `n` the number of carrying members. The line pulls anchor A with `F(0)` and anchor B with
+`−F(L₀)`: those are the reactions the experiment reports. Integrating over the line gives the two
+global balances that §18.6 checks:
+
+```
+F(L₀) − F(0) + ∫₀^L₀ q₀ dS + P_ext = 0
+r_B × F(L₀) + ∫₀^L₀ r × q₀ dS + r_P × P_ext = 0          (moments about A)
+```
+
+Without wind this is §4 and §6.1: `F = (H, 0, V₀ + w·S)` up to the rider, whose weight `P` adds to
+the vertical component beyond it.
+
+### 18.3 Aerodynamic closure of the line
+
+`u` is the velocity of the air **relative to the element, pointing where the air goes**. The line
+is static, so `u` is the wind: `u = (u_along, u_across, 0)` with the components of
+`windComponents` (`src/lib/sim/wind.ts`) — `u_along > 0` a tail wind, `u_across > 0` a wind from
+the right of the travel. With `ρ` the air density and `d` the declared diameter:
+
+```
+u_t = u·t                         u_n = u − u_t·t
+f_n = ½·ρ·C_D⊥·d·|u_n|·u_n                         normal drag
+f_L = ½·ρ·C_L ·d·|u_n|·(t × u_n)                   lift, « binormal » law
+f_L = ½·ρ·C_L ·d· u_t ·(t × u_n)                   lift, « yaw-odd » law
+f_a = ½·ρ·C_t ·d·|u_t|·u_t·t                       axial drag
+```
+
+| Force | Direction                                   | Reference speed          | Reference length | Unit |
+| ----- | ------------------------------------------- | ------------------------ | ---------------- | ---- |
+| `f_n` | along `u_n`, orthogonal to `t`              | `\|u_n\|`                | `d`              | N/m  |
+| `f_L` | along `t × u_n`, orthogonal to `t` and `u_n` | `\|u_n\|`, or `√(\|u_t\|·\|u_n\|)` | `d`     | N/m  |
+| `f_a` | along `t`, on the side the air goes         | `\|u_t\|`                | `d`              | N/m  |
+
+All three are per metre of **stretched** line and on the **declared diameter**, constant during
+a calculation; none is on the wetted perimeter — a skin-friction coefficient `C_f` on `π·d` is
+`C_t = π·C_f` here. `|t × u_n| = |u_n|`, so no term divides by a speed: `u_n = 0` or `u_t = 0`
+gives a zero force, not a normalised null vector.
+
+**Three forces, never one counted twice.** On a deflected line `f_n` has a vertical component:
+that is the projection of the normal drag and it stays in `f_n`
+(`docs/references/spatial-wind/line-aerodynamics-review.md` §3.3). The lift is a separate force,
+orthogonal to both `t` and `u_n`. On a level line in a pure wind from the right, `t = (1, 0, 0)`
+and `u = (0, U, 0)`: `t × u_n = (0, 0, U)`, so `C_L > 0` lifts the line and `C_L < 0` presses it
+down; a wind from the left reverses both.
+
+**The lift's orientation is a hypothesis, in two parts.**
+
+- _Its sign._ The wind alone does not determine on which side of the plane `(t, u_n)` a stranded
+  line is pushed: the lay does. `C_L` is therefore **signed**, and every magnitude is run with
+  both signs. The sign stands for no real construction.
+- _Its dependence on the yaw._ The « binormal » law is the closure the archived notes wrote
+  (`line-lift-axial-drag-significance.md` §3): a magnitude `½·ρ·|C_L|·d·|u_n|²` whatever the yaw,
+  greatest in a pure crossflow. The « yaw-odd » law is added here because of a symmetry, **derived
+  and not measured**: a uniform helical strand is mapped onto itself by a half-turn about a
+  transverse axis that meets it, and a line many lay lengths long is, on average over its roll,
+  unchanged by a half-turn about the direction of `u_n`. That half-turn leaves `u_n` as it was,
+  reverses `u_t`, and reverses any force along `t × u_n`: the mean lift of such a line is **odd
+  in `u_t`** and **nil in a pure crossflow**. `u_t·|u_n|` is the lowest product with that parity;
+  it claims nothing about a magnitude, and at 45° of yaw both laws give the same magnitude for
+  the same `|C_L|`. Neither law is asserted to be a real rope's — an idealised helix is not a
+  worn 6×19 or a braided sheath.
+
+**The axial drag follows the air.** The archived notes write `f_a` « opposed to the axial
+component of `u` » (`line-lift-axial-drag-significance.md` §3,
+`production-aerodynamics-followup.md` §4.1). With `u` the velocity of the air relative to the
+line — the convention under which `f_n` is along `+u_n` — a drag is along the relative flow, so
+the experiment takes `+|u_t|·u_t·t`: a tail wind pulls the line toward B and raises the tension
+at A. The opposite sign would make the air push upstream. This is a correction of sign with
+respect to those notes, **flagged for the maintainer**, not a new physical claim; it changes
+which anchor gains tension, not a magnitude.
+
+### 18.4 Coefficients — classes, not values of the engine
+
+| Quantity | Values run                         | Class                         | What it is                                                                                                                                                                  |
+| -------- | ---------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `C_D⊥`   | `1.2`, every model                 | published, **not transferable** | order of magnitude of a smooth cylinder below its critical Reynolds number and of other stranded constructions; #127's adopted convention (Q35). No 6×19 and no dry textile rope was measured |
+| `C_L`    | `0`; `±0.05`; `±0.2`; `±0.5`       | **sensitivity probe**         | chosen to explore the response under both laws of §18.3. No transferable measurement exists (`production-aerodynamics-followup.md` §4)                                    |
+| `C_t`    | `0`; `0.02`; `0.1`                 | **sensitivity probe**         | chosen to explore the response. No usable measurement exists (ibid.)                                                                                                        |
+| `ρ`      | `1.225 kg/m³`                      | convention                    | §12.2's sea-level density                                                                                                                                                   |
+
+A **sensitivity probe** is neither a realistic interval nor a bound: a result obtained with one
+says how the equilibrium responds **if** the coefficient had that value, and nothing about
+whether it does. The four models compared are: normal drag alone (the reference); normal + lift
+(both laws, three magnitudes, both signs); normal + axial drag (two magnitudes); normal + lift +
+axial (the binormal law crossed with the axial probes). The line properties, geometries, wind
+directions and speeds are inputs of the experiment, listed with their own provenance in
+`experiments/spatial-aero-134/cases.ts` and in the report it generates; the wind speeds are
+illustrations, not design winds.
+
+### 18.5 Numerical method and outputs
+
+**Shooting from A.** The unknown is `F_A = F(0)`, three numbers. §18.2's equations are integrated
+from A by the classical fourth-order Runge–Kutta rule with a fixed step in `S` — `N = 240` steps
+along the line, split between the two sides of the rider into even numbers of equal steps in
+proportion to their unstretched lengths, the rider's jump applied at its node. The residual is
+the anchor closure `R(F_A) = r(L₀) − B`.
+
+**Damped Newton.** `R = 0` is solved by Newton's method with a Jacobian by central finite
+differences (step `10⁻⁶·|F_A|`) and §5.1's line search: the step is halved until `‖R‖` decreases.
+The first seed is the plane line of the engine under the weight and the rider,
+`F_A = (H, 0, V₀)` from `solveSpan` — exact without wind. Iteration stops at `‖R‖ ≤ 10⁻¹⁰ m` or
+when no shorter step decreases `‖R‖`; the case is **accepted** if `‖R‖` is within §5.3's bar
+(`10⁻⁶ m` up to 1000 m of span) and is otherwise a **failure, reported as such** with the closure
+reached — never replaced by a neighbouring case or by the plane line. A trial along which the
+tension vanishes is refused, not clamped. A non-convergence is a numerical statement, not a
+physical impossibility.
+
+**Outputs**, all read on the solved nodes:
+
+| Output                 | Definition                                                                                                                       |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| reactions              | `F(0)` on A, `−F(L₀)` on B, N, three components                                                                                  |
+| `T_A`, `T_B`, `T_max`  | `\|F(0)\|`, `\|F(L₀)\|`, greatest `\|F\|` over the nodes, both sides of the rider included                                       |
+| flèche                 | greatest vertical drop below the straight line A–B, `max(h·x/L − z)`, never negative (Q9); a rise above A–B is reported beside it |
+| déport latéral         | the lateral offset `y` of greatest magnitude, **signed**                                                                         |
+| écart combiné à A–B    | `max over the line of √((h·x/L − z)² + y²)` — combined **at each abscissa, then maximised** (Q10); not a shortest distance to A–B |
+| garde verticale        | `min over the line of z − z_ground(x) − h_gabarit`, on the ground profile **extruded sideways** (Q16) and the whole gabarit of §6.3 |
+| distributed loads      | mean over the stretched length and greatest nodal value of `\|f_n\|`, `\|f_L\|`, `\|f_a\|`, N/m, also as a share of `w`             |
+
+An extremum is read between the nodes: inside a smooth piece, the vertex of the parabola through
+the sampled extremum and its two neighbours; at the rider's node, which is a corner, the node
+itself. The garde is a vertical clearance over an extruded profile: it is no clearance from the
+real ground off the A–B axis.
+
+### 18.6 Controls and tolerances
+
+**The bars are fixed here, from the controls alone, before any difference between two aerodynamic
+models is read.** A case over a bar is a failure that stays in the tables, never a difference.
+
+| Check, on every solved case                                   | Bar                                         | Why that bar                                                                    |
+| ------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------- |
+| anchor closure `‖r(L₀) − B‖`                                  | §5.3: `10⁻⁶ m` (`10⁻⁶·L` beyond 1000 m)     | the engine's own                                                                |
+| global force balance of §18.2                                 | `10⁻⁶ N`                                    | the loads are re-integrated by Simpson's rule, a second quadrature of what RK4 integrated; three orders under the force floor below |
+| global moment balance about A                                 | `10⁻⁶ N·m` per metre of chord               | the force bar times its lever arm                                               |
+| rider's jump `‖F(S_P⁺) − F(S_P⁻) + P_ext‖`                    | `10⁻⁶ N`                                    | as the force balance                                                            |
+| continuity `‖r(S_P⁺) − r(S_P⁻)‖`                              | `10⁻⁹ m`                                    | the node is shared: anything else is a defect                                   |
+| refinement: gap between `N` and `2N` steps, on every length and on every force reported | `10⁻⁵ m`, `10⁻⁴ N`     | RK4 is of order 4: the gap is 15/16 of the coarse error, so the finer line, the one reported, is well inside it |
+
+A difference between two models is **read only between two cases that both passed**, and is
+called **resolved** only above a floor of `10⁻⁴ m` and `10⁻³ N` — ten times the refinement bars.
+Resolved means distinguishable from the numerical error; it does not mean significant for an
+installation. A relative difference is given only where the reference is at least `0.1 m` or
+`10 N`: below, the percentage would be a ratio to nearly nothing and the absolute value stands
+alone.
+
+**Controls of the prototype itself**, each with an expected value that does not come from it:
+
+1. _No-wind return to §15._ Z1–Z5 with every aerodynamic coefficient at zero: `H`, `V₀`, `V_B`,
+   `T_A`, `T_B`, `T_max`, the sag or the node's position within `4×10⁻⁶` relative — the
+   solved-scalars tier of `docs/conventions/testing.md`.
+2. _No-wind return to the plane engine_ on every calm case of the matrix, same bar; and every
+   variant of a calm case identical to the reference within the floor.
+3. _Normal drag alone, no weight, pure crossflow, level span._ The load is normal to the line, so
+   `T` is constant and, with `p = ½·ρ·C_D⊥·d·U²` and `Σ = (1 + T/EA)·L₀` the stretched length, the
+   line is a catenary of parameter `T/p` in the horizontal plane:
+   `L = (2T/p)·asinh(p·Σ/(2T))`, déport `= (T/p)·(√(1 + (p·Σ/(2T))²) − 1)`.
+4. _Lift alone (binormal law), no weight, pure crossflow, level span._ The line stays in the
+   vertical plane, where the load `p = ½·ρ·|C_L|·d·U²` is normal and of constant magnitude: a
+   circular arc of radius `R = T/p`, `L = 2R·sin(Σ/(2R))`, rise `= R·(1 − cos(Σ/(2R)))`.
+5. _Axial drag alone, no weight, wind along a level span._ The line is straight:
+   `T_A − T_B = ½·ρ·C_t·d·|U|·U·L`, positive in a tail wind.
+6. _A uniform load vector._ A constant lateral load `p_y` per unstretched metre on a level span,
+   with no aerodynamic term: the line is §4's plane catenary under `w' = √(w² + p_y²)`, tilted by
+   `atan(p_y/w)` about A–B — §15's Z1 with `w = 3`, `p_y = 4`.
+7. _Mirror._ Reversing `u_across` together with the sign of `C_L` mirrors the line in the plane
+   `y = 0`: same tensions, same flèche, opposite déport, within the refinement bars.
+
+Controls 3–5 are asserted at `10⁻⁸` relative: the closed forms are exact and the integration
+leaves less. **If a control fails, the report gives the diagnostic and draws no conclusion on the
+physics.**
+
+### 18.7 The two installation conventions
+
+**Main comparison — identical unstretched length.** For each line and geometry, `L₀` is resolved
+**once, by the engine, without wind**, from the line's tension de pose at anchor A (§7), and is
+then the same for every wind, load state and model. Same installation, same anchors, same other
+inputs: what differs between two columns is the added force and nothing else. No length is
+recomputed.
+
+**Separate comparison — identical tension de pose.** #127's tension de pose is read on the
+unloaded line under the scenario's wind. Here, for each line, geometry, wind **and model**, the
+experiment solves the `L₀` at which the unloaded line reads the same total tension at A under
+that wind and that model, **reports that length**, and solves the unloaded and the loaded line at
+it. A model that changes the pose describes another installation; these rows live in their own
+table and are never merged with the main comparison. The length is searched on the taut branch
+from the no-wind length (§7: `T_A(L₀)` is not monotone on a very slack line); a target that
+cannot be bracketed is a reported failure, and a root found is local — nothing claims it unique.
+
+**Reference and differences.** In both tables every model is compared with normal drag alone on
+the same case under the same convention: `Δ = value − reference`, and `Δ/|reference|` only under
+§18.6's rule. A flèche, a déport or a garde can be nil or change sign: the absolute difference is
+the result, the percentage a convenience.
+
+**What the experiment cannot conclude.** That a probe moves a result says the equilibrium is
+sensitive to that coefficient at that size; that it does not says so for that size only. Neither
+supports adopting a coefficient, omitting a force as negligible, or bounding an error on a real
+product: those need measurements the open sources do not provide, and a decision of the
+maintainer.
