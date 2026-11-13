@@ -480,6 +480,24 @@ describe("sampleTension — §2's T(s) along the line, §6.1's node on both side
     expect(Ts[1]).toBeCloseTo(Math.hypot(Z4.out.H, Z4.out.V0 + (Z4.in.w * Z4.in.L0) / 2), 9);
   });
 
+  test("a node past L₀ still gets its pair, last, and leaves the grid unloaded", () => {
+    const shape = { H: Z4.out.H, V0: Z4.out.V0, w: Z4.in.w, EA: Z4.in.EA, L0: Z4.in.L0 };
+    const bare = tensionPairs(sampleTension(stateOf(shape), 4));
+    const past = stateOf({ ...shape, loads: [{ P: Z4.in.P, s: Z4.in.L0 + 5 }] });
+    const { xs, Ts } = tensionPairs(sampleTension(past, 4));
+    // n + 1 grid pairs and the node's two: the array is full, no trailing zero pair.
+    expect(xs).toHaveLength(5 + 2);
+    expect(xs.slice(0, 5)).toEqual(bare.xs);
+    expect(Ts.slice(0, 5)).toEqual(bare.Ts);
+    expect(xs[6]).toBe(xs[5]);
+    expect(xs[5]).toBeGreaterThan(xs[4]);
+    expect(Ts[5]).toBeCloseTo(Math.hypot(Z4.out.H, Z4.out.V0 + Z4.in.w * (Z4.in.L0 + 5)), 9);
+    expect(Ts[6]).toBeCloseTo(
+      Math.hypot(Z4.out.H, Z4.out.V0 + Z4.in.w * (Z4.in.L0 + 5) + Z4.in.P),
+      9,
+    );
+  });
+
   test("n must be a positive integer, as for sampleCable", () => {
     const state = stateOf({ H: Z1.out.H, V0: Z1.out.V0, w: Z1.in.w, EA: Z1.in.EA, L0: Z1.in.L0 });
     expect(() => sampleTension(state, 0)).toThrow(RangeError);
