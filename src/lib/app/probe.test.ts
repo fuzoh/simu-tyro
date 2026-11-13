@@ -21,7 +21,7 @@ describe("off, as in a reader's tab", () => {
   test("records nothing and leaves the work it wraps untouched", () => {
     expect(probing()).toBe(false);
     probeMark("rider:asked", 12.5);
-    probeMeasure("vue3d:render", 0, undefined);
+    probeMeasure("vue3d:render", 0);
     expect(probeSpan("vue3d:scene", 12.5, () => 42)).toBe(42);
     const scene = {};
     expect(probeTag(scene, 12.5)).toBe(scene);
@@ -69,7 +69,7 @@ describe("on, as the rider-drag harness opens the page", () => {
     const start = performance.now();
     const until = start + 2;
     while (performance.now() < until);
-    probeMeasure("vue3d:render", start, undefined);
+    probeMeasure("vue3d:render", start);
     const [span] = entries("vue3d:render");
     expect(span!.startTime).toBe(start);
     expect(span!.duration).toBeGreaterThanOrEqual(2);

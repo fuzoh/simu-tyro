@@ -575,7 +575,7 @@ function probeFrames(widget: CesiumWidget, current: () => Vue3dScene | null) {
   });
   let marked: Vue3dScene | null = null;
   cesium.postRender.addEventListener(() => {
-    probeMeasure("vue3d:render", start, undefined);
+    probeMeasure("vue3d:render", start);
     const scene = current();
     if (scene === null || scene === marked || !widget.clock.canAnimate) return;
     marked = scene;

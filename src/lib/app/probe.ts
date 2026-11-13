@@ -57,7 +57,7 @@ export function probeSpan<T>(name: ProbeName, detail: unknown, run: () => T): T 
 }
 
 /** Records the span from `start` — a `performance.now()` — to now, when probing. */
-export function probeMeasure(name: ProbeName, start: number, detail: unknown): void {
+export function probeMeasure(name: ProbeName, start: number, detail?: unknown): void {
   if (!probing()) return;
   performance.measure(name, { start, end: performance.now(), detail });
 }
