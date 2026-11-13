@@ -400,8 +400,9 @@ export function profileReading(preview: ProfilePreview): readonly string[] {
 }
 
 /**
- * The same readings as one line under a map that has no pad for them (#120) — the Page Terrain's —
- * or `null` under a uniform wind, where the line the rose already reads says everything.
+ * The same readings as one line under a map that has no pad for them (#120) — the Page Terrain's,
+ * the Mesure's, the frame that stands in for a map that could not arrive — or `null` under a
+ * uniform wind, where the line the rose already reads says everything.
  */
 export function profileCaption(preview: ProfilePreview): string | null {
   if (preview.uniform) return null;

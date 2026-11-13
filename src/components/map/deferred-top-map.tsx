@@ -16,6 +16,10 @@
  * Banane's note — the same caption (`./map-caption.tsx`). What needs the map's module is not there:
  * no rose, no « 3D » (its renderer is fetched from the map's chunk), no Mesure, no anchor placed.
  * The Page stays usable, and the next Page that shows the map asks for it again.
+ *
+ * **A Vent that varies along the line is never captioned as one speed** (#120). No pad stands
+ * here, so once the physics reads the Vent's profile the caption carries its readings under the
+ * Vent's line, as under the live map without a pad — by the live map's own rule (`windControls`).
  */
 
 import type { ComponentProps, ReactNode } from "react";
@@ -25,7 +29,8 @@ import { useEffect, useState } from "react";
 import { useAppState } from "@/components/app/store.tsx";
 import { MapOverCoupe, plainDrawing, TopViewFrame } from "@/components/statique/top-view.tsx";
 import { bananeAcross } from "@/lib/map/banane.ts";
-import { windReading } from "@/lib/map/copy.ts";
+import { profileCaption, windReading } from "@/lib/map/copy.ts";
+import { profilePreview, windControls } from "@/lib/map/wind-rose.ts";
 import { windBearing } from "@/lib/rail/gates.ts";
 
 import type { TopMap as LiveTopMap } from "./top-map.tsx";
@@ -78,7 +83,11 @@ export function TopMap({ readOnly, ...props }: TopMapProps) {
   ) : module === null ? (
     <TopViewFrame />
   ) : (
-    <Unavailable windCause={props.windCause} />
+    <Unavailable
+      frame={props.frame}
+      windCause={props.windCause}
+      windCulprits={props.windCulprits}
+    />
   );
   return readOnly === undefined ? (
     map
@@ -88,7 +97,11 @@ export function TopMap({ readOnly, ...props }: TopMapProps) {
 }
 
 /** The map's own no-WebGL fallback, drawn without MapLibre: the line, its anchors, its Banane. */
-function Unavailable({ windCause }: { windCause: string | null }) {
+function Unavailable({
+  frame,
+  windCause,
+  windCulprits,
+}: Pick<TopMapProps, "frame" | "windCause" | "windCulprits">) {
   const { scenario } = useAppState();
   const { positions } = scenario;
   // A withheld Vent is drawn as none, as the live map draws it.
@@ -96,12 +109,22 @@ function Unavailable({ windCause }: { windCause: string | null }) {
   const bearing = windBearing({ positions });
   const across = bananeAcross(wind, bearing);
   const plain = plainDrawing(positions, across);
+  // A frame that writes nothing and measures nothing: of the Vent's controls it has the profile's
+  // readings alone, where the live map's rule reads the profile out.
+  const controls = windControls({
+    culprits: windCulprits,
+    placed: bearing !== null,
+    locked: true,
+    measuring: false,
+  });
+  const preview = controls.preview ? profilePreview(scenario.wind, frame?.L ?? null) : null;
   return (
     <TopViewFrame
       caption={
         <MapCaption
           banane={across !== 0 && positions.A !== null && positions.B !== null}
           positions={positions}
+          profile={preview === null ? null : profileCaption(preview)}
           unavailable
           unoriented={plain.unoriented}
           // No rose stands here, so the line offers no handle.
