@@ -1584,14 +1584,16 @@ function FileControls({
   );
 }
 
-/**
- * « Charger le profil geo.admin » (#103) — an explicit action, never a side effect of typing a
- * Position. Every outcome short of a profil is an **ambient** line under the button: the terrain on
- * screen stays as it was, because the profil is a connected extra on top of an app that computes
- * offline.
- */
 /** Why « Charger le profil geo.admin » is disabled. */
 const GEOADMIN_NEEDS_POSITIONS = "Les Positions A et B sont nécessaires.";
+
+/**
+ * « Charger le profil geo.admin » (#103) — an explicit action, never a side effect of typing a
+ * Position. Every outcome short of a profil is **ambient**: the terrain on screen stays as it was,
+ * because the profil is a connected extra on top of an app that computes offline. A failed load is
+ * a ⚠ beside the button and the reason it is disabled joins its ⓘ (#122); only « Chargement… »
+ * stays a line under it, as the button's state.
+ */
 
 function GeoadminControls() {
   const { scenario } = useAppState();

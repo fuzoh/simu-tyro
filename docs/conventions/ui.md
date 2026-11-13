@@ -232,7 +232,8 @@ explanation, note, Avertissement and blocking field error sits behind an icon �
 - **Hover, keyboard focus and touch.** It is Base UI's popover with `openOnHover`, so a tap opens
   it and a link inside it stays reachable (a tooltip closes before its link can be pressed). A
   `:focus-visible` focus opens it too, without moving the focus (`initialFocus={false}`); Tab then
-  walks into the bubble's links before leaving it. The popover's own flex column is neutralised by
+  walks into the bubble's links before leaving it. The focus Base UI hands back to the icon on
+  Escape does not reopen it (`opensOnFocus`), so one Escape closes the bubble. The popover's own flex column is neutralised by
   one wrapper `div`, or each segment of a sentence — a `§` link, the words around it — would stand
   on a line of its own.
 - **One `ⓘ` per row.** A row's help, its field meaning, its ambient note and why an option is
@@ -247,7 +248,11 @@ explanation, note, Avertissement and blocking field error sits behind an icon �
   result from reading as a usable one; commands (Fix Actions, « Ouvrir la Page Avancé », « Passer en
   mouflage »); the terrain's source line and the swisstopo attribution its terms ask to sit beside
   the data; the vue de dessus's caption, whose lines are readings and the live gesture's prompt in a
-  height the layout reserves. The Banane note's explanation moved from a `title` — which the mouse
+  height the layout reserves; Provenance's aggregate summary (« ⚠ N valeurs sans référence
+  normative confirmée »), which is a count and the toggle of its `<details>`, not an explanation —
+  the entries and their chips are behind it. The terrain lines in the open keep their glyph, `✓`
+  for a check that passed and `ℹ` for one that could not be made, so the two never read alike. The
+  Banane note's explanation moved from a `title` — which the mouse
   alone could read — to an `ⓘ`.
 - **Where a section's notes go.** On its heading: `Group`'s `tip`, `Region`'s and `RailSection`'s
   `tips`. « Ce que cet outil ne calcule pas » keeps its heading in the open and its lines behind the
