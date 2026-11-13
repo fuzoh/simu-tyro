@@ -88,6 +88,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { Toggle } from "@/components/ui/toggle.tsx";
+import { probeSpan, probeTag, probeTagOf } from "@/lib/app/probe.ts";
 import { coupeLines, coupeReading } from "@/lib/chart/hover.ts";
 import { placeRider } from "@/lib/chart/scene.ts";
 import { bananeAcross } from "@/lib/map/banane.ts";
@@ -602,7 +603,8 @@ function Vue3dHost({
   }, [renderer]);
 
   useEffect(() => {
-    view?.show(scene, display, idle, layers);
+    if (view === null) return;
+    probeSpan("vue3d:show", probeTagOf(scene), () => view.show(scene, display, idle, layers));
   }, [view, scene, display, idle, layers]);
 
   useEffect(() => {
@@ -721,8 +723,11 @@ function useVue3dScene(
     if (!shown) return null;
     const at = vue3dPlacement(positions, frame, profil);
     if (!at.ok) return null;
-    const placed = solved === null ? null : placeRider(solved, xD);
-    return vue3dScene({ placement: at.placement, solved, rider: placed, across });
+    return probeSpan("vue3d:scene", xD, () => {
+      const placed = solved === null ? null : placeRider(solved, xD);
+      const scene = vue3dScene({ placement: at.placement, solved, rider: placed, across });
+      return probeTag(scene, xD);
+    });
   }, [shown, positions, frame, profil, solved, xD, across]);
 }
 

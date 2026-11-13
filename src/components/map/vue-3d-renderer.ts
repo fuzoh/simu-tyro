@@ -91,6 +91,7 @@ import type {
 import type { EarthPoint, Vue3dFollowing, Vue3dLayers, Vue3dScene } from "@/lib/map/vue-3d.ts";
 import type { TraceEnds } from "@/lib/terrain/trace.ts";
 
+import { probeMark, probeMeasure, probeSpan, probeTagOf, probing } from "@/lib/app/probe.ts";
 import {
   LINE_CASING,
   LINE_INK,
@@ -246,6 +247,9 @@ export async function openVue3d(
     idle: boolean;
     layers: Vue3dLayers;
   } | null = null;
+
+  // The rider-drag protocol (#130) times every frame and marks the first that draws a new scene.
+  if (probing()) probeFrames(widget, () => shown?.scene ?? null);
   let drawn: Drawn | null = null;
   // The anchor under a press; `moved` once it has left its Position, which is when the gesture
   // starts — a press and release on an anchor is no new line. `pointerId` is the pointer that took
@@ -524,6 +528,31 @@ export async function openVue3d(
       if (!widget.isDestroyed()) widget.destroy();
     },
   };
+}
+
+/**
+ * The rider-drag protocol's marks on the render loop (#130), installed only when a harness listens
+ * (`@/lib/app/probe.ts`): each frame's entity update — `DataSourceDisplay.update`, where an entity
+ * becomes geometry — and its render, and `vue3d:shown` on the first frame drawn with the scene
+ * `current` says is on hand complete — every entity's geometry on the GPU, which CesiumJS's clock
+ * says by letting itself animate again.
+ */
+function probeFrames(widget: CesiumWidget, current: () => Vue3dScene | null) {
+  const { scene: cesium, dataSourceDisplay: display } = widget;
+  const update = display.update.bind(display);
+  display.update = (time) => probeSpan("vue3d:entities", undefined, () => update(time));
+  let start = 0;
+  cesium.preUpdate.addEventListener(() => {
+    start = performance.now();
+  });
+  let marked: Vue3dScene | null = null;
+  cesium.postRender.addEventListener(() => {
+    probeMeasure("vue3d:render", start, undefined);
+    const scene = current();
+    if (scene === null || scene === marked || !widget.clock.canAnimate) return;
+    marked = scene;
+    probeMark("vue3d:shown", probeTagOf(scene));
+  });
 }
 
 /**

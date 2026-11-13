@@ -49,7 +49,7 @@ const PROFILES: Record<string, Profile> = {
  * app writes today, so the Page completes it and shows the « champs absents » strip — an old shared
  * link, as it lands.
  */
-const TRIAL_LINE =
+export const TRIAL_LINE =
   "v=1&u=daN&use=perm&za=12&zb=12&fl=6&lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783" +
   "&tr=p1.AwCQTpBOAJ8G5wcA";
 
@@ -64,7 +64,7 @@ const SCENARIOS: Record<string, { path: string; vue3d?: boolean }> = {
   vue3d: { path: `?${TRIAL_LINE}`, vue3d: true },
 };
 
-const BASE = "/simu-tyro/";
+export const BASE = "/simu-tyro/";
 const CHROMIUM = process.env.CHROMIUM ?? "/usr/bin/chromium";
 
 function arg(name: string, fallback: string): string {
@@ -93,14 +93,16 @@ const MIME: Record<string, string> = {
 const COMPRESSED = new Set([".html", ".js", ".mjs", ".css", ".json", ".svg", ".xml", ".txt"]);
 
 /** One response of the server's: what crossed the wire, and the file's own size. */
-type Served = { path: string; ext: string; sent: number; size: number };
+export type Served = { path: string; ext: string; sent: number; size: number };
 
 /**
  * GitHub Pages, as far as a first load can tell: see the file's docblock. Every response is logged
  * in `served`, the app's side of the count — a Worker's own fetch included, which the page's
  * DevTools session sees only in part.
  */
-function serve(root: string): Promise<{ origin: string; served: Served[]; close: () => void }> {
+export function serve(
+  root: string,
+): Promise<{ origin: string; served: Served[]; close: () => void }> {
   const served: Served[] = [];
   const gz = new Map<string, Uint8Array>();
   const server = createServer((request, response) => {
@@ -179,7 +181,7 @@ type Message = {
 };
 
 /** A one-page CDP session over the page target's WebSocket. */
-class Cdp {
+export class Cdp {
   private next = 1;
   private readonly pending = new Map<number, (message: Message) => void>();
   private readonly listeners: ((message: Message) => void)[] = [];
@@ -216,9 +218,12 @@ class Cdp {
   }
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+export const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function launch(): Promise<{ cdp: Cdp; quit: () => void }> {
+/** @param flags more of Chromium's switches, after the protocol's own — `scripts/rider-drag.ts`'s. */
+export async function launch(
+  flags: readonly string[] = [],
+): Promise<{ cdp: Cdp; quit: () => void }> {
   const profile = mkdtempSync(join(tmpdir(), "first-load-"));
   const child = spawn(
     CHROMIUM,
@@ -234,6 +239,7 @@ async function launch(): Promise<{ cdp: Cdp; quit: () => void }> {
       "--remote-debugging-port=0",
       `--user-data-dir=${profile}`,
       "--window-size=1440,900",
+      ...flags,
       "about:blank",
     ],
     { stdio: "ignore" },
@@ -579,7 +585,7 @@ async function measure(
   }
 }
 
-function median(values: (number | null | undefined)[]): number | null {
+export function median(values: (number | null | undefined)[]): number | null {
   const known = values
     .filter((value): value is number => typeof value === "number")
     .sort((a, b) => a - b);
@@ -651,4 +657,5 @@ async function main() {
   }
 }
 
-await main();
+// Run as a script, not when `scripts/rider-drag.ts` borrows its server and browser.
+if ((import.meta as { main?: boolean }).main) await main();
