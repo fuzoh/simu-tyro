@@ -309,6 +309,18 @@ _Avoid_: blocage, point mort, position finale, arrêt par le vent (as the only c
 The passager's speed at B on a ride that reaches it, in km/h and m/s. Terrain reads it with the Vent entered and Dynamique for both rides; a ride that stops short, or never settles, has none and says why instead. Always an estimation.
 _Avoid_: vitesse finale, vitesse maximale
 
+**Point le plus loin**:
+The farthest the passager gets toward B over the whole ride, swings back included — read with the **distance restante à B** from there. Not the Point d'arrêt: a passager who swings back comes to rest well short of where he turned, and a ride that reaches B has reached it wherever it rests afterwards. Always an estimation.
+_Avoid_: position maximale, portée atteinte, point d'arrêt (for it)
+
+**Cible du point le plus loin**:
+Where the Point le plus loin is wanted, as a share of the portée: 90 % shipped, 50 – 98 % its domain, a convention — B itself and anything past it are excluded. Set on Avancé in « Dynamique du passager » and read by the Proposition pour l'ancrage B alone: no ride, no garde and no Verdict reads it.
+_Avoid_: cible d'arrêt, objectif, consigne
+
+**Proposition pour l'ancrage B**:
+What Dynamique reads under its charts: by how much to raise or lower B, A fixed, for the Point le plus loin of the ride with the Vent entered to land on its cible — « Monter B de 17,6 m », « Descendre B de 0,4 m », « Garder B à cette hauteur ». The candidate is the Scenario's own chain run again with B moved in place over the profil as known — the Tightness Driver resolved afresh — and it is read by three values that are not one another (Point le plus loin, distance restante à B, Point d'arrêt), with the ride without wind beside it for comparison. It applies nothing: the Scenario and the ancrages stay as they are. An estimation, never a promise that the passager stops before B or that nothing is hit, and a B really moved stands on another ground, to be checked and computed again. Where the cible is out of its domain or out of reach, where the line stops solving on the way, where the garde is not judged or where the candidate would touch the profil outside the Zones d'ancrage, it says why and proposes no height.
+_Avoid_: suggestion, correction, recommandation, hauteur conseillée, réglage automatique
+
 **Estimation**:
 The word every dynamic value carries — Point d'arrêt, vitesse d'arrivée, durée, the speed and acceleration curves, the dynamic marks on the coupe. The passager's ride is a point mass on a frozen line with a fitted drag, not a measurement, and it never judges the Verdict. Never said of the statics, which Statique computes. The essai finds the engine *cohérent avec un essai* at the order of magnitude and shows nothing of the wind; the interface does not say *validé*, and what the essai does not show — the 50/50 share between two lignes — is *pas confirmé*.
 _Avoid_: prédiction, validé, précis, exact
@@ -318,7 +330,7 @@ The path of the passager's load over the whole traverse — where the trolley ha
 _Avoid_: parcours, chemin, animation
 
 **Dynamique du passager**:
-The Avancé group of what the ride is given beside the statics (§12.2): the **surface de traînée C_dA**, the **frottement constant de la poulie F₀** and the **frottement de la poulie proportionnel à la vitesse k_v** on a corde, the **frottement de la poulie μ** on a câble, and the **masse volumique de l'air ρ**. Set on Avancé only, each with its source; Dynamique says where they are set, not what they are. None is fitted on the essai.
+The Avancé group of what the ride is given beside the statics (§12.2): the **surface de traînée C_dA**, the **frottement constant de la poulie F₀** and the **frottement de la poulie proportionnel à la vitesse k_v** on a corde, the **frottement de la poulie μ** on a câble, and the **masse volumique de l'air ρ**. Set on Avancé only, each with its source; Dynamique says where they are set, not what they are. None is fitted on the essai. The group also holds the Cible du point le plus loin, which the ride does not read.
 _Avoid_: paramètres de la poulie
 
 **Rider Envelope**:
