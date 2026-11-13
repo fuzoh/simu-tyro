@@ -54,6 +54,7 @@ import type { LabelId, Register } from "@/lib/vocabulary/labels.ts";
 
 import { formatQuantity, formatValue, fromDisplay, roundToDisplay } from "@/lib/format/quantity.ts";
 import { clampX } from "@/lib/scenario/geometry.ts";
+import { REACH } from "@/lib/scenario/reach.ts";
 import { DYNAMICS, REGIMES } from "@/lib/sim";
 import { heading, isHiddenTerm, label } from "@/lib/vocabulary/labels.ts";
 
@@ -112,6 +113,7 @@ export type FieldId =
   | "kv"
   | "trolleyMu"
   | "rho"
+  | "reachTarget"
   | "latA"
   | "lonA"
   | "latB"
@@ -157,7 +159,10 @@ export type FieldSpec = {
   readonly optional?: true;
   /** § 3's warning column — non-blocking, and never a reason to withhold a number. */
   readonly warning: WarningRule | null;
-  /** Which gate this field's failure breaches. `null` for `x_D` and the Positions, in none. */
+  /**
+   * Which gate this field's failure breaches. `null` for `x_D`, the Positions and the target of the
+   * farthest point, in none.
+   */
   readonly gate: GateId | null;
 };
 
@@ -642,6 +647,24 @@ export const FIELDS = {
     optional: true,
     warning: null,
     gate: "ride",
+  },
+  // Where the passager's farthest point is wanted (#121). **In no gate**: no ride, garde or Verdict
+  // reads it — only the proposal of a height for B on Dynamique, which says itself why it gives
+  // none for a target outside the domain. So the band is a warning here, and a link's `cib=120` is
+  // kept as given (ADR-0001) without withholding a ride it has no part in.
+  reachTarget: {
+    id: "reachTarget",
+    label: heading("reachTarget", "exact"),
+    errorLabel: heading("reachTarget", "exact"),
+    quantity: "reachTarget",
+    rule: { kind: "finite" },
+    warning: {
+      kind: "band",
+      min: REACH.targetBand.min,
+      max: REACH.targetBand.max,
+      copy: `cible hors du domaine (${formatValue("reachTarget", REACH.targetBand.min)} – ${formatValue("reachTarget", REACH.targetBand.max)} % de la portée) : aucune hauteur de B n'est proposée [CONVENTION]`,
+    },
+    gate: null,
   },
   // The two Positions (#90). Both sit in no gate — their one reader is the Vent's bearing, and
   // without it the Vent is not applied rather than refused (`windBearing`) — and a blank pair is

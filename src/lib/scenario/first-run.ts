@@ -43,6 +43,8 @@ import { DYNAMICS, TEXTILE } from "@/lib/sim";
 
 import type { EndTermination, Scenario, TextileDraft } from "./types.ts";
 
+import { REACH } from "./reach.ts";
+
 /**
  * § 9's shipped inputs, one property per row of its field table.
  *
@@ -117,7 +119,8 @@ export const FIRST_RUN_SCENARIO = {
    * §12.2's defaults, which is the ride's keys **absent**: `C_dA` 0,45 m² `[FIELD:SSF]`, the
    * corde's SSF fit `F₀` 15 N and `k_v` 1,5 kg/s `[FIELD:SSF]`, the câble's constant `μ` 0,015 — an
    * Unconfirmed Default — and `ρ` derived, 1,225 on this manual line, which has no profil to read an
-   * altitude from.
+   * altitude from. Beside them the target of the passager's farthest point (#121), 90 % of the span,
+   * which is `cib` **absent**.
    */
   dynamics: {
     CdA: DYNAMICS.CdA,
@@ -125,6 +128,7 @@ export const FIRST_RUN_SCENARIO = {
     F0: DYNAMICS.textile.F0,
     kv: DYNAMICS.textile.kv,
     mu: DYNAMICS.steel.mu,
+    reachTarget: REACH.target,
   },
   /** Unknown, which is the four coordinate keys **absent**: the first-run line has no map. */
   positions: { A: null, B: null },

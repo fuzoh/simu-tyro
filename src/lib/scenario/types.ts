@@ -218,6 +218,13 @@ export type DynamicsConstants = {
   kv: number;
   /** The câble's trolley: §12.2's constant friction ratio `μ`, `F = μ·N`. */
   mu: number;
+  /**
+   * Where the passager's farthest point is wanted, % of the span (#121) — not a constant of the
+   * ride but a target read against it: `proposeAnchorB` searches the height of B that puts it
+   * there, and no ride reads it. Set on Avancé, 90 shipped; `cib` in a link, **absent there at
+   * 90**, so a link older than the key reads the shipped target.
+   */
+  reachTarget: number;
 };
 
 /** § 7's Scenario: everything a link transports, and nothing the Session keeps on the side. */

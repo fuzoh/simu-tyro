@@ -77,6 +77,23 @@ describe("§ 8's first sentence — the `vr` and `gm` keys are named like every 
     expect(carried?.completed).not.toContain("zone d'ancrage");
   });
 
+  test("an unreadable `cib` names the target of the farthest point (#121)", () => {
+    expect(strip("?L=250&cib=abc")?.ignored).toBe(
+      "Une partie du lien a été ignorée : « cib » n'était pas un nombre " +
+        "(cible du point le plus loin ignorée).",
+    );
+  });
+
+  test("`cib` absent is the shipped target, a meaning and not a hole: never completed (#121)", () => {
+    expect(strip("?L=250&h=-40")?.completed).not.toContain("cible");
+    expect(strip("?L=250&cib=abc")?.completed).not.toContain("cible");
+    // Present and readable — out of its domain included — it is a value the link carries.
+    for (const carried of [strip("?L=250&h=-40&cib=75"), strip("?L=250&h=-40&cib=120")]) {
+      expect(carried?.ignored).toBeNull();
+      expect(carried?.completed).not.toContain("cible");
+    }
+  });
+
   test("an unreadable `vr` names Rapport V", () => {
     expect(strip("?L=250&vr=abc")?.ignored).toBe(
       "Une partie du lien a été ignorée : « vr » n'était pas un nombre (rapport V ignoré).",

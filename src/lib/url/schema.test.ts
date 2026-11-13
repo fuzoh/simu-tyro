@@ -103,6 +103,8 @@ describe("the key table and canonical order", () => {
       "kv",
       "mur",
       "rho",
+      // #121: the target of the farthest point, after the ride's constants it sits beside.
+      "cib",
       "x",
       "lata",
       "lona",

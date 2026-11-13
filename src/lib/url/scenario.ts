@@ -257,6 +257,7 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
       | "wd"
       | "cda"
       | "rho"
+      | "cib"
       | "lata"
       | "lona"
       | "latb"
@@ -272,8 +273,8 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
  * `mbf`/`ea`/`mu` absent is « non surchargée », which differs from « equal to the formula value »,
  * `mbl` absent — with `mu`, under `fam=tx` — is § 9's rope nobody typed, `bp` absent is one
  * Brin porteur, `cp` absent is the Mise en tension at A, `mt` absent is the mouflage, `zan` absent
- * is the shipped Zones d'ancrage, `ws` / `wd` absent is no wind, `cda` / `f0` / `kv` / `mur` / `rho` absent is §12.2's default for the ride, the
- * four coordinates absent are Positions unknown and `ph` absent is a profil that runs between them:
+ * is the shipped Zones d'ancrage, `ws` / `wd` absent is no wind, `cda` / `f0` / `kv` / `mur` / `rho` absent is §12.2's default for the ride,
+ * `cib` absent is the shipped target of the passager's farthest point, the four coordinates absent are Positions unknown and `ph` absent is a profil that runs between them:
  * completing any would rewrite, and name in the strip, every link older than the key.
  */
 const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>([
@@ -289,6 +290,7 @@ const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>([
   "kv",
   "mur",
   "rho",
+  "cib",
   "lata",
   "lona",
   "latb",
@@ -335,8 +337,8 @@ export type Completion = {
  *
  * Three groups are exempt, all of them § 7's meanings of absence:
  *
- * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, `cp`, `mt`, `zan`, `ws`, `wd`, the ride's constants, the
- *    Positions and `ph`, the Overrides and the textile blanks. Under `fam=tx`
+ * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, `cp`, `mt`, `zan`, `ws`, `wd`, the ride's constants, `cib`,
+ *    the Positions and `ph`, the Overrides and the textile blanks. Under `fam=tx`
  *    **no rope is invented**: § 9 ships `MBL` and `μ` « vides et requis », because one made-up
  *    `MBL` decides the verdict, and those two blocking errors are the correct arrival state.
  *    Polyester's `k` stays blank too, because §13.2 publishes none.
@@ -584,6 +586,8 @@ function dynamics(search: CompletedSearch): DynamicsConstants {
     F0: search.f0 === undefined ? DYNAMICS.textile.F0 : newtonsFromDaN(search.f0),
     kv: search.kv ?? DYNAMICS.textile.kv,
     mu: search.mur ?? DYNAMICS.steel.mu,
+    // Absent **is** the shipped target — a link older than the key reads it.
+    reachTarget: search.cib ?? FIRST_RUN_SCENARIO.dynamics.reachTarget,
   };
 }
 
@@ -667,7 +671,7 @@ export function scenarioToSearch(scenario: Scenario): CompletedSearch {
   if (scenario.wind.directionDeg !== 0) out.wd = scenario.wind.directionDeg;
   // Likewise the ride's constants: §12.2's defaults are the keys **absent**, `F₀` in daN, and only
   // the active family's trolley travels.
-  const { CdA, rho, F0, kv, mu } = scenario.dynamics;
+  const { CdA, rho, F0, kv, mu, reachTarget } = scenario.dynamics;
   if (CdA !== DYNAMICS.CdA) out.cda = CdA;
   if (material.family === "textile") {
     if (F0 !== DYNAMICS.textile.F0) out.f0 = daNFromNewtons(F0);
@@ -676,6 +680,9 @@ export function scenarioToSearch(scenario: Scenario): CompletedSearch {
     out.mur = mu;
   }
   if (rho !== null) out.rho = rho;
+  // The shipped target is `cib` **absent**, so the links written before the key stay
+  // string-identical.
+  if (reachTarget !== FIRST_RUN_SCENARIO.dynamics.reachTarget) out.cib = reachTarget;
   out.x = rider.xD;
   // Unknown is the four keys **absent**, so a link with no Position stays string-identical.
   const { A, B } = scenario.positions;

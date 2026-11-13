@@ -239,6 +239,42 @@ describe("the ride's constants (#104) — §12.2's, in the Ride Gate", () => {
   });
 });
 
+describe("the target of the farthest point (#121) — set here, read by Dynamique's proposal", () => {
+  test("it sits in no gate: no ride, garde or Verdict reads it", () => {
+    expect(gateOf("reachTarget", "manual")).toBeNull();
+    expect(gateOf("reachTarget", "trace")).toBeNull();
+  });
+
+  test("it is a number, required, in whole hundredths of the span", () => {
+    expect(checkField("reachTarget", "90")).toBeNull();
+    expect(checkField("reachTarget", "abc")?.kind).toBe("unreadable");
+    expect(checkField("reachTarget", "")?.kind).toBe("empty");
+    expect(FIELDS.reachTarget.quantity).toBe("reachTarget");
+    expect(displayField("reachTarget", 90)).toBe("90");
+    expect(commitField("reachTarget", "75")).toBe(75);
+  });
+
+  test("a target out of its domain is kept and warned, never refused (ADR-0001)", () => {
+    // B itself, past B, and under mid-span: each is a value the field holds.
+    for (const out of ["99", "100", "120", "49", "0", "-5"]) {
+      expect(checkField("reachTarget", out)).toBeNull();
+    }
+    expect(warningFor("reachTarget", 90)).toBeNull();
+    expect(warningFor("reachTarget", 50)).toBeNull();
+    expect(warningFor("reachTarget", 98)).toBeNull();
+    for (const out of [49, 99, 100, 120]) {
+      expect(warningFor("reachTarget", out), `${out}`).toBe(
+        "cible hors du domaine (50 – 98 % de la portée) : aucune hauteur de B n'est proposée [CONVENTION]",
+      );
+    }
+  });
+
+  test("its label is the registry's, the same on every Page", () => {
+    expect(FIELDS.reachTarget.label).toBe("Cible du point le plus loin");
+    expect(fieldLabel("reachTarget", "terrain")).toBe("Cible du point le plus loin");
+  });
+});
+
 describe("§ 3's warning column — non-blocking, and it never withholds a number", () => {
   test("`L ∉ [50, 2000]`", () => {
     expect(warningFor("L", 150)).toBeNull();

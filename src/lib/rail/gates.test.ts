@@ -1058,3 +1058,29 @@ describe("two Zones d'ancrage that meet are a Blocking Error (#106)", () => {
     ).toEqual([]);
   });
 });
+
+describe("the target of the farthest point (#121) is in no gate", () => {
+  const ALL = { solve: true, clearance: true, verdict: true, wind: true, ride: true };
+
+  test.each([120, 100, 49, 0, -5])("a target of %d is kept as given and withholds nothing", (t) => {
+    const report = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.regime = "en15567";
+        draft.dynamics = { ...draft.dynamics, reachTarget: t };
+      }),
+    });
+    expect(report.errors).toEqual([]);
+    expect(report.passed).toEqual(ALL);
+  });
+
+  test("a target being typed is the form's own business: no gate hears of it", () => {
+    const report = evaluateGates({
+      scenario: scenario((draft) => {
+        draft.regime = "en15567";
+      }),
+      issues: [{ field: "reachTarget", kind: "empty", message: "valeur requise" }],
+    });
+    expect(report.errors).toEqual([]);
+    expect(report.passed).toEqual(ALL);
+  });
+});

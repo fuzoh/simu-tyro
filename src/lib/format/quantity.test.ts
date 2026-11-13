@@ -93,6 +93,11 @@ const ROWS: ReadonlyArray<{ id: QuantityId; value: number; expected: string }> =
   { id: "kv", value: 1.5, expected: "1,50 kg/s" },
   { id: "trolleyMu", value: 0.015, expected: "0,015" },
   { id: "rho", value: 1.225, expected: "1,225 kg/m³" },
+  // The proposal of a height for B (#121): the target a whole percent, where a ride's farthest
+  // point falls to a tenth of one, and what is left to B to a tenth of a metre.
+  { id: "reachTarget", value: 90, expected: "90 %" },
+  { id: "reachShare", value: 89.716, expected: "89,7 %" },
+  { id: "remainingToB", value: 15.425, expected: "15,4 m" },
   // The passager's ride (#92), prints of the Page Dynamique: speeds, acceleration, duration.
   { id: "speed", value: 20.46, expected: "20,5 m/s" },
   { id: "speedKmh", value: 73.66, expected: "74 km/h" },

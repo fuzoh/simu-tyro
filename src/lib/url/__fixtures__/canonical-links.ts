@@ -74,6 +74,9 @@ export const BRANCHES = [
   "anchor-zone-absent",
   "anchor-zone-off-default",
   "anchor-zone-default-explicit",
+  "reach-target-absent",
+  "reach-target-off-default",
+  "reach-target-default-explicit",
 ] as const;
 
 export type Branch = (typeof BRANCHES)[number];
@@ -94,7 +97,8 @@ export type CanonicalLinkFixture = {
     | typeof MEASURED_103
     | typeof MEASURED_PH
     | typeof MEASURED_WIND
-    | typeof MEASURED_106;
+    | typeof MEASURED_106
+    | typeof MEASURED_121;
   covers: readonly Branch[];
   scenario: Scenario;
   link: string;
@@ -120,7 +124,8 @@ export type DecodeOnlyFixture = {
     | typeof MEASURED_90
     | typeof MEASURED_103
     | typeof MEASURED_PH
-    | typeof MEASURED_106;
+    | typeof MEASURED_106
+    | typeof MEASURED_121;
   covers: readonly Branch[];
   link: string;
 } & ({ scenario: Scenario; canonical: string } | { scenario: ScenarioDraft; canonical: null });
@@ -138,6 +143,7 @@ const MEASURED_103 = "[MEASURED] issue #103, codec as of 2026-11-08";
 const MEASURED_PH = "[MEASURED] map #1's review of `ph`, codec as of 2026-11-09";
 const MEASURED_WIND = "[MEASURED] geographic `wd`, codec as of 2026-11-09";
 const MEASURED_106 = "[MEASURED] issue #106, codec as of 2026-11-09";
+const MEASURED_121 = "[MEASURED] issue #121, codec as of 2026-11-13";
 
 /** Three samples `(0,0) (50,-4) (100,-9)`, as `encodeP1` writes them — a 100 m profil. */
 export const TRACE_P1 = "p1.AwCQTpBOAJ8G5wcA";
@@ -166,7 +172,7 @@ const STEEL: Scenario = {
   },
   rider: { mp: 120, hRider: 2.1, hClearMin: 1, anchorZone: 10, DAF: 1.2, xD: 75 },
   wind: { speedKmh: 0, directionDeg: 0 },
-  dynamics: { CdA: 0.45, rho: null, F0: 15, kv: 1.5, mu: 0.015 },
+  dynamics: { CdA: 0.45, rho: null, F0: 15, kv: 1.5, mu: 0.015, reachTarget: 90 },
   positions: { A: null, B: null },
 };
 
@@ -203,8 +209,8 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
   {
     name: "first-run: steel, manual, sag driver, perm, no regime",
     source: MEASURED,
-    // No `bp`, `cp`, `mt`, `ws`, `wd` or ride key, as before the keys existed: one Brin porteur,
-    // Mise en tension at A, by mouflage, no wind, §12.2's constants.
+    // No `bp`, `cp`, `mt`, `ws`, `wd`, ride key or `cib`, as before the keys existed: one Brin
+    // porteur, Mise en tension at A, by mouflage, no wind, §12.2's constants, the 90 % target.
     covers: [
       "steel",
       "manual",
@@ -217,9 +223,28 @@ export const CANONICAL_LINKS: readonly CanonicalLinkFixture[] = [
       "dynamics-absent",
       "positions-absent",
       "anchor-zone-absent",
+      "reach-target-absent",
     ],
     scenario: STEEL,
     link: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "a target of the farthest point at 75 %: `cib` after `rho`, before `x`",
+    source: MEASURED_121,
+    covers: ["reach-target-off-default"],
+    scenario: { ...STEEL, dynamics: { ...STEEL.dynamics, rho: 1.069, reachTarget: 75 } },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&rho=1.069&cib=75&x=75",
+  },
+  {
+    name: "a target past B is kept as given: `cib=120` travels, and Dynamique refuses it (ADR-0001)",
+    source: MEASURED_121,
+    covers: ["reach-target-off-default"],
+    scenario: { ...STEEL, dynamics: { ...STEEL.dynamics, reachTarget: 120 } },
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&cib=120&x=75",
   },
   {
     name: "Zones d'ancrage of 25 m: `zan` after `gm`, before `daf`",
@@ -663,6 +688,16 @@ export const DECODE_ONLY_LINKS: readonly DecodeOnlyFixture[] = [
     link:
       `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
       "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&zan=10&daf=1.2&x=75",
+    scenario: STEEL,
+    canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
+  },
+  {
+    name: "`cib=90` is the shipped target, and the canonical link says so by omitting it",
+    source: MEASURED_121,
+    covers: ["reach-target-default-explicit"],
+    link:
+      `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}` +
+      "&ta=cosse&tb=cosse&na=0.9&nb=0.9&mp=120&hr=2.1&gm=1&daf=1.2&cib=90&x=75",
     scenario: STEEL,
     canonical: `/?v=1&u=daN&use=perm&L=150&h=-18&za=12&zb=12&fl=6&${STEEL_HEAD}&${TAIL}`,
   },

@@ -750,7 +750,7 @@ describe("the Vent in the Session (#87)", () => {
 describe("the ride's constants in the Session (#89)", () => {
   test("typed constants survive a write and a read, `ρ` included", () => {
     const storage = memoryStorage();
-    const dynamics = { CdA: 0.5, rho: 1.069, F0: 20, kv: 2, mu: 0.02 };
+    const dynamics = { CdA: 0.5, rho: 1.069, F0: 20, kv: 2, mu: 0.02, reachTarget: 80 };
     writeSession(storage, { ...bareSession(), scenario: { ...firstRunDefaults(), dynamics } });
     expect(readSession(storage)?.scenario.dynamics).toEqual(dynamics);
   });
@@ -770,7 +770,33 @@ describe("the ride's constants in the Session (#89)", () => {
       F0: 15,
       kv: 1.5,
       mu: 0.015,
+      reachTarget: 90,
     });
+  });
+
+  test("a Session stored before the target of the farthest point reads the shipped 90 % (#121)", () => {
+    const storage = memoryStorage();
+    const blob = storedBlob(fullSession());
+    const scenario = blob.scenario as Record<string, unknown>;
+    const dynamics: Record<string, unknown> = {
+      ...(scenario.dynamics as Record<string, unknown>),
+      CdA: 0.5,
+    };
+    delete dynamics.reachTarget;
+    storage.setItem(SESSION_KEY, JSON.stringify({ ...blob, scenario: { ...scenario, dynamics } }));
+
+    const restored = readSession(storage);
+    expect(restored?.trace).not.toBeNull();
+    // What the Session did hold is kept; the key it never had reads the shipped target.
+    expect(restored?.scenario.dynamics.CdA).toBe(0.5);
+    expect(restored?.scenario.dynamics.reachTarget).toBe(90);
+  });
+
+  test("a target out of its domain comes back as stored: Dynamique refuses it, not the Session", () => {
+    const storage = memoryStorage();
+    const dynamics = { ...firstRunDefaults().dynamics, reachTarget: 120 };
+    writeSession(storage, { ...bareSession(), scenario: { ...firstRunDefaults(), dynamics } });
+    expect(readSession(storage)?.scenario.dynamics.reachTarget).toBe(120);
   });
 
   test("a constant that is not a number is not a Session — the blob is discarded whole", () => {

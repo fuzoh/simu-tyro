@@ -55,15 +55,16 @@
  * - **Forces are daN in the URL, always**, whatever `u` says. `u` is display-only, so hand-editing
  *   `u=daN` → `u=kN` must not make the line 100× tighter. The engine holds newtons; `./scenario.ts`
  *   is the one place the ÷10 happens, in both directions.
- * - **Absence carries exactly eleven meanings and never a twelfth.** `reg` absent is « — choisir — »,
+ * - **Absence carries exactly twelve meanings and never a thirteenth.** `reg` absent is « — choisir — »,
  *   `mbf`/`ea`/`mu` absent is « non surchargée », `bp` absent is one Brin porteur, `cp` absent is
  *   the Mise en tension at A, `mt` absent is the mouflage, `ws`/`wd` absent is no wind (speed 0,
  *   direction 0), `cda`/`f0`/`kv`/`mur`/`rho` absent is §12.2's default for the passager's ride (#89)
  *   — `ρ`'s being derived from the profil —, `lata`/`lona`/`latb`/`lonb` absent is an unknown Position
  *   (#90), `ph` absent is a profil that runs between the Positions, `zan` absent is the shipped 10 m
- *   Zones d'ancrage (#106), and a family- or terrain-scoped key absent means that configuration is
- *   not the active one. So `stripSearchParams` is rejected, every other key with a value is stated
- *   even at its default, and `./scenario.ts`'s completion exempts the first ten.
+ *   Zones d'ancrage (#106), `cib` absent is the shipped 90 % target of the passager's farthest
+ *   point (#121), and a family- or terrain-scoped key absent means that configuration is not the
+ *   active one. So `stripSearchParams` is rejected, every other key with a value is stated even at
+ *   its default, and `./scenario.ts`'s completion exempts the first eleven.
  * - **The dropped-keys reporter takes the raw query string as a parameter**
  *   ({@link reportDroppedKeys}), never reading `window.location` — amendment A removed the jsdom
  *   environment that would otherwise be needed, and as a pure function this is a plain unit test.
@@ -132,6 +133,7 @@ export const CANONICAL_KEYS = [
   "kv",
   "mur",
   "rho",
+  "cib",
   "x",
   "lata",
   "lona",
@@ -325,6 +327,9 @@ const KEY_SCHEMAS = {
   kv: FINITE, // Frottement de la poulie proportionnel à la vitesse `k_v`, kg/s — corde.
   mur: FINITE, // Frottement de la poulie `μ`, sans unité — câble.
   rho: FINITE, // Masse volumique de l'air `ρ`, kg/m³. Absent = déduite du profil, 1,225 sans profil.
+  // Cible du point le plus loin, % de la portée (#121). Absent **is** the shipped 90 %, so a link
+  // older than the key reads the shipped target.
+  cib: FINITE,
   x: FINITE, // Position du passager, m — clamped to the span by `searchToScenario`, **never here**.
   // The anchors' Positions (#90), WGS84 degrees. Absent **is** unknown, and a lone coordinate is
   // dropped by {@link salvageSearch}: a Position needs both of its own.

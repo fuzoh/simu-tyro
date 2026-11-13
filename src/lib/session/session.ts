@@ -333,7 +333,15 @@ const SCENARIO: v.GenericSchema<unknown, Scenario> = v.object({
   // Added with #89, optional for the same reason: a Session written before it rode on §12.2's
   // defaults. A function, so a restored Session never shares the shipped object.
   dynamics: v.optional(
-    v.object({ CdA: FINITE, rho: v.nullable(FINITE), F0: FINITE, kv: FINITE, mu: FINITE }),
+    v.object({
+      CdA: FINITE,
+      rho: v.nullable(FINITE),
+      F0: FINITE,
+      kv: FINITE,
+      mu: FINITE,
+      // Added with #121, optional with the shipped target for the same reason as `anchorZone`.
+      reachTarget: v.optional(FINITE, FIRST_RUN_SCENARIO.dynamics.reachTarget),
+    }),
     () => ({ ...FIRST_RUN_SCENARIO.dynamics }),
   ),
   // Added with #90, optional with both Positions unknown: a Session written before it had none.

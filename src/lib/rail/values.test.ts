@@ -316,6 +316,7 @@ describe("FIELD_ACCESS — one lens per numeric field", () => {
       "kv",
       "trolleyMu",
       "rho",
+      "reachTarget",
       "latA",
       "lonA",
       "latB",
@@ -888,6 +889,42 @@ describe("the ride's constants (#104) — one trolley law per family, and ρ rea
     ] as const) {
       expect(sameGatedText(shown, { ...shown, [id]: text })).toBe(false);
     }
+  });
+});
+
+describe("the target of the farthest point (#121) — one value, set on Avancé", () => {
+  const shipped = scenario();
+  const commit = (on: ScenarioDraft, raw: string) =>
+    commitText({
+      scenario: on,
+      trace: null,
+      id: "reachTarget",
+      raw,
+      settled: true,
+      text: railValues(on),
+      context: fieldContext(on),
+    });
+
+  test("the field shows the shipped 90, a whole number", () => {
+    expect(railValues(shipped).reachTarget).toBe("90");
+  });
+
+  test("typing it writes the target and nothing else", () => {
+    const typed = commit(shipped, "75").next;
+    expect(typed?.dynamics).toEqual({ ...shipped.dynamics, reachTarget: 75 });
+    expect({ ...typed, dynamics: shipped.dynamics }).toEqual(shipped);
+    expect(typed === null ? null : railValues(typed).reachTarget).toBe("75");
+  });
+
+  test("a target out of its domain is written as typed: the warning and Dynamique answer it", () => {
+    expect(commit(shipped, "120").next?.dynamics.reachTarget).toBe(120);
+    expect(commit(shipped, "49").next?.dynamics.reachTarget).toBe(49);
+  });
+
+  test("it is in no gate: an edit leaves the text the gates read as it was", () => {
+    const shown = railValues(shipped);
+    expect(sameGatedText(shown, { ...shown, reachTarget: "120" })).toBe(true);
+    expect(sameGatedText(shown, { ...shown, reachTarget: "" })).toBe(true);
   });
 });
 

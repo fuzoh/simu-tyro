@@ -229,6 +229,21 @@ export const QUANTITIES = {
   trolleyMu: { unit: "", decimals: 3 },
   /** `ρ`, kg/m³ — §12.2 prints 1,225, and the ISA density moves the third decimal every ~10 m. */
   rho: { unit: "kg/m³", decimals: 3 },
+  /**
+   * `Cible du point le plus loin`, % of the span (#121) — a whole percent: one is 0,5 m on the
+   * shortest line the references cover, under what one step of B's height moves that point by.
+   */
+  reachTarget: { unit: "%", decimals: 0 },
+  /**
+   * Where a ride's farthest point falls, % of the span — an estimation, read beside the whole
+   * percent it is held to: one decimal shows by how much a proposed height falls short of it.
+   */
+  reachShare: { unit: "%", decimals: 1 },
+  /**
+   * What is left to B from a ride's farthest point, m — an estimation, the difference of two
+   * positions read to 0,1 m.
+   */
+  remainingToB: { unit: "m", decimals: 1 },
   /** The passager's speed, m/s — an estimation (§12.2): a tenth of a metre per second is its grain. */
   speed: { unit: "m/s", decimals: 1 },
   /** The same speed in km/h, whole: the unit a rider has a feel for, and no model reads finer. */

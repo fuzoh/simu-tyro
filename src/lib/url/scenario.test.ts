@@ -601,7 +601,7 @@ describe("searchToScenario — the read side of § 7's key table", () => {
   it("reads the ride's keys absent as §12.2's defaults — and neither completes nor names them (#89)", () => {
     for (const fam of ["ac", "tx"] as const) {
       const { search, completed } = complete(`?L=250&fam=${fam}`);
-      for (const key of ["cda", "f0", "kv", "mur", "rho"] as const) {
+      for (const key of ["cda", "f0", "kv", "mur", "rho", "cib"] as const) {
         expect(search[key]).toBeUndefined();
         expect(completed).not.toContain(key);
       }
@@ -611,6 +611,7 @@ describe("searchToScenario — the read side of § 7's key table", () => {
         F0: 15,
         kv: 1.5,
         mu: 0.015,
+        reachTarget: 90,
       });
     }
   });
@@ -641,6 +642,31 @@ describe("searchToScenario — the read side of § 7's key table", () => {
   it("keeps a typed ρ, and a non-positive C_dA as it arrived (ADR-0001)", () => {
     expect(decode("?L=250&rho=1.069").dynamics.rho).toBe(1.069);
     expect(decode("?L=250&cda=-0.1").dynamics.CdA).toBe(-0.1);
+  });
+
+  it("reads `cib` as the target of the farthest point, and absent as the shipped 90 % (#121)", () => {
+    expect(decode("?L=250").dynamics.reachTarget).toBe(90);
+    expect(decode("?L=250&cib=75").dynamics.reachTarget).toBe(75);
+    // Under either family: the target is no trolley's.
+    expect(decode("?L=250&fam=tx&cib=60").dynamics.reachTarget).toBe(60);
+  });
+
+  it("keeps a target at B, past it or under mid-span as it arrived (ADR-0001)", () => {
+    for (const out of [100, 120, 49, -5]) {
+      expect(decode(`?L=250&cib=${out}`).dynamics.reachTarget).toBe(out);
+    }
+  });
+
+  it("writes `cib` only off the shipped target, so older links stay string-identical", () => {
+    const shipped = firstRunDefaults();
+    expect(scenarioToSearch(shipped)).not.toHaveProperty("cib");
+    const typed = { ...shipped, dynamics: { ...shipped.dynamics, reachTarget: 75 } };
+    expect(scenarioToSearch(typed).cib).toBe(75);
+    // Avancé writes it, Dynamique opens the same query under its own path (ADR-0002).
+    const onAvance = canonicalLink(scenarioToSearch(typed), "/avance");
+    const onDynamique = canonicalLink(scenarioToSearch(typed), "/dynamique");
+    expect(onAvance.replace("/avance", "")).toBe(onDynamique.replace("/dynamique", ""));
+    expect(decode(onDynamique.replace("/dynamique", "")).dynamics.reachTarget).toBe(75);
   });
 
   it("keeps a Maestro that arrives beside a câble, as given (ADR-0001)", () => {

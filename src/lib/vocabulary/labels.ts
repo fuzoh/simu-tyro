@@ -109,6 +109,8 @@ export type TermId =
   | "tensionLimit"
   | "arrivalSpeed"
   | "stopPoint"
+  | "farthestPoint"
+  | "reachTarget"
   | "banana"
   | "position"
   | "latitude"
@@ -268,6 +270,10 @@ export const LABELS = {
   tensionLimit: same("limite de tension"),
   arrivalSpeed: same("vitesse d'arrivée"),
   stopPoint: same("point d'arrêt"),
+  // How close to B the passager comes over the whole ride, and where that is wanted (#121): never
+  // the point d'arrêt, which a ride that swings back leaves far behind.
+  farthestPoint: same("point le plus loin"),
+  reachTarget: same("cible du point le plus loin"),
   banana: same("banane"),
   position: same("position"),
   latitude: same("latitude"),
