@@ -49,7 +49,7 @@ const PROFILES: Record<string, Profile> = {
  * app writes today, so the Page completes it and shows the « champs absents » strip — an old shared
  * link, as it lands.
  */
-export const TRIAL_LINE =
+const TRIAL_LINE =
   "v=1&u=daN&use=perm&za=12&zb=12&fl=6&lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783" +
   "&tr=p1.AwCQTpBOAJ8G5wcA";
 
@@ -93,7 +93,7 @@ const MIME: Record<string, string> = {
 const COMPRESSED = new Set([".html", ".js", ".mjs", ".css", ".json", ".svg", ".xml", ".txt"]);
 
 /** One response of the server's: what crossed the wire, and the file's own size. */
-export type Served = { path: string; ext: string; sent: number; size: number };
+type Served = { path: string; ext: string; sent: number; size: number };
 
 /**
  * GitHub Pages, as far as a first load can tell: see the file's docblock. Every response is logged
