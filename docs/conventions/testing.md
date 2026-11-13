@@ -17,12 +17,18 @@ The `test` block lives in `vite.config.ts`.
   `src/components/map/load-top-map.test.ts` run Vite's production client build in memory
   (`build.write: false`) and read its chunks — the Vue 3D's CesiumJS behind a dynamic import, the
   size of what `/` downloads (#95); MapLibre behind the vue de dessus's door, out of what Statique,
-  Avancé and Terrain download before they render, and no font inside a stylesheet (#128). A chunk
-  graph is the only place those contracts are observable, and it is still `node`, no DOM.
+  Avancé and Terrain download before they render (#128). A chunk graph is the only place those
+  contracts are observable, and it is still `node`, no DOM. Both read it through one harness,
+  `src/components/map/client-build.ts` — the build and the static-import `closure` — so the two
+  cannot drift into measuring different sets, the move `bench-harness.ts` makes for the benches.
+  **`load-top-map.test.ts` also holds a contract that is not its file's**: no font inside a
+  stylesheet, which is `vite.config.ts`'s and `src/lib/app/inline-asset.ts`'s (#128). It rides on
+  that build on purpose — a stylesheet is observable only in a built client — so it spans modules,
+  like the next one.
 - **One test reads the whole app's copy**: `src/lib/vocabulary/labels.test.ts` walks every `.ts` and
   `.tsx` under `src/` for the words the interface never says, and checks the glossary names the
-  wordings it prints (#102). A scan of every string is observable nowhere else; it is the one
-  suite spanning several modules, and it is still `node`, no DOM.
+  wordings it prints (#102). A scan of every string is observable nowhere else; it spans every
+  module, and it is still `node`, no DOM.
 
 ## What deserves a test
 
@@ -43,7 +49,7 @@ Decided in the wayfinder ticket _Engine API, execution model and module layout_.
 - **Colocated.** `solve.test.ts` sits beside `solve.ts` in `src/lib/sim/`. Keeps each
   assertion in eyeshot of the `docs/simulation-theory.md` § citation it verifies.
 - **One test file per source file**, same basename. **No `tests/` directory, and no suite file
-  spanning several modules** (bar the two exceptions above). This survives every app layer
+  spanning several modules** (bar the three exceptions above: the two build tests and the copy scan). This survives every app layer
   unchanged — `first-run.test.ts` beside `first-run.ts`, `p1.test.ts` beside `p1.ts`.
 - **Physics fixtures live in one place**: `src/lib/sim/__fixtures__/theory-15.ts`, exporting `F1`,
   `Z1`–`Z6` and `Z8` from `docs/simulation-theory.md` §15 as typed consts. Every fixture carries
