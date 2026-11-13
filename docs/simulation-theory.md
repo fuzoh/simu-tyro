@@ -441,6 +441,66 @@ Design wind speed and lateral corridor: `[PAYWALLED]` (§16). Drag on the cable 
 lateral blow-out are **out of scope for v1** (2-D vertical-plane model); record as open
 question, not silently ignored (§16).
 
+**Prescribed wind profile along the line** (issue #120). The entered wind may carry a _profile_:
+how its speed varies between the anchors. It is a **scenario the user prescribes, never a valley
+forecast**: no relief, no meteorology and no measured shelter enters it, and it is no conservative
+envelope. It has two typed parameters and one fixed shape, and it carries no trust tag of §0.2
+because it holds no physical coefficient and no safety factor. It scales the **speed** of the
+wind; the direction is the same along the whole line.
+
+| Parameter                         | Symbol | Meaning                                                                                                                                        | Domain      | Step | Default |
+| --------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ---- | ------- |
+| largeur à mi-atténuation (width)  | `w`    | % of the horizontal span between the two points where the speed is halfway between the mid-span speed and the anchor speed                       | `[10, 90]`  | 1    | 50      |
+| atténuation aux ancrages          | `a`    | how far the speed at both anchors sits below the mid-span speed, % of that speed: 0 is a **uniform wind**, 100 a wind that is nil at the anchors | `[0, 100]`  | 1    | 0       |
+
+With `ξ = x/L ∈ [0, 1]` on §2's horizontal abscissa (`L > 0`; never the material coordinate `s`,
+the stretched arc or the chord), `χ = |2ξ − 1|`, `λ = w/100` and `α = a/100`:
+
+```
+p    = ln 2 / ln(1/λ)
+h(t) = sin²(π·t/2)
+φ(ξ) = cos²( (π/2)·h(χ^p) )
+U(ξ) = V·[ (1 − α) + α·φ(ξ) ]
+```
+
+`V` is the entered wind speed, which is the speed **at mid-span**; `U` is in the unit `V` is
+entered in, and is converted to SI where the physics reads it. What the shape guarantees, each
+derivable from the four lines above:
+
+- `φ(1/2) = 1` and `φ(0) = φ(1) = 0`: `U = V` at mid-span and `U = V·(1 − α)` at both anchors.
+- `φ` depends on `χ` alone: the profile is **symmetric** about mid-span.
+- `φ` decreases strictly from mid-span to each anchor: **monotone, no plateau**. The maximum is
+  one point, not an interval.
+- `φ = 1/2` exactly where `χ = λ`, i.e. at `ξ = (1 ± λ)/2`, since `λ^p = 1/2`: the two half-gap
+  points are `w` % of the span apart, so the width typed is the width measured, and there
+  `U = V·(1 − α/2)`. The exponent `p` is 1 at `w = 50`.
+- **Zero slope at mid-span and at both anchors over the whole width domain.** At the anchors for
+  every `p > 0`; at mid-span because `1 − φ ~ χ^(4p)`, which needs `p > 1/4`, i.e. `λ > 1/16` —
+  below the domain's 10 %.
+- The family is **C¹ and no more**: `φ''` is unbounded at mid-span for widths 10–24 % (`p < 1/2`).
+  A solver reading `U` must not assume a bounded second derivative.
+- `α = 0` gives `U ≡ V` **exactly**, whatever `w`: the width is kept and has no effect. `V = 0`
+  gives `U ≡ 0`.
+
+The field is **one field for every reader**: the line being posed, the line under wind and the
+rider read the same `U` at their own `x`, whatever their height or lateral position, and the
+deflection of the line does not move it. It is **evaluated locally** — never replaced by its mean
+over the span, and never turned into one multiplier on a force. `x` outside `[0, L]` is outside
+its domain: a reader handles that case itself, explicitly, and the fractional power is never
+extrapolated.
+
+Both parameters are **read at the whole percent they print as**: a link may hold `ww=50.4`, kept
+as given, and the profile judged and evaluated is the 50 % every screen shows. A value outside
+its domain is kept as given and refused by the Wind Gate — never clamped, never read as a
+uniform wind.
+
+**Engine:** `src/lib/sim/wind-profile.ts` evaluates `φ`, `U` and the local wind vector. **No
+reader consumes it yet**: §12.2's ride and the Banane take one speed for the whole line. Until the
+spatial statics (#127) and the views (#118) read `U(x)`, the app accepts a uniform wind only and
+**refuses a non-uniform profile at the Wind Gate** — it never computes under a uniform wind what a
+link entered as a profile. This shape is the one adopted for #120; it is not to be swapped for
+another curve silently.
+
 ---
 
 ## 9. Time-dependent changes of state (all as `ΔL₀`)
