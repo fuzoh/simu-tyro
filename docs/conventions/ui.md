@@ -360,6 +360,19 @@ and `max-w-[1984px]`, and `contract.test.ts` holds the two together. B2 and B3 a
   handlers.
 - **`Valeurs déduites` holds editable rows**, so it shares `Paramètres`' field-row context: `RailInputs`
   owns the context and hands the two sections back through a render prop.
+- **The tension graph closes the Page (#119).** `Tension interne le long de la ligne`, at the
+  passager's position: the ligne à vide dashed and the ligne chargée solid, as on the coupe, against
+  the distance from A, on the coupe's own `SharedX`. From B2 it stands **inside the Chart Block's
+  box**, under the read-out cells (the Shell's `columnTail`), so it takes the block's width, its
+  1984 px letterbox and the one observer's measure; below B2 it is the last thing in the Rail's run,
+  after « Ce que cet outil ne calcule pas » (`railTail`). `threeColumns()` decides which slot it is
+  *mounted* in, as for the vue de dessus — never a hidden twin. Its height is `tensionChartHeight()`
+  in `contract.ts`, a band of the width alone (180–300 px); below B2 the Rail's scroller may be a
+  classic scrollbar narrower than the block, so the SVG scales through its `viewBox` rather than
+  reflowing. The y axis starts at zero: along one line the tension moves by a few percent of
+  itself, and a fitted baseline would draw that as a cliff. With two Brins porteurs every value is
+  one line's under the normal 50/50 share, said on the axis, in a note and in the hover — never the
+  sum. The numbers are `@/lib/chart/tension.ts`'s, over the engine's `sampleTension`.
 
 ## Statique's first row
 
