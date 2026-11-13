@@ -12,11 +12,20 @@ import { lineBearing } from "@/lib/scenario/geometry.ts";
 import { TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
 import { exactTermsIn, proscribedIn } from "@/lib/vocabulary/labels.ts";
 
+import type { EmbarkedReading } from "./vue-3d-embarquee.ts";
+
 import {
   anchorReading,
   BANANE_HELP,
   clickHint,
   describeRelative,
+  EMBARK_BLOCKED,
+  embarkedEndLine,
+  embarkedLabelTable,
+  embarkedKeysHelp,
+  embarkedReadingLine,
+  EMBARQUEE_COPY,
+  EMBARQUEE_HELP,
   GIMBAL_COPY,
   gimbalHint,
   MAP_COPY,
@@ -208,8 +217,14 @@ describe("the Gimbal's hover help (#111)", () => {
       "+ / − : zoom",
       "1 : Vue du départ",
       "2 : Vue latérale",
+      "3 : Vue embarquée",
       "N : nord en haut",
     ]);
+  });
+
+  test("leaves out key 3 where the Page plays no ride", () => {
+    expect(vue3dKeysHelp(false).split("\n")).not.toContain("3 : Vue embarquée");
+    expect(vue3dKeysHelp(false).split("\n")).toHaveLength(vue3dKeysHelp().split("\n").length - 1);
   });
 
   test("a button's hover names the key that does the same", () => {
@@ -217,9 +232,88 @@ describe("the Gimbal's hover help (#111)", () => {
   });
 });
 
+describe("the Vue embarquée's words (#126)", () => {
+  const reading = (patch: Partial<EmbarkedReading> = {}): EmbarkedReading => ({
+    t: 12.34,
+    duration: 45.67,
+    x: 123.45,
+    v: 10,
+    playing: true,
+    ended: false,
+    end: { kind: "arrival", v: 12.5, t: 45.67 },
+    ...patch,
+  });
+
+  test("the read-out is the ride's time against its last instant, the abscissa and the speed", () => {
+    expect(embarkedReadingLine(reading())).toBe("t 12,3 / 45,7 s · x 123,5 m · 36 km/h");
+  });
+
+  test("a swing back reads a negative speed, the engine's sign", () => {
+    expect(embarkedReadingLine(reading({ v: -2.5 }))).toBe("t 12,3 / 45,7 s · x 123,5 m · -9 km/h");
+  });
+
+  test("says from the start how the motion computed ends: arrival, Point d'arrêt or no rest", () => {
+    expect(embarkedEndLine({ kind: "arrival", v: 12.5, t: 45.67 })).toBe(
+      "Fin : arrivée en B à 45 km/h, 45,7 s.",
+    );
+    expect(embarkedEndLine({ kind: "stop", x: 229.31, t: 85.1 })).toBe(
+      "Fin : arrêt à x 229,3 m, 85,1 s.",
+    );
+    expect(embarkedEndLine({ kind: "unsettled", t: 300 })).toBe(
+      "Fin : mouvement non stabilisé — la lecture s'arrête au dernier instant calculé, 300,0 s.",
+    );
+  });
+
+  test("is an estimation of the ride with the Vent entered, and its help says so", () => {
+    expect(EMBARQUEE_COPY.estimate).toBe("estimation");
+    expect(EMBARQUEE_COPY.ride).toBe("Mouvement calculé avec le vent saisi");
+    expect(EMBARQUEE_HELP).toContain("estimation");
+    expect(EMBARQUEE_HELP).toContain("gabarit du passager");
+    expect(EMBARQUEE_HELP).toContain("retours en arrière compris");
+  });
+
+  test("its hover help lists its keys and the drag", () => {
+    expect(embarkedKeysHelp().split("\n")).toEqual([
+      "Clavier, dans la Vue embarquée :",
+      "← / → : tourner la tête",
+      "↑ / ↓ : lever / baisser les yeux",
+      "Espace : lecture / pause",
+      "R : recommencer",
+      "Échap : quitter la vue embarquée",
+      "Glisser dans la vue : tourner la tête",
+    ]);
+  });
+
+  test("stays out of the table the Page Statique reads, which never says « estimation »", () => {
+    const shared = mapLabelTable().join("\n").toLocaleLowerCase("fr");
+    expect(shared).not.toContain("estimation");
+    expect(embarkedLabelTable()).toContain(EMBARQUEE_HELP);
+  });
+
+  test("says why it is off", () => {
+    expect(EMBARK_BLOCKED["no-ride"]).toBe(
+      "Vue embarquée : aucun mouvement calculé pour ce Scénario.",
+    );
+    expect(Object.keys(EMBARK_BLOCKED).sort()).toEqual(["gesture", "no-motion", "no-ride"]);
+  });
+});
+
 describe("every line the map prints stays in the terrain register", () => {
   const lines = [
     ...mapLabelTable(),
+    ...embarkedLabelTable(),
+    embarkedReadingLine({
+      t: 1,
+      duration: 2,
+      x: 3,
+      v: 4,
+      playing: false,
+      ended: false,
+      end: { kind: "stop", x: 3, t: 2 },
+    }),
+    embarkedEndLine({ kind: "arrival", v: 12.5, t: 45.67 }),
+    embarkedEndLine({ kind: "stop", x: 229.31, t: 85.1 }),
+    embarkedEndLine({ kind: "unsettled", t: 300 }),
     ...Object.values(READINGS).flat(),
     windReading({ speedKmh: 25, directionDeg: 60 }, lineBearing(TRIAL_ENDS)),
     windReading({ speedKmh: 25, directionDeg: 60 }, null),

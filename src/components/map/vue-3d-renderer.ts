@@ -32,6 +32,13 @@
  * - **The camera moves as `@/lib/map/vue-3d-camera.ts` says**: the Vues prédéfinies are its
  *   poses, flown to in under a second; the Gimbal's and the keys' steps are its amounts. The canvas
  *   takes the focus on a press, so the keys reach the view only once it has been chosen.
+ * - **The Vue embarquée owns the camera while it lasts** (#126): before each frame the eye is put
+ *   where `@/lib/map/vue-3d-embarquee.ts` says the ride stands at the screen's time, looking where
+ *   the reader turned it. CesiumJS's camera gestures and its terrain collision are off — the eye
+ *   stands where the engine puts it, never lifted off the relief — a drag turns the head, no anchor
+ *   is taken, the Gimbal's steps do nothing, and the loaded line, the passager's at `x_D`, gives way
+ *   to the Trajectoire the pulley follows. Leaving puts the camera back where it stood and every
+ *   gesture with it.
  */
 
 import "cesium/Source/Widgets/CesiumWidget/CesiumWidget.css";
@@ -74,6 +81,12 @@ import type { MapDisplay } from "@/lib/map/display.ts";
 import type { Anchor, MapEvent } from "@/lib/map/gesture.ts";
 import type { WmtsLayer } from "@/lib/map/style.ts";
 import type { CameraPose, Lens, Vue3dCommand } from "@/lib/map/vue-3d-camera.ts";
+import type {
+  Embarked,
+  EmbarkedCommand,
+  EmbarkedReading,
+  Vue3dRide,
+} from "@/lib/map/vue-3d-embarquee.ts";
 import type { EarthPoint, Vue3dFollowing, Vue3dLayers, Vue3dScene } from "@/lib/map/vue-3d.ts";
 
 import {
@@ -94,6 +107,13 @@ import {
   walkAmount,
   zoomAmount,
 } from "@/lib/map/vue-3d-camera.ts";
+import {
+  embarkedPose,
+  embarkedReading,
+  embarkedStep,
+  lookDragged,
+  openEmbarked,
+} from "@/lib/map/vue-3d-embarquee.ts";
 import { CAMERA_REACH, DRAPED, TERRAIN_URL, vue3dFollowing } from "@/lib/map/vue-3d.ts";
 import { sameEnds } from "@/lib/terrain/trace.ts";
 
@@ -123,8 +143,15 @@ export type Vue3d = {
    * @param layers which of the scene's lines the View Strip shows.
    */
   show(scene: Vue3dScene, display: MapDisplay, idle: boolean, layers: Vue3dLayers): void;
-  /** Moves the camera as a Gimbal button or a key asks. */
+  /** Moves the camera as a Gimbal button or a key asks — nothing while the Vue embarquée lasts. */
   command(command: Vue3dCommand): void;
+  /**
+   * Hangs the camera under the pulley on `ride`, paused at the departure — or, with `null`, takes it
+   * out of the Vue embarquée, back where it stood before. A new ride starts over.
+   */
+  embark(ride: Vue3dRide | null): void;
+  /** Plays, pauses, starts over or turns the head in the Vue embarquée. */
+  ride(command: EmbarkedCommand): void;
   destroy(): void;
 };
 
@@ -135,6 +162,8 @@ export type Vue3d = {
  * @param onUnavailable called once if the Vue 3D falls over after it opened — a render error.
  * @param onHeading hears the camera's heading, whole degrees clockwise from north, when it changes.
  * @param label the canvas's accessible name: it takes the focus, and the keys with it.
+ * @param onEmbarked hears the Vue embarquée's read-out when its tenth of a second or its state
+ *   changes, and `null` when it ends.
  * @returns the open view; rejects when it cannot open — no relief, no WebGL.
  */
 export async function openVue3d(
@@ -143,11 +172,13 @@ export async function openVue3d(
     onGesture,
     onUnavailable,
     onHeading,
+    onEmbarked,
     label,
   }: {
     onGesture: (event: MapEvent) => void;
     onUnavailable: () => void;
     onHeading: (headingDeg: number) => void;
+    onEmbarked: (reading: EmbarkedReading | null) => void;
     label: string;
   },
 ): Promise<Vue3d> {
@@ -221,6 +252,35 @@ export async function openVue3d(
   // Where the dragged anchor stands, from its first move until the machine is idle again.
   let pose: { anchor: Anchor; foot: EarthPoint } | null = null;
   let following: Vue3dFollowing | null = null;
+  // The Vue embarquée: the ride it plays, its clock and look, the camera as it stood before, whether
+  // a drag turns the head, and the last read-out told.
+  let embarked: {
+    readonly ride: Vue3dRide;
+    state: Embarked;
+    readonly before: { destination: Cartesian3; heading: number; pitch: number; roll: number };
+    turning: boolean;
+    told: string;
+  } | null = null;
+  const controller = cesium.screenSpaceCameraController;
+
+  /** The read-out, told when its tenth of a second, its playing or its end changes. */
+  function tellEmbarked() {
+    if (embarked === null) return;
+    const reading = embarkedReading(embarked.ride, embarked.state, performance.now());
+    const now = `${Math.round(reading.t * 10)}|${reading.playing}|${reading.ended}`;
+    if (now === embarked.told) return;
+    embarked.told = now;
+    onEmbarked(reading);
+  }
+
+  // Before CesiumJS's own camera update, so the eye is where the ride stands on this very frame.
+  cesium.preUpdate.addEventListener(() => {
+    if (embarked === null) return;
+    cesium.camera.setView(
+      cesiumPose(embarkedPose(embarked.ride, embarked.state, performance.now())),
+    );
+    tellEmbarked();
+  });
 
   /**
    * Draws the dragged anchor where `pose` has it, or the scene's own anchors and lines — those the
@@ -231,10 +291,12 @@ export async function openVue3d(
       shown === null || pose === null ? null : vue3dFollowing(shown.scene, pose.anchor, pose.foot);
     if (drawn === null || shown === null) return;
     const still = following === null;
+    const riding = embarked !== null;
     const { layers } = shown;
-    for (const entity of drawn.loaded) entity.show = still;
+    // Riding, the loaded line — the passager's at x_D — gives way to the Trajectoire the eye follows.
+    for (const entity of drawn.loaded) entity.show = still && !riding;
     for (const entity of drawn.unloaded) entity.show = still && layers.unloaded;
-    for (const entity of drawn.trajectory) entity.show = still && layers.trajectory;
+    for (const entity of drawn.trajectory) entity.show = still && (riding || layers.trajectory);
     drawn.chord.show = still && layers.ligneAB;
     drawn.ligneAB.show = !still;
   }
@@ -289,6 +351,12 @@ export async function openVue3d(
 
   const pointer = new ScreenSpaceEventHandler(canvas);
   pointer.setInputAction(({ position }: ScreenSpaceEventHandler.PositionedEvent) => {
+    // Riding, a press turns the head and takes no anchor.
+    if (embarked !== null) {
+      embarked.turning = true;
+      canvas.style.cursor = "grabbing";
+      return;
+    }
     if (shown?.idle !== true || grip !== null) return;
     const anchor = anchorAt(position);
     if (anchor === null) return;
@@ -298,7 +366,17 @@ export async function openVue3d(
     canvas.style.cursor = "grabbing";
   }, ScreenSpaceEventType.LEFT_DOWN);
 
-  pointer.setInputAction(({ endPosition }: ScreenSpaceEventHandler.MotionEvent) => {
+  pointer.setInputAction(({ startPosition, endPosition }: ScreenSpaceEventHandler.MotionEvent) => {
+    if (embarked !== null) {
+      if (!embarked.turning) return;
+      const look = lookDragged(
+        embarked.state.look,
+        endPosition.x - startPosition.x,
+        endPosition.y - startPosition.y,
+      );
+      embarked.state = { ...embarked.state, look };
+      return;
+    }
     if (grip === null) {
       cesium.canvas.style.cursor =
         shown?.idle === true && anchorAt(endPosition) !== null ? "grab" : "";
@@ -316,7 +394,14 @@ export async function openVue3d(
     }
   }, ScreenSpaceEventType.MOUSE_MOVE);
 
-  pointer.setInputAction(release, ScreenSpaceEventType.LEFT_UP);
+  pointer.setInputAction(() => {
+    if (embarked === null) {
+      release();
+      return;
+    }
+    embarked.turning = false;
+    canvas.style.cursor = "grab";
+  }, ScreenSpaceEventType.LEFT_UP);
 
   return {
     show(scene, display, idle, layers) {
@@ -341,14 +426,55 @@ export async function openVue3d(
       follow();
       // The camera stands back from the line when it opens, and when the Positions move to where
       // the reader cannot see them — a typed Position, an imported CSV. A line dragged in the view
-      // is already in it, so the camera stays where the reader put it.
-      if (before === null || (!sameEnds(before.scene.ends, scene.ends) && !inView(cesium, scene))) {
+      // is already in it, so the camera stays where the reader put it; riding, it is the ride's.
+      if (
+        embarked === null &&
+        (before === null || (!sameEnds(before.scene.ends, scene.ends) && !inView(cesium, scene)))
+      ) {
         cesium.camera.setView(cesiumPose(lateralPose(cesium, scene, layers)));
       }
     },
     command(command) {
-      if (shown === null || widget.isDestroyed()) return;
+      if (shown === null || widget.isDestroyed() || embarked !== null) return;
       moveCamera(cesium, shown, line, command);
+    },
+    embark(ride) {
+      if (widget.isDestroyed() || embarked?.ride === ride) return;
+      const { camera } = cesium;
+      if (ride === null) {
+        const { before } = embarked ?? {};
+        embarked = null;
+        controller.enableInputs = true;
+        controller.enableCollisionDetection = true;
+        canvas.style.cursor = "";
+        if (before !== undefined) {
+          const { destination, heading: h, pitch, roll } = before;
+          camera.setView({ destination, orientation: { heading: h, pitch, roll } });
+        }
+        follow();
+        onEmbarked(null);
+        return;
+      }
+      camera.cancelFlight();
+      const before = embarked?.before ?? {
+        destination: Cartesian3.clone(camera.positionWC),
+        heading: camera.heading,
+        pitch: camera.pitch,
+        roll: camera.roll,
+      };
+      embarked = { ride, state: openEmbarked(ride), before, turning: false, told: "" };
+      // `enableInputs` alone would come back at the end of a flight: collision is the other switch.
+      controller.enableInputs = false;
+      controller.enableCollisionDetection = false;
+      canvas.style.cursor = "grab";
+      follow();
+      tellEmbarked();
+    },
+    ride(command) {
+      if (embarked === null || widget.isDestroyed()) return;
+      const { ride, state } = embarked;
+      embarked.state = embarkedStep(state, command, performance.now(), ride.duration);
+      tellEmbarked();
     },
     destroy() {
       pointer.destroy();

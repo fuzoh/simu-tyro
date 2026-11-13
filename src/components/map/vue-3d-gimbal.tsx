@@ -18,38 +18,69 @@
  *   group's own stacking context (`isolate`), so they still win over the canvas: a face is its own
  *   button, and only the 4 px gaps and the margin around the group take the enlarged target. The
  *   pad's grid box would sit over its gaps' hit boxes, so it lets presses through.
+ * - **The Vue embarquée has controls of its own** (#126): « Vue embarquée » (key 3) enters it, off
+ *   with its reason on hover while no motion is proposed. Inside it the Gimbal gives way to
+ *   {@link EmbarkedControls} — lecture or pause, recommencer, the head turned and the eyes raised or
+ *   lowered, « Quitter la vue embarquée » — on the same corner and the same hit-box rule, and the
+ *   read-out of the ride sits over the view's bottom-left corner, an estimation with its `ⓘ`.
  */
 
 import type { ReactNode } from "react";
 
 import {
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Keyboard,
   Minus,
   Navigation2,
+  Pause,
+  Play,
   Plus,
   RotateCcw,
   RotateCw,
+  SkipBack,
+  X,
 } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 import type { Vue3dCommand } from "@/lib/map/vue-3d-camera.ts";
+import type { EmbarkedCommand, EmbarkedReading } from "@/lib/map/vue-3d-embarquee.ts";
 
+import { InfoTip } from "@/components/rail/controls.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { GIMBAL_COPY, gimbalHint, vue3dKeysHelp } from "@/lib/map/copy.ts";
+import {
+  EMBARQUEE_COPY,
+  EMBARQUEE_HELP,
+  embarkedEndLine,
+  embarkedKeysHelp,
+  embarkedReadingLine,
+  GIMBAL_COPY,
+  gimbalHint,
+  vue3dKeysHelp,
+} from "@/lib/map/copy.ts";
+import { EMBARK_KEY } from "@/lib/map/vue-3d-embarquee.ts";
 
 /**
  * @param headingDeg the camera's heading, degrees clockwise from north.
  * @param onCommand moves the camera.
+ * @param embark the Vue embarquée's button — `blocked` says why it proposes no motion, `null` when
+ *   it can be entered — or `null` on a Page that plays no ride.
+ * @param onEmbark enters the Vue embarquée.
  */
 export function Gimbal({
   headingDeg,
   onCommand,
+  embark,
+  onEmbark,
 }: {
   headingDeg: number;
   onCommand: (command: Vue3dCommand) => void;
+  embark: { readonly blocked: string | null } | null;
+  onEmbark: () => void;
 }) {
-  const help = vue3dKeysHelp();
+  const help = vue3dKeysHelp(embark !== null);
   return (
     <div
       aria-label={GIMBAL_COPY.title}
@@ -132,7 +163,170 @@ export function Gimbal({
         name={GIMBAL_COPY.vueLaterale}
         onCommand={onCommand}
       />
+      {/* A disabled button takes no hover, so the reason is the wrapper's. */}
+      {embark !== null && (
+        <span className="flex" title={embark.blocked ?? undefined}>
+          <Button
+            className={UNDER_FACES}
+            disabled={embark.blocked !== null}
+            onClick={onEmbark}
+            size="sm"
+            title={
+              embark.blocked === null ? gimbalHint(EMBARQUEE_COPY.enter, EMBARK_KEY) : undefined
+            }
+            variant="outline"
+          >
+            {EMBARQUEE_COPY.enter}
+          </Button>
+        </span>
+      )}
     </div>
+  );
+}
+
+/**
+ * The Vue embarquée's controls, in the Gimbal's place, and the ride's read-out over the bottom-left
+ * corner.
+ *
+ * @param reading the ride at the instant shown, `null` until the first is told.
+ * @param onCommand plays, pauses, starts over or turns the head.
+ * @param onExit leaves the Vue embarquée.
+ */
+export function EmbarkedControls({
+  reading,
+  onCommand,
+  onExit,
+}: {
+  reading: EmbarkedReading | null;
+  onCommand: (command: EmbarkedCommand) => void;
+  onExit: () => void;
+}) {
+  const help = embarkedKeysHelp();
+  const playing = reading?.playing ?? false;
+  // Entering is a press or a key inside the view: the focus lands on « Lecture », so the keys answer
+  // at once where the button that entered is gone.
+  const first = useRef<HTMLButtonElement>(null);
+  useEffect(() => first.current?.focus({ preventScroll: true }), []);
+  return (
+    <>
+      <div
+        aria-label={EMBARQUEE_COPY.title}
+        className="absolute top-2 left-2 isolate flex flex-col items-start gap-1"
+        role="group"
+      >
+        <div className="pointer-events-none flex gap-1 *:pointer-events-auto">
+          <Button
+            aria-label={playing ? EMBARQUEE_COPY.pause : EMBARQUEE_COPY.play}
+            className={UNDER_FACES}
+            onClick={() => onCommand({ kind: playing ? "pause" : "play" })}
+            ref={first}
+            size="icon-sm"
+            title={gimbalHint(playing ? EMBARQUEE_COPY.pause : EMBARQUEE_COPY.play, "Espace")}
+            variant="outline"
+          >
+            {playing ? <Pause /> : <Play />}
+          </Button>
+          <Turn
+            command={{ kind: "restart" }}
+            keys="R"
+            name={EMBARQUEE_COPY.restart}
+            onCommand={onCommand}
+          >
+            <SkipBack />
+          </Turn>
+          <Turn
+            command={{ kind: "look", step: -1 }}
+            keys="←"
+            name={EMBARQUEE_COPY.lookLeft}
+            onCommand={onCommand}
+          >
+            <ChevronLeft />
+          </Turn>
+          <Turn
+            command={{ kind: "tilt", step: 1 }}
+            keys="↑"
+            name={EMBARQUEE_COPY.lookUp}
+            onCommand={onCommand}
+          >
+            <ChevronUp />
+          </Turn>
+          <Turn
+            command={{ kind: "tilt", step: -1 }}
+            keys="↓"
+            name={EMBARQUEE_COPY.lookDown}
+            onCommand={onCommand}
+          >
+            <ChevronDown />
+          </Turn>
+          <Turn
+            command={{ kind: "look", step: 1 }}
+            keys="→"
+            name={EMBARQUEE_COPY.lookRight}
+            onCommand={onCommand}
+          >
+            <ChevronRight />
+          </Turn>
+          <span
+            aria-label={help}
+            className="bg-background text-muted-foreground grid size-7 place-items-center"
+            role="img"
+            title={help}
+          >
+            <Keyboard className="size-3.5" />
+          </span>
+        </div>
+        <Button
+          className={UNDER_FACES}
+          onClick={onExit}
+          size="sm"
+          title={gimbalHint(EMBARQUEE_COPY.exit, "Échap")}
+          variant="outline"
+        >
+          <X />
+          {EMBARQUEE_COPY.exit}
+        </Button>
+      </div>
+      <div className="bg-background/80 text-foreground absolute right-20 bottom-0 left-0 flex w-fit flex-col px-1 text-xs">
+        <span className="flex items-center gap-1">
+          {EMBARQUEE_COPY.ride} · {EMBARQUEE_COPY.estimate}
+          <InfoTip label={EMBARQUEE_COPY.enter} text={EMBARQUEE_HELP} />
+        </span>
+        {reading !== null && (
+          <>
+            <span className="font-mono">{embarkedReadingLine(reading)}</span>
+            <span>{embarkedEndLine(reading.end)}</span>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+/** One of the Vue embarquée's square buttons: an icon, its name and the key that does the same. */
+function Turn({
+  command,
+  keys,
+  name,
+  onCommand,
+  children,
+}: {
+  command: EmbarkedCommand;
+  keys: string;
+  name: string;
+  onCommand: (command: EmbarkedCommand) => void;
+  children: ReactNode;
+}) {
+  return (
+    <Button
+      aria-label={name}
+      className={UNDER_FACES}
+      onClick={() => onCommand(command)}
+      size="icon-sm"
+      title={gimbalHint(name, keys)}
+      variant="outline"
+    >
+      {children}
+    </Button>
   );
 }
 

@@ -99,6 +99,7 @@ function Live({ page }: { page: string }) {
               </CoupeBox>
             ),
           }}
+          rides={reading}
           solved={solved}
           windCause={windCause}
         />

@@ -184,7 +184,7 @@ function Live({ page }: { page: string }) {
           railTail={three ? undefined : tension}
           views={
             three ? (
-              <TopMap frame={frame} solved={solved} windCause={windCause} />
+              <TopMap frame={frame} rides={rides} solved={solved} windCause={windCause} />
             ) : (
               <TopViewFrame />
             )

@@ -659,14 +659,19 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     // The gestures themselves are pure view models (`@/lib/map/`), and the Rail reading what they
     // write is `@/lib/rail/values.test.ts`'s; what is source is that both Pages stand the very same
     // component, with the same three inputs, and that Avancé's own files draw no map of their own.
+    // Avancé adds the rides it already prints (#126), for the Vue embarquée; Statique, which never
+    // says « estimation » (#91), passes none and its map offers no ride.
     const root = fileURLToPath(new URL("../../..", import.meta.url));
     const read = (path: string) => readFileSync(join(root, path), "utf8");
-    const pages = ["src/components/app/app.tsx", "src/components/statique/statique.tsx"];
-    for (const page of pages) {
-      expect(read(page)).toContain('import { TopMap } from "@/components/map/top-map.tsx";');
-      expect(read(page)).toContain(
+    const pages = {
+      "src/components/app/app.tsx":
+        "<TopMap frame={frame} rides={rides} solved={solved} windCause={windCause} />",
+      "src/components/statique/statique.tsx":
         "<TopMap frame={frame} solved={solved} windCause={windCause} />",
-      );
+    };
+    for (const [page, element] of Object.entries(pages)) {
+      expect(read(page)).toContain('import { TopMap } from "@/components/map/top-map.tsx";');
+      expect(read(page)).toContain(element);
     }
     const avance = readdirSync(join(root, "src/components/app")).map((name) =>
       read(`src/components/app/${name}`),

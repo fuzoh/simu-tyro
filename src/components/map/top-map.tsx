@@ -40,6 +40,13 @@
  *   renderer beside the scene, never in it, so a toggle redraws nothing. On the Page Terrain, whose
  *   coupe hides while the 3D is shown, no strip stands beside it, and the view keeps its own lines
  *   (`vue3dLayers` with `viewStrip: false`).
+ * - **The Vue embarquée plays the rides the Page already read** (#126): the ride with the Vent
+ *   entered, as the gates leave it (`gatedRides`), placed on the line the Vue 3D stands — never a
+ *   ride of its own. While none is read, while it never leaves the departure, or while an anchor is
+ *   dragged — its rides are then the last release's — the Gimbal's « Vue embarquée » is off and says
+ *   why. A Page that passes no rides — Statique, which never says « estimation » (#91) — has no
+ *   Vue embarquée at all. A new ride ends the one playing: the camera goes back where it stood, and
+ *   the reader enters again on the new one, never on the motion of another Scenario.
  * - **One gesture machine for both views** (#97): an anchor dragged in the Vue 3D is sent to the
  *   same `send` as a marker, so its release is the same new line, recomputed by the same rule.
  * - **On the Page Terrain the map writes nothing** (#101): no click places an anchor, no anchor is
@@ -64,8 +71,11 @@ import type { Fond, MapDisplay } from "@/lib/map/display.ts";
 import type { Anchor, MapEvent, MapGesture } from "@/lib/map/gesture.ts";
 import type { MeasurePoints, MeasureReading } from "@/lib/map/measure.ts";
 import type { FondHealth, MapStyle, MeasureDrawing } from "@/lib/map/style.ts";
+import type { EmbarkedCommand, EmbarkedReading, Vue3dRide } from "@/lib/map/vue-3d-embarquee.ts";
 import type { Vue3dBlock, Vue3dLayers, Vue3dScene } from "@/lib/map/vue-3d.ts";
+import type { DynamicsReading } from "@/lib/scenario/dynamics.ts";
 import type { Position, Positions } from "@/lib/scenario/types.ts";
+import type { Ride } from "@/lib/sim";
 import type { Fetch } from "@/lib/terrain/geoadmin.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
@@ -90,6 +100,7 @@ import {
   anchorReading,
   BANANE_HELP,
   clickHint,
+  EMBARK_BLOCKED,
   FOND_LABEL,
   MAP_COPY,
   MEASURE_COPY,
@@ -120,6 +131,12 @@ import {
   SWISSTOPO_COVERAGE,
 } from "@/lib/map/style.ts";
 import { vue3dKeyCommand } from "@/lib/map/vue-3d-camera.ts";
+import {
+  embarkBlock,
+  embarkedKeyCommand,
+  isEmbarkKey,
+  vue3dRide,
+} from "@/lib/map/vue-3d-embarquee.ts";
 import { drapedAttribution, vue3dLayers, vue3dPlacement, vue3dScene } from "@/lib/map/vue-3d.ts";
 import { roseReference } from "@/lib/map/wind-rose.ts";
 import { windBearing } from "@/lib/rail/gates.ts";
@@ -131,7 +148,7 @@ import type { Vue3d } from "./vue-3d-renderer.ts";
 
 import { loadVue3d } from "./load-vue-3d.ts";
 import { useMeasure } from "./use-measure.ts";
-import { Gimbal } from "./vue-3d-gimbal.tsx";
+import { EmbarkedControls, Gimbal } from "./vue-3d-gimbal.tsx";
 import { WindRose } from "./wind-rose.tsx";
 
 // MapLibre cannot find its worker inside a bundle; Vite hands over the file's URL.
@@ -149,14 +166,19 @@ const FIT = { padding: 48, maxZoom: 16 } as const;
  * @param windCause why the Wind Gate withholds the Vent, or `null`: while it stands no Banane bows
  *   and the rose draws no wind, and the line under the map says it in place of the rose's reading.
  * @param readOnly the Page Terrain's visualisation (#101), whose `coupe` stands under the map in 2D.
+ * @param rides the passager's two rides as the gates leave them (`gatedRides`), off the same solved
+ *   half — `null` while none is read: the Vue embarquée plays the one with the Vent entered. Absent
+ *   on a Page that prints no ride, whose Vue 3D then offers none.
  */
 export function TopMap({
   frame,
+  rides,
   solved,
   windCause,
   readOnly,
 }: {
   frame: SceneFrame | null;
+  rides?: DynamicsReading | null;
   solved: SceneBase | null;
   windCause: string | null;
   readOnly?: { readonly coupe: ReactNode };
@@ -187,6 +209,10 @@ export function TopMap({
   const bearing = windBearing({ positions: drawn });
   const across = bananeAcross(wind, bearing);
   const scene3d = useVue3dScene(shows3d, frame, profil, solved, across);
+  const ride = rides?.windy ?? null;
+  const ride3d = useVue3dRide(shows3d, frame, profil, ride);
+  // While an anchor moves or its profil loads, the rides on hand are the last release's.
+  const embarkBlocked = embarkBlock(ride, ride3d, gesture.kind === "idle");
   // The View Strip's layers where the strip stands beside the Vue 3D; on the Page Terrain it hides
   // with the coupe while the 3D is shown, and toggles out of reach decide nothing.
   const layers3d = useMemo(() => vue3dLayers(layers, { viewStrip: !locked }), [locked, layers]);
@@ -316,12 +342,15 @@ export function TopMap({
             ) : (
               <Vue3dHost
                 display={display}
+                embarkBlocked={embarkBlocked === null ? null : EMBARK_BLOCKED[embarkBlocked]}
+                embarks={rides !== undefined}
                 // A view that never idles takes no anchor: the Page Terrain only looks at the line.
                 idle={!locked && gesture.kind === "idle"}
                 layers={layers3d}
                 onGesture={send}
                 onUnavailable={lose3d}
                 renderer={renderer}
+                ride={embarkBlocked === null ? ride3d : null}
                 scene={scene3d}
               />
             )}
@@ -513,6 +542,10 @@ function Vue3dLoading() {
  *
  * @param idle the gesture machine waits for a gesture, so an anchor may be taken.
  * @param layers which of the scene's lines are shown: a change shows or hides, and draws nothing.
+ * @param ride the ride the Vue embarquée may play, `null` while it proposes none; a new one ends the
+ *   one playing.
+ * @param embarkBlocked why it proposes none, `null` when `ride` stands.
+ * @param embarks the Page plays rides at all: without, the Gimbal has no « Vue embarquée ».
  */
 function Vue3dHost({
   renderer,
@@ -520,6 +553,9 @@ function Vue3dHost({
   display,
   idle,
   layers,
+  ride,
+  embarkBlocked,
+  embarks,
   onGesture,
   onUnavailable,
 }: {
@@ -528,12 +564,19 @@ function Vue3dHost({
   display: MapDisplay;
   idle: boolean;
   layers: Vue3dLayers;
+  ride: Vue3dRide | null;
+  embarkBlocked: string | null;
+  embarks: boolean;
   onGesture: (event: MapEvent) => void;
   onUnavailable: () => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<Vue3d | null>(null);
   const [heading, setHeading] = useState(0);
+  // The ride the reader entered the Vue embarquée on: riding only while it is still the one on hand.
+  const [embarkedOn, setEmbarkedOn] = useState<Vue3dRide | null>(null);
+  const riding = embarkedOn !== null && embarkedOn === ride ? embarkedOn : null;
+  const [reading, setReading] = useState<EmbarkedReading | null>(null);
   const fallen = useRef(onUnavailable);
   const gestured = useRef(onGesture);
   useLayoutEffect(() => {
@@ -555,6 +598,7 @@ function Vue3dHost({
       onGesture: (event: MapEvent) => gestured.current(event),
       onUnavailable: fail,
       onHeading: setHeading,
+      onEmbarked: setReading,
       label: MAP_COPY.vue3dTitle,
     };
     renderer.openVue3d(node, options).then((open) => {
@@ -574,6 +618,16 @@ function Vue3dHost({
     view?.show(scene, display, idle, layers);
   }, [view, scene, display, idle, layers]);
 
+  useEffect(() => {
+    view?.embark(riding);
+  }, [view, riding]);
+
+  /** Out of the Vue embarquée: the focus goes back to the view, so its keys still answer. */
+  const leave = useCallback(() => {
+    setEmbarkedOn(null);
+    container.current?.querySelector("canvas")?.focus({ preventScroll: true });
+  }, []);
+
   // The keys reach the view only from inside it: the canvas — a focusable `application` once pressed
   // or tabbed to — or a Gimbal button. Handled, a key's default, the page scrolling under an arrow,
   // is cancelled. Heard on the region rather than on either, so a key works after a Gimbal press.
@@ -582,6 +636,20 @@ function Vue3dHost({
     const node = region.current;
     if (node === null || view === null) return;
     const keyed = (event: KeyboardEvent) => {
+      if (riding !== null) {
+        const command = embarkedKeyCommand(event);
+        if (command === null || !embarkedKeyApplies(command, event.target)) return;
+        event.preventDefault();
+        if (command.kind === "exit") leave();
+        else view.ride(command);
+        return;
+      }
+      if (isEmbarkKey(event)) {
+        if (ride === null) return;
+        event.preventDefault();
+        setEmbarkedOn(ride);
+        return;
+      }
       const command = vue3dKeyCommand(event);
       if (command === null) return;
       event.preventDefault();
@@ -589,7 +657,7 @@ function Vue3dHost({
     };
     node.addEventListener("keydown", keyed);
     return () => node.removeEventListener("keydown", keyed);
-  }, [view]);
+  }, [view, riding, ride, leave]);
 
   return (
     <div aria-label={MAP_COPY.vue3dTitle} className="absolute inset-0" ref={region} role="region">
@@ -599,11 +667,54 @@ function Vue3dHost({
       />
       {view === null ? (
         <Vue3dLoading />
+      ) : riding === null ? (
+        <Gimbal
+          embark={embarks ? { blocked: embarkBlocked } : null}
+          headingDeg={heading}
+          onCommand={(command) => view.command(command)}
+          onEmbark={() => {
+            if (ride !== null) setEmbarkedOn(ride);
+          }}
+        />
       ) : (
-        <Gimbal headingDeg={heading} onCommand={(command) => view.command(command)} />
+        <EmbarkedControls
+          onCommand={(command) => view.ride(command)}
+          onExit={leave}
+          reading={reading}
+        />
       )}
     </div>
   );
+}
+
+/**
+ * Does a key of the Vue embarquée act here? The space bar on a button is the button's own press, and
+ * Escape on an open infobulle's icon closes the bubble, not the view.
+ */
+function embarkedKeyApplies({ kind }: EmbarkedCommand, target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return true;
+  if (kind === "toggle") return target.tagName !== "BUTTON";
+  if (kind === "exit") return !target.hasAttribute("data-popup-open");
+  return true;
+}
+
+/**
+ * The ride the Vue embarquée may play, while the Vue 3D is shown: the gated ride placed on the line
+ * the view stands — `null` without one, or for a ride that never leaves the departure.
+ */
+function useVue3dRide(
+  shown: boolean,
+  frame: SceneFrame | null,
+  profil: Trace | null,
+  ride: Ride | null,
+): Vue3dRide | null {
+  const { positions, rider } = useAppState().scenario;
+  const { hRider } = rider;
+  return useMemo(() => {
+    if (!shown || ride === null) return null;
+    const at = vue3dPlacement(positions, frame, profil);
+    return at.ok ? vue3dRide({ placement: at.placement, ride, hRider }) : null;
+  }, [shown, positions, frame, profil, ride, hRider]);
 }
 
 /**
