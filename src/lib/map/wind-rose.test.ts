@@ -13,6 +13,7 @@ import { appReducer, initialAppState } from "@/lib/app/state.ts";
 import { applyField, railValues } from "@/lib/rail/values.ts";
 import { FIRST_RUN_SCENARIO } from "@/lib/scenario/first-run.ts";
 import { lineBearing } from "@/lib/scenario/geometry.ts";
+import { uniformWind } from "@/lib/scenario/wind.ts";
 import { TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
 import { scenarioToSearch } from "@/lib/url/scenario.ts";
 
@@ -20,11 +21,16 @@ import {
   azimuthOf,
   handleOffset,
   NORTH_UP,
+  PROFILE_PAD_PX,
+  PROFILE_PREVIEW_STEPS,
+  profileHandleOffset,
+  profilePreview,
   ROSE_MAX_KMH,
   ROSE_RADIUS_PX,
   roseReference,
   screenBearing,
   windFromOffset,
+  windFromProfileOffset,
 } from "./wind-rose.ts";
 
 /** No wind, under the profile that ships: uniform, the 50 % width kept. */
@@ -186,7 +192,7 @@ describe("the rose and the two fields write one Vent", () => {
   });
 });
 
-describe("the handle keeps the rest of the Vent (#120)", () => {
+describe("each handle writes its own fields (#120)", () => {
   /** The trial's west wind, under a profile: 30 % of the span, the anchors 75 % under mid-span. */
   const shaped: Wind = { speedKmh: 20, directionDeg: 264, widthPct: 30, attenuationPct: 75 };
 
@@ -206,9 +212,221 @@ describe("the handle keeps the rest of the Vent (#120)", () => {
     });
   });
 
-  test("it does not write into the Vent it was given", () => {
+  test("a profile drag keeps the speed and the direction as they were", () => {
+    const reshaped = windFromProfileOffset({ x: 90, y: 60 }, shaped);
+    expect(reshaped).toMatchObject({ speedKmh: 20, directionDeg: 264 });
+    expect(reshaped.widthPct).not.toBe(shaped.widthPct);
+    expect(reshaped.attenuationPct).not.toBe(shaped.attenuationPct);
+  });
+
+  test("neither handle writes into the Vent it was given", () => {
     const before = { ...shaped };
     windFromOffset({ x: 31, y: -17 }, NORTH_UP, shaped);
+    windFromProfileOffset({ x: 90, y: 60 }, shaped);
     expect(shaped).toEqual(before);
+  });
+});
+
+describe("the profile's handle (#120)", () => {
+  const { width: W, height: H } = PROFILE_PAD_PX;
+
+  test("its pad gives every percent a pixel of its own: at least 100 by 100", () => {
+    expect(W).toBeGreaterThanOrEqual(100);
+    expect(H).toBeGreaterThanOrEqual(100);
+  });
+
+  test("stands at the bottom of the pad without attenuation, at the width kept", () => {
+    // 50 % is halfway between 10 and 90: the middle of the bottom edge.
+    expect(profileHandleOffset(CALM)).toEqual({ x: W / 2, y: H });
+    expect(profileHandleOffset({ widthPct: 10, attenuationPct: 0 })).toEqual({ x: 0, y: H });
+    expect(profileHandleOffset({ widthPct: 90, attenuationPct: 100 })).toEqual({ x: W, y: 0 });
+  });
+
+  test("right is wider and up is more attenuated", () => {
+    const narrow = profileHandleOffset({ widthPct: 30, attenuationPct: 40 });
+    const wide = profileHandleOffset({ widthPct: 60, attenuationPct: 40 });
+    const sheltered = profileHandleOffset({ widthPct: 30, attenuationPct: 80 });
+    expect(wide.x).toBeGreaterThan(narrow.x);
+    expect(wide.y).toBe(narrow.y);
+    // `y` runs downward on a screen: up is a smaller `y`.
+    expect(sheltered.y).toBeLessThan(narrow.y);
+    expect(sheltered.x).toBe(narrow.x);
+  });
+
+  test("a diagonal sets both", () => {
+    const from = profileHandleOffset({ widthPct: 30, attenuationPct: 40 });
+    const moved = windFromProfileOffset({ x: from.x + 30, y: from.y - 30 }, CALM);
+    // 30 px to the right is 30/120 of the 80 points of width; 30 px up is 30 of the 100.
+    expect(moved).toMatchObject({ widthPct: 50, attenuationPct: 70 });
+  });
+
+  test("its axes are the screen's: the wind's direction and the drawing's turn leave it where it is", () => {
+    const profile = { widthPct: 30, attenuationPct: 75 };
+    const west = { ...profile, speedKmh: 30, directionDeg: 264 };
+    const north = { ...profile, speedKmh: 12, directionDeg: 0 };
+    // 30 % is a quarter of the way across; 75 % is three quarters of the way up.
+    expect(profileHandleOffset(west)).toEqual({ x: W / 4, y: H / 4 });
+    expect(profileHandleOffset(north)).toEqual(profileHandleOffset(west));
+    // The direction handle, under the same two drawings, does turn.
+    expect(handleOffset(west, NORTH_UP)).not.toEqual(handleOffset(west, LEVEL_TRIAL));
+  });
+
+  test("every whole profile put down on the pad is read back as written", () => {
+    for (let widthPct = 10; widthPct <= 90; widthPct++) {
+      for (let attenuationPct = 0; attenuationPct <= 100; attenuationPct++) {
+        const written = windFromProfileOffset(
+          profileHandleOffset({ widthPct, attenuationPct }),
+          CALM,
+        );
+        expect(written).toEqual({ ...CALM, widthPct, attenuationPct });
+      }
+    }
+  });
+
+  test("dragged anywhere, writes whole percents inside their domains", () => {
+    for (const offset of [
+      { x: 31.4, y: 17.8 },
+      { x: -50, y: 500 },
+      { x: 9999, y: -9999 },
+      { x: W / 3, y: H / 7 },
+    ]) {
+      const { widthPct, attenuationPct } = windFromProfileOffset(offset, CALM);
+      expect(Number.isInteger(widthPct)).toBe(true);
+      expect(Number.isInteger(attenuationPct)).toBe(true);
+      expect(widthPct).toBeGreaterThanOrEqual(10);
+      expect(widthPct).toBeLessThanOrEqual(90);
+      expect(attenuationPct).toBeGreaterThanOrEqual(0);
+      expect(attenuationPct).toBeLessThanOrEqual(100);
+    }
+    // Past the pad's corners, the corners' own values.
+    expect(windFromProfileOffset({ x: -50, y: 500 }, CALM)).toMatchObject({
+      widthPct: 10,
+      attenuationPct: 0,
+    });
+    expect(windFromProfileOffset({ x: 9999, y: -9999 }, CALM)).toMatchObject({
+      widthPct: 90,
+      attenuationPct: 100,
+    });
+  });
+
+  test("a value out of its domain parks the handle on the nearest edge, and is not rewritten", () => {
+    const carried = { widthPct: 95, attenuationPct: -1 };
+    expect(profileHandleOffset(carried)).toEqual({ x: W, y: H });
+    expect(profileHandleOffset({ widthPct: 9, attenuationPct: 110 })).toEqual({ x: 0, y: 0 });
+    expect(carried).toEqual({ widthPct: 95, attenuationPct: -1 });
+  });
+
+  test("a value between two steps stands where its field shows it", () => {
+    expect(profileHandleOffset({ widthPct: 50.4, attenuationPct: 74.6 })).toEqual(
+      profileHandleOffset({ widthPct: 50, attenuationPct: 75 }),
+    );
+  });
+
+  test("« Vent uniforme » drops the handle to the bottom, and leaves it at its width", () => {
+    const shaped: Wind = { speedKmh: 20, directionDeg: 264, widthPct: 30, attenuationPct: 75 };
+    const before = profileHandleOffset(shaped);
+    const after = profileHandleOffset(uniformWind(shaped));
+    expect(after).toEqual({ x: before.x, y: H });
+  });
+});
+
+describe("the profile's preview (#120)", () => {
+  const shaped: Wind = { speedKmh: 40, directionDeg: 264, widthPct: 50, attenuationPct: 75 };
+
+  test("reads the speed at mid-span, the speed at the anchors, and the width", () => {
+    // 40 km/h entered, the anchors 75 % under it; half of a 150 m span is 75 m.
+    expect(profilePreview(shaped, 150)).toMatchObject({
+      midKmh: 40,
+      anchorKmh: 10,
+      uniform: false,
+      width: 50,
+      widthMetres: 75,
+      marks: [0.25, 0.75],
+    });
+  });
+
+  test("leaves the metres out without a span: the percent stands alone", () => {
+    expect(profilePreview(shaped, null)?.widthMetres).toBeNull();
+    expect(profilePreview(shaped, 0)?.widthMetres).toBeNull();
+    expect(profilePreview(shaped, null)?.width).toBe(50);
+  });
+
+  test("draws the line from A on the left to B on the right, highest at mid-span", () => {
+    const curve = profilePreview(shaped, 150)?.curve ?? [];
+    expect(curve).toHaveLength(PROFILE_PREVIEW_STEPS + 1);
+    expect(curve[0]).toEqual({ xi: 0, share: 0.25 });
+    expect(curve.at(-1)).toEqual({ xi: 1, share: 0.25 });
+    expect(curve[PROFILE_PREVIEW_STEPS / 2]).toEqual({ xi: 0.5, share: 1 });
+    // Symmetric about mid-span — to rounding: a 48th is no exact float — and rising from A to it.
+    for (let step = 0; step < PROFILE_PREVIEW_STEPS / 2; step++) {
+      expect(curve[PROFILE_PREVIEW_STEPS - step].share).toBeCloseTo(curve[step].share, 12);
+      expect(curve[step + 1].share).toBeGreaterThanOrEqual(curve[step].share);
+    }
+  });
+
+  test("a uniform wind is a level line, and the width kept is still marked", () => {
+    const uniform = profilePreview({ ...shaped, widthPct: 30, attenuationPct: 0 }, 200);
+    expect(uniform).toMatchObject({ midKmh: 40, anchorKmh: 40, uniform: true, width: 30 });
+    expect(uniform?.marks).toEqual([0.35, 0.65]);
+    expect(uniform?.widthMetres).toBeCloseTo(60, 12);
+    expect(uniform?.curve.every((point) => point.share === 1)).toBe(true);
+  });
+
+  test("a Vent without speed still shows the shape its two percents describe", () => {
+    const still = profilePreview({ ...shaped, speedKmh: 0 }, 150);
+    expect(still).toMatchObject({ midKmh: 0, anchorKmh: 0, uniform: false });
+    expect(still?.curve[0].share).toBe(0.25);
+  });
+
+  test("a profile the gates refuse has no preview: it is not drawn as though legal", () => {
+    expect(profilePreview({ ...shaped, widthPct: 95 }, 150)).toBeNull();
+    expect(profilePreview({ ...shaped, widthPct: 9 }, 150)).toBeNull();
+    expect(profilePreview({ ...shaped, attenuationPct: -1 }, 150)).toBeNull();
+    expect(profilePreview({ ...shaped, attenuationPct: 101 }, 150)).toBeNull();
+    expect(profilePreview({ ...shaped, speedKmh: -5 }, 150)).toBeNull();
+  });
+});
+
+describe("the profile's handle and its two fields write one profile (#120)", () => {
+  const start = appReducer(initialAppState({ query: "", session: null }), {
+    type: "scénario/modifié",
+    patch: { positions: TRIAL_ENDS, wind: { ...CALM, speedKmh: 30, directionDeg: 264 } },
+  });
+
+  test("a handle dropped a quarter across and three quarters up is 30 % and 75 % in the fields and the link", () => {
+    const wind = windFromProfileOffset(
+      { x: PROFILE_PAD_PX.width / 4, y: PROFILE_PAD_PX.height / 4 },
+      start.scenario.wind,
+    );
+    const { scenario } = appReducer(start, { type: "scénario/modifié", patch: { wind } });
+    expect(railValues(scenario)).toMatchObject({
+      windSpeed: "30",
+      windDirection: "264",
+      windWidth: "30",
+      windAttenuation: "75",
+    });
+    expect(scenarioToSearch({ ...FIRST_RUN_SCENARIO, wind: scenario.wind })).toMatchObject({
+      ws: 30,
+      wd: 264,
+      ww: 30,
+      wa: 75,
+    });
+  });
+
+  test("a percent typed in its field moves the handle along its own axis alone", () => {
+    const before = profileHandleOffset(start.scenario.wind);
+    const wider = applyField(start.scenario, "windWidth", 70, null);
+    expect(profileHandleOffset(wider.wind)).toEqual({
+      x: (PROFILE_PAD_PX.width * 3) / 4,
+      y: before.y,
+    });
+    const sheltered = applyField(start.scenario, "windAttenuation", 50, null);
+    expect(profileHandleOffset(sheltered.wind)).toEqual({
+      x: before.x,
+      y: PROFILE_PAD_PX.height / 2,
+    });
+    // And the typed percent leaves the rest of the Vent.
+    expect(wider.wind).toEqual({ ...start.scenario.wind, widthPct: 70 });
+    expect(sheltered.wind).toEqual({ ...start.scenario.wind, attenuationPct: 50 });
   });
 });

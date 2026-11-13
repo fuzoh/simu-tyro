@@ -13,6 +13,7 @@ import { TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
 import { exactTermsIn, proscribedIn } from "@/lib/vocabulary/labels.ts";
 
 import type { EmbarkedReading } from "./vue-3d-embarquee.ts";
+import type { ProfilePreview } from "./wind-rose.ts";
 
 import {
   anchorReading,
@@ -32,6 +33,8 @@ import {
   mapLabelTable,
   measureHint,
   measureLines,
+  profileCaption,
+  profileReading,
   vue3dKeysHelp,
   windReading,
 } from "./copy.ts";
@@ -119,6 +122,100 @@ describe("the wind's reading", () => {
     expect(windReading({ speedKmh: 25, directionDeg: 60 }, trial, false)).toBe(
       windReading({ speedKmh: 25, directionDeg: 60 }, trial),
     );
+  });
+});
+
+/**
+ * The profile's previews, written by hand (#120): 30 km/h at mid-span on a 150 m span. Attenuated
+ * by 40 %, the anchors read 30 × 0,6 = 18 km/h and 70 % of the span is 105 m; uniform, both ends
+ * read the entered speed and 50 % of the span is 75 m.
+ */
+const ATTENUATED: ProfilePreview = {
+  midKmh: 30,
+  anchorKmh: 18,
+  uniform: false,
+  width: 70,
+  widthMetres: 105,
+  marks: [0.15, 0.85],
+  curve: [],
+};
+const UNIFORM: ProfilePreview = {
+  midKmh: 30,
+  anchorKmh: 30,
+  uniform: true,
+  width: 50,
+  widthMetres: 75,
+  marks: [0.25, 0.75],
+  curve: [],
+};
+
+describe("the profile's reading (#120)", () => {
+  test("says the speed at mid-span, at the anchors, and the width in percent and in metres", () => {
+    expect(profileReading(ATTENUATED)).toEqual([
+      "Milieu : 30 km/h",
+      "Ancrages : 18 km/h",
+      "Largeur à mi-atténuation : 70 % de la portée, soit 105,0 m",
+    ]);
+  });
+
+  test("without a span the width stands in percent alone: no length is made up", () => {
+    expect(profileReading({ ...ATTENUATED, widthMetres: null })).toEqual([
+      "Milieu : 30 km/h",
+      "Ancrages : 18 km/h",
+      "Largeur à mi-atténuation : 70 % de la portée",
+    ]);
+  });
+
+  test("a speed reads on the grain of its field, whole km/h", () => {
+    // 45 % below 30 km/h is 16,5 km/h, which the field would print 17.
+    expect(profileReading({ ...ATTENUATED, anchorKmh: 16.5 })[1]).toBe("Ancrages : 17 km/h");
+    // Fully attenuated, the anchors are without wind.
+    expect(profileReading({ ...ATTENUATED, anchorKmh: 0 })[1]).toBe("Ancrages : 0 km/h");
+  });
+
+  test("a uniform wind says so, and that the width it keeps has no effect", () => {
+    expect(profileReading(UNIFORM)).toEqual([
+      "Vent uniforme : 30 km/h sur toute la ligne",
+      "Largeur à mi-atténuation gardée, sans effet : 50 % de la portée, soit 75,0 m",
+    ]);
+    expect(profileReading({ ...UNIFORM, widthMetres: null })[1]).toBe(
+      "Largeur à mi-atténuation gardée, sans effet : 50 % de la portée",
+    );
+  });
+
+  test("under a map that has no pad it is one line, and none for a uniform wind", () => {
+    expect(profileCaption(ATTENUATED)).toBe(
+      "Profil du vent — Milieu : 30 km/h · Ancrages : 18 km/h · " +
+        "Largeur à mi-atténuation : 70 % de la portée, soit 105,0 m.",
+    );
+    // The rose's own reading already says everything a uniform wind has to say.
+    expect(profileCaption(UNIFORM)).toBeNull();
+  });
+
+  test("the pad's words: its name, its two axes, its one command", () => {
+    expect(MAP_COPY.profile).toBe("Profil du vent");
+    expect(MAP_COPY.profileWider).toBe("plus large →");
+    expect(MAP_COPY.profileSheltered).toBe("↑ plus atténué");
+    expect(MAP_COPY.uniformWind).toBe("Vent uniforme");
+    expect(MAP_COPY.profileHandle).toBe(
+      "Glissez pour régler le profil du vent : vers la droite, plus large ; vers le haut, plus atténué aux ancrages",
+    );
+  });
+
+  test("it is a width at half-attenuation: never a plateau, a zone, a Q — nor a forecast", () => {
+    const words = [
+      ...profileReading(ATTENUATED),
+      ...profileReading(UNIFORM),
+      profileCaption(ATTENUATED) ?? "",
+      MAP_COPY.profile,
+      MAP_COPY.profileHandle,
+      MAP_COPY.profileWider,
+      MAP_COPY.profileSheltered,
+      MAP_COPY.uniformWind,
+    ];
+    for (const line of words) {
+      expect(line).not.toMatch(/plateau|zone|\bQ\b|prévision|prévu|météo/i);
+    }
   });
 });
 
@@ -321,6 +418,9 @@ describe("every line the map prints stays in the terrain register", () => {
     windReading({ speedKmh: 25, directionDeg: 60 }, lineBearing(TRIAL_ENDS)),
     windReading({ speedKmh: 25, directionDeg: 60 }, null),
     windReading({ speedKmh: 0, directionDeg: 0 }, null),
+    ...profileReading(ATTENUATED),
+    ...profileReading(UNIFORM),
+    profileCaption(ATTENUATED) ?? "",
     ...(["A", "B"] as const).flatMap((anchor) => [
       anchorReading(anchor, TRIAL_ENDS) ?? "",
       anchorReading(anchor, { A: PARIS, B: PARIS }) ?? "",

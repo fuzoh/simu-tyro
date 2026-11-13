@@ -17,13 +17,24 @@
  *   parks the handle on the outer ring and stays what was typed.
  * - **What the handle writes is what a field can hold**: whole km/h and whole degrees, the display
  *   grain of the two fields, so a gesture and a typed value agree to the last digit.
- * - **The handle writes its own fields and keeps the rest of the Vent** (#120): the profile stays
- *   as it is, a speed of zero included.
+ * - **Each handle writes its own fields and keeps the rest of the Vent** (#120). The direction
+ *   handle leaves the profile as it is, a speed of zero included; the profile's handle leaves the
+ *   speed and the direction.
+ * - **The profile's handle has fixed screen axes**: right is wider, up is more attenuated, whatever
+ *   the wind's direction and however the drawing is turned — it reads no {@link RoseReference}. Its
+ *   travel is a rectangle, a pixel never skips a percent, and a value outside its domain parks it
+ *   on the nearest edge without being rewritten until a drag says otherwise.
+ * - **The preview is A on the left, B on the right**, always: it draws the profile along the line,
+ *   which is not the pad's horizontal axis. Its three speeds are evaluated at the anchors and at
+ *   mid-span, never read off a sample; and a profile the gates refuse has no preview — it is not
+ *   drawn as though it were legal.
  */
 
 import type { Wind } from "@/lib/scenario/types.ts";
 
 import { roundToDisplay } from "@/lib/format/quantity.ts";
+import { windProfileOf } from "@/lib/scenario/wind.ts";
+import { WIND_PROFILE, windProfileSpeed } from "@/lib/sim";
 
 /** Where the rose's scale stops, km/h. The outer ring. */
 export const ROSE_MAX_KMH = 60;
@@ -101,5 +112,103 @@ export function windFromOffset(offset: RoseOffset, reference: RoseReference, pre
     ...previous,
     speedKmh,
     directionDeg: mod360(roundToDisplay("windDirection", azimuthOf(screen, reference))),
+  };
+}
+
+/**
+ * The rectangle the profile's handle travels (#120), px: at least 100 × 100, so that each of the 81
+ * widths and of the 101 attenuations has a pixel of its own. A drawing choice, never a scenario's.
+ */
+export const PROFILE_PAD_PX = { width: 120, height: 100 } as const;
+
+const clamp01 = (share: number) => Math.min(Math.max(share, 0), 1);
+
+/**
+ * Where the profile's handle stands, px from the pad's **top-left** corner, `y` downward: the
+ * width from left to right over its domain, the attenuation from bottom to top over its own. Read
+ * as the fields read it (`windProfileOf`); a value outside its domain stands on the nearest edge.
+ */
+export function profileHandleOffset(wind: Pick<Wind, "widthPct" | "attenuationPct">): RoseOffset {
+  const { width, attenuation } = windProfileOf(wind);
+  const across = WIND_PROFILE.width;
+  const up = WIND_PROFILE.attenuation;
+  return {
+    x: clamp01((width - across.min) / (across.max - across.min)) * PROFILE_PAD_PX.width,
+    y: (1 - clamp01((attenuation - up.min) / (up.max - up.min))) * PROFILE_PAD_PX.height,
+  };
+}
+
+/**
+ * The Vent a profile handle dropped at `offset` writes: its width and its attenuation on the grain
+ * of their fields, **the speed and the direction kept as they were**. A point outside the pad is
+ * read on its nearest edge, so a drag never writes a percent outside its domain.
+ */
+export function windFromProfileOffset(offset: RoseOffset, previous: Wind): Wind {
+  const across = WIND_PROFILE.width;
+  const up = WIND_PROFILE.attenuation;
+  const u = clamp01(offset.x / PROFILE_PAD_PX.width);
+  const v = clamp01(1 - offset.y / PROFILE_PAD_PX.height);
+  return {
+    ...previous,
+    widthPct: roundToDisplay("windWidth", across.min + u * (across.max - across.min)),
+    attenuationPct: roundToDisplay("windAttenuation", up.min + v * (up.max - up.min)),
+  };
+}
+
+/** The segments the preview's curve is drawn with. */
+export const PROFILE_PREVIEW_STEPS = 48;
+
+/** The profile of a Vent as its preview shows it: A on the left, mid-span, B on the right. */
+export type ProfilePreview = {
+  /** The speed at mid-span, km/h — the entered speed. */
+  readonly midKmh: number;
+  /** The speed at both anchors, km/h. */
+  readonly anchorKmh: number;
+  /** No attenuation: the curve is level, and the width is kept without effect. */
+  readonly uniform: boolean;
+  /** The largeur à mi-atténuation as it is read, % of the span. */
+  readonly width: number;
+  /** That width along the line, m — a reading, never a second entry. `null` without a span. */
+  readonly widthMetres: number | null;
+  /** The two half-gap points the width is measured between, as shares of the span from A. */
+  readonly marks: readonly [number, number];
+  /**
+   * The curve from A to B: the share of the span, and the speed there as a share of the speed at
+   * mid-span — so a Vent without speed still draws the shape its two percents describe.
+   */
+  readonly curve: readonly { readonly xi: number; readonly share: number }[];
+};
+
+function within(value: number, { min, max }: { readonly min: number; readonly max: number }) {
+  return value >= min && value <= max;
+}
+
+/**
+ * The preview of a Vent's profile, or `null` where there is none to draw: a percent outside its
+ * domain or a speed that is not one — what the Wind Gate refuses is not drawn as though legal.
+ *
+ * @param span the horizontal span, m, or `null` when it is not known: the width in metres is then
+ *   left out, and the percent stands alone.
+ */
+export function profilePreview(wind: Wind, span: number | null): ProfilePreview | null {
+  const profile = windProfileOf(wind);
+  const legal =
+    within(profile.width, WIND_PROFILE.width) &&
+    within(profile.attenuation, WIND_PROFILE.attenuation) &&
+    wind.speedKmh >= 0 &&
+    Number.isFinite(wind.speedKmh);
+  if (!legal) return null;
+  const lambda = profile.width / 100;
+  return {
+    midKmh: windProfileSpeed(wind.speedKmh, profile, 0.5),
+    anchorKmh: windProfileSpeed(wind.speedKmh, profile, 0),
+    uniform: profile.attenuation === 0,
+    width: profile.width,
+    widthMetres: span !== null && span > 0 ? lambda * span : null,
+    marks: [(1 - lambda) / 2, (1 + lambda) / 2],
+    curve: Array.from({ length: PROFILE_PREVIEW_STEPS + 1 }, (_, step) => {
+      const xi = step / PROFILE_PREVIEW_STEPS;
+      return { xi, share: windProfileSpeed(1, profile, xi) };
+    }),
   };
 }

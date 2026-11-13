@@ -50,8 +50,9 @@
  * - **One gesture machine for both views** (#97): an anchor dragged in the Vue 3D is sent to the
  *   same `send` as a marker, so its release is the same new line, recomputed by the same rule.
  * - **On the Page Terrain the map writes nothing** (#101): no click places an anchor, no anchor is
- *   taken in either view, the rose has no handle and no Fond or Couche pentes is offered — the Fond
- *   is the one the Session holds. The Mesure stays, being the map's own, as #98 drew it — no aperçu,
+ *   taken in either view, the rose has no handle — nor the Vent's profile a pad (#120) — and no
+ *   Fond or Couche pentes is offered — the Fond is the one the Session holds. The Mesure stays,
+ *   being the map's own, as #98 drew it — no aperçu,
  *   no Repère d'ancrage, no « Repères » (#107); the coupe stands under the map, and the switch flips
  *   the two together between « 2D » and « 3D ». The coupe is placed by `./deferred-top-map.tsx`,
  *   outside this module, which only says whether the Vue 3D stands alone (`readOnly.onShows3d`).
@@ -100,6 +101,7 @@ import {
   MEASURE_COPY,
   measureHint,
   measureLines,
+  profileCaption,
   VUE_3D_BLOCKED,
   VUE_3D_BLOCKED_READ_ONLY,
   windReading,
@@ -132,8 +134,9 @@ import {
   vue3dRide,
 } from "@/lib/map/vue-3d-embarquee.ts";
 import { drapedAttribution, vue3dLayers, vue3dPlacement, vue3dScene } from "@/lib/map/vue-3d.ts";
-import { roseReference } from "@/lib/map/wind-rose.ts";
+import { profilePreview, roseReference } from "@/lib/map/wind-rose.ts";
 import { windBearing } from "@/lib/rail/gates.ts";
+import { WIND_PROFILE_ACTIVE } from "@/lib/scenario/wind.ts";
 import { geoadminNotice, loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
 import { profilRunsBetween } from "@/lib/terrain/trace.ts";
 import { cn } from "@/lib/utils.ts";
@@ -144,7 +147,7 @@ import { loadVue3d } from "./load-vue-3d.ts";
 import { MapCaption } from "./map-caption.tsx";
 import { useMeasure } from "./use-measure.ts";
 import { EmbarkedControls, Gimbal } from "./vue-3d-gimbal.tsx";
-import { WindRose } from "./wind-rose.tsx";
+import { WindProfilePad, WindRose } from "./wind-rose.tsx";
 
 // MapLibre cannot find its worker inside a bundle; Vite hands over the file's URL.
 setWorkerUrl(workerUrl);
@@ -233,6 +236,15 @@ export function TopMap({
   // rose turns by the line's bearing to stand where the wind comes from on that drawing.
   const reference = roseReference(bearing, plain !== null && plain.unoriented !== null);
   const rose = useRef<HTMLDivElement>(null);
+  // The Vent's profile (#120) is shown only once the physics reads it (`WIND_PROFILE_ACTIVE`), and
+  // never as legal while the gates withhold the Vent. Its pad stands where the rose's handle does
+  // — never on the Page Terrain, never without a bearing — and under a map without one the
+  // caption carries its readings.
+  const preview =
+    WIND_PROFILE_ACTIVE && windCause === null && bearing !== null
+      ? profilePreview(scenario.wind, frame?.L ?? null)
+      : null;
+  const profilePad = WIND_PROFILE_ACTIVE && !locked && reference !== null && !measuring;
   const [project, setProject] = useState<Project | null>(null);
   // The line is read under the pointer only while nothing else is using the pointer on the map.
   // The line the map draws is the portée's own only where the coupe's profil runs between its ends.
@@ -300,6 +312,7 @@ export function TopMap({
           banane={bananeShown}
           gesture={gestureLine}
           positions={drawn}
+          profile={shows3d || profilePad || preview === null ? null : profileCaption(preview)}
           unavailable={!shows3d && unavailable}
           unoriented={plain?.unoriented ?? null}
           vue3d={
@@ -424,6 +437,15 @@ export function TopMap({
               reference={reference}
               wind={wind}
             />
+            {profilePad && (
+              <WindProfilePad
+                onWind={(next) => dispatch({ type: "scénario/modifié", patch: { wind: next } })}
+                preview={preview}
+                // As the Scenario holds it, a withheld Vent included: the handle stands on what a
+                // drag would rewrite.
+                wind={scenario.wind}
+              />
+            )}
             <Attribution text={fondAttribution(display.fond)} />
             {read !== null && read.reading !== null && (
               <HoverReadout at={read.at} lines={coupeLines(read.reading, "terrain")} />
