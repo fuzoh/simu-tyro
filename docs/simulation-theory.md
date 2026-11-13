@@ -659,6 +659,51 @@ Constants — every one editable and labelled, none silent:
 - **Not shipped**: a 95 % trolley efficiency as a speed loss, and the local reports' `C_w` and `μ`
   tables (research #8).
 
+**Inverse — the height of B for a target farthest point (#121).** The ride gives three distinct
+quantities along the span: the **farthest point** reached toward B over the whole motion (the
+largest `x` of the ride, a turning point), the **distance left to B** from there, and the Point
+d'arrêt. A rider who swings back rests tens of metres short of where he turned (shipped line with
+B raised 17.6 m: farthest point 134.6 m, Point d'arrêt 79.8 m), so the Point d'arrêt is never what
+an inverse is held to; and a ride that reaches B has reached it wherever it rests afterwards. The
+inverse searched is: A fixed, the variation `Δ` of B's height for which the farthest point of the
+ride **with the entered wind** is at a target share of the span. No formula of its own — each trial
+is this file's whole chain run again on the span with `h + Δ` and B's Anchor Height `+ Δ` (the
+ground stays where it is): §7's Tightness Driver resolved afresh, §6.2's sweep, then the ride above.
+The search walks a 0.1 m grid of heights and answers with the lowest one that keeps the farthest
+point on the target or short of it; the candidate is then recomputed with §11 and with the ride
+without wind as a comparison. Bounds: `z_B + Δ ≥ 0` and `h + Δ ≤ L` (45°). It refuses, with its
+reason and no height, when the target is outside its domain, when no height within the bounds
+reaches it, when the chain stops solving on the way (§5.4), when the farthest point jumps over the
+target between two neighbouring heights (more than 5 % of `L` short), when §11 is not judged, or
+when the candidate touches the known terrain outside the Zones d'ancrage. It is an **estimation**
+like the ride it is built on, applies nothing, re-judges neither the Verdict nor the garde exigée,
+and says nothing of a B moved elsewhere: another foot stands on another ground.
+
+The target's domain is **50–98 % of the span, whole percents, 90 % shipped** — `[CONVENTION]`,
+decided with #121. B and beyond are excluded (the arrival is what the inverse avoids); under
+mid-span the rider turns back before half the line. Measured `[MEASURED]` 2026-11-13 on seven
+lines, every whole target of the domain: a height is found for each (0.1 m grid, farthest point
+0.4 % of `L` short of the target at most on lines of 150 m and more, 1.8 % on the 50 m one), in
+about 10 ms each on the development machine. What the upper bound is worth is read off two variations of the candidate — the low
+end of the `C_dA` field's band, and a light tail wind:
+
+| Line (span, `h`, driver) | `Δ` for 90 % | Farthest point of the 90 % candidate with `C_dA` 0.30 / with a 10 km/h tail wind | Lowest target whose candidate reaches B under either |
+|---|---|---|---|
+| steel 50 m, −5 m, pretension 2634 N | +4.9 m | 90.7 % / 92.4 % | 99 % |
+| steel 150 m, −18 m, pretension 2634 N (shipped) | +17.6 m | 92.2 % / 93.4 % | 99 % |
+| HMPE rope 150 m, −18 m, pretension 2634 N | +15.7 m | 92.2 % / 93.8 % | 98 % |
+| steel 300 m, −25 m, sag 9 m | +18.4 m | 93.9 % / 94.8 % | 97 % |
+| steel 500 m, −40 m, sag 15 m | +20.2 m | 95.1 % / 95.2 % | 96 % |
+| steel 1000 m, −80 m, sag 30 m | +10.2 m | 96.2 % / 95.2 % | 94 % |
+| steel 2000 m, −160 m, sag 60 m | −28.0 m | 94.8 % / 94.3 % | 96 % |
+
+So 99 % is short of B on paper only — on every line the tail wind turns it into an arrival — and
+is excluded; **98 % is the last whole percent kept, not a safe one**: from 300 m of span on, a
+target of 94–97 % is already within the model's own sensitivity of B. Only up to 93 % did both
+variations leave the rider short of B on all seven lines. A ±20 kg change of the rider's mass moves
+the 90 % candidate's farthest point by 1–4 % of the span. None of this is a stopping guarantee:
+braking stays §12.3's, and out of this inverse.
+
 ### 12.3 Braking (B13)
 
 - **Eddy-current (zipSTOP class)**: force rises with velocity, monotone then saturating
