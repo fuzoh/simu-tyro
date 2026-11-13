@@ -32,6 +32,9 @@
  *   `d ∉ [6, 26]` are **warnings** — non-blocking, needing no physics — and they live here beside
  *   the hard rule they are so easily confused with. The result-level ladder (`> 30 % MBL`,
  *   `flèche < 3 %`, `k` hors bande, the verdict) needs a solve and is § 6's, not this module's.
+ *   **A closed domain is a hard rule, not a band** (`within`, the Vent's profile, #120): where the
+ *   quantity has no value outside its interval, the interval blocks — a warning would hand a
+ *   reader a width of 95 % to evaluate.
  * - **Values are canonical on the way out.** § 3's « SI internally, always »: a field displays in
  *   the selected force unit and {@link commitField} returns **newtons**, rounded to the row's
  *   display precision so that the value in state *is* the value on screen — § 3's prefill rule,
@@ -1039,11 +1042,14 @@ export function unreadableMessage(id: FieldId, raw: string, register?: Register)
 
 /**
  * Tier one on one field's raw text. **This is the whole of what a form validator may decide**:
- * emptiness, readability and a sign rule — no physics at all.
+ * emptiness, readability, and the field's one {@link HardRule} — a sign rule or a closed domain —
+ * no physics at all.
  *
- * @returns the standing issue, or `null` when the text is a value tier one accepts. An
- *   out-of-range-but-representable value is **valid here** and lights up as a warning or as an
- *   engine refusal — never as a second copy of a rule that lives downstream.
+ * @returns the standing issue, or `null` when the text is a value tier one accepts. A value
+ *   outside a **warning band** is valid here and lights up as a warning or as an engine refusal —
+ *   never as a second copy of a rule that lives downstream. A value outside a `within` domain
+ *   **blocks**: the rule is the field's own, not a reference's coverage, and the quantity has no
+ *   value there to compute with — the Vent's profile (#120) has no shape for a width of 95 %.
  */
 export function checkField(
   id: FieldId,
@@ -1087,7 +1093,7 @@ export function checkField(
       };
     case "within": {
       // What the field would commit, which is what it prints: the canonical value on its grain.
-      const read = commitField(id, raw, context) ?? shown;
+      const read = canonicalValue(id, shown, unit);
       if (read >= spec.rule.min && read <= spec.rule.max) return null;
       return {
         field: id,
@@ -1132,10 +1138,13 @@ export function warningFor(id: FieldId, value: number, context: FieldContext = {
  */
 export function commitField(id: FieldId, raw: string, context: FieldContext = {}): number | null {
   const shown = parseDecimal(raw);
-  if (shown === null) return null;
+  return shown === null ? null : canonicalValue(id, shown, context.unit ?? "daN");
+}
+
+/** A number read off the field's text → the canonical value, on the grain the field prints at. */
+function canonicalValue(id: FieldId, shown: number, unit: ForceUnit): number {
   const { quantity } = FIELDS[id];
   if (quantity === null) return shown;
-  const unit = context.unit ?? "daN";
   return roundToDisplay(quantity, fromDisplay(quantity, shown, unit), unit);
 }
 
