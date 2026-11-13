@@ -7,6 +7,7 @@ import viteReact from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 
+import { inlineAsset } from "./src/lib/app/inline-asset.ts";
 import { APP_PAGES } from "./src/lib/app/pages.ts";
 
 /**
@@ -22,6 +23,8 @@ const base = process.env.BASE_PATH ?? "/";
 const config = defineConfig({
   base,
   resolve: { tsconfigPaths: true },
+  // No font is inlined into the stylesheet the document waits on (#128): `src/lib/app/inline-asset.ts`.
+  build: { assetsInlineLimit: inlineAsset },
   plugins: [
     devtools(),
     tailwindcss(),
