@@ -27,7 +27,8 @@ const WIND: Wind = { speedKmh: 36, directionDeg: 264, widthPct: 30, attenuationP
 describe("the activation's boundary", () => {
   test("the profile is not consumed by the physics yet: its activation is off", () => {
     // Turning it on is the coordinated activation of #120 / #127 / #118, and nothing less: every
-    // reader of the Vent must take `windAt` first. This lock is the reminder.
+    // reader of the Vent must take `windAt` first, and the profile's pad must fit the narrow maps
+    // (`WindProfilePad`'s note). This lock is the reminder.
     expect(WIND_PROFILE_ACTIVE).toBe(false);
   });
 });

@@ -32,7 +32,9 @@ import type { Wind } from "./types.ts";
  * While it is off: the profile's fields, its handle on the rose, its preview and « Vent uniforme »
  * are not offered, and a link or a Session that carries a non-uniform profile is kept as given and
  * refused by the Wind Gate, with a Fix Action back to the uniform wind. Turning it on is that
- * activation and nothing less: every reader of the Vent must take the local field first.
+ * activation and nothing less: every reader of the Vent must take the local field first, and the
+ * profile's pad must fit the maps it stands on — it does not yet on the narrow ones
+ * (`WindProfilePad`, `src/components/map/wind-rose.tsx`, holds the measurements).
  *
  * Typed `boolean` so that both states stay compiled and tested: every function that reads it takes
  * it as a defaulted parameter.

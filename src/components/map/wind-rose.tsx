@@ -247,6 +247,19 @@ const READING_PX = 168;
  * A sibling of the map like the rose, and `data-rose` like it, so the line under it is not read
  * through it. Each gesture writes the profile's two percents and keeps the speed and the direction.
  *
+ * **Not laid out for every map yet: a precondition of the activation.** The pad stands in a fixed
+ * corner of the frame, as large as its content, and the frame clips. Measured with
+ * `WIND_PROFILE_ACTIVE` turned on locally (2026-11-13, Statique, the trial line, a profile at
+ * 30 % and 40 %): at 1440 × 900 the map is 701 × 467 and the pad, 310 × 182, stands over the
+ * rose's outer rings, 33 px short of its centre; at 768 × 1024 (map 422 × 281) it fits and covers
+ * that centre, so the direction handle of a light wind is under it; at 1024 × 768 (map 285 × 189)
+ * it covers the centre too and runs 33 px
+ * past the frame's right edge and 41 px past its bottom, « Vent uniforme » wholly clipped; at
+ * 390 × 664 (map 364 × 242) it stacks, 178 × 338, and runs 144 px past the bottom. Before the
+ * activation it is to open on demand — the brief's « zone de réglage pouvant apparaître à la
+ * sélection de cette poignée » — clear of the rose and of the frame's clip, and to be driven at
+ * the three pixel budgets of `docs/conventions/testing.md` and at 1024 px.
+ *
  * @param wind the Scenario's Vent as it is held — a percent out of its domain parks the handle on
  *   the pad's nearest edge and is rewritten only by a drag.
  * @param preview what the preview draws, or `null` while the gates refuse the Vent: a profile that
@@ -277,7 +290,7 @@ export function WindProfilePad({
   return (
     <div
       aria-label={MAP_COPY.profile}
-      className="bg-background/90 text-foreground pointer-events-auto absolute top-12 left-2 flex flex-col gap-2 rounded-md border p-2 text-xs shadow sm:flex-row sm:gap-6"
+      className="bg-background/90 text-foreground pointer-events-auto absolute top-12 left-2 flex flex-col gap-2 border px-1 py-1 text-xs shadow sm:flex-row sm:gap-3"
       data-rose
       role="group"
     >

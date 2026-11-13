@@ -80,7 +80,7 @@ empty `ui/`.
 `--radius: 0`, which is what the installed `base-lyra` style already assumes — its `button` and
 `native-select` are `rounded-none` in every size variant. So a freshly-added component needs no
 patch, forever. `rounded-full` survives for **circular marks only** (status dots, the rider grab
-handle, the vue de dessus's anchor markers, its hover point and the rose des vents's handle): a dot is a shape, not a corner radius. `rounded-md`, `rounded-sm` and bare `rounded`
+handle, the vue de dessus's anchor markers, its hover point, the rose des vents's handle and its profile pad's): a dot is a shape, not a corner radius. `rounded-md`, `rounded-sm` and bare `rounded`
 appear nowhere.
 
 ### One control height: 28 px
@@ -489,6 +489,15 @@ arithmetic over the shell, measured by `agent-browser` (`docs/conventions/routin
   is then cut to « Pentes sup… », its whole name in its title — the select gives way first, so
   390 px still reads « Pentes supérieures à 30° » whole. Accepted: the brief puts the switch at
   1024, and the map is the wider of the two from 1106.
+- **The Vent's profile pad does not fit this map, and is not shown yet** (#120): `WindProfilePad`
+  is mounted only once `WIND_PROFILE_ACTIVE` is on. Turned on locally (2026-11-13) it is
+  310 × 182 px in a fixed corner of the frame, which clips: on the 285 × 189 map at 1024 it runs
+  33 px past the right edge and 41 px past the bottom, « Vent uniforme » out of reach; on a
+  390 px phone (map 364 × 242) it stacks to 178 × 338 and runs 144 px past the bottom; at 768 it
+  fits and covers the rose's centre. **Not accepted — a precondition of the activation**: the pad
+  is to open on demand, clear of the rose and of the frame's clip, and to be driven at 390, 768,
+  1024 and 1440 before the flag is turned on. Its box is the map overlays' — `px-1 py-1`, square,
+  `gap-3` between its two columns.
 - **The Skeleton is the same tree** (`StatiqueFrame`), so it lands in the same boxes at every width.
 
 ## Dynamique's proposal
