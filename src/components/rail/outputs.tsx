@@ -46,11 +46,7 @@ import {
   NOT_COMPUTED_LINES,
   provenanceAggregate,
 } from "@/lib/rail/provenance.ts";
-import {
-  SWISSTOPO_ATTRIBUTION,
-  terrainDisclosure,
-  terrainSource,
-} from "@/lib/terrain/provenance.ts";
+import { terrainDisclosure, terrainSource } from "@/lib/terrain/provenance.ts";
 import { cn } from "@/lib/utils.ts";
 
 import { Chip, InfoTip, RowTips, Tip } from "./controls.tsx";
@@ -323,7 +319,6 @@ export function TerrainDisclosure({
   // own on the first line, whole behind it (#122).
   const { shown, warnings } = disclosureTips(
     terrainDisclosure(terrainSource(scenario.geometry.source, trace)),
-    SWISSTOPO_ATTRIBUTION,
   );
   return (
     <div className="text-muted-foreground flex flex-col gap-1 text-xs">
@@ -331,6 +326,7 @@ export function TerrainDisclosure({
         // Inline, not a flex row: the icons follow the statement's last word rather than wrapping
         // onto a line of their own under a long one.
         <p className="[&>button]:ml-1 [&>button]:align-middle" key={line.text}>
+          {TERRAIN_GLYPH[line.tier]}
           {line.text}
           {line.tip !== null && <Tip label={line.text} text={line.tip} />}
           {index === 0 &&
@@ -342,6 +338,12 @@ export function TerrainDisclosure({
     </div>
   );
 }
+
+/**
+ * The glyph a line in the open keeps: ✓ for a check that passed, ℹ for one that could not be made —
+ * « we checked and it is fine » and « we could not check » must not read alike.
+ */
+const TERRAIN_GLYPH = { plain: "", ok: "✓ ", info: "ℹ " } as const;
 
 /** The subject the terrain's ⚠ icons are named after. */
 const TERRAIN_LABEL = "Terrain";

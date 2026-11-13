@@ -4,7 +4,7 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { SWISSTOPO_ATTRIBUTION, terrainDisclosure } from "@/lib/terrain/provenance.ts";
 
-import { disclosureTips, tipName, tipText } from "./tip.ts";
+import { disclosureTips, opensOnFocus, tipClose, tipName, tipText } from "./tip.ts";
 
 /**
  * #122's contract for the infobulles, on its pure half: **no information is removed** on the way
@@ -37,21 +37,18 @@ describe("tipName — the icon's accessible name says which kind it is", () => {
 describe("disclosureTips — the terrain disclosure behind its icons", () => {
   test("a manual terrain keeps its statement in the open and its detail in the bubble", () => {
     const lines = terrainDisclosure({ kind: "manual" });
-    const tips = disclosureTips(lines, SWISSTOPO_ATTRIBUTION);
+    const tips = disclosureTips(lines);
     expect(tips.warnings).toEqual([]);
-    expect(tips.shown).toEqual([{ text: lines[0]?.text, tip: lines[0]?.detail }]);
+    expect(tips.shown).toEqual([{ text: lines[0]?.text, tip: lines[0]?.detail, tier: "info" }]);
   });
 
   test("every warning goes whole behind its own ⚠, statement then detail", () => {
-    const tips = disclosureTips(
-      [
-        { tier: "plain", text: "Profil importé · 3 points · pas max 12,0 m" },
-        { tier: "warn", text: "Résolution grossière.", detail: "Ré-exporter ne changera rien." },
-        { tier: "warn", text: "Distances peut-être en km ?" },
-        { tier: "ok", text: "Profil rectiligne" },
-      ],
-      SWISSTOPO_ATTRIBUTION,
-    );
+    const tips = disclosureTips([
+      { tier: "plain", text: "Profil importé · 3 points · pas max 12,0 m" },
+      { tier: "warn", text: "Résolution grossière.", detail: "Ré-exporter ne changera rien." },
+      { tier: "warn", text: "Distances peut-être en km ?" },
+      { tier: "ok", text: "Profil rectiligne" },
+    ]);
     expect(tips.warnings).toEqual([
       "Résolution grossière.\n\nRé-exporter ne changera rien.",
       "Distances peut-être en km ?",
@@ -70,7 +67,7 @@ describe("disclosureTips — the terrain disclosure behind its icons", () => {
       origin: { kind: "geoadmin" },
     };
     const lines = terrainDisclosure({ kind: "trace", trace });
-    const tips = disclosureTips(lines, SWISSTOPO_ATTRIBUTION);
+    const tips = disclosureTips(lines);
     expect(tips.shown[0]?.text).toContain(SWISSTOPO_ATTRIBUTION);
     expect(tips.shown[0]?.tip).toBeNull();
   });
@@ -81,7 +78,36 @@ describe("disclosureTips — the terrain disclosure behind its icons", () => {
       { tier: "warn", text: "c" },
       { tier: "plain", text: "d" },
     ] as const;
-    const tips = disclosureTips(lines, SWISSTOPO_ATTRIBUTION);
+    const tips = disclosureTips(lines);
     expect(tips.shown.length + tips.warnings.length).toBe(lines.length);
+  });
+});
+
+describe("disclosureTips — the tier survives the move into the open", () => {
+  test("a check that passed and one that could not be made keep different tiers", () => {
+    const tips = disclosureTips([
+      { tier: "ok", text: "Profil rectiligne" },
+      { tier: "info", text: "Rectitude non vérifiable" },
+      { tier: "plain", text: "Profil importé" },
+    ]);
+    expect(tips.shown.map((line) => line.tier)).toEqual(["ok", "info", "plain"]);
+  });
+});
+
+describe("opensOnFocus — a keyboard focus opens the bubble, a restored one does not", () => {
+  test("only a keyboard focus opens it", () => {
+    expect(opensOnFocus(true, null)).toBe(true);
+    expect(opensOnFocus(false, null)).toBe(false);
+  });
+
+  test("the focus Escape hands back to the icon does not reopen the bubble", () => {
+    expect(opensOnFocus(true, tipClose("escape-key"))).toBe(false);
+    expect(opensOnFocus(true, tipClose("close-press"))).toBe(false);
+  });
+
+  test("after any other close, the next keyboard focus opens it again", () => {
+    for (const reason of ["trigger-hover", "outside-press", "focus-out", "trigger-press"]) {
+      expect(opensOnFocus(true, tipClose(reason))).toBe(true);
+    }
   });
 });

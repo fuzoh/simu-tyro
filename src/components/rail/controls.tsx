@@ -28,9 +28,9 @@
 import type { ChangeEvent, ReactNode } from "react";
 
 import { Info, OctagonX, TriangleAlert } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
-import type { TipTone } from "@/lib/app/tip.ts";
+import type { TipClose, TipTone } from "@/lib/app/tip.ts";
 
 import { HelpText } from "@/components/docs/help-text.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -42,7 +42,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover.tsx";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
-import { tipName, tipText } from "@/lib/app/tip.ts";
+import { opensOnFocus, tipClose, tipName, tipText } from "@/lib/app/tip.ts";
 import { formatValue } from "@/lib/format/quantity.ts";
 import { PICKER_COPY } from "@/lib/rail/fields.ts";
 import { cn } from "@/lib/utils.ts";
@@ -457,7 +457,8 @@ export function Chip({
  * so touch users reach the same text and the same links. **Keyboard focus opens it too** (#122):
  * Base UI's popover has no focus trigger, so a `:focus-visible` focus — the keyboard's, never a
  * click's, which would open it only for the click to toggle it shut — opens it here, without moving
- * the focus, and Tab goes on into the bubble's links before leaving it. The content is `text-xs`
+ * the focus, and Tab goes on into the bubble's links before leaving it. The focus Base UI hands back
+ * to the icon on Escape does not reopen it (`opensOnFocus`): one Escape closes the bubble. The content is `text-xs`
  * like every other annotation; it is wider than the registry's `w-72` because a formula and its §
  * reference do not fit three lines.
  *
@@ -480,9 +481,18 @@ export function Tip({
   children?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  // Why the bubble last closed, until a focus or a blur on the icon answers it: Escape hands the
+  // focus back to the icon, and that focus must not reopen what Escape just shut.
+  const lastClose = useRef<TipClose | null>(null);
   const Icon = TIP_ICON[tone];
   return (
-    <Popover onOpenChange={(next: boolean) => setOpen(next)} open={open}>
+    <Popover
+      onOpenChange={(next, details) => {
+        lastClose.current = next ? null : tipClose(details.reason);
+        setOpen(next);
+      }}
+      open={open}
+    >
       <PopoverTrigger
         aria-label={tipName(tone, label)}
         className={cn(
@@ -491,8 +501,13 @@ export function Tip({
         )}
         closeDelay={150}
         delay={200}
+        onBlur={() => {
+          lastClose.current = null;
+        }}
         onFocus={(event) => {
-          if (focusVisible(event.currentTarget)) setOpen(true);
+          const opens = opensOnFocus(focusVisible(event.currentTarget), lastClose.current);
+          lastClose.current = null;
+          if (opens) setOpen(true);
         }}
         openOnHover
         type="button"
