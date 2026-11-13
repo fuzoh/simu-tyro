@@ -9,8 +9,9 @@
 
 import type { ReachOutputs, ReachProposalOutput, ReachRideOutput } from "@/lib/dynamique/reach.ts";
 
+import { RowTips, Tip } from "@/components/rail/controls.tsx";
 import { TileFrame } from "@/components/statique/outputs.tsx";
-import { ESTIMATE, REACH_COPY } from "@/lib/dynamique/copy.ts";
+import { ESTIMATE, REACH_COPY, SECTION } from "@/lib/dynamique/copy.ts";
 import { cn } from "@/lib/utils.ts";
 
 import { RideGrid } from "./outputs.tsx";
@@ -22,7 +23,7 @@ import { RideGrid } from "./outputs.tsx";
 export function ReachProposal({ model, stale = false }: { model: ReachOutputs; stale?: boolean }) {
   return (
     <div aria-busy={stale} className={cn("flex flex-col gap-2", stale && "opacity-50")}>
-      <p className="text-muted-foreground text-xs">{model.target}</p>
+      {/* The target is the region title's `ⓘ` (#122); what the Scenario does now is a reading. */}
       <p className="text-muted-foreground text-xs">{model.current}</p>
       {model.refusal !== null && <p className="text-xs">{model.refusal}</p>}
       {model.proposal !== null && <Proposal proposal={model.proposal} />}
@@ -50,17 +51,24 @@ function Proposal({ proposal }: { proposal: ReachProposalOutput }) {
           <RideTiles ride={ride} />
         </section>
       ))}
-      <ul className="text-muted-foreground flex flex-col gap-1 text-xs">
-        {proposal.assumptions.map((assumption) => (
-          <li key={assumption}>{assumption}</li>
-        ))}
-      </ul>
-      {proposal.warnings.map((warning) => (
-        <p className="text-warning text-xs" key={warning}>
-          ⚠ {warning}
-        </p>
-      ))}
     </>
+  );
+}
+
+/**
+ * The proposal's notes beside its region's title (#122): the target and the assumptions as one
+ * `ⓘ`, each warning a ⚠ of its own. Dimmed with the answer while it is the Scenario before's.
+ */
+export function ReachTips({ model, stale = false }: { model: ReachOutputs; stale?: boolean }) {
+  const { proposal } = model;
+  return (
+    <span className={cn("inline-flex items-center gap-1", stale && "opacity-50")}>
+      <RowTips label={SECTION.proposal} notes={[model.target, ...(proposal?.assumptions ?? [])]}>
+        {proposal?.warnings.map((warning) => (
+          <Tip key={warning} label={SECTION.proposal} text={warning} tone="warning" />
+        ))}
+      </RowTips>
+    </span>
   );
 }
 

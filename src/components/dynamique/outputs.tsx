@@ -9,9 +9,9 @@ import type { ReactNode } from "react";
 
 import type { DynamiqueOutputs, RideOutput } from "@/lib/dynamique/outputs.ts";
 
-import { GroupHeading } from "@/components/rail/controls.tsx";
+import { GroupHeading, RowTips, Tip } from "@/components/rail/controls.tsx";
 import { TileFrame } from "@/components/statique/outputs.tsx";
-import { OUTPUT_LABEL, RIDE_LABEL } from "@/lib/dynamique/copy.ts";
+import { OUTPUT_LABEL, RIDE_LABEL, SECTION } from "@/lib/dynamique/copy.ts";
 import { RIDE_IDS } from "@/lib/dynamique/outputs.ts";
 
 /**
@@ -32,8 +32,7 @@ export function DynamiqueOutputTiles({ model }: { model: DynamiqueOutputs }) {
     <div className="flex flex-col gap-3">
       {model.rides.map((ride) => (
         <section className="flex flex-col gap-1" key={ride.id}>
-          <GroupHeading title={ride.label} />
-          {ride.notice !== null && <p className="text-muted-foreground text-xs">{ride.notice}</p>}
+          <GroupHeading tip={ride.notice} title={ride.label} />
           <RideGrid>
             <StopTile ride={ride} />
             <ArrivalTile ride={ride} />
@@ -45,16 +44,21 @@ export function DynamiqueOutputTiles({ model }: { model: DynamiqueOutputs }) {
           </RideGrid>
         </section>
       ))}
-      {model.coincideNote !== null && (
-        <p className="text-muted-foreground text-xs">{model.coincideNote}</p>
-      )}
-      {model.warnings.map((warning) => (
-        <p className="text-warning text-xs" key={warning}>
-          ⚠ {warning}
-        </p>
-      ))}
-      <p className="text-muted-foreground text-xs">{model.constants}</p>
     </div>
+  );
+}
+
+/**
+ * The results' notes and warnings, beside the region's title (#122): the constants' provenance and
+ * the windless note as one `ⓘ`, each engine warning a ⚠ of its own.
+ */
+export function DynamiqueOutputTips({ model }: { model: DynamiqueOutputs }) {
+  return (
+    <RowTips label={SECTION.outputs} notes={[model.coincideNote, model.constants]}>
+      {model.warnings.map((warning) => (
+        <Tip key={warning} label={SECTION.outputs} text={warning} tone="warning" />
+      ))}
+    </RowTips>
   );
 }
 
@@ -105,8 +109,6 @@ export function DynamiqueOutputSkeleton() {
           </RideGrid>
         </section>
       ))}
-      {/* The provenance line's height, so the coupe does not move when it lands. */}
-      <p className="min-h-4 text-xs" />
     </div>
   );
 }

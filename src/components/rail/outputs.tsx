@@ -32,7 +32,6 @@ import type { Deduced } from "@/lib/rail/deduced.ts";
 import type { AggregateEntry } from "@/lib/rail/provenance.ts";
 import type { ResultGridRow, ResultRow, Results } from "@/lib/rail/results.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
-import type { DisclosureLine } from "@/lib/terrain/provenance.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { jumpToField } from "@/components/app/banner.tsx";
@@ -40,16 +39,21 @@ import { RailSection } from "@/components/app/shell.tsx";
 import { useAppState } from "@/components/app/store.tsx";
 import { HelpText } from "@/components/docs/help-text.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import { disclosureTips } from "@/lib/app/tip.ts";
 import { GRID_HELP, RESULT_HELP } from "@/lib/rail/help.ts";
 import {
   LOAD_COMBINATION_FORMULA,
   NOT_COMPUTED_LINES,
   provenanceAggregate,
 } from "@/lib/rail/provenance.ts";
-import { terrainDisclosure, terrainSource } from "@/lib/terrain/provenance.ts";
+import {
+  SWISSTOPO_ATTRIBUTION,
+  terrainDisclosure,
+  terrainSource,
+} from "@/lib/terrain/provenance.ts";
 import { cn } from "@/lib/utils.ts";
 
-import { Chip, InfoTip } from "./controls.tsx";
+import { Chip, InfoTip, RowTips, Tip } from "./controls.tsx";
 
 /**
  * The Rail's three output sections. `deduced` is the shared rider-free chain and `results` the
@@ -227,11 +231,10 @@ function GridRow({ row }: { row: ResultGridRow }) {
     <div className="mt-2">
       <div className="flex flex-wrap items-center gap-1">
         <span className="text-xs">{row.label}</span>
-        <InfoTip label={row.label} text={GRID_HELP[row.id]} />
+        {/* The criterion's formula and detail join its explanation behind the `ⓘ` (#122). */}
+        <RowTips label={row.label} notes={[GRID_HELP[row.id], row.formula, row.detail]} />
         {row.note !== null && <span className="text-muted-foreground text-xs">{row.note}</span>}
       </div>
-      {row.formula !== "" && <p className="text-muted-foreground text-xs">{row.formula}</p>}
-      {row.detail !== null && <p className="text-muted-foreground text-xs">{row.detail}</p>}
       {row.cells.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-3">
           {row.cells.map((cell) => (
@@ -316,28 +319,32 @@ export function TerrainDisclosure({
   scenario: ScenarioDraft;
   trace: Trace | null;
 }) {
+  // What the terrain *is* stays in the open, its detail behind `ⓘ`; each warning is a ⚠ of its
+  // own on the first line, whole behind it (#122).
+  const { shown, warnings } = disclosureTips(
+    terrainDisclosure(terrainSource(scenario.geometry.source, trace)),
+    SWISSTOPO_ATTRIBUTION,
+  );
   return (
-    <div className="flex flex-col gap-1">
-      {terrainDisclosure(terrainSource(scenario.geometry.source, trace)).map((line) => (
-        <TerrainLine key={line.text} line={line} />
+    <div className="text-muted-foreground flex flex-col gap-1 text-xs">
+      {shown.map((line, index) => (
+        // Inline, not a flex row: the icons follow the statement's last word rather than wrapping
+        // onto a line of their own under a long one.
+        <p className="[&>button]:ml-1 [&>button]:align-middle" key={line.text}>
+          {line.text}
+          {line.tip !== null && <Tip label={line.text} text={line.tip} />}
+          {index === 0 &&
+            warnings.map((warning) => (
+              <Tip key={warning} label={TERRAIN_LABEL} text={warning} tone="warning" />
+            ))}
+        </p>
       ))}
     </div>
   );
 }
 
-/** One disclosure line. The glyph is the renderer's, so the copy stays comparable in `node`. */
-function TerrainLine({ line }: { line: DisclosureLine }) {
-  const glyph = { plain: "", ok: "✓ ", warn: "⚠ ", info: "ℹ " }[line.tier];
-  return (
-    <div className={cn("text-xs", line.tier === "warn" ? "text-warning" : "text-muted-foreground")}>
-      <span>
-        {glyph}
-        {line.text}
-      </span>
-      {line.detail !== undefined && <p className="text-muted-foreground pl-3">{line.detail}</p>}
-    </div>
-  );
-}
+/** The subject the terrain's ⚠ icons are named after. */
+const TERRAIN_LABEL = "Terrain";
 
 /**
  * One aggregate line. **The régime is pinned first and visually separated**: it is not one input
@@ -364,24 +371,32 @@ function AggregateRow({ entry }: { entry: AggregateEntry }) {
  * only place a user learns that a passing verdict says nothing about wind.
  */
 function NotComputedSection() {
+  // The heading stays in the open — it is what says the block exists — and the lines are its
+  // `ⓘ`'s (#122). §8.3 asks that the load combination be exposed and labelled: the formula stays
+  // behind its own chip inside the bubble, never printed in the open, where someone would apply
+  // those γ factors by hand and believe the result.
   return (
-    <RailSection title="Ce que cet outil ne calcule pas">
-      <ul className="text-muted-foreground mt-2 flex flex-col gap-1 text-xs">
-        {NOT_COMPUTED_LINES.map((line, index) => (
-          <li className="flex items-start gap-1" key={line}>
-            <span>·</span>
-            <span>
-              <HelpText text={line} />
-            </span>
-            {/* §8.3 asks that the load combination be exposed and labelled — prose on the
-                surface, formula in the popover. Printed in the open, someone applies those γ
-                factors by hand and believes the result. */}
-            {index === 0 && (
-              <Chip detail={LOAD_COMBINATION_FORMULA} label="la formule" tone="neutral" />
-            )}
-          </li>
-        ))}
-      </ul>
-    </RailSection>
+    <RailSection
+      tips={
+        <Tip label={NOT_COMPUTED_TITLE}>
+          <ul className="flex flex-col gap-1">
+            {NOT_COMPUTED_LINES.map((line, index) => (
+              <li className="flex items-start gap-1" key={line}>
+                <span>·</span>
+                <span>
+                  <HelpText text={line} />
+                </span>
+                {index === 0 && (
+                  <Chip detail={LOAD_COMBINATION_FORMULA} label="la formule" tone="neutral" />
+                )}
+              </li>
+            ))}
+          </ul>
+        </Tip>
+      }
+      title={NOT_COMPUTED_TITLE}
+    />
   );
 }
+
+const NOT_COMPUTED_TITLE = "Ce que cet outil ne calcule pas";

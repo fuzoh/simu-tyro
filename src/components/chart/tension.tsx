@@ -30,6 +30,7 @@ import { useAppState } from "@/components/app/store.tsx";
 import { HoverRule, HoverTip } from "@/components/chart/hover.tsx";
 import { xTicks } from "@/components/chart/profile.tsx";
 import { useHover } from "@/components/chart/use-hover.ts";
+import { Tip } from "@/components/rail/controls.tsx";
 import { NO_SPAN_LINE, TENSION_COPY } from "@/lib/chart/copy.ts";
 import { RIDER_REACH_PX } from "@/lib/chart/hover.ts";
 import {
@@ -96,6 +97,13 @@ export function TensionChart({
       <h2 className="font-heading text-muted-foreground flex flex-wrap items-baseline gap-x-2 px-3 text-xs font-semibold tracking-wide uppercase">
         {TENSION_COPY.title}
         <span className="text-muted-foreground/70 text-xs normal-case">{TENSION_COPY.scope}</span>
+        {/* Two Brins porteurs: one line's share, said behind the title's `ⓘ` (#122) as on the
+            axis and in the hover. */}
+        {profile?.perLine === true && frame !== null && width !== null && (
+          <span className="inline-flex self-center normal-case">
+            <Tip label={TENSION_COPY.title} text={TENSION_COPY.perLineNote} />
+          </span>
+        )}
       </h2>
       {width === null ? (
         // Not measured yet: the box keeps its floor, and nothing about the line is said.
@@ -108,9 +116,6 @@ export function TensionChart({
       ) : (
         <>
           <Legend profile={profile} />
-          {profile.perLine && (
-            <p className="text-muted-foreground px-3 text-xs">{TENSION_COPY.perLineNote}</p>
-          )}
           {saisie !== null && <p className="text-muted-foreground px-3 text-xs">{saisie}</p>}
           <Plot frame={frame} profile={profile} unit={unit} width={width} />
         </>

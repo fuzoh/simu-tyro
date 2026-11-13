@@ -31,8 +31,8 @@ import { reachProposal, reachSearch } from "@/lib/dynamique/reach.ts";
 
 import { DynamiqueFields, shownOnDynamique } from "./fields.tsx";
 import { DynamiqueFrame } from "./frame.tsx";
-import { DynamiqueOutputTiles } from "./outputs.tsx";
-import { ReachProposal } from "./reach.tsx";
+import { DynamiqueOutputTiles, DynamiqueOutputTips } from "./outputs.tsx";
+import { ReachProposal, ReachTips } from "./reach.tsx";
 
 /** @param page the router path of the Page — every link it writes opens it. */
 export function Dynamique({ page }: { page: string }) {
@@ -115,12 +115,18 @@ function Live({ page }: { page: string }) {
           <DynamiqueOutputTiles model={model} />
         )
       }
+      outputsTips={model === null ? null : <DynamiqueOutputTips model={model} />}
       proposal={
         // None without a ride on this very frame: the search may still hold the Scenario before it.
         model === null || proposal === null ? (
           <p className="text-muted-foreground text-xs">{REACH_COPY.noRide}</p>
         ) : (
           <ReachProposal model={proposal} stale={posed !== search} />
+        )
+      }
+      proposalTips={
+        model === null || proposal === null ? null : (
+          <ReachTips model={proposal} stale={posed !== search} />
         )
       }
       section={

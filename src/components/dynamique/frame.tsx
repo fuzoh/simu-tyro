@@ -23,10 +23,16 @@ export function DynamiqueFrame({
   strip,
   fields,
   outputs,
+  outputsTips,
   section,
   sectionRef,
   proposal,
+  proposalTips,
 }: {
+  /** The results' notes and warnings, beside their region's title (#122). */
+  outputsTips?: ReactNode;
+  /** The proposal's target, assumptions and warnings, beside its region's title (#122). */
+  proposalTips?: ReactNode;
   /** The Skeleton sets it: `aria-busy`, and no `aria-live` region, no spinner. */
   busy?: boolean;
   /** § 8's « clé ignorée » strip, full width above both columns. */
@@ -42,7 +48,7 @@ export function DynamiqueFrame({
 }) {
   return (
     <ColumnsFrame busy={busy} fields={fields} strip={strip}>
-      <Region title={SECTION.outputs}>
+      <Region tips={outputsTips} title={SECTION.outputs}>
         <div className="px-3">{outputs}</div>
       </Region>
       <Region title={SECTION.section}>
@@ -53,7 +59,7 @@ export function DynamiqueFrame({
       </Region>
       {/* Last, under the charts: what it holds is as long as its answer — a refusal is a line, a
           proposal a dozen — and above them it would move the coupe each time it lands. */}
-      <Region title={SECTION.proposal}>
+      <Region tips={proposalTips} title={SECTION.proposal}>
         <div className="px-3">{proposal}</div>
       </Region>
     </ColumnsFrame>

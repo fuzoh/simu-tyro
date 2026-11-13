@@ -35,7 +35,8 @@ export function DynamiqueFields({ rail }: { rail: RailFormState }) {
       <div className="flex flex-col gap-3 px-3 py-3">
         {elsewhere !== null && <AvanceNotice gate={elsewhere} />}
 
-        <Group title={DYNAMIQUE_GROUPS.passenger}>
+        {/* That the other values are Avancé's is said on the column's first heading (#122). */}
+        <Group tip={ASSUMED_NOTE} title={DYNAMIQUE_GROUPS.passenger}>
           <NumericRow hint="kg" id="mp" />
         </Group>
 
@@ -43,8 +44,6 @@ export function DynamiqueFields({ rail }: { rail: RailFormState }) {
           <NumericRow hint="km/h" id="windSpeed" />
           <NumericRow hint="°" id="windDirection" />
         </Group>
-
-        <p className="text-muted-foreground text-xs">{ASSUMED_NOTE}</p>
       </div>
     </RailRow.Provider>
   );

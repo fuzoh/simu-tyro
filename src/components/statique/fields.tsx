@@ -24,7 +24,6 @@ import { AvanceNotice } from "@/components/app/avance-notice.tsx";
 import { useAppState } from "@/components/app/store.tsx";
 import { ReadOut } from "@/components/rail/controls.tsx";
 import {
-  AmbientNote,
   CarryingLinesRow,
   DerivedRow,
   FamilyRow,
@@ -93,7 +92,8 @@ export function StatiqueFields({
       <div className="flex flex-col gap-3 px-3 py-3">
         {elsewhere !== null && <AvanceNotice gate={elsewhere} />}
 
-        <Group title={STATIQUE_GROUPS.profile}>
+        {/* That the other values are Avancé's is said on the column's first heading (#122). */}
+        <Group tip={ASSUMED_NOTE} title={STATIQUE_GROUPS.profile}>
           {shows("L") ? (
             <>
               <NumericRow hint="m" id="L" />
@@ -155,7 +155,7 @@ export function StatiqueFields({
             id="T_target"
             idle={idleDriverText(scenario, "anchor", pretension.readOut)}
             // Where the value is read, on the field it is typed into as on the tile it prints in.
-            note={<AmbientNote text={pretensionWhere(scenario.tensioningSide)} />}
+            notes={[pretensionWhere(scenario.tensioningSide)]}
             warning={pretension.warning}
           />
         </Group>
@@ -178,8 +178,6 @@ export function StatiqueFields({
           <NumericRow hint="m" id="hClearMin" />
           <NumericRow hint="m" id="hRider" />
         </Group>
-
-        <p className="text-muted-foreground text-xs">{ASSUMED_NOTE}</p>
       </div>
     </RailRow.Provider>
   );

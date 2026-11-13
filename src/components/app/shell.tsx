@@ -487,9 +487,12 @@ export function RailHeader({ children }: { children?: ReactNode }) {
 export function RailSection({
   title,
   aside,
+  tips,
   children,
 }: {
   title: string;
+  /** The section's infobulles, beside its title (#122). */
+  tips?: ReactNode;
   /**
    * § 6's scope label — « sur toute la traversée » — and § 9's « aucun régime choisi » beside it,
    * on the heading itself so the scope and the reduction are read in one glance. It is one of the
@@ -503,6 +506,9 @@ export function RailSection({
     <section className="border-border border-t px-3 py-3">
       <h2 className="font-heading text-muted-foreground flex flex-wrap items-baseline gap-x-2 text-xs font-semibold tracking-wide uppercase">
         {title}
+        {tips !== undefined && tips !== null && (
+          <span className="inline-flex items-center gap-1 self-center normal-case">{tips}</span>
+        )}
         {aside !== undefined && aside !== null && (
           <span className="text-muted-foreground/70 text-xs normal-case">{aside}</span>
         )}

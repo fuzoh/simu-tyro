@@ -71,6 +71,7 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { useAppDispatch, useAppState } from "@/components/app/store.tsx";
 import { useHover } from "@/components/chart/use-hover.ts";
+import { InfoTip } from "@/components/rail/controls.tsx";
 import {
   MapOverCoupe,
   plainDrawing,
@@ -279,7 +280,13 @@ export function TopMap({
           {!shows3d && unavailable && (
             <span>{[MAP_COPY.unavailable, plain?.unoriented].filter(Boolean).join(" · ")}</span>
           )}
-          {bananeShown && <span title={BANANE_HELP}>{MAP_COPY.bananeNote}</span>}
+          {/* A `title` reached the mouse alone; the `ⓘ` reaches keyboard and touch too (#122). */}
+          {bananeShown && (
+            <span className="flex items-center gap-1">
+              {MAP_COPY.bananeNote}
+              <InfoTip label={MAP_COPY.bananeNote} text={BANANE_HELP} />
+            </span>
+          )}
           {placement.ok ? (
             lost3d && <span>{MAP_COPY.vue3dUnavailable}</span>
           ) : (
