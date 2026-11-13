@@ -21,6 +21,8 @@
  *   speed from A to B and « Vent uniforme ». The same gesture as the rose's, and no key of its own:
  *   the profile's keyboard is its two fields. Its holder mounts it only where the direction handle
  *   stands and only once the physics reads the profile (`WIND_PROFILE_ACTIVE`).
+ * - **One gesture, written once** ({@link useHandleDrag}, {@link Handle}): the two handles differ in
+ *   what an offset means, never in how the pointer is taken, followed and released.
  */
 
 import type { PointerEvent, RefObject } from "react";
@@ -48,6 +50,95 @@ import { cn } from "@/lib/utils.ts";
 /** The handle's touch target, px: Apple's and Material's minimum. */
 const HANDLE_PX = 44;
 
+/**
+ * A handle's gesture, the rose's and the profile pad's alike. The pointer takes the handle where
+ * it stands, so it does not jump to the pointer's centre; it is captured, so a drag that leaves the
+ * handle still belongs to it; and each move asks for the handle at an offset from `origin`.
+ *
+ * @param origin the element whose top-left corner the offsets are measured from — the rose's host,
+ *   which is a point, or the pad.
+ * @param handle where the handle stands now, from that corner, px.
+ * @param onOffset where a move asks for the handle, px: its caller makes a Vent of it and writes it.
+ * @returns what {@link Handle} spreads on its target, and whether a drag is under way.
+ */
+function useHandleDrag(
+  origin: RefObject<HTMLElement | null>,
+  handle: RoseOffset,
+  onOffset: (offset: RoseOffset) => void,
+) {
+  // Where the pointer took the handle, from the handle's own centre.
+  const grab = useRef<RoseOffset | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  function pointer(event: PointerEvent): RoseOffset {
+    const box = origin.current?.getBoundingClientRect();
+    return { x: event.clientX - (box?.left ?? 0), y: event.clientY - (box?.top ?? 0) };
+  }
+
+  function release() {
+    grab.current = null;
+    setDragging(false);
+  }
+
+  return {
+    dragging,
+    handlers: {
+      onLostPointerCapture: release,
+      onPointerCancel: release,
+      onPointerDown(event: PointerEvent<HTMLDivElement>) {
+        if (event.button !== 0) return;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        const at = pointer(event);
+        grab.current = { x: at.x - handle.x, y: at.y - handle.y };
+        setDragging(true);
+      },
+      onPointerMove(event: PointerEvent<HTMLDivElement>) {
+        if (grab.current === null) return;
+        const at = pointer(event);
+        onOffset({ x: at.x - grab.current.x, y: at.y - grab.current.y });
+      },
+      onPointerUp: release,
+    },
+  };
+}
+
+/**
+ * The handle {@link useHandleDrag} moves: the touch target, centred on `at`, around the dot.
+ *
+ * @param dot the dot's size, a Tailwind class — the rose's is the larger of the two.
+ */
+function Handle({
+  drag,
+  at,
+  title,
+  dot,
+}: {
+  drag: ReturnType<typeof useHandleDrag>;
+  at: RoseOffset;
+  title: string;
+  dot: string;
+}) {
+  return (
+    <div
+      // `pointer-events-auto`: the rose around its handle lets every pointer through to the map.
+      className={cn(
+        "pointer-events-auto absolute grid touch-none place-items-center",
+        drag.dragging ? "cursor-grabbing" : "cursor-grab",
+      )}
+      style={{
+        width: HANDLE_PX,
+        height: HANDLE_PX,
+        left: at.x - HANDLE_PX / 2,
+        top: at.y - HANDLE_PX / 2,
+      }}
+      title={title}
+      {...drag.handlers}
+    >
+      <span className={cn("bg-background border-foreground rounded-full border-2 shadow", dot)} />
+    </div>
+  );
+}
+
 export function WindRose({
   hostRef,
   wind,
@@ -61,46 +152,13 @@ export function WindRose({
   reference: RoseReference | null;
   onWind?: (wind: Wind) => void;
 }) {
-  // Where the pointer took the handle, so it does not jump to the pointer's centre.
-  const grab = useRef<RoseOffset | null>(null);
-  const [dragging, setDragging] = useState(false);
   const handle = reference === null ? { x: 0, y: 0 } : handleOffset(wind, reference);
   const oriented = reference?.oriented ?? false;
-
-  function centre(): RoseOffset {
-    const box = hostRef.current?.getBoundingClientRect();
-    return { x: box?.left ?? 0, y: box?.top ?? 0 };
-  }
-
-  function onPointerDown(event: PointerEvent<HTMLDivElement>) {
-    if (event.button !== 0) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const origin = centre();
-    grab.current = {
-      x: event.clientX - origin.x - handle.x,
-      y: event.clientY - origin.y - handle.y,
-    };
-    setDragging(true);
-  }
-
-  function onPointerMove(event: PointerEvent<HTMLDivElement>) {
-    if (grab.current === null || reference === null) return;
-    const origin = centre();
-    const next = windFromOffset(
-      {
-        x: event.clientX - origin.x - grab.current.x,
-        y: event.clientY - origin.y - grab.current.y,
-      },
-      reference,
-      wind,
-    );
+  const drag = useHandleDrag(hostRef, handle, (offset) => {
+    if (reference === null) return;
+    const next = windFromOffset(offset, reference, wind);
     if (next.speedKmh !== wind.speedKmh || next.directionDeg !== wind.directionDeg) onWind?.(next);
-  }
-
-  function release() {
-    grab.current = null;
-    setDragging(false);
-  }
+  });
 
   return (
     <div
@@ -169,26 +227,7 @@ export function WindRose({
         </>
       )}
       {onWind !== undefined && reference !== null && (
-        <div
-          className={cn(
-            "pointer-events-auto absolute grid touch-none place-items-center",
-            dragging ? "cursor-grabbing" : "cursor-grab",
-          )}
-          onLostPointerCapture={release}
-          onPointerCancel={release}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={release}
-          style={{
-            width: HANDLE_PX,
-            height: HANDLE_PX,
-            left: handle.x - HANDLE_PX / 2,
-            top: handle.y - HANDLE_PX / 2,
-          }}
-          title={MAP_COPY.roseHandle}
-        >
-          <span className="bg-background border-foreground size-7 rounded-full border-2 shadow" />
-        </div>
+        <Handle at={handle} dot="size-7" drag={drag} title={MAP_COPY.roseHandle} />
       )}
     </div>
   );
@@ -223,46 +262,13 @@ export function WindProfilePad({
   onWind: (wind: Wind) => void;
 }) {
   const pad = useRef<HTMLDivElement>(null);
-  // Where the pointer took the handle, so it does not jump to the pointer's centre.
-  const grab = useRef<RoseOffset | null>(null);
-  const [dragging, setDragging] = useState(false);
   const handle = profileHandleOffset(wind);
-
-  function corner(): RoseOffset {
-    const box = pad.current?.getBoundingClientRect();
-    return { x: box?.left ?? 0, y: box?.top ?? 0 };
-  }
-
-  function onPointerDown(event: PointerEvent<HTMLDivElement>) {
-    if (event.button !== 0) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const origin = corner();
-    grab.current = {
-      x: event.clientX - origin.x - handle.x,
-      y: event.clientY - origin.y - handle.y,
-    };
-    setDragging(true);
-  }
-
-  function onPointerMove(event: PointerEvent<HTMLDivElement>) {
-    if (grab.current === null) return;
-    const origin = corner();
-    const next = windFromProfileOffset(
-      {
-        x: event.clientX - origin.x - grab.current.x,
-        y: event.clientY - origin.y - grab.current.y,
-      },
-      wind,
-    );
+  const drag = useHandleDrag(pad, handle, (offset) => {
+    const next = windFromProfileOffset(offset, wind);
     if (next.widthPct !== wind.widthPct || next.attenuationPct !== wind.attenuationPct) {
       onWind(next);
     }
-  }
-
-  function release() {
-    grab.current = null;
-    setDragging(false);
-  }
+  });
 
   const { width, height, margin } = PREVIEW_PX;
   // The curve's top is the speed at mid-span and its floor is no wind: shares of that speed.
@@ -283,26 +289,7 @@ export function WindProfilePad({
           ref={pad}
           style={{ width: PROFILE_PAD_PX.width, height: PROFILE_PAD_PX.height }}
         >
-          <div
-            className={cn(
-              "absolute grid touch-none place-items-center",
-              dragging ? "cursor-grabbing" : "cursor-grab",
-            )}
-            onLostPointerCapture={release}
-            onPointerCancel={release}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={release}
-            style={{
-              width: HANDLE_PX,
-              height: HANDLE_PX,
-              left: handle.x - HANDLE_PX / 2,
-              top: handle.y - HANDLE_PX / 2,
-            }}
-            title={MAP_COPY.profileHandle}
-          >
-            <span className="bg-background border-foreground size-5 rounded-full border-2 shadow" />
-          </div>
+          <Handle at={handle} dot="size-5" drag={drag} title={MAP_COPY.profileHandle} />
         </div>
         <span className="mt-2 self-end">{MAP_COPY.profileWider}</span>
       </div>
