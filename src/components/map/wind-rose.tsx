@@ -12,15 +12,18 @@
  *   the gesture, and the address bar's own debounce writes the link once it stops.
  * - **The host is a point.** Its parent places it — at the line's midpoint on the map, at the middle
  *   of the box without one — and everything the rose draws is relative to it.
- * - **Without `onWind` there is no handle** (#101): the Page Terrain shows the Vent and sets none.
+ * - **Without `onWind` there is no handle**: the Page Terrain shows the Vent and sets none (#101),
+ *   and over a Vent withheld for its profile no handle waits at the centre for a drag to replace
+ *   the Vent from (#120). The holder decides it (`windControls`, `@/lib/map/wind-rose.ts`).
  * - **Without a reference there is no wind and no handle either**: A or B is not on the map, so the
  *   line has no bearing and the Vent can be neither drawn nor set (`windBearing`). The rose draws
  *   the level line, A on the left, and the reading under the map says why.
  * - **The profile has a handle of its own** (#120): {@link WindProfilePad}, a pad beside the rose
  *   whose axes are the screen's — right is wider, up is more attenuated — with the preview of the
  *   speed from A to B and « Vent uniforme ». The same gesture as the rose's, and no key of its own:
- *   the profile's keyboard is its two fields. Its holder mounts it only where the direction handle
- *   stands and only once the physics reads the profile (`WIND_PROFILE_ACTIVE`).
+ *   the profile's keyboard is its two fields. Its holder mounts it by the same rule
+ *   (`windControls`): only on a map that writes, on a line that has a bearing, and only once the
+ *   physics reads the profile (`WIND_PROFILE_ACTIVE`).
  * - **One gesture, written once** ({@link useHandleDrag}, {@link Handle}): the two handles differ in
  *   what an offset means, never in how the pointer is taken, followed and released.
  */

@@ -20,6 +20,11 @@
  * - **The Banane is drawn, not computed** (#96): the wind's cross component alone sets how far the
  *   line bows (`@/lib/map/banane.ts`). It has its own source in every style, redrawn with the wind
  *   and with the anchors during a drag, and the note under the map says it is a shape, not a distance.
+ * - **The Vent's controls are one rule's** (#94, #120): `windControls`
+ *   (`@/lib/map/wind-rose.ts`) says whether the rose's handle and the profile's pad stand and
+ *   whether the profile is read out, for this map and for the frame that stands in for it
+ *   (`./deferred-top-map.tsx`). A withheld Vent is drawn as none; the rose's handle then waits at
+ *   the centre only where a drag from there lifts the breach, never over a refused profile.
  * - **The Vue 3D is behind one door** (#95): the « 3D » switch stands it in the map's place, and its
  *   renderer is fetched through `./load-vue-3d.ts` the first time it is chosen — never imported
  *   here. Whatever stops it (no network, no WebGL) brings the vue de dessus back with « Vue 3D
@@ -75,6 +80,7 @@ import type { MeasurePoints, MeasureReading } from "@/lib/map/measure.ts";
 import type { FondHealth, MapStyle, MeasureDrawing } from "@/lib/map/style.ts";
 import type { EmbarkedCommand, EmbarkedReading, Vue3dRide } from "@/lib/map/vue-3d-embarquee.ts";
 import type { Vue3dBlock, Vue3dLayers, Vue3dScene } from "@/lib/map/vue-3d.ts";
+import type { FieldId } from "@/lib/rail/fields.ts";
 import type { DynamicsReading } from "@/lib/scenario/dynamics.ts";
 import type { Position, Positions } from "@/lib/scenario/types.ts";
 import type { Ride } from "@/lib/sim";
@@ -134,9 +140,8 @@ import {
   vue3dRide,
 } from "@/lib/map/vue-3d-embarquee.ts";
 import { drapedAttribution, vue3dLayers, vue3dPlacement, vue3dScene } from "@/lib/map/vue-3d.ts";
-import { profilePreview, roseReference } from "@/lib/map/wind-rose.ts";
+import { profilePreview, roseReference, windControls } from "@/lib/map/wind-rose.ts";
 import { windBearing } from "@/lib/rail/gates.ts";
-import { WIND_PROFILE_ACTIVE } from "@/lib/scenario/wind.ts";
 import { geoadminNotice, loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
 import { profilRunsBetween } from "@/lib/terrain/trace.ts";
 import { cn } from "@/lib/utils.ts";
@@ -163,6 +168,9 @@ const FIT = { padding: 48, maxZoom: 16 } as const;
  *   the Vue 3D draws the same line the coupe does, or none.
  * @param windCause why the Wind Gate withholds the Vent, or `null`: while it stands no Banane bows
  *   and the rose draws no wind, and the line under the map says it in place of the rose's reading.
+ * @param windCulprits the fields that breach stands on (`ErrorSurfaces.windCulprits`), empty
+ *   without one: the rose's handle is offered over a withheld Vent only where a drag of it lifts
+ *   them (`windControls`).
  * @param readOnly the Page Terrain's visualisation (#101). Its coupe stands under the map in 2D and
  *   is hidden while the Vue 3D stands alone; the map does not hold it — `./deferred-top-map.tsx`
  *   does, so the coupe keeps its place, its focus and its state when this module arrives (#128) —
@@ -176,12 +184,14 @@ export function TopMap({
   rides,
   solved,
   windCause,
+  windCulprits,
   readOnly,
 }: {
   frame: SceneFrame | null;
   rides?: DynamicsReading | null;
   solved: SceneBase | null;
   windCause: string | null;
+  windCulprits: readonly FieldId[];
   readOnly?: { readonly onShows3d: (shows3d: boolean) => void };
 }) {
   const { scenario, map: display, trace, layers } = useAppState();
@@ -205,8 +215,10 @@ export function TopMap({
   const onShows3d = readOnly?.onShows3d;
   useLayoutEffect(() => onShows3d?.(shows3d), [onShows3d, shows3d]);
   const renderer = useVue3dRenderer(shows3d, lose3d);
-  // A withheld Vent is drawn as none, and the rose's handle waits at the centre, where a drag sets a
-  // Vent the gates accept.
+  // A withheld Vent is drawn as none, which parks the rose's handle at the centre. It is offered
+  // there only where a drag sets a Vent the gates accept — a refused speed — and not under a
+  // refused profile, where the drag would overwrite the speed and the direction the Scenario holds
+  // and lift nothing (`windControls`).
   const wind = windCause === null ? scenario.wind : { ...scenario.wind, speedKmh: 0 };
   // The Vent is geographic: the line it is projected on is the one drawn, a dragged anchor included.
   // Without A and B there is none, and no Vent bows it — the gates' one check, `windBearing`.
@@ -236,15 +248,17 @@ export function TopMap({
   // rose turns by the line's bearing to stand where the wind comes from on that drawing.
   const reference = roseReference(bearing, plain !== null && plain.unoriented !== null);
   const rose = useRef<HTMLDivElement>(null);
-  // The Vent's profile (#120) is shown only once the physics reads it (`WIND_PROFILE_ACTIVE`), and
-  // never as legal while the gates withhold the Vent. Its pad stands where the rose's handle does
-  // — never on the Page Terrain, never without a bearing — and under a map without one the
-  // caption carries its readings.
-  const preview =
-    WIND_PROFILE_ACTIVE && windCause === null && bearing !== null
-      ? profilePreview(scenario.wind, frame?.L ?? null)
-      : null;
-  const profilePad = WIND_PROFILE_ACTIVE && !locked && reference !== null && !measuring;
+  // Which of the Vent's controls stand here is one rule's (`windControls`), the fallback frame's
+  // too: the rose's handle, and — once the physics reads it — the profile's pad and its preview
+  // (#120), never drawn as legal while the gates withhold the Vent. Under a map without the pad —
+  // the Page Terrain's, the Mesure's — the caption carries the preview's readings.
+  const controls = windControls({
+    culprits: windCulprits,
+    placed: reference !== null,
+    locked,
+    measuring,
+  });
+  const preview = controls.preview ? profilePreview(scenario.wind, frame?.L ?? null) : null;
   const [project, setProject] = useState<Project | null>(null);
   // The line is read under the pointer only while nothing else is using the pointer on the map.
   // The line the map draws is the portée's own only where the coupe's profil runs between its ends.
@@ -312,7 +326,7 @@ export function TopMap({
           banane={bananeShown}
           gesture={gestureLine}
           positions={drawn}
-          profile={shows3d || profilePad || preview === null ? null : profileCaption(preview)}
+          profile={shows3d || controls.pad || preview === null ? null : profileCaption(preview)}
           unavailable={!shows3d && unavailable}
           unoriented={plain?.unoriented ?? null}
           vue3d={
@@ -430,14 +444,14 @@ export function TopMap({
             <WindRose
               hostRef={rose}
               onWind={
-                locked
-                  ? undefined
-                  : (next) => dispatch({ type: "scénario/modifié", patch: { wind: next } })
+                controls.handle
+                  ? (next) => dispatch({ type: "scénario/modifié", patch: { wind: next } })
+                  : undefined
               }
               reference={reference}
               wind={wind}
             />
-            {profilePad && (
+            {controls.pad && (
               <WindProfilePad
                 onWind={(next) => dispatch({ type: "scénario/modifié", patch: { wind: next } })}
                 preview={preview}

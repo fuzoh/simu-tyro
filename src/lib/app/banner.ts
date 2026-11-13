@@ -312,6 +312,27 @@ export function windCause({
   return withheld(errors, ["wind"], GATE_CONSEQUENCE.wind, register);
 }
 
+/**
+ * The fields the Wind Gate's breaches stand on, in the report's order — {@link windCause} names
+ * the first of them. Empty while the Vent may be read.
+ *
+ * The vue de dessus reads them to offer the rose's handle only where a drag of it lifts what
+ * withholds the Vent (`windControls`, `@/lib/map/wind-rose.ts`): the handle writes a speed and a
+ * direction, and under a refused profile it would write them over the ones the Scenario holds and
+ * lift nothing (#120).
+ */
+export function windCulprits({
+  report,
+  saisie = null,
+}: {
+  readonly report: GateReport;
+  readonly saisie?: SaisieEnCours | null;
+}): readonly FieldId[] {
+  return standingReport(report, saisie)
+    .errors.filter((error) => error.gate === "wind")
+    .map((error) => error.field);
+}
+
 /** The cause sentence of what `gates` withhold, from their first breach, or `null` without one. */
 function withheld(
   errors: readonly BlockingError[],

@@ -28,12 +28,20 @@
  *   which is not the pad's horizontal axis. Its three speeds are evaluated at the anchors and at
  *   mid-span, never read off a sample; and a profile the gates refuse has no preview — it is not
  *   drawn as though it were legal.
+ * - **A control is offered only where it may write, and a parked handle only where its drag
+ *   mends** ({@link windControls}). Neither handle stands on a map that writes nothing or on a
+ *   line without a bearing, and the profile's pad and preview wait for the profile to be read by
+ *   the physics (`WIND_PROFILE_ACTIVE`). A Vent the Wind Gate withholds is drawn as none, which
+ *   parks the direction handle at the centre: it is offered there only while every breach stands
+ *   on the speed or the direction it writes. Under a refused profile a drag from the centre would
+ *   write a speed and a direction over the ones the Scenario holds, and lift nothing.
  */
 
+import type { FieldId } from "@/lib/rail/fields.ts";
 import type { Wind } from "@/lib/scenario/types.ts";
 
 import { roundToDisplay } from "@/lib/format/quantity.ts";
-import { windProfileOf } from "@/lib/scenario/wind.ts";
+import { WIND_PROFILE_ACTIVE, windProfileOf } from "@/lib/scenario/wind.ts";
 import { WIND_PROFILE, windProfileSpeed } from "@/lib/sim";
 
 /** Where the rose's scale stops, km/h. The outer ring. */
@@ -152,6 +160,68 @@ export function windFromProfileOffset(offset: RoseOffset, previous: Wind): Wind 
     ...previous,
     widthPct: roundToDisplay("windWidth", across.min + u * (across.max - across.min)),
     attenuationPct: roundToDisplay("windAttenuation", up.min + v * (up.max - up.min)),
+  };
+}
+
+/** The fields the direction handle writes — the only breaches a drag of it can lift. */
+const ROSE_HANDLE_FIELDS: ReadonlySet<FieldId> = new Set<FieldId>(["windSpeed", "windDirection"]);
+
+/** What a vue de dessus knows of itself and of the Vent, for {@link windControls} to decide on. */
+export type WindControlsInput = {
+  /**
+   * The fields the Wind Gate's breaches stand on (`windCulprits`, `@/lib/app/banner.ts`); empty
+   * while the Vent may be read.
+   */
+  readonly culprits: readonly FieldId[];
+  /** The line has a bearing: A and B are on the map ({@link roseReference} is not `null`). */
+  readonly placed: boolean;
+  /** The map writes nothing: the Page Terrain's (#101), or the frame that has no rose at all. */
+  readonly locked: boolean;
+  /** The Mesure is on (#98): the map's clicks are the ruler's. */
+  readonly measuring: boolean;
+};
+
+/** Which of the Vent's controls a vue de dessus offers, and whether it reads the profile out. */
+export type WindControls = {
+  /** The rose's direction handle is offered. */
+  readonly handle: boolean;
+  /** The profile's pad is mounted (#120). */
+  readonly pad: boolean;
+  /**
+   * The profile is read out (#120): {@link profilePreview} drawn on the pad, or said under a map
+   * that has none (`profileCaption`).
+   */
+  readonly preview: boolean;
+};
+
+/**
+ * The Vent's controls on a vue de dessus — the one rule the live map and its fallback frame read.
+ *
+ * - **The direction handle** stands where the map may write and the line has a bearing. Over a
+ *   withheld Vent it waits at the centre, and is offered only while a drag from there lifts what
+ *   withholds it: every culprit is the speed or the direction the handle writes (`ws=-5`). Under a
+ *   refused profile — one no calculation reads yet, a percent out of its domain — it is not: the
+ *   drag would replace the speed and the direction the Scenario holds and leave the breach
+ *   standing. The profile's own field, its Fix Action and its pad repair it.
+ * - **The profile's pad** stands on the same maps — one that writes, a line with a bearing — once
+ *   the profile is read by the physics, and not while the Mesure holds the map. Its handle stands
+ *   on the percents the Scenario holds, withheld or not, so a drag of it overwrites nothing it
+ *   does not set, and it stays over a withheld Vent.
+ * - **The profile is read out** once it is read by the physics, on a line that has a bearing, and
+ *   never while the gates withhold the Vent: what is refused is not shown as though applied.
+ *
+ * @param active does the physics read the Vent's profile? `WIND_PROFILE_ACTIVE` when absent, which
+ *   is what the app passes: a parameter only so that both sides of the activation are tested.
+ */
+export function windControls(
+  { culprits, placed, locked, measuring }: WindControlsInput,
+  active: boolean = WIND_PROFILE_ACTIVE,
+): WindControls {
+  const writes = placed && !locked;
+  return {
+    handle: writes && culprits.every((field) => ROSE_HANDLE_FIELDS.has(field)),
+    pad: active && writes && !measuring,
+    preview: active && placed && culprits.length === 0,
   };
 }
 

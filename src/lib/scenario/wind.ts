@@ -37,7 +37,9 @@ import type { Wind } from "./types.ts";
  * (`WindProfilePad`, `src/components/map/wind-rose.tsx`, holds the measurements).
  *
  * Typed `boolean` so that both states stay compiled and tested: every function that reads it takes
- * it as a defaulted parameter.
+ * it as a defaulted parameter — the gates' `evaluateGates` and `isWindProfileFieldShown`
+ * (`@/lib/rail/gates.ts`) and the vue de dessus's `windControls` (`@/lib/map/wind-rose.ts`), which
+ * the live map and its fallback frame both ask. No component reads the constant itself.
  */
 export const WIND_PROFILE_ACTIVE: boolean = false;
 

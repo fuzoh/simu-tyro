@@ -54,8 +54,18 @@ function Live({ page }: { page: string }) {
     page,
     register: "terrain",
   });
-  const { cause, clearance, frame, occupant, results, rideCause, solved, windCause, windNotice } =
-    surfaces;
+  const {
+    cause,
+    clearance,
+    frame,
+    occupant,
+    results,
+    rideCause,
+    solved,
+    windCause,
+    windCulprits,
+    windNotice,
+  } = surfaces;
   const { scenario } = state;
 
   const view = useMemo(
@@ -102,6 +112,7 @@ function Live({ page }: { page: string }) {
           rides={reading}
           solved={solved}
           windCause={windCause}
+          windCulprits={windCulprits}
         />
       }
     />

@@ -50,7 +50,8 @@ function Live({ page }: { page: string }) {
     page,
     register: "terrain",
   });
-  const { cause, clearance, frame, refusal, results, saisie, solved, windCause } = surfaces;
+  const { cause, clearance, frame, refusal, results, saisie, solved, windCause, windCulprits } =
+    surfaces;
   const model = statiqueOutputs({ scenario: state.scenario, deduced, results, cause });
   // No ride is printed here: a Ride Gate breach does not take the slot from the Verdict.
   const occupant = useMemo(
@@ -88,7 +89,9 @@ function Live({ page }: { page: string }) {
       }
       sectionRef={ref}
       strip={<LinkStripNotice strip={strip} />}
-      topView={<TopMap frame={frame} solved={solved} windCause={windCause} />}
+      topView={
+        <TopMap frame={frame} solved={solved} windCause={windCause} windCulprits={windCulprits} />
+      }
     />
   );
 }

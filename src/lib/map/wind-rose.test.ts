@@ -29,6 +29,7 @@ import {
   ROSE_RADIUS_PX,
   roseReference,
   screenBearing,
+  windControls,
   windFromOffset,
   windFromProfileOffset,
 } from "./wind-rose.ts";
@@ -384,6 +385,119 @@ describe("the profile's preview (#120)", () => {
     expect(profilePreview({ ...shaped, attenuationPct: -1 }, 150)).toBeNull();
     expect(profilePreview({ ...shaped, attenuationPct: 101 }, 150)).toBeNull();
     expect(profilePreview({ ...shaped, speedKmh: -5 }, 150)).toBeNull();
+  });
+});
+
+/**
+ * Which of the Vent's controls a vue de dessus offers. Each expectation is the brief's or the
+ * map's own rule, read off no implementation: no mutation command in a read-only view, no profile
+ * shown before the physics reads it, none drawn as legal while it is refused — and a handle that
+ * waits at the centre only where a drag from the centre can repair what parked it there.
+ */
+describe("which of the Vent's controls a vue de dessus offers (#120)", () => {
+  /** The live map of a Page that writes: A and B placed, the Vent read, no Mesure. */
+  const MAP = { culprits: [], placed: true, locked: false, measuring: false } as const;
+  const BOTH = [false, true] as const;
+
+  test("as it ships: the rose's handle, and nothing of the profile", () => {
+    expect(windControls(MAP)).toEqual({ handle: true, pad: false, preview: false });
+  });
+
+  describe("the direction handle", () => {
+    test.each(BOTH)("stands on a placed line of a map that writes (profile read: %s)", (active) => {
+      expect(windControls(MAP, active).handle).toBe(true);
+      // The Mesure takes the map's clicks, not the rose's handle.
+      expect(windControls({ ...MAP, measuring: true }, active).handle).toBe(true);
+    });
+
+    test.each(BOTH)(
+      "not on the Page Terrain, nor without a bearing (profile read: %s)",
+      (active) => {
+        expect(windControls({ ...MAP, locked: true }, active).handle).toBe(false);
+        expect(windControls({ ...MAP, placed: false }, active).handle).toBe(false);
+      },
+    );
+
+    test.each([[["windSpeed"]], [["windDirection"]], [["windSpeed", "windDirection"]]] as const)(
+      "waits at the centre over a refused %j: a drag writes both",
+      (culprits) => {
+        for (const active of BOTH) {
+          expect(windControls({ ...MAP, culprits }, active).handle).toBe(true);
+        }
+      },
+    );
+
+    test.each([
+      [["windAttenuation"]],
+      [["windWidth"]],
+      [["windWidth", "windAttenuation"]],
+      // The drag would mend the speed and leave the Vent withheld, the handle back at the centre.
+      [["windSpeed", "windAttenuation"]],
+    ] as const)("is not offered over a refused %j: a drag writes neither percent", (culprits) => {
+      for (const active of BOTH) {
+        expect(windControls({ ...MAP, culprits }, active).handle).toBe(false);
+      }
+    });
+  });
+
+  describe("the profile's pad", () => {
+    test("is mounted nowhere before the physics reads the profile", () => {
+      for (const locked of BOTH) {
+        for (const placed of BOTH) {
+          for (const measuring of BOTH) {
+            expect(windControls({ culprits: [], placed, locked, measuring }, false).pad).toBe(
+              false,
+            );
+          }
+        }
+      }
+    });
+
+    test("once it does, stands on a placed line of a map that writes", () => {
+      expect(windControls(MAP, true).pad).toBe(true);
+      expect(windControls({ ...MAP, placed: false }, true).pad).toBe(false);
+    });
+
+    test("never on the Page Terrain: a read-only view has no mutation command", () => {
+      expect(windControls({ ...MAP, locked: true }, true).pad).toBe(false);
+      // Whatever else holds — a refused percent a drag of it would bring back included.
+      expect(windControls({ ...MAP, locked: true, culprits: ["windWidth"] }, true).pad).toBe(false);
+    });
+
+    test("gives way to the Mesure", () => {
+      expect(windControls({ ...MAP, measuring: true }, true).pad).toBe(false);
+    });
+
+    test("stays over a withheld Vent: its handle stands on the percents the Scenario holds", () => {
+      for (const culprits of [["windWidth"], ["windAttenuation"], ["windSpeed"]] as const) {
+        expect(windControls({ ...MAP, culprits }, true).pad).toBe(true);
+      }
+    });
+  });
+
+  describe("the profile's readings", () => {
+    test("are not shown before the physics reads the profile, on any map", () => {
+      for (const locked of BOTH) {
+        for (const measuring of BOTH) {
+          expect(windControls({ ...MAP, locked, measuring }, false).preview).toBe(false);
+        }
+      }
+    });
+
+    test("once it does, are read out on every map of a placed line — the read-only ones too", () => {
+      expect(windControls(MAP, true).preview).toBe(true);
+      expect(windControls({ ...MAP, locked: true }, true).preview).toBe(true);
+      expect(windControls({ ...MAP, measuring: true }, true).preview).toBe(true);
+      expect(windControls({ ...MAP, placed: false }, true).preview).toBe(false);
+    });
+
+    test.each([[["windWidth"]], [["windAttenuation"]], [["windSpeed"]]] as const)(
+      "a Vent withheld for %j is not read out as though applied",
+      (culprits) => {
+        expect(windControls({ ...MAP, culprits }, true).preview).toBe(false);
+        expect(windControls({ ...MAP, culprits, locked: true }, true).preview).toBe(false);
+      },
+    );
   });
 });
 

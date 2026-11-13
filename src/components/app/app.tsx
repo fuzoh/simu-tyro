@@ -95,8 +95,18 @@ function Live({ page }: { page: string }) {
     navigationHeight: NAV_BAR,
   };
   const collapse = useCollapse({ fits: fitsWholeBlock(fit), compact: compactRequired(fit) });
-  const { cause, clearance, frame, occupant, results, rideCause, saisie, solved, windCause } =
-    surfaces;
+  const {
+    cause,
+    clearance,
+    frame,
+    occupant,
+    results,
+    rideCause,
+    saisie,
+    solved,
+    windCause,
+    windCulprits,
+  } = surfaces;
   /**
    * The tension graph closes the Page (#119): under the Chart Block from three columns, after the
    * Rail's last section below. `threeColumns()` decides where it is *mounted*, as it does the vue
@@ -184,7 +194,13 @@ function Live({ page }: { page: string }) {
           railTail={three ? undefined : tension}
           views={
             three ? (
-              <TopMap frame={frame} rides={rides} solved={solved} windCause={windCause} />
+              <TopMap
+                frame={frame}
+                rides={rides}
+                solved={solved}
+                windCause={windCause}
+                windCulprits={windCulprits}
+              />
             ) : (
               <TopViewFrame />
             )
