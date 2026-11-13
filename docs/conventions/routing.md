@@ -68,10 +68,11 @@ verbatim. The registry is `src/lib/docs/pages.ts`; the bytes are `src/lib/docs/s
 `?raw` imports.
 
 - **They are SSR and prerendered, unlike the app Pages.** `vite.config.ts` lists `/docs` and every
-  `DOC_PAGES` slug under `pages` with `prerender.enabled`, so the build emits `dist/client/docs/<slug>/index.html` as full
-  HTML and a shared `/docs/modele#s-10-4` lands with a **200**. `autoStaticPathsDiscovery` is
-  **off** so `/` stays the SPA shell. Under `bun run dev`, SPA mode serves the shell for every path
-  and the page renders client-side — same output, different status line.
+  `DOC_PAGES` slug under `pages` with `prerender.enabled`, so the build emits
+  `dist/client/docs/<slug>/index.html` as full HTML and a shared `/docs/modele#s-10-4` lands with
+  a **200**. `autoStaticPathsDiscovery` is **off** so `/` stays the SPA shell. Under
+  `bun run dev`, SPA mode serves the shell for every path and the page renders client-side — same
+  output, different status line.
 - **Heading ids come from the section number, not the title**: `### 10.4 Use-class gate` renders as
   `id="s-10-4"` (`src/components/docs/markdown.tsx`, `@/lib/docs/refs.ts`). That number is the
   contract every `§` in `src/lib/rail/help.ts` and `provenance.ts` links to, through `HelpText`

@@ -29,6 +29,15 @@ The `test` block lives in `vite.config.ts`.
   `.tsx` under `src/` for the words the interface never says, and checks the glossary names the
   wordings it prints (#102). A scan of every string is observable nowhere else; it spans every
   module, and it is still `node`, no DOM.
+- **Two tests read the documentation against the code** (#125). `src/lib/docs/links.test.ts` unit
+  tests `links.ts`, then walks every page `pages.ts` serves — the guide, the reference, the
+  reports, read from disk — so that each link between pages lands on a heading that exists, the
+  guide's sommaire reaches every sub-chapter, and every slug and anchor served before the guide
+  still is. `src/lib/docs/guide-examples.test.ts` has no source file of its own: it runs the
+  First-Run Scenario through the engine's chain (`solveSpan`, `sweep`, `evaluateClearance`,
+  `evaluateVerdict`, `ride`) and checks that `docs/guide/*.md` prints each figure it quotes. A
+  link, or a figure in prose, is observable only across the page and the module that produce it;
+  both are still `node`, no DOM.
 
 ## What deserves a test
 
@@ -49,8 +58,9 @@ Decided in the wayfinder ticket _Engine API, execution model and module layout_.
 - **Colocated.** `solve.test.ts` sits beside `solve.ts` in `src/lib/sim/`. Keeps each
   assertion in eyeshot of the `docs/simulation-theory.md` § citation it verifies.
 - **One test file per source file**, same basename. **No `tests/` directory, and no suite file
-  spanning several modules** (bar the three exceptions above: the two build tests and the copy scan). This survives every app layer
-  unchanged — `first-run.test.ts` beside `first-run.ts`, `p1.test.ts` beside `p1.ts`.
+  spanning several modules** (bar the five exceptions above: the two build tests, the copy scan
+  and the two documentation tests). This survives every app layer unchanged — `first-run.test.ts`
+  beside `first-run.ts`, `p1.test.ts` beside `p1.ts`.
 - **Physics fixtures live in one place**: `src/lib/sim/__fixtures__/theory-15.ts`, exporting `F1`,
   `Z1`–`Z6` and `Z8` from `docs/simulation-theory.md` §15 as typed consts. Every fixture carries
   a `source` field naming its § (e.g. `"simulation-theory.md §15 Z4"`). The golden canonical
@@ -73,6 +83,13 @@ Decided in the wayfinder ticket _Engine API, execution model and module layout_.
     assert at the loosest tier below.
 
   Treating the two alike invites someone to tighten the wrong one and to trust the wrong one.
+
+  A third class checks **documentation, not physics**: `src/lib/docs/guide-examples.test.ts` takes
+  its expected values from the engine's output on purpose — what it guards is that the guide's
+  prose still prints what the opening screen shows, not that the engine is right (the §15 and
+  `[MEASURED]` rows do that). The arithmetic it does on that output is the guide's own
+  presentation — `w / g` as a linear mass, `v · 3.6` in km/h, a share of the MBF — never a formula
+  of the engine. It is no model for a physics test.
 
   A datasheet figure takes `[DATASHEET]` (`simulation-theory.md` §0.2); arithmetic done on one
   keeps that tag and says so in `source` (`src/lib/rail/__fixtures__/courant-bandit.ts`).

@@ -52,13 +52,14 @@ Tailwind CSS v4 · shadcn/ui on Base UI · Vitest · Oxlint / Oxfmt.
 
 ```
 src/
-├── routes/        # file-based routes: `/` (simulator) and `/docs/*` (theory pages)
+├── routes/        # file-based routes: `/` (simulator) and `/docs/*` (guide, reference, reports)
 ├── components/    # app, chart, rail, docs — and ui/ (shadcn, generated)
 └── lib/
     ├── sim/       # physics engine: catenary, solver, sweep, clearance, verdict
     ├── terrain/   # terrain profile import (CSV)
     └── …          # scenario, url, session, chart, format helpers
 docs/
+├── guide/                 # the step-by-step guide, in French — first group served at `/docs`
 ├── simulation-theory.md   # the contract the engine implements
 ├── conventions/           # how the code is written, per area
 └── references/            # source research reports
@@ -67,8 +68,11 @@ GLOSSARY.md                # domain vocabulary
 
 ## Documentation
 
+- [`docs/guide/`](docs/guide/README.md) — the simulator explained step by step, in French, for a
+  reader with school mathematics: the line, statics, safety, the ride, the model's limits. Served
+  first in the app under `/docs`.
 - [`docs/simulation-theory.md`](docs/simulation-theory.md) — the physics, its sources and their
-  trust levels. Also served in the app under `/docs`.
+  trust levels: the reference the guide explains. Also served in the app under `/docs`.
 - [`GLOSSARY.md`](GLOSSARY.md) — the domain vocabulary used in code, issues and UI.
 - [`docs/conventions/`](docs/conventions/) — coding conventions per area.
 

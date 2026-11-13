@@ -20,12 +20,12 @@ docs/references/`) rather than reading top-to-bottom.
 
 ## Served to the user
 
-`docs/simulation-theory.md`, `algo simulation tyrolienne.md`, `research-two.md` and the four reports
-above are rendered in the app at `/docs/<slug>` (`src/lib/docs/pages.ts`), and every `§n.m` in the Rail's
-help and provenance copy links to the matching heading of `simulation-theory.md`. **Renumbering a
-section of the theory file breaks those links** — `src/lib/docs/refs.test.ts` catches it. The
-three prose reports were given markdown headings on 2026-09-23 so they render; their wording is
-unchanged and `rg` still works.
+`docs/simulation-theory.md`, `algo simulation tyrolienne.md`, `research-two.md` and the four
+reports above are rendered in the app at `/docs/<slug>` (`src/lib/docs/pages.ts`), and every
+`§n.m` in the Rail's help and provenance copy links to the matching heading of
+`simulation-theory.md`. **Renumbering a section of the theory file breaks those links** —
+`src/lib/docs/refs.test.ts` catches it. The three prose reports were given markdown headings on
+2026-09-23 so they render; their wording is unchanged and `rg` still works.
 
 `docs/guide/` (#125) explains the reference step by step, in French, for a reader with school
 mathematics: one chapter per part of the engine, each sub-chapter citing the § it explains, and a
