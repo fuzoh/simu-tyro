@@ -53,12 +53,13 @@
  *   taken in either view, the rose has no handle and no Fond or Couche pentes is offered — the Fond
  *   is the one the Session holds. The Mesure stays, being the map's own, as #98 drew it — no aperçu,
  *   no Repère d'ancrage, no « Repères » (#107); the coupe stands under the map, and the switch flips
- *   the two together between « 2D » and « 3D ».
+ *   the two together between « 2D » and « 3D ». The coupe is placed by `./deferred-top-map.tsx`,
+ *   outside this module, which only says whether the Vue 3D stands alone (`readOnly.onShows3d`).
  */
 
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { GeoJSONSource } from "maplibre-gl";
-import type { ReactNode, RefObject } from "react";
+import type { RefObject } from "react";
 
 import { Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl } from "maplibre-gl";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
@@ -81,13 +82,7 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { useAppDispatch, useAppState } from "@/components/app/store.tsx";
 import { useHover } from "@/components/chart/use-hover.ts";
-import { InfoTip } from "@/components/rail/controls.tsx";
-import {
-  MapOverCoupe,
-  plainDrawing,
-  TOP_VIEW_BOX,
-  TopViewFrame,
-} from "@/components/statique/top-view.tsx";
+import { plainDrawing, TOP_VIEW_BOX, TopViewFrame } from "@/components/statique/top-view.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.tsx";
@@ -97,8 +92,6 @@ import { coupeLines, coupeReading } from "@/lib/chart/hover.ts";
 import { placeRider } from "@/lib/chart/scene.ts";
 import { bananeAcross } from "@/lib/map/banane.ts";
 import {
-  anchorReading,
-  BANANE_HELP,
   clickHint,
   EMBARK_BLOCKED,
   FOND_LABEL,
@@ -147,6 +140,7 @@ import { cn } from "@/lib/utils.ts";
 import type { Vue3d } from "./vue-3d-renderer.ts";
 
 import { loadVue3d } from "./load-vue-3d.ts";
+import { MapCaption } from "./map-caption.tsx";
 import { useMeasure } from "./use-measure.ts";
 import { EmbarkedControls, Gimbal } from "./vue-3d-gimbal.tsx";
 import { WindRose } from "./wind-rose.tsx";
@@ -165,7 +159,10 @@ const FIT = { padding: 48, maxZoom: 16 } as const;
  *   the Vue 3D draws the same line the coupe does, or none.
  * @param windCause why the Wind Gate withholds the Vent, or `null`: while it stands no Banane bows
  *   and the rose draws no wind, and the line under the map says it in place of the rose's reading.
- * @param readOnly the Page Terrain's visualisation (#101), whose `coupe` stands under the map in 2D.
+ * @param readOnly the Page Terrain's visualisation (#101). Its coupe stands under the map in 2D and
+ *   is hidden while the Vue 3D stands alone; the map does not hold it — `./deferred-top-map.tsx`
+ *   does, so the coupe keeps its place, its focus and its state when this module arrives (#128) —
+ *   and tells its holder, through `onShows3d`, which of the two it shows.
  * @param rides the passager's two rides as the gates leave them (`gatedRides`), off the same solved
  *   half — `null` while none is read: the Vue embarquée plays the one with the Vent entered. Absent
  *   on a Page that prints no ride, whose Vue 3D then offers none.
@@ -181,7 +178,7 @@ export function TopMap({
   rides?: DynamicsReading | null;
   solved: SceneBase | null;
   windCause: string | null;
-  readOnly?: { readonly coupe: ReactNode };
+  readOnly?: { readonly onShows3d: (shows3d: boolean) => void };
 }) {
   const { scenario, map: display, trace, layers } = useAppState();
   const dispatch = useAppDispatch();
@@ -200,6 +197,9 @@ export function TopMap({
   const [lost3d, setLost3d] = useState(false);
   const shows3d = display.view === "3d" && placement.ok && !lost3d;
   const lose3d = useCallback(() => setLost3d(true), [setLost3d]);
+  // Said before the paint, so the coupe never shows beside the Vue 3D nor misses under the map.
+  const onShows3d = readOnly?.onShows3d;
+  useLayoutEffect(() => onShows3d?.(shows3d), [onShows3d, shows3d]);
   const renderer = useVue3dRenderer(shows3d, lose3d);
   // A withheld Vent is drawn as none, and the rose's handle waits at the centre, where a drag sets a
   // Vent the gates accept.
@@ -295,30 +295,21 @@ export function TopMap({
   const view = (
     <TopViewFrame
       caption={
-        <>
-          {(["A", "B"] as const).map((anchor) => (
-            <span className="font-mono" key={anchor}>
-              {anchorReading(anchor, drawn)}
-            </span>
-          ))}
-          {!shows3d && <span>{windCause ?? windReading(wind, bearing, !locked)}</span>}
-          <span>{gestureLine}</span>
-          {!shows3d && unavailable && (
-            <span>{[MAP_COPY.unavailable, plain?.unoriented].filter(Boolean).join(" · ")}</span>
-          )}
-          {/* A `title` reached the mouse alone; the `ⓘ` reaches keyboard and touch too (#122). */}
-          {bananeShown && (
-            <span className="flex items-center gap-1">
-              {MAP_COPY.bananeNote}
-              <InfoTip label={MAP_COPY.bananeNote} text={BANANE_HELP} />
-            </span>
-          )}
-          {placement.ok ? (
-            lost3d && <span>{MAP_COPY.vue3dUnavailable}</span>
-          ) : (
-            <span>{blockedWhy[placement.block]}</span>
-          )}
-        </>
+        <MapCaption
+          banane={bananeShown}
+          gesture={gestureLine}
+          positions={drawn}
+          unavailable={!shows3d && unavailable}
+          unoriented={plain?.unoriented ?? null}
+          vue3d={
+            placement.ok ? (
+              lost3d && <span>{MAP_COPY.vue3dUnavailable}</span>
+            ) : (
+              <span>{blockedWhy[placement.block]}</span>
+            )
+          }
+          wind={shows3d ? null : (windCause ?? windReading(wind, bearing, !locked))}
+        />
       }
       controls={
         <MapControls
@@ -441,11 +432,7 @@ export function TopMap({
       }
     />
   );
-  return readOnly === undefined ? (
-    view
-  ) : (
-    <MapOverCoupe coupe={shows3d ? null : readOnly.coupe} map={view} />
-  );
+  return view;
 }
 
 /** The Mesure's distances, over the map's bottom-left corner so the caption's height never moves. */
