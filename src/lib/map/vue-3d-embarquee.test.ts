@@ -98,7 +98,6 @@ describe("the eye in the gabarit du passager", () => {
 describe("the ride placed on the earth", () => {
   test("puts the eye under each sample, on the line the Vue 3D draws, its drop below the pulley", () => {
     const ride = placed();
-    expect(ride.eyeBelowM).toBeCloseTo(0.5, 12);
     expect(ride.duration).toBe(30);
     expect(ride.end).toEqual(SWING.end);
     SWING.samples.forEach(({ t, x, z, v }, i) => {
@@ -288,7 +287,9 @@ describe("the look, free of the motion", () => {
   test("a drag grabs the view: right turns the head left, down raises the eyes", () => {
     const look = { headingDeg: 10, pitchDeg: 0 };
     const k = VUE_EMBARQUEE.dragDegPerPx;
-    expect(lookDragged(look, 100, 0).headingDeg).toBeCloseTo(normalised(10 - 100 * k), 9);
+    expect(k).toBe(0.25);
+    // 10° − 100 px × 0,25 °/px = −15°, which is 345°.
+    expect(lookDragged(look, 100, 0).headingDeg).toBeCloseTo(345, 9);
     expect(lookDragged(look, 0, 40).pitchDeg).toBeCloseTo(40 * k, 9);
     expect(lookDragged(look, 0, 10_000).pitchDeg).toBe(PITCH_RANGE.max);
     // A whole circle of drag comes back where it started.
@@ -341,7 +342,3 @@ describe("when no motion is proposed", () => {
     expect(embarkBlock(SWING, ride, false)).toBe("gesture");
   });
 });
-
-function normalised(deg: number): number {
-  return ((deg % 360) + 360) % 360;
-}

@@ -33,7 +33,7 @@ import type { CameraPose, Key } from "./vue-3d-camera.ts";
 import type { EarthPoint, Vue3dPlacement } from "./vue-3d.ts";
 
 import { localPlane } from "./measure.ts";
-import { CAMERA_STEP, PITCH_RANGE } from "./vue-3d-camera.ts";
+import { CAMERA_STEP, headingOf, normalise, PITCH_RANGE } from "./vue-3d-camera.ts";
 import { earthFrame } from "./vue-3d.ts";
 
 /** The Vue embarquée's `[CONVENTION]`s: where the eye stands in the gabarit, and how far a press turns it. */
@@ -88,8 +88,6 @@ export type Vue3dRide = {
   readonly duration: number;
   /** The heading of A → B, degrees clockwise from north: where the look starts. */
   readonly lineHeadingDeg: number;
-  /** How far below the pulley the eye stands, m. */
-  readonly eyeBelowM: number;
 };
 
 /** Why the Vue embarquée is off: no ride read, a ride with no motion, or a line being dragged. */
@@ -135,14 +133,12 @@ export function vue3dRide({
   const onEarth = earthFrame({ ends, L: frame.L, topA: bases.zBaseA + frame.anchors.zA });
   const eyeBelowM = eyeBelowPulley(hRider);
   const plane = localPlane(ends.A, ends.B);
-  const b = plane.metres(ends.B);
+  const { east, north } = plane.metres(ends.B);
   return {
     samples: ride.samples.map(({ t, x, z, v }) => ({ t, x, v, eye: onEarth(x, z - eyeBelowM) })),
     end: ride.end,
     duration: last.t,
-    lineHeadingDeg:
-      b.east === 0 && b.north === 0 ? 0 : normalise(degrees(Math.atan2(b.east, b.north))),
-    eyeBelowM,
+    lineHeadingDeg: headingOf(east, north),
   };
 }
 
@@ -360,12 +356,4 @@ export function isEmbarkKey({ key, ctrlKey, altKey, metaKey }: Key): boolean {
 
 function pitchIn(deg: number): number {
   return Math.min(PITCH_RANGE.max, Math.max(PITCH_RANGE.min, deg));
-}
-
-function normalise(deg: number): number {
-  return ((deg % 360) + 360) % 360;
-}
-
-function degrees(rad: number): number {
-  return (rad * 180) / Math.PI;
 }
