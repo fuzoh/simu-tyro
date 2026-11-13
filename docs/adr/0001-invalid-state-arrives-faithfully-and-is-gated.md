@@ -31,5 +31,11 @@ change when the old behaviour was accidental, and the PR explains the re-pin.
   Its label names the active family's shipped end (« Passer à « Œil cousu / épissuré » » on a
   textile line). It repairs a knot on HMPE and an end of the other family that arrived in a link
   or a Session.
+- A sixth Fix Action (`passer-au-vent-uniforme`, #120) is admitted on the same terms. A link or a
+  Session can carry a Profil du vent that is not uniform before any calculation reads the profile:
+  the Vent is kept as given and is a Blocking Error on the Wind Gate, never computed as a Vent
+  uniforme. « Passer au vent uniforme » writes the Atténuation aux ancrages to 0 % and nothing
+  else of the Vent. It is offered only while no calculation reads the profile, and never on a
+  percent outside its domain, whose repair is the user's to choose.
 - The spec's assumption that knots on HMPE "never reach a warning" no longer holds; the
   state is reachable and is a Blocking Error, not a warning.
