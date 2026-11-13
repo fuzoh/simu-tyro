@@ -25,6 +25,7 @@ import { mapStyle, wmtsTiles } from "./style.ts";
 import {
   CAMERA_REACH,
   DRAPED,
+  onlyLoadedMoved,
   vue3dFollowing,
   vue3dLayers,
   vue3dPlacement,
@@ -442,5 +443,53 @@ describe("the coupe's layers in the Vue 3D (#111)", () => {
 
   test("the Banane bows the Ligne à vide, never the Trajectoire", () => {
     expect(drawn(10).trajectory).toEqual(drawn(0).trajectory);
+  });
+});
+
+describe("a passager dragged along the coupe moves the loaded line alone (#130)", () => {
+  const scene = solved(trial());
+  const at = (xD: number, { across = 0, line = scene } = {}) =>
+    vue3dScene({ placement: placed(line), solved: line, rider: placeRider(line, xD), across });
+
+  test("another position along the same line: only the loaded line moved", () => {
+    const before = at(100);
+    const after = at(300);
+    expect(after.loaded).not.toEqual(before.loaded);
+    expect(onlyLoadedMoved(before, after)).toBe(true);
+  });
+
+  test("the same position, built anew: nothing but the loaded line could have moved", () => {
+    expect(onlyLoadedMoved(at(100), at(100))).toBe(true);
+  });
+
+  test("a Vent bows the Ligne à vide: the line is drawn anew", () => {
+    expect(onlyLoadedMoved(at(100), at(300, { across: 10 }))).toBe(false);
+  });
+
+  test("a heavier passager moves the Trajectoire: the line is drawn anew", () => {
+    const heavier = solved(trial({ rider: { ...trial().rider, mp: 200 } }));
+    expect(onlyLoadedMoved(at(100), at(100, { line: heavier }))).toBe(false);
+  });
+
+  test("an anchor raised moves its Fil à plomb and the Ligne A–B: the line is drawn anew", () => {
+    const raised = solved(trial({ anchors: { ...ANCHORS, zB: 3 } }));
+    expect(onlyLoadedMoved(at(100), at(100, { line: raised }))).toBe(false);
+  });
+
+  test("two Brins porteurs instead of one: the members are drawn anew", () => {
+    const two = solved(trial({ carryingLines: 2 }));
+    expect(onlyLoadedMoved(at(100), at(100, { line: two }))).toBe(false);
+  });
+
+  test("a passager no longer placed, or placed again, takes the solve's lines away or back", () => {
+    const unplaced = vue3dScene({
+      placement: placed(scene),
+      solved: scene,
+      rider: null,
+      across: 0,
+    });
+    expect(onlyLoadedMoved(at(100), unplaced)).toBe(false);
+    expect(onlyLoadedMoved(unplaced, at(100))).toBe(false);
+    expect(onlyLoadedMoved(unplaced, unplaced)).toBe(false);
   });
 });
