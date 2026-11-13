@@ -240,9 +240,12 @@ and `max-w-[1984px]`, and `contract.test.ts` holds the two together. B2 and B3 a
   `src/` for the retyping). The column is `wide-rail:w-144`, `2 × 288`; the Rail Header and the
   `Paramètres` heading stay across it, and the groups under them flow in **CSS columns**
   (`wide-rail:columns-2`), each group `break-inside-avoid`, `space-y-3` between groups and the
-  wrapper's own `gap-3` between the two columns: each column is `(576 − 1 − 24 − 12) / 2 = 269,5`
-  px, against the `288 − 1 − 24 = 263` px a group has in the 288 px column (both measured, the
-  column's hairline counted). Columns rather than a grid because a column box flows the groups in the
+  wrapper's `wide-rail:gap-6` (24 px) between the two columns, split by a 1px `column-rule` in
+  `--border` (the colour of the Page's other dividers, #123): each column is
+  `(576 − 1 − 24 − 24) / 2 = 263,5` px (the rule is drawn in the middle of the gap and takes no
+  width), against the `288 − 1 − 24 = 263` px a group has in the 288 px column (the column's
+  hairline counted; computed from the classes, routing.md's 269,5 px is the earlier gap-3
+  measurement). Columns rather than a grid because a column box flows the groups in the
   DOM's order, down the left column and then down the right: the reading order, the order on screen
   and the Tab order are one, with no `order` to keep in step and no split point to choose by hand.
   The browser balances the two, so which group opens the right column depends on the groups'

@@ -427,7 +427,8 @@ export function RailInputs({
           is the reading order and the Tab order, with no `order` to keep in step. `gap-3` is then
           the gap on narrow widths, `wide-rail:gap-6` the one between the two columns, split by a
           1px `column-rule` in `--border` (the colour of the Page's other dividers, #123);
-          `space-y-3` the one between groups, and no group is ever cut across them (`break-inside-avoid` on each). The heading above stays across both. */}
+          `space-y-3` the one between groups, and no group is ever cut across them
+          (`break-inside-avoid` on each). The heading above stays across both. */}
       <div className="wide-rail:block wide-rail:columns-2 wide-rail:space-y-3 wide-rail:*:break-inside-avoid wide-rail:gap-6 wide-rail:[column-rule:1px_solid_var(--border)] mt-2 flex flex-col gap-3">
         <Group title="Installation et régime">
           <UsageRow />
