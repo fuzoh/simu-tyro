@@ -72,7 +72,7 @@ export function tensionProfile(base: SceneBase, requestedXD: number): TensionPro
     L: base.L,
     unloaded,
     loaded,
-    rider: loaded === null || resolved === null ? null : riderOn(loaded, resolved.step.xD),
+    rider: loaded === null ? null : riderOn(loaded),
     perLine: base.members.length > 1,
   };
 }
@@ -90,17 +90,16 @@ function curveOf(interleaved: Float64Array): TensionCurve {
 }
 
 /**
- * The node's two pairs, read off the sampled curve: the one place its `x` repeats. Falls back to
- * the curve's value at `x_D` on both sides should no `x` repeat — a node that `sampleTension` did
- * not emit is a node it was not given.
+ * The node's two pairs, read off the sampled curve: the one place its `x` repeats. A loaded curve
+ * always has one — {@link solveRider} returns `null` without a load, and `sampleTension` emits
+ * both sides of every load it is given — so a curve without it is a broken invariant, not a state.
  */
-function riderOn(curve: TensionCurve, xD: number): NonNullable<TensionProfile["rider"]> {
+function riderOn(curve: TensionCurve): NonNullable<TensionProfile["rider"]> {
   const { xs, Ts } = curve;
   for (let i = 1; i < xs.length; i++) {
     if (xs[i] === xs[i - 1]) return { xD: xs[i], sideA: Ts[i - 1], sideB: Ts[i] };
   }
-  const T = polylineAt({ xs, zs: Ts }, xD);
-  return { xD, sideA: T, sideB: T };
+  throw new Error("tensionProfile: the loaded curve has no node");
 }
 
 /** A curve's tension at `x`: the A side before the node, the B side from it on. */
