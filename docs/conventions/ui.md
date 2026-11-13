@@ -434,6 +434,32 @@ arithmetic over the shell, measured by `agent-browser` (`docs/conventions/routin
   1024, and the map is the wider of the two from 1106.
 - **The Skeleton is the same tree** (`StatiqueFrame`), so it lands in the same boxes at every width.
 
+## Dynamique's proposal
+
+The Page Dynamique's third region, « Proposition pour l'ancrage B » (#121), stands **last, under
+the charts** (`DynamiqueFrame`'s `proposal` slot). Its height is its answer's — a refusal is three
+lines, a proposal a screenful — so above the coupe it would move both charts each time
+an answer lands; under them it moves nothing.
+
+- **It is read, never pressed.** No button, no field, no link that edits the Scenario: the proposal
+  applies nothing, and the target it is held to is set on Avancé (« Cible du point le plus loin »,
+  in « Dynamique du passager »). The view model (`src/lib/dynamique/reach.ts`) decides every word;
+  `src/components/dynamique/reach.tsx` lays it out.
+- **One headline, then three tiles per ride.** The height variation is the one `TileFrame` alone on
+  its row; each of the candidate's rides is then a `RideGrid` of three — Point le plus loin, Distance
+  restante à B, Point d'arrêt — so the three are never read as one. With a wind along the line there
+  are two rides, the second headed « sans vent — comparaison ». Assumptions are muted `text-xs`
+  lines, the warnings `text-warning` behind a ⚠, like a tile's Avertissement.
+- **A refusal is a sentence in the foreground colour**, in the place of the tiles, never beside a
+  height.
+- **Searched after the frame that prints the rides** (`useDeferredValue`): the search re-runs the
+  whole chain a dozen times, so a keystroke paints its own results first. Meanwhile the answer of
+  the Scenario before it stays, **dimmed (`opacity-50`) and `aria-busy`**, so a height is never read
+  as this Scenario's while it is another's. Measured with `agent-browser` on the dev server
+  (2026-11-13, 1440 × 1000, the shipped line, « Masse » 120 → 100): stale mark 17 ms after the
+  input, the new answer (« Monter B de 14,9 m ») at 49 ms.
+- **Narrow**: at 390 px the tiles stack one per row and nothing overflows (`scrollWidth` 390).
+
 ## Charts
 
 **Hand-rolled SVG in React with `d3-shape` for the paths, and one hand-written affine scale per
