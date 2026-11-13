@@ -60,7 +60,7 @@ ligne A–B mesure $\sqrt{150^2 + 18^2} = \sqrt{22\,824} \approx 151{,}08$ m. La
 $18 / 150 = 12$ %.
 
 Le sol n'entre pas dans ce repère comme une donnée de la statique : il ne sert qu'à mesurer la
-garde au sol (2.10). Les **hauteurs d'ancrage** (la hauteur de chaque ancrage au-dessus du sol à
+garde au sol ([2.10](2-statique.md#s-2-10)). Les **hauteurs d'ancrage** (la hauteur de chaque ancrage au-dessus du sol à
 son pied) servent uniquement à placer le sol sous la ligne.
 
 Référence : [§2](../simulation-theory.md#s-2).
@@ -104,7 +104,7 @@ Pour la statique, une ligne est décrite par deux grandeurs :
 | $\mu$ | masse linéique | kg/m | masse d'un mètre de ligne non tendue |
 | $w$ | poids linéique | N/m | poids d'un mètre de ligne non tendue : $w = \mu \cdot g$ |
 
-et, pour l'allongement, par sa raideur axiale $EA$ (1.6). La sécurité utilise en plus sa
+et, pour l'allongement, par sa raideur axiale $EA$ ([1.6](1-ligne.md#s-1-6)). La sécurité utilise en plus sa
 **charge de rupture** ([3.1](3-securite.md#s-3-1)).
 
 **Exemple — la ligne d'ouverture.** Un câble de 12 mm a une masse linéique de 0,5465 kg/m (la
@@ -182,7 +182,7 @@ point du câble garde la même abscisse $s$ quelle que soit la charge.
 **Exemple — la ligne d'ouverture.** Le câble de 12 mm a une raideur axiale
 $EA \approx 6{,}90$ MN, soit 6 897 240 N. Sous environ 2600 N, l'allongement relatif vaut
 $2600 / 6\,897\,240 \approx 0{,}038$ %, soit environ 5,7 cm sur les 151,6 m de câble. C'est peu
-pour un câble ; une corde en polyamide s'allongerait de plusieurs pour cent (3.2).
+pour un câble ; une corde en polyamide s'allongerait de plusieurs pour cent ([3.2](3-securite.md#s-3-2)).
 
 Référence : [§1](../simulation-theory.md#s-1), [§2](../simulation-theory.md#s-2),
 [§7](../simulation-theory.md#s-7) (pourquoi $L_0$ est la variable d'état).
@@ -196,7 +196,7 @@ en mètres, et souvent en part de la portée : **flèche / portée**, $D/L$, en 
 - la **flèche chargée**, avec le passager sur la ligne ; elle se trouve sous le passager.
 
 Plus la ligne est longue par rapport à la ligne A–B, plus la flèche est grande et plus la tension
-est faible : flèche et tension sont les deux faces d'un même réglage (2.6).
+est faible : flèche et tension sont les deux faces d'un même réglage ([2.6](2-statique.md#s-2-6)).
 
 **Exemple — la ligne d'ouverture.** La ligne non tendue mesure $L_0 = 151{,}64$ m, soit 0,57 m de
 plus que la ligne A–B (151,08 m). Ces 57 cm suffisent à donner une flèche à vide de 6,00 m, soit
@@ -231,3 +231,7 @@ Les symboles du guide sont ceux de la référence technique et du simulateur.
 
 La table complète français ↔ anglais, qui fixe aussi les noms utilisés dans le code, est au
 [§1 de la référence](../simulation-theory.md#s-1).
+
+---
+
+Précédent : [Sommaire](README.md) · Suivant : [2. Statique](2-statique.md)

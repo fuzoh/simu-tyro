@@ -51,7 +51,7 @@ horizontale divise la flèche par deux**, et doubler la portée multiplie la fl�
 
 Le signe moins dit que la parabole **sous-estime** la flèche : la vraie ligne pend plus bas. Pour la
 garde au sol, ce n'est pas du côté de la sécurité. C'est pourquoi le moteur n'utilise la parabole
-que comme **point de départ** de ses calculs (2.5), jamais comme résultat.
+que comme **point de départ** de ses calculs ([2.5](2-statique.md#s-2-5)), jamais comme résultat.
 
 **Exemple — la ligne d'ouverture.** Avec $w = 5{,}361$ N/m, $L = 150$ m et $H = 2535{,}6$ N, la
 parabole donne $D \approx 5{,}361 \cdot 150^2 / (8 \cdot 2535{,}6) \approx 5{,}95$ m, contre
@@ -75,7 +75,7 @@ ressemble à une parabole près de son minimum et remonte plus vite ensuite. La 
 la « raideur » de la courbe : une grande tension (grand $C$) donne une ligne presque droite.
 
 La chaînette rigide sert au moteur de cas limite : quand la raideur axiale devient infinie, le
-modèle élastique (2.4) doit retrouver exactement cette courbe, et les tests le vérifient.
+modèle élastique ([2.4](2-statique.md#s-2-4)) doit retrouver exactement cette courbe, et les tests le vérifient.
 
 Référence : [§3](../simulation-theory.md#s-3).
 
@@ -85,7 +85,7 @@ Le modèle du moteur est la **chaînette élastique** (Irvine, 1981) : une chaî
 morceau s'allonge selon la loi de 1.6. C'est le seul modèle utilisé pour les résultats, pour le
 câble comme pour la corde.
 
-**Les données.** La portée $L$ et le dénivelé $h$ (1.2), la longueur non tendue $L_0$, le poids
+**Les données.** La portée $L$ et le dénivelé $h$ ([1.2](1-ligne.md#s-1-2)), la longueur non tendue $L_0$, le poids
 linéique $w$ et la raideur axiale $EA$.
 
 **Les inconnues.** La tension horizontale $H$ et la composante verticale en A, $V_0$ (en N). Une
@@ -156,14 +156,14 @@ grandit avec la portée ($10^{-6} \cdot L$).
 
 **Les précautions.** Un pas de Newton peut aller trop loin. Le moteur divise alors le pas par deux
 jusqu'à ce que le résidu diminue, garde $H$ positif, et, faute de converger, repart d'une autre
-estimation (cinq essais au plus). L'estimation de départ vient de la parabole (2.2). Deux cas
+estimation (cinq essais au plus). L'estimation de départ vient de la parabole ([2.2](2-statique.md#s-2-2)). Deux cas
 limites ont un traitement à part : la ligne presque droite (très tendue, ou très légère), traitée
 comme une barre élastique, et la ligne très lâche, où l'on évite que le calcul ne s'effondre.
 
 **Quand il n'y a pas de solution.** Le simulateur le dit, avec un nom précis :
 
 - **Tension impossible** : la tension demandée dépasserait la charge de rupture de la ligne ;
-- **Cible inatteignable** : aucune longueur non tendue ne donne la valeur demandée (2.6) ;
+- **Cible inatteignable** : aucune longueur non tendue ne donne la valeur demandée ([2.6](2-statique.md#s-2-6)) ;
 - **Calcul impossible** : le calcul n'a pas convergé sur un cas que les autres contrôles
   laissaient passer — un cas qui ne devrait pas arriver.
 
@@ -174,7 +174,7 @@ Référence : [§4.2](../simulation-theory.md#s-4-2) (jacobien), [§4.3](../simu
 
 ## 2.6 Dire à quel point la ligne est tendue
 
-Pour le moteur, la seule grandeur d'état est la **longueur non tendue** $L_0$ (1.6). Mais on ne coupe pas
+Pour le moteur, la seule grandeur d'état est la **longueur non tendue** $L_0$ ([1.6](1-ligne.md#s-1-6)). Mais on ne coupe pas
 une ligne au centimètre : sur le terrain, on règle une tension ou une flèche. Le
 simulateur accepte donc cinq façons de dire à quel point la ligne est tendue — le **pilote de
 tension** — et ramène chacune à une longueur $L_0$ avant tout calcul :
@@ -194,7 +194,7 @@ entre une ligne très courte (presque la ligne A–B, tension énorme) et une li
 **dichotomie**.
 
 **Pourquoi la tension de pose demande plus de soin.** La tension à l'ancrage vaut
-$T = \sqrt{H^2 + V^2}$ (1.5). Quand on allonge la ligne, $H$ diminue mais $V$ augmente, puisque
+$T = \sqrt{H^2 + V^2}$ ([1.5](1-ligne.md#s-1-5)). Quand on allonge la ligne, $H$ diminue mais $V$ augmente, puisque
 chaque mètre ajouté pèse. Sur une ligne très lâche, la tension à l'ancrage passe par un **minimum**
 puis remonte. Le moteur ne retient que la **branche tendue** (avant ce minimum) ; une tension de
 pose plus faible que ce minimum n'a pas de solution et s'affiche « Cible inatteignable ».
@@ -274,9 +274,9 @@ converger Newton en une à trois itérations.
 - la **trajectoire** : le chemin du point d'attache du passager, $z_D(x_D)$, dessiné en pointillé
   sur la coupe ;
 - l'**enveloppe des tensions** : la plus grande tension à chaque ancrage sur toute la traversée,
-  que le Verdict juge (3.5) ;
-- la **garde au sol** à chaque position (2.10) ;
-- la pente de la trajectoire, que la dynamique utilise (4.2).
+  que le Verdict juge ([3.5](3-securite.md#s-3-5)) ;
+- la **garde au sol** à chaque position ([2.10](2-statique.md#s-2-10)) ;
+- la pente de la trajectoire, que la dynamique utilise ([4.2](4-dynamique.md#s-4-2)).
 
 **La couverture.** Si certaines positions ne se résolvent pas, tout ce qui se déduit du balayage
 (tension maximale, garde min (traversée), Verdict) est incomplet ; le simulateur le dit et le Verdict
@@ -379,9 +379,13 @@ plus que la charge et la température sont élevées. La règle retenue est de g
 vide d'une corde sous 30 % de sa charge de rupture ([3.8](3-securite.md#s-3-8)).
 
 **Ce que le simulateur en fait.** Il **ne calcule pas** ces évolutions : ni température, ni
-fluage. Il avertit sur la tension à vide des cordes (3.8) et, sur la Page Avancé, cite les
+fluage. Il avertit sur la tension à vide des cordes ([3.8](3-securite.md#s-3-8)) et, sur la Page Avancé, cite les
 pertes de tension relevées lors de l'essai de terrain (« Pourquoi on retend ») sans en tirer de
 loi. Ces paragraphes expliquent pourquoi une ligne se retend, pas un résultat affiché.
 
 Référence : [§9](../simulation-theory.md#s-9), [§9.1](../simulation-theory.md#s-9-1),
 [§9.2](../simulation-theory.md#s-9-2), cas Z7 au [§15](../simulation-theory.md#s-15).
+
+---
+
+Précédent : [1. Comprendre la ligne](1-ligne.md) · Suivant : [3. Sécurité](3-securite.md)

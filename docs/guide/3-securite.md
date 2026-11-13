@@ -126,7 +126,7 @@ $$
 | Symbole | Signification | Unité |
 | --- | --- | --- |
 | $T_{\text{vide}}$ | tension à l'ancrage, ligne à vide | N |
-| $T_{\text{chargée}}$ | plus grande tension à l'ancrage sur la traversée, passager compris (2.8) | N |
+| $T_{\text{chargée}}$ | plus grande tension à l'ancrage sur la traversée, passager compris ([2.8](2-statique.md#s-2-8)) | N |
 | majoration | multiplicateur de la part due au passager | sans dimension |
 | $T_{\text{maj}}$ | tension majorée, celle que le Verdict juge | N |
 
@@ -189,7 +189,7 @@ faible. L'essai de charge n'est pas évalué par le simulateur.
 **Exemple — la ligne d'ouverture.** Terminaisons cosse à sertir ($\eta = 0{,}90$), MBF 90 737 N.
 
 - Facteur de sécurité en A : $0{,}90 \cdot 90\,737 / 9279{,}8 \approx 8{,}80$ ; en B, 9,06. A
-  gouverne, parce que c'est l'ancrage le plus haut (1.5).
+  gouverne, parce que c'est l'ancrage le plus haut ([1.5](1-ligne.md#s-1-5)).
 - Sous EN 15567-1 ($k = 3$) : $T_{\text{adm}} = 0{,}90 \cdot 90\,737 / 3 \approx 27\,221$ N. La réserve
   vaut $27\,221 - 9280 \approx 17\,941$ N : **Dans les limites**.
 - Sous ACCT 10:1 ($k = 10$) : $T_{\text{adm}} \approx 8166$ N, plus faible que 9280 N ; le facteur de
@@ -216,12 +216,12 @@ choisi. Il prend l'un de cinq états, chacun appelant une action différente :
 les valeurs que l'outil reconnaît ne pas connaître précisément : elle n'est pas présentée comme
 saine avec une note.
 
-**Les causes d'« Interdit ».** Des serre-câbles sur une ligne qui porte des passagers (3.3) ; une
-corde en installation permanente (3.7) ; le régime « Secours sur corde » sur une ligne qui n'est
+**Les causes d'« Interdit ».** Des serre-câbles sur une ligne qui porte des passagers ([3.3](3-securite.md#s-3-3)) ; une
+corde en installation permanente ([3.7](3-securite.md#s-3-7)) ; le régime « Secours sur corde » sur une ligne qui n'est
 pas une corde en installation temporaire.
 
 **La garde au sol** n'entre pas dans le calcul du facteur de sécurité : la garde min (traversée)
-est comparée à la garde exigée et signalée sur sa propre ligne de résultats (2.10).
+est comparée à la garde exigée et signalée sur sa propre ligne de résultats ([2.10](2-statique.md#s-2-10)).
 
 Le Verdict n'est jamais une attestation de conformité à une norme
 ([5.2](5-limites.md#s-5-2)).
@@ -253,7 +253,7 @@ sans régime choisi :
 
 - **flèche / portée sous 3 %** : la ligne est très tendue. Elle se raidit, et la majoration au
   départ de 1,2 a été mesurée sur des lignes moins tendues : sa valeur n'est plus garantie. La
-  parabole et la chaînette diffèrent alors de moins de 0,15 % (2.2) ;
+  parabole et la chaînette diffèrent alors de moins de 0,15 % ([2.2](2-statique.md#s-2-2)) ;
 - **tension à vide d'une corde au-dessus de 30 % de sa MBL** : le fluage devient important. C'est
   une limite de **durée de vie**, pas de résistance.
 
@@ -281,3 +281,7 @@ vent saisi n'intervient que dans l'estimation du mouvement du passager
 ([4.2](4-dynamique.md#s-4-2)) et dans le dessin qualitatif de la Banane.
 
 Référence : [§8.3](../simulation-theory.md#s-8-3), [§8.4](../simulation-theory.md#s-8-4).
+
+---
+
+Précédent : [2. Statique](2-statique.md) · Suivant : [4. Dynamique](4-dynamique.md)

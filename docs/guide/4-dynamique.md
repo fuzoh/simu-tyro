@@ -24,7 +24,7 @@ $$
 | --- | --- | --- |
 | $c$ | vitesse des ondes transversales le long de la ligne | m/s |
 | $T$ | tension de la ligne au niveau de la poulie | N |
-| $\mu$ | masse linéique (1.4) | kg/m |
+| $\mu$ | masse linéique ([1.4](1-ligne.md#s-1-4)) | kg/m |
 
 Tant que le passager va nettement moins vite que ces ondes, la ligne a le temps de « suivre ».
 Les deux recherches d'origine placent la limite entre $v/c \approx 0{,}2$ et $0{,}3$ ; le simulateur
@@ -53,7 +53,7 @@ $$
 | Terme | Signification | Unité |
 | --- | --- | --- |
 | $m \cdot g \cdot \sin\theta$ | part du poids le long de la trajectoire ; $\theta$ est la pente locale, comptée positive vers le bas | N |
-| $F_{\text{frottement}}$ | résistance de la poulie au roulement, opposée au mouvement (4.3) | N |
+| $F_{\text{frottement}}$ | résistance de la poulie au roulement, opposée au mouvement ([4.3](4-dynamique.md#s-4-3)) | N |
 | $F_{\text{traînée}}$ | résistance de l'air, opposée au mouvement relatif à l'air | N |
 
 **La traînée de l'air** croît comme le carré de la vitesse relative à l'air :
@@ -155,7 +155,7 @@ Référence : cas Z8 au [§15](../simulation-theory.md#s-15).
   bien en deçà de l'endroit où il a fait demi-tour ;
 - la **durée** de la descente.
 
-Avec deux Brins porteurs, la trajectoire est celle d'une ligne sous $P/2$ (2.9), et la masse qui
+Avec deux Brins porteurs, la trajectoire est celle d'une ligne sous $P/2$ ([2.9](2-statique.md#s-2-9)), et la masse qui
 la parcourt est la masse entière du passager.
 
 Ne sont **pas** produits : le déplacement latéral, la tension dynamique de la ligne, le freinage.
@@ -220,3 +220,7 @@ $12{,}9^2 / (2 \cdot 2{,}5 \cdot 9{,}81) \approx 3{,}4$ m. Ces nombres ne sont p
 simulateur et ne remplacent pas le dimensionnement d'un frein.
 
 Référence : [§12.3](../simulation-theory.md#s-12-3).
+
+---
+
+Précédent : [3. Sécurité](3-securite.md) · Suivant : [5. Limites du modèle](5-limites.md)

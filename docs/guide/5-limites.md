@@ -135,3 +135,7 @@ le vent) et `docs/mesures dynamometre/` (relevés bruts de l'essai du 1er novemb
 
 **La [référence technique](../simulation-theory.md)** consolide tout cela : c'est le contrat que le
 moteur respecte et que ses tests vérifient.
+
+---
+
+Précédent : [4. Dynamique](4-dynamique.md) · Suivant : [Sommaire](README.md)
