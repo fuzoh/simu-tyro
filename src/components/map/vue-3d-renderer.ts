@@ -835,8 +835,7 @@ function loadedLine(
   let solid: Primitive | null = null;
   const place = (next: readonly EarthPoint[] | null) => {
     at = (next ?? []).map(cartesian);
-    // « Down », for a shifted member, is along each vertex's own vertical.
-    up = at.map((point) => Ellipsoid.WGS84.geodeticSurfaceNormal(point, new Cartesian3()));
+    up = verticals(at);
     if (solid !== null) primitives.remove(solid);
     solid = membersPx.includes(0) && at.length >= 2 ? primitives.add(solidLine(at, shown)) : null;
   };
@@ -846,17 +845,12 @@ function loadedLine(
     .map((offsetPx) =>
       entities.add({
         polyline: {
-          positions: new CallbackProperty(() => {
-            const drop = offsetPx * metresPerPixel.current;
-            return at.map((point, i) => {
-              const shift = Cartesian3.multiplyByScalar(
-                up[i] ?? Cartesian3.ZERO,
-                drop,
-                new Cartesian3(),
-              );
-              return Cartesian3.subtract(point, shift, shift);
-            });
-          }, false),
+          positions: shiftedDown(
+            () => at,
+            () => up,
+            offsetPx,
+            metresPerPixel,
+          ),
           arcType: ArcType.NONE,
           // 2 px of ink in a thin casing: two members 6 px apart keep air between them, as on the coupe.
           width: 3,
@@ -932,12 +926,40 @@ function member(
 ): Cartesian3[] | CallbackProperty {
   const at = points.map(cartesian);
   if (offsetPx === 0) return at;
-  // « Down » is along each vertex's own vertical.
-  const up = at.map((point) => Ellipsoid.WGS84.geodeticSurfaceNormal(point, new Cartesian3()));
+  const up = verticals(at);
+  return shiftedDown(
+    () => at,
+    () => up,
+    offsetPx,
+    metresPerPixel,
+  );
+}
+
+/** « Down », for a shifted member, is along each vertex's own vertical: the vertices' normals. */
+function verticals(at: readonly Cartesian3[]): Cartesian3[] {
+  return at.map((point) => Ellipsoid.WGS84.geodeticSurfaceNormal(point, new Cartesian3()));
+}
+
+/**
+ * A member shifted `offsetPx` down, positive as on the coupe, at the scale the camera shows it —
+ * rebuilt on every frame from the vertices `at` and their {@link verticals} `up` read then, so the
+ * Ligne à vide's members and the loaded line's stay one convention and line up.
+ */
+function shiftedDown(
+  at: () => readonly Cartesian3[],
+  up: () => readonly Cartesian3[],
+  offsetPx: number,
+  metresPerPixel: { readonly current: number },
+): CallbackProperty {
   return new CallbackProperty(() => {
     const drop = offsetPx * metresPerPixel.current;
-    return at.map((point, i) => {
-      const shift = Cartesian3.multiplyByScalar(up[i] ?? Cartesian3.ZERO, drop, new Cartesian3());
+    const verticalsNow = up();
+    return at().map((point, i) => {
+      const shift = Cartesian3.multiplyByScalar(
+        verticalsNow[i] ?? Cartesian3.ZERO,
+        drop,
+        new Cartesian3(),
+      );
       return Cartesian3.subtract(point, shift, shift);
     });
   }, false);
