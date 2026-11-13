@@ -159,6 +159,11 @@ export { TEXTILE, deriveTextile } from "./materials/textile.ts";
 export type { WindComponents } from "./wind.ts";
 export { kmhToMs, msToKmh, windComponents } from "./wind.ts";
 
+// —— wind-profile.ts — §8.4's prescribed profile of the wind along the line (#120) ——————————————
+// `WIND_PROFILE` because the app ships its defaults and gates its two fields on its domains.
+export type { WindField, WindProfile } from "./wind-profile.ts";
+export { WIND_PROFILE, windAt, windProfileShape, windProfileSpeed } from "./wind-profile.ts";
+
 // —— dynamics.ts — §12.2's point mass along the frozen trajectory, §12.1's validity (#89) ——————
 // `DYNAMICS` because the app ships its defaults and labels them, and §12.1's threshold is its.
 export type {
