@@ -1649,6 +1649,15 @@ describe("§ 5 — the two mechanisms the layout may not use", () => {
     expect(readers).toStrictEqual(["src/components/app/use-viewport.ts"]);
   });
 
+  it("one file reads a window width, and it is the viewport hook", () => {
+    // #128: Avancé's route `loader` decides whether to fetch the map from the width, and it reads it
+    // through `viewportWidth()` rather than a second `window.innerWidth` beside the hook.
+    const readers = FILES.filter((path) =>
+      /window\.(innerWidth|outerWidth)|screen\.width/.test(read(path)),
+    );
+    expect(readers).toStrictEqual(["src/components/app/use-viewport.ts"]);
+  });
+
   it("no chart band is sized from a viewport height, in any spelling", () => {
     // `h-dvh` on the shell is the fixed box § 5 asks for. Inside the Chart Block and in the contract
     // itself every height is `var(--w-inner)`-derived, so here the bar is the whole vocabulary: no

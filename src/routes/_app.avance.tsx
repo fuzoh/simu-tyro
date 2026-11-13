@@ -17,6 +17,7 @@ import { App } from "@/components/app/app.tsx";
 import { LoadFailure } from "@/components/app/load-failure.tsx";
 import { LinkRefusalSurface } from "@/components/app/refusal.tsx";
 import { Skeleton } from "@/components/app/skeleton.tsx";
+import { viewportWidth } from "@/components/app/use-viewport.ts";
 import { prefetchTopMap } from "@/components/map/load-top-map.ts";
 import { threeColumns } from "@/lib/layout/contract.ts";
 
@@ -47,10 +48,11 @@ export const Route = createFileRoute("/_app/avance")({
   /**
    * The vue de dessus's module, on the wire beside the Page's chunk (#128, `_app.index.tsx`) — only
    * where the middle column will show the map. Below B2 Avancé never starts it (`app.tsx`), so a
-   * phone does not download MapLibre for an empty frame.
+   * phone does not download MapLibre for an empty frame. The width is the viewport hook's own read
+   * (`use-viewport.ts`), the app's one.
    */
   loader: () => {
-    if (threeColumns(window.innerWidth)) prefetchTopMap();
+    if (threeColumns(viewportWidth())) prefetchTopMap();
   },
   /**
    * For **genuine load failures only**. § 7 once named this the refusal's owner; amendment E struck
