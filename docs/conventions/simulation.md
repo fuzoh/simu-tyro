@@ -55,3 +55,15 @@ quotes and fails when they drift.
   nothing is projected: the ride and the Banane run without wind, the wind fields are disabled, and
   a carried Vent is kept as given with a notice — never a Blocking Error. Moving an anchor changes
   the components and never `wd`.
+- **The Vent's profile is a prescribed scenario, read locally, and refused until it is read**
+  (#120, `docs/simulation-theory.md` §8.4). `windAt(field, x, L, bearing)`
+  (`src/lib/sim/wind-profile.ts`) is the one entry a spatial reader takes — at its own `x`, for
+  each evaluation: never a mean speed over the span, never one multiplier on a force, and nothing
+  clamped outside `[0, L]`. The Scenario's two percents become that field in
+  `src/lib/scenario/wind.ts` (`windFieldOf`), read at the whole percent they print as. The same
+  module holds `WIND_PROFILE_ACTIVE`, **off until every reader of the Vent takes `windAt`** (#127,
+  #118): meanwhile the profile's controls are not offered, and the Wind Gate refuses a profile
+  that is not uniform — a link or a Session can carry one — rather than compute it under one
+  speed. Turning the flag on while a reader still calls `windComponents` with the entered speed
+  is that silent substitution. The shape is §8.4's: no other curve, parameter or default without
+  changing the reference first.
