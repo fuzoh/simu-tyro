@@ -79,7 +79,7 @@ const terrain: Terrain = {
   zs: Float64Array.from([-s.anchors.zA, h - s.anchors.zB]),
 };
 const clearance = evaluateClearance(span, P, traverse.steps, terrain, s.rider.hRider, 60);
-const verdict = evaluateVerdict({
+const verdictInput: Parameters<typeof evaluateVerdict>[0] = {
   steps: traverse.steps,
   coverage: traverse.coverage,
   Tvide: { TA: vide.TA, TB: vide.TB },
@@ -90,7 +90,10 @@ const verdict = evaluateVerdict({
   usage: s.usage,
   terminations: { A: s.terminations.A.id, B: s.terminations.B.id },
   family: "steel",
-});
+};
+const verdict = evaluateVerdict(verdictInput);
+/** The same line judged under ACCT 10:1, which chapter 3 sets beside EN 15567-1. */
+const verdictAcct = evaluateVerdict({ ...verdictInput, regime: "acct10" });
 const path = ridePath(traverse.steps, { L, h });
 const descent = ride({
   path,
@@ -162,7 +165,9 @@ describe("chapter 3 — the judgement", () => {
   });
 
   test("ACCT 10:1's allowable", () => {
-    expect(text).toContain(`T_{\\text{adm}} \\approx ${fr((0.9 * derived.strength) / 10, 0)} N`);
+    expect(text).toContain(
+      `T_{\\text{adm}} \\approx ${fr(verdictAcct.cells[0]?.Tadm ?? Number.NaN, 0)} N`,
+    );
   });
 
   test("the tension à vide as a share of MBF", () => {
