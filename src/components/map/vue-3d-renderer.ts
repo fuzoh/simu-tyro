@@ -38,7 +38,8 @@
  *   stands where the engine puts it, never lifted off the relief — a drag turns the head, no anchor
  *   is taken, the Gimbal's steps do nothing, and the loaded line, the passager's at `x_D`, gives way
  *   to the Trajectoire the pulley follows. Leaving puts the camera back where it stood and every
- *   gesture with it.
+ *   gesture with it — unless the Positions moved while riding and that pose no longer shows them:
+ *   then the camera stands back from the new line, as a typed Position or an imported CSV does.
  */
 
 import "cesium/Source/Widgets/CesiumWidget/CesiumWidget.css";
@@ -88,6 +89,7 @@ import type {
   Vue3dRide,
 } from "@/lib/map/vue-3d-embarquee.ts";
 import type { EarthPoint, Vue3dFollowing, Vue3dLayers, Vue3dScene } from "@/lib/map/vue-3d.ts";
+import type { TraceEnds } from "@/lib/terrain/trace.ts";
 
 import {
   LINE_CASING,
@@ -252,12 +254,18 @@ export async function openVue3d(
   // Where the dragged anchor stands, from its first move until the machine is idle again.
   let pose: { anchor: Anchor; foot: EarthPoint } | null = null;
   let following: Vue3dFollowing | null = null;
-  // The Vue embarquée: the ride it plays, its clock and look, the camera as it stood before, whether
-  // a drag turns the head, and the last read-out told.
+  // The Vue embarquée: the ride it plays, its clock and look, the camera as it stood before and the
+  // Positions it stood over, whether a drag turns the head, and the last read-out told.
   let embarked: {
     readonly ride: Vue3dRide;
     state: Embarked;
-    readonly before: { destination: Cartesian3; heading: number; pitch: number; roll: number };
+    readonly before: {
+      destination: Cartesian3;
+      heading: number;
+      pitch: number;
+      roll: number;
+      ends: TraceEnds | null;
+    };
     turning: boolean;
     told: string;
   } | null = null;
@@ -349,11 +357,24 @@ export async function openVue3d(
     if (!other) release();
   }
 
+  /**
+   * Ends the drag that turns the head, wherever it ended — the canvas's release or the window's
+   * ({@link ENDS_OF_A_PRESS}): a window that lost the focus mid-drag hears no release, and the head
+   * would go on turning under a pointer with no button held.
+   */
+  function stopTurning() {
+    for (const type of ENDS_OF_A_PRESS) window.removeEventListener(type, stopTurning);
+    if (embarked === null || !embarked.turning) return;
+    embarked.turning = false;
+    canvas.style.cursor = "grab";
+  }
+
   const pointer = new ScreenSpaceEventHandler(canvas);
   pointer.setInputAction(({ position }: ScreenSpaceEventHandler.PositionedEvent) => {
     // Riding, a press turns the head and takes no anchor.
     if (embarked !== null) {
       embarked.turning = true;
+      for (const type of ENDS_OF_A_PRESS) window.addEventListener(type, stopTurning);
       canvas.style.cursor = "grabbing";
       return;
     }
@@ -399,8 +420,7 @@ export async function openVue3d(
       release();
       return;
     }
-    embarked.turning = false;
-    canvas.style.cursor = "grab";
+    stopTurning();
   }, ScreenSpaceEventType.LEFT_UP);
 
   return {
@@ -426,7 +446,8 @@ export async function openVue3d(
       follow();
       // The camera stands back from the line when it opens, and when the Positions move to where
       // the reader cannot see them — a typed Position, an imported CSV. A line dragged in the view
-      // is already in it, so the camera stays where the reader put it; riding, it is the ride's.
+      // is already in it, so the camera stays where the reader put it; riding, it is the ride's,
+      // and leaving the ride (`embark(null)`) applies the same rule to the pose it gives back.
       if (
         embarked === null &&
         (before === null || (!sameEnds(before.scene.ends, scene.ends) && !inView(cesium, scene)))
@@ -442,6 +463,7 @@ export async function openVue3d(
       if (widget.isDestroyed() || embarked?.ride === ride) return;
       const { camera } = cesium;
       if (ride === null) {
+        stopTurning();
         const { before } = embarked ?? {};
         embarked = null;
         controller.enableInputs = true;
@@ -450,6 +472,16 @@ export async function openVue3d(
         if (before !== undefined) {
           const { destination, heading: h, pitch, roll } = before;
           camera.setView({ destination, orientation: { heading: h, pitch, roll } });
+          // The reframe `show` skipped while riding: the Positions moved since the reader embarked
+          // — an imported CSV, a typed Position — and out of the pose given back, the camera stands
+          // back from the new line rather than over the old site.
+          if (
+            shown !== null &&
+            (before.ends === null || !sameEnds(before.ends, shown.scene.ends)) &&
+            !inView(cesium, shown.scene)
+          ) {
+            camera.setView(cesiumPose(lateralPose(cesium, shown.scene, shown.layers)));
+          }
         }
         follow();
         onEmbarked(null);
@@ -461,6 +493,7 @@ export async function openVue3d(
         heading: camera.heading,
         pitch: camera.pitch,
         roll: camera.roll,
+        ends: shown?.scene.ends ?? null,
       };
       embarked = { ride, state: openEmbarked(ride), before, turning: false, told: "" };
       // `enableInputs` alone would come back at the end of a flight: collision is the other switch.
@@ -478,7 +511,10 @@ export async function openVue3d(
     },
     destroy() {
       pointer.destroy();
-      for (const type of ENDS_OF_A_PRESS) window.removeEventListener(type, ended);
+      for (const type of ENDS_OF_A_PRESS) {
+        window.removeEventListener(type, ended);
+        window.removeEventListener(type, stopTurning);
+      }
       // Closed under a moving anchor, the view hears no release: the gesture ends where the anchor
       // was drawn, or the machine would wait for it — and keep the vue de dessus's markers — forever.
       if (grip?.moved === true && pose !== null) {
