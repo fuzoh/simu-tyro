@@ -186,6 +186,15 @@ Position number for the traverse worst case signs off a line that fails 20 m fur
 along.
 _Avoid_: descente, envelope vs instant, global vs local, min vs current, worst case
 
+**Tension interne**:
+The tension the line carries at one point along it, `T = √(H² + V²)` there — a Position scope
+quantity: Avancé's graph at its foot draws it for the ligne à vide and the ligne chargée with the
+passager where the Scenario puts it, against the distance from A. Its two ends are the anchor
+tensions of that same instant, and at the passager it steps: the A side and the B side carry
+different tensions. Not the T max of the Résultats, which is the traverse's worst, and with two
+Brins porteurs always one line's under the normal 50/50 share, never the sum of the two.
+_Avoid_: tension max, tension totale, effort dans la ligne
+
 ### Safety
 
 **Verdict**:

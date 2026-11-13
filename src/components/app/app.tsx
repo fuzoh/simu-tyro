@@ -18,6 +18,7 @@
 import type { ViewportFit } from "@/lib/layout/collapse.ts";
 
 import { ChartBlock } from "@/components/chart/chart-block.tsx";
+import { TensionChart } from "@/components/chart/tension.tsx";
 import { useChartWidth } from "@/components/chart/use-chart-width.ts";
 import { TopMap } from "@/components/map/top-map.tsx";
 import { RailHeaderControls, RailInputs } from "@/components/rail/inputs.tsx";
@@ -95,6 +96,21 @@ function Live({ page }: { page: string }) {
   const collapse = useCollapse({ fits: fitsWholeBlock(fit), compact: compactRequired(fit) });
   const { cause, clearance, frame, occupant, results, rideCause, saisie, solved, windCause } =
     surfaces;
+  /**
+   * The tension graph closes the Page (#119): under the Chart Block from three columns, after the
+   * Rail's last section below. `threeColumns()` decides where it is *mounted*, as it does the vue
+   * de dessus — one graph, one solve per `x_D`, never a hidden twin.
+   */
+  const three = threeColumns(viewport.width);
+  const tension = (
+    <TensionChart
+      cause={cause}
+      frame={frame}
+      saisie={saisie?.message ?? null}
+      solved={solved}
+      width={width}
+    />
+  );
 
   return (
     // `RailInputs` owns the Rail's field rows and hands back the two sections they live in, so the
@@ -163,8 +179,10 @@ function Live({ page }: { page: string }) {
           // the middle column shows it — a map started in a `display: none` box holds a WebGL
           // context for nothing and has no size to fit its camera to; below B2 the box keeps the
           // Skeleton's empty frame.
+          columnTail={three ? tension : undefined}
+          railTail={three ? undefined : tension}
           views={
-            threeColumns(viewport.width) ? (
+            three ? (
               <TopMap frame={frame} solved={solved} windCause={windCause} />
             ) : (
               <TopViewFrame />

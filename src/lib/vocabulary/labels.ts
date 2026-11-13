@@ -126,6 +126,8 @@ export type TermId =
   | "estimate"
   | "traverse"
   | "unloadedLine"
+  | "loadedLine"
+  | "internalTension"
   | "trajectory"
   | "seeWholeLine"
   | "page";
@@ -284,6 +286,9 @@ export const LABELS = {
   estimate: same("estimation"),
   traverse: same("traversée"),
   unloadedLine: same("ligne à vide"),
+  loadedLine: same("ligne chargée"),
+  // The tension the line carries at one point of it, at the passager's position (#119). Avancé's.
+  internalTension: exactOnly("tension interne"),
   trajectory: same("trajectoire"),
   seeWholeLine: same("voir toute la ligne"),
   page: same("Page"),

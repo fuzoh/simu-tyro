@@ -58,6 +58,8 @@ import {
   STATIQUE_TILE_MAX_PX,
   STRIP,
   STRIP_POLICY_BAND,
+  TENSION_CHART,
+  tensionChartHeight,
   THREE_COLUMN_PX,
   threeColumns,
   stripOuterHeight,
@@ -224,6 +226,13 @@ describe("§ 5 — the layout contract", () => {
 
   it("the strip ceiling is 200 px — the over-feeding it exists to bound", () => {
     expect(stripOuterHeight(10_000)).toBe(200);
+  });
+
+  it("the tension graph is a band of the width alone, 180 to 300 px (#119)", () => {
+    expect(tensionChartHeight(0)).toBe(TENSION_CHART.min);
+    expect(tensionChartHeight(innerWidth(390))).toBe(180);
+    expect(tensionChartHeight(1000)).toBeCloseTo(220, 9);
+    expect(tensionChartHeight(innerWidth(1984))).toBe(TENSION_CHART.max);
   });
 
   it("B1 is exactly 624 px of chart column, not 625", () => {
