@@ -492,7 +492,12 @@ extrapolated.
 Both parameters are **read at the whole percent they print as**: a link may hold `ww=50.4`, kept
 as given, and the profile judged and evaluated is the 50 % every screen shows. A value outside
 its domain is kept as given and refused by the Wind Gate — never clamped, never read as a
-uniform wind.
+uniform wind. This is the app's one reading of a percent between two steps — §12.2's target has
+it, and every gate judges a value as its field prints it, so the value a message echoes is the
+value refused. What it costs: a percent typed by hand into a link is read up to half a point
+from what the link carries — `ww=90.4` is 90 % and passes, `wa=0.4` is the uniform wind — where
+the preparatory note (`docs/references/spatial-wind/wind-profile-contract-followup.md` §3.2)
+evaluated `ww=50.5` as held. The fields and the profile's handle write whole percents only.
 
 **Engine:** `src/lib/sim/wind-profile.ts` evaluates `φ`, `U` and the local wind vector. **No
 reader consumes it yet**: §12.2's ride and the Banane take one speed for the whole line. Until the
