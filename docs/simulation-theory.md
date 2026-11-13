@@ -1,9 +1,16 @@
 # Zip-line simulation — consolidated theory & algorithm reference
 
+> **Pour comprendre le modèle pas à pas, en français, commencez par le
+> [guide](guide/README.md)** : il définit chaque notion avant de l'utiliser, explique chaque
+> formule et la suit sur un exemple chiffré, et renvoie ici, paragraphe par paragraphe, pour le
+> détail. Ce fichier-ci est la référence exacte du moteur, en anglais ; les « § » des infobulles
+> du simulateur désignent ses paragraphes, dont la numérotation ne change pas.
+
 **Status.** Definitive theory file for the Scoutech physics engine. Consolidates the four
 French reference reports and the two deep-research runs, arbitrates their contradictions,
-and records only values whose provenance is known. No app code exists yet; this file is
-the contract the implementation must satisfy.
+and records only values whose provenance is known. It is the contract the implementation
+satisfies: the engine under `src/lib/sim/` cites its sections, and its §15 fixtures are the
+engine's tests. The step-by-step guide (`docs/guide/`) explains it and adds nothing to it.
 
 **Scope.** Spans 50 m – ~2000 m, two families at parity:
 
