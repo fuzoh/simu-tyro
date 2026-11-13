@@ -81,11 +81,15 @@ export const GIMBAL_COPY = {
   zoomOut: "Zoom arrière",
   vueDuDepart: "Vue du départ",
   vueLaterale: "Vue latérale",
-  /** The Vue embarquée (#126): not a Vue prédéfinie — it rides, and has its own controls. */
-  vueEmbarquee: "Vue embarquée",
   /** The hover help's heading: the keys act once the Vue 3D has been clicked or tabbed to. */
   keys: "Clavier, après un clic dans la Vue 3D",
 } as const;
+
+/**
+ * The Vue embarquée's name (#126): not a Vue prédéfinie — it rides, and has its own controls — so
+ * not in {@link GIMBAL_COPY}, whose words every Page's map lists, Statique's included.
+ */
+const VUE_EMBARQUEE_NAME = "Vue embarquée";
 
 /** The keys of the Vue 3D, as the hover help lists them: the key, then what it does. */
 export const VUE_3D_KEYS = [
@@ -95,7 +99,7 @@ export const VUE_3D_KEYS = [
   ["+ / −", "zoom"],
   ["1", GIMBAL_COPY.vueDuDepart],
   ["2", GIMBAL_COPY.vueLaterale],
-  ["3", GIMBAL_COPY.vueEmbarquee],
+  ["3", VUE_EMBARQUEE_NAME],
   ["N", GIMBAL_COPY.north.toLocaleLowerCase("fr")],
 ] as const;
 
@@ -120,7 +124,7 @@ export function gimbalHint(name: string, key: string): string {
  */
 export const EMBARQUEE_COPY = {
   /** The Gimbal's button, and the view's name. */
-  enter: GIMBAL_COPY.vueEmbarquee,
+  enter: VUE_EMBARQUEE_NAME,
   /** The controls' accessible name. */
   title: "Lecture de la Vue embarquée",
   play: "Lecture",
@@ -399,8 +403,8 @@ export function mapLabelTable(): readonly string[] {
 
 /**
  * The Vue embarquée's fixed words (#126), apart from {@link mapLabelTable}: they say « estimation »,
- * which the Page Statique never does, so only the Pages whose map plays a ride — Avancé and Terrain —
- * consume them.
+ * which the Page Statique never does. Avancé and Terrain show them, but Avancé keeps no label
+ * table, so Terrain's alone consumes them.
  */
 export function embarkedLabelTable(): readonly string[] {
   return [

@@ -287,7 +287,10 @@ describe("the Vue embarquée's words (#126)", () => {
   test("stays out of the table the Page Statique reads, which never says « estimation »", () => {
     const shared = mapLabelTable().join("\n").toLocaleLowerCase("fr");
     expect(shared).not.toContain("estimation");
+    // Statique's map shows no « Vue embarquée » button: its name is the embarked table's alone.
+    expect(shared).not.toContain("vue embarquée");
     expect(embarkedLabelTable()).toContain(EMBARQUEE_HELP);
+    expect(embarkedLabelTable()).toContain(EMBARQUEE_COPY.enter);
   });
 
   test("says why it is off", () => {

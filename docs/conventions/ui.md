@@ -224,8 +224,9 @@ leaving, so the keys keep answering. The read-out sits over the bottom-left corn
 head; CesiumJS's own gestures are off. The space bar on a button is the button's press, and Escape on
 an open infobulle's icon closes the bubble before it leaves the view. **Statique has none**: it never
 says « estimation » (#91), so its map passes no rides, shows no button and lists no key 3; the
-embarked words live apart from `mapLabelTable` (`embarkedLabelTable`), in the tables of Avancé and
-Terrain alone.
+embarked words — the button's « Vue embarquée » included, kept out of `GIMBAL_COPY` — live apart
+from `mapLabelTable` (`embarkedLabelTable`), in Terrain's label table alone: Avancé shows them but
+keeps no label table.
 
 **The carte claire has no raster twin, so the Vue 3D drapes its nearest one.** The carte claire is
 swisstopo's vector `ch.swisstopo.lightbasemap.vt`, which CesiumJS cannot drape; the WMTS
