@@ -218,6 +218,41 @@ Vue 3D drapes `ch.swisstopo.pixelkarte-grau`, the grey national map — light, n
 A–B legible on it. `DRAPED` in `src/lib/map/vue-3d.ts` is the table; the orthophoto and the carte
 nationale drape the very tiles the vue de dessus shows.
 
+## Infobulles: labels in the open, explanations behind an icon (#122)
+
+On the four Pages only **labels, values, units and controls** are printed in the open. Every
+explanation, note, Avertissement and blocking field error sits behind an icon — `Tip` in
+`src/components/rail/controls.tsx`, its pure half (`tipText`, `tipName`, `disclosureTips`) in
+`src/lib/app/tip.ts`.
+
+- **Three tones, three icons, three tokens.** `ⓘ` (`Info`, `text-muted-foreground`) for help and
+  notes, `⚠` (`TriangleAlert`, `text-warning`) for an Avertissement, `⛔` (`OctagonX`,
+  `text-destructive`) for a blocking field error. A warning or an error is seen without opening
+  anything; only its words moved.
+- **Hover, keyboard focus and touch.** It is Base UI's popover with `openOnHover`, so a tap opens
+  it and a link inside it stays reachable (a tooltip closes before its link can be pressed). A
+  `:focus-visible` focus opens it too, without moving the focus (`initialFocus={false}`); Tab then
+  walks into the bubble's links before leaving it. The popover's own flex column is neutralised by
+  one wrapper `div`, or each segment of a sentence — a `§` link, the words around it — would stand
+  on a line of its own.
+- **One `ⓘ` per row.** A row's help, its field meaning, its ambient note and why an option is
+  disabled join in one bubble, in that order (`Row`'s and `ReadOut`'s `notes`, `RowTips`). The
+  icons sit in the label's line, so a warning landing moves no row and no tile.
+- **A blocking error still announces itself.** The `⛔` carries a visually hidden copy of its
+  message in a `role="alert"` region — what `FieldError` did when the message was printed.
+- **What stays in the open, and why.** The Verdict and its reason; « Saisie en cours » and a field's
+  empty-state line (it says the numbers on screen are not this text's); every cause sentence that
+  *replaces* a value — « Aucun résultat — … » in a tile, a plot, the read-out row, a region, and
+  the proposal's refusal — because a sentence standing where a number would is what keeps a missing
+  result from reading as a usable one; commands (Fix Actions, « Ouvrir la Page Avancé », « Passer en
+  mouflage »); the terrain's source line and the swisstopo attribution its terms ask to sit beside
+  the data; the vue de dessus's caption, whose lines are readings and the live gesture's prompt in a
+  height the layout reserves. The Banane note's explanation moved from a `title` — which the mouse
+  alone could read — to an `ⓘ`.
+- **Where a section's notes go.** On its heading: `Group`'s `tip`, `Region`'s and `RailSection`'s
+  `tips`. « Ce que cet outil ne calcule pas » keeps its heading in the open and its lines behind the
+  heading's `ⓘ`; §8.3's formula stays behind its own chip inside that bubble.
+
 ## Avancé's three columns
 
 The Page Avancé (`/avance`) stands on **three columns from 1024 px of viewport** and on one below
