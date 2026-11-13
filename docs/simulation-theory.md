@@ -1240,8 +1240,9 @@ the anchor closure `R(F_A) = r(L₀) − B`.
 **Damped Newton.** `R = 0` is solved by Newton's method with a Jacobian by central finite
 differences (step `10⁻⁶·|F_A|`) and §5.1's line search: the step is halved until `‖R‖` decreases.
 The first seed is the plane line of the engine under the weight and the rider,
-`F_A = (H, 0, V₀)` from `solveSpan` — exact without wind. Iteration stops at `‖R‖ ≤ 10⁻¹⁰ m` or
-when no shorter step decreases `‖R‖`; the case is **accepted** if `‖R‖` is within §5.3's bar
+`F_A = (H, 0, V₀)` from `solveSpan` — exact without wind. Iteration stops at `‖R‖ ≤ 10⁻¹⁰ m`,
+when no shorter step decreases `‖R‖`, or after 60 iterations; the case is **accepted** if `‖R‖`
+is within §5.3's bar
 (`10⁻⁶ m` up to 1000 m of span) and is otherwise a **failure, reported as such** with the closure
 reached — never replaced by a neighbouring case or by the plane line. A trial along which the
 tension vanishes is refused, not clamped. A non-convergence is a numerical statement, not a
@@ -1260,8 +1261,8 @@ physical impossibility.
 | distributed loads      | mean over the stretched length and greatest nodal value of `\|f_n\|`, `\|f_L\|`, `\|f_a\|`, N/m, also as a share of `w`             |
 
 An extremum is read between the nodes: inside a smooth piece, the vertex of the parabola through
-the sampled extremum and its two neighbours; at the rider's node, which is a corner, the node
-itself. The garde is a vertical clearance over an extruded profile: it is no clearance from the
+three consecutive nodes wherever it lies between them; at the rider's node, which is a corner,
+the node itself. The garde is a vertical clearance over an extruded profile: it is no clearance from the
 real ground off the A–B axis.
 
 ### 18.6 Controls and tolerances
@@ -1289,7 +1290,8 @@ alone.
 
 1. _No-wind return to §15._ Z1–Z5 with every aerodynamic coefficient at zero: `H`, `V₀`, `V_B`,
    `T_A`, `T_B`, `T_max`, the sag or the node's position within `4×10⁻⁶` relative — the
-   solved-scalars tier of `docs/conventions/testing.md`.
+   solved-scalars tier of `docs/conventions/testing.md` — and Z3's sag, which §15 prints to five
+   figures, within half a unit of its last.
 2. _No-wind return to the plane engine_ on every calm case of the matrix, same bar; and every
    variant of a calm case identical to the reference within the floor.
 3. _Normal drag alone, no weight, pure crossflow, level span._ The load is normal to the line, so
@@ -1324,7 +1326,8 @@ unloaded line under the scenario's wind. Here, for each line, geometry, wind **a
 experiment solves the `L₀` at which the unloaded line reads the same total tension at A under
 that wind and that model, **reports that length**, and solves the unloaded and the loaded line at
 it. A model that changes the pose describes another installation; these rows live in their own
-table and are never merged with the main comparison. The length is searched on the taut branch
+table and are never merged with the main comparison. The length is solved at `2N` steps, the
+count the rows are reported at. The length is searched on the taut branch
 from the no-wind length (§7: `T_A(L₀)` is not monotone on a very slack line); a target that
 cannot be bracketed is a reported failure, and a root found is local — nothing claims it unique.
 

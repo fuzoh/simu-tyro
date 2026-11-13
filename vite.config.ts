@@ -97,7 +97,9 @@ const config = defineConfig({
     environment: "node",
     // Colocated, one test file per source file, `.ts` only (a `.tsx` test would be
     // a component test, which this project does not have). No `tests/` directory.
-    include: ["src/**/*.test.ts"],
+    // `experiments/` holds isolated numerical experiments nothing under `src/` imports; their
+    // tests sit beside them under the same rules — voir docs/conventions/testing.md.
+    include: ["src/**/*.test.ts", "experiments/**/*.test.ts"],
     benchmark: {
       // `benchmark.enabled` stays unset: only `vitest bench` turns it on, so a bench never
       // executes inside `bun run test`.

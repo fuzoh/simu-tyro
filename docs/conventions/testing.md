@@ -7,7 +7,11 @@ The `test` block lives in `vite.config.ts`.
   no `@vitest-environment-options`. `jsdom`, `@testing-library/react` and `@testing-library/dom` are
   **not** dependencies of this project and must not come back.
 - `test.include` is `src/**/*.test.ts` — `.ts` only, because a `.tsx` test file would be a component
-  test.
+  test — plus `experiments/**/*.test.ts`: an isolated numerical experiment (#134,
+  `experiments/spatial-aero-134/`) is code nothing under `src/` imports, and its tests sit beside
+  it under the same rules as the engine's — colocated, one per source file, expected values from
+  §15, a closed form or a hand calculation. An experiment's matrix is replayed by its own
+  command, not by the suite: a test runs the part of it that it asserts on.
 - **Point-to-point app testing belongs to `agent-browser`**, not to Vitest — see
   [What CI does not cover](#what-ci-does-not-cover-agent-browsers-half) at the bottom of this file.
 - The two seams that once wanted a DOM are **parameters** instead: the dropped-keys reporter takes the

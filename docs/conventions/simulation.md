@@ -34,6 +34,15 @@ coefficient or rule appears there first. A change to the physics or a shipped de
 reference, then the guide; `src/lib/docs/guide-examples.test.ts` recomputes the figures the guide
 quotes and fails when they drift.
 
+## Experiments are not the engine
+
+`experiments/` holds isolated numerical experiments — today `experiments/spatial-aero-134/`
+(#134, `docs/simulation-theory.md` §18): a prototype spatial statics that compares normal drag
+alone with an added lift and an added axial drag on the line. Its coefficients are **sensitivity
+probes**, its report is archived in `docs/references/spatial-wind/`, and **nothing under `src/`
+may import from it**: a value or a solver moves from an experiment into the engine only through
+the reference and a decision of the maintainer, never by reuse.
+
 ## Rules
 
 - Read the relevant report **before** writing or changing simulation math,
