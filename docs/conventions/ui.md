@@ -449,7 +449,10 @@ an answer lands; under them it moves nothing.
   its row; each of the candidate's rides is then a `RideGrid` of three — Point le plus loin, Distance
   restante à B, Point d'arrêt — so the three are never read as one. With a wind along the line there
   are two rides, the second headed « sans vent — comparaison ». Assumptions are muted `text-xs`
-  lines, the warnings `text-warning` behind a ⚠, like a tile's Avertissement.
+  lines, the warnings `text-warning` behind a ⚠, like a tile's Avertissement. The assumption that
+  names the Tightness Driver kept also prints what it does to the line — longueur à vide and, when
+  it is not the driver, tension de pose, each « before → after » — and a target above 93 % adds
+  the warning « Cible haute … » (§12.2's measured bound).
 - **A refusal is a sentence in the foreground colour**, in the place of the tiles, never beside a
   height.
 - **Searched after the frame that prints the rides** (`useDeferredValue`): the search re-runs the

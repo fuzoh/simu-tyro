@@ -677,11 +677,17 @@ reaches it, when the chain stops solving on the way (§5.4), when the farthest p
 target between two neighbouring heights (more than 5 % of `L` short), when §11 is not judged, or
 when the candidate touches the known terrain outside the Zones d'ancrage. It is an **estimation**
 like the ride it is built on, applies nothing, re-judges neither the Verdict nor the garde exigée,
-and says nothing of a B moved elsewhere: another foot stands on another ground.
+and says nothing of a B moved elsewhere: another foot stands on another ground. What the kept
+Tightness Driver does to the line is printed with the proposal rather than judged: the unstretched
+length before and after, and — whenever the driver is not the pretension itself — the unloaded
+tension at the tensioning anchor before and after (a typed `L₀` is not re-cut, so B's whole move
+goes into that tension: shipped line with `L₀` typed at 151.20 m, B raised 18.4 m, 4381 N → 1851 N).
 
 The target's domain is **50–98 % of the span, whole percents, 90 % shipped** — `[CONVENTION]`,
 decided with #121. B and beyond are excluded (the arrival is what the inverse avoids); under
-mid-span the rider turns back before half the line. Measured `[MEASURED]` 2026-11-13 on seven
+mid-span the rider turns back before half the line. A link may carry a target between whole
+percents (`cib=98.4`); it is kept as given and **read at the whole percent it prints as**, so the
+domain judges, and the search is held to, the same 98 % every Page shows. Measured `[MEASURED]` 2026-11-13 on seven
 lines, every whole target of the domain: a height is found for each (0.1 m grid, farthest point
 0.4 % of `L` short of the target at most on lines of 150 m and more, 1.8 % on the 50 m one), in
 about 10 ms each on the development machine. What the upper bound is worth is read off two variations of the candidate — the low
@@ -700,7 +706,8 @@ end of the `C_dA` field's band, and a light tail wind:
 So 99 % is short of B on paper only — on every line the tail wind turns it into an arrival — and
 is excluded; **98 % is the last whole percent kept, not a safe one**: from 300 m of span on, a
 target of 94–97 % is already within the model's own sensitivity of B. Only up to 93 % did both
-variations leave the rider short of B on all seven lines. A ±20 kg change of the rider's mass moves
+variations leave the rider short of B on all seven lines, so a proposal for a target above 93 %
+is still given and carries a warning saying so (`REACH.steadyMax`). A ±20 kg change of the rider's mass moves
 the 90 % candidate's farthest point by 1–4 % of the span. None of this is a stopping guarantee:
 braking stays §12.3's, and out of this inverse.
 

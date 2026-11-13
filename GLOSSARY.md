@@ -314,7 +314,7 @@ The farthest the passager gets toward B over the whole ride, swings back include
 _Avoid_: position maximale, portée atteinte, point d'arrêt (for it)
 
 **Cible du point le plus loin**:
-Where the Point le plus loin is wanted, as a share of the portée: 90 % shipped, 50 – 98 % its domain, a convention — B itself and anything past it are excluded. Set on Avancé in « Dynamique du passager » and read by the Proposition pour l'ancrage B alone: no ride, no garde and no Verdict reads it.
+Where the Point le plus loin is wanted, as a share of the portée: 90 % shipped, 50 – 98 % its domain in whole percents, a convention — B itself and anything past it are excluded. A link's value between whole percents is read at the percent it prints as; above 93 % the proposal warns that a light tail wind or a lower drag reached B on lines measured. Set on Avancé in « Dynamique du passager » and read by the Proposition pour l'ancrage B alone: no ride, no garde and no Verdict reads it.
 _Avoid_: cible d'arrêt, objectif, consigne
 
 **Proposition pour l'ancrage B**:
