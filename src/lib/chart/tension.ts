@@ -25,7 +25,7 @@ import type { SharedX } from "@/lib/layout/contract.ts";
 import type { ForceUnit } from "@/lib/scenario/types.ts";
 
 import { polylineAt, solveRider } from "@/lib/chart/scene.ts";
-import { formatQuantity, fromDisplay, toDisplay } from "@/lib/format/quantity.ts";
+import { DECIMAL_MARK, formatQuantity, fromDisplay, toDisplay } from "@/lib/format/quantity.ts";
 import { niceStep } from "@/lib/layout/contract.ts";
 import { sampleTension } from "@/lib/sim";
 import { label } from "@/lib/vocabulary/labels.ts";
@@ -154,7 +154,7 @@ export function tensionAxis(
   const decimals = Math.max(0, -Math.floor(Math.log10(step) + 1e-9));
   const ticks = Array.from({ length: steps + 1 }, (_, i) => {
     const shown = i * step;
-    const digits = shown.toFixed(decimals).replace(".", ",");
+    const digits = shown.toFixed(decimals).replace(".", DECIMAL_MARK);
     return { value: fromDisplay("Tstatic", shown, unit), text: digits };
   });
   return { top: fromDisplay("Tstatic", steps * step, unit), ticks };

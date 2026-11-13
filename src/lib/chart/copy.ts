@@ -65,7 +65,7 @@ export const TENSION_COPY = {
   scope: READ_OUT_SCOPE,
   /** The y axis's name, with the unit the force selector chose. */
   yAxis: (unit: string, perLine: boolean) =>
-    `${perLine ? "tension par ligne" : "tension"} (${unit})`,
+    `${label("internalTension", "exact")}${perLine ? " par ligne" : ""} (${unit})`,
   xAxis: `${label("distance", "exact")} depuis A (m)`,
   unloaded: label("unloadedLine", "exact"),
   loaded: label("loadedLine", "exact"),
@@ -75,6 +75,5 @@ export const TENSION_COPY = {
   sideA: `${label("loadedLine", "exact")}, côté A`,
   sideB: `${label("loadedLine", "exact")}, côté B`,
   perLineShort: "par ligne, partage 50/50",
-  perLineNote:
-    "Deux Brins porteurs : tension d'une seule ligne, le passager étant partagé 50/50 entre les deux (P / 2 par ligne) — jamais la somme des deux lignes. Ce partage n'est pas confirmé par l'essai.",
+  perLineNote: `Deux ${label("carryingLines", "exact")} : tension d'une seule ligne, le passager étant partagé 50/50 entre les deux (P / 2 par ligne) — jamais la somme des deux lignes. Ce partage n'est pas confirmé par l'essai.`,
 } as const;

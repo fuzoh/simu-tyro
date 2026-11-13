@@ -15,6 +15,7 @@ import { createSharedX } from "@/lib/layout/contract.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { sweepRiderOf } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
+import { label } from "@/lib/vocabulary/labels.ts";
 
 import { TENSION_COPY } from "./copy.ts";
 import { buildSceneBase, buildSceneFrame, placeRider } from "./scene.ts";
@@ -119,7 +120,13 @@ describe("two Brins porteurs: one line's tension, never the sum", () => {
     const profile = tensionProfile(pair, 75);
     const lines = tensionLines(profile, 40, "daN", 1) ?? [];
     expect(lines.map((line) => line.label)).toContain(TENSION_COPY.perLineShort);
-    expect(TENSION_COPY.yAxis("daN", true)).toBe("tension par ligne (daN)");
+    expect(TENSION_COPY.yAxis("daN", true)).toBe(
+      `${label("internalTension", "exact")} par ligne (daN)`,
+    );
+    expect(TENSION_COPY.yAxis("daN", false)).toBe(`${label("internalTension", "exact")} (daN)`);
+    expect(TENSION_COPY.perLineNote.startsWith(`Deux ${label("carryingLines", "exact")} :`)).toBe(
+      true,
+    );
     expect(tensionProfile(base, 75).perLine).toBe(false);
   });
 });
