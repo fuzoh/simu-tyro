@@ -299,7 +299,7 @@ describe("everything the app prints", () => {
     // A JSX text that a « ; » runs through: what a scan that cut on punctuation would lose.
     const docsIndex = join(SRC, "routes", "docs.index.tsx");
     expect(copyOf(docsIndex, readFileSync(docsIndex, "utf8"))).toContain(
-      "Les « § » des infobulles du simulateur renvoient à la première page. Les autres sont les rapports dont elle a été consolidée ; ils sont servis tels qu'ils figurent dans le dépôt.",
+      ". Les « § » des infobulles du simulateur renvoient à la référence technique ; les rapports d'origine sont servis tels qu'ils figurent dans le dépôt.",
     );
   });
 

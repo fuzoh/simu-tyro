@@ -64,7 +64,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.
 import { Separator } from "@/components/ui/separator.tsx";
 import { COPY_INCOMPLETE, copyLink } from "@/lib/app/persist.ts";
 import { siteOrigin } from "@/lib/app/site.ts";
-import { DOC_PAGES } from "@/lib/docs/pages.ts";
+import { MENU_DOC_PAGES } from "@/lib/docs/pages.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { deducedRows } from "@/lib/rail/deduced.ts";
 import {
@@ -1113,11 +1113,12 @@ export function RailHeaderControls({
             </span>
           </Button>
           <Separator className="my-1" />
-          {/* The documentation — the theory the engine is built against and the reports behind
-              it, rendered at `/docs`. Links wearing `buttonVariants`, never `<Button render>`:
+          {/* The documentation — the guide's sommaire, the reference the engine is built against
+              and the reports behind it, rendered at `/docs`; the guide's chapters are one click
+              away from its sommaire. Links wearing `buttonVariants`, never `<Button render>`:
               they navigate, and Base UI's button would take the anchor's semantics away. */}
           <p className="text-muted-foreground px-2.5 text-xs">Documentation</p>
-          {DOC_PAGES.map((page) => (
+          {MENU_DOC_PAGES.map((page) => (
             <Link
               className={cn(
                 buttonVariants({ variant: "ghost", size: "sm" }),

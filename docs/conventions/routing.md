@@ -61,12 +61,14 @@ under `bun run dev` it happens per request. Same output either way — which is 
 ## The documentation pages — `/docs`
 
 Added 2026-09-23. `src/routes/docs.tsx` (layout), `docs.index.tsx` and `docs.$slug.tsx` render the
-repository's own markdown — `docs/simulation-theory.md` and four reports under `docs/references/` —
-through `react-markdown` (+ `remark-gfm`, `remark-math`, `rehype-katex`). The registry is
-`src/lib/docs/pages.ts`; the bytes are `src/lib/docs/sources.ts`, raw `?raw` imports.
+repository's own markdown through `react-markdown` (+ `remark-gfm`, `remark-math`, `rehype-katex`),
+in three groups since #125: the step-by-step **guide** (`docs/guide/`, French), the **reference**
+(`docs/simulation-theory.md`) and the **original reports** under `docs/references/`, served
+verbatim. The registry is `src/lib/docs/pages.ts`; the bytes are `src/lib/docs/sources.ts`, raw
+`?raw` imports.
 
-- **They are SSR and prerendered, unlike the app Pages.** `vite.config.ts` lists the six paths under
-  `pages` with `prerender.enabled`, so the build emits `dist/client/docs/<slug>/index.html` as full
+- **They are SSR and prerendered, unlike the app Pages.** `vite.config.ts` lists `/docs` and every
+  `DOC_PAGES` slug under `pages` with `prerender.enabled`, so the build emits `dist/client/docs/<slug>/index.html` as full
   HTML and a shared `/docs/modele#s-10-4` lands with a **200**. `autoStaticPathsDiscovery` is
   **off** so `/` stays the SPA shell. Under `bun run dev`, SPA mode serves the shell for every path
   and the page renders client-side — same output, different status line.
@@ -76,11 +78,20 @@ through `react-markdown` (+ `remark-gfm`, `remark-math`, `rehype-katex`). The re
   (`src/components/docs/help-text.tsx`). `src/lib/docs/refs.test.ts` fails on a `§` that names no
   heading of the theory file — so a renumbering of `docs/simulation-theory.md` is a test failure,
   not a dead link.
+- **A slug, once served, never changes, nor does a section anchor.** `src/lib/docs/links.test.ts`
+  freezes the five slugs and every anchor served before #125, so a reorganisation that would break
+  a bookmark or a shared `/docs/modele#s-10-4` fails a test instead. It also resolves every link
+  between pages to an existing heading, and checks the guide's sommaire reaches every sub-chapter.
+- **Pages link to each other by repository path** — `../simulation-theory.md#s-10-4`,
+  `2-statique.md#s-2-4` — so the files read the same on GitHub; `@/lib/docs/links.ts` resolves such
+  a link against the page's `path` and the renderer routes it (`basepath` applied). A relative link
+  to a file the app does not serve is printed as its path.
 - **The markdown is read in the route's `component`, never in its `loader`.** The router plugin
   code-splits the component and leaves the loader in the critical chunk; a `docSource` call in the
   loader ships ~150 kB of prose with the simulator. Measured: `index-*.js` 517 kB → 668 kB.
-- Add a page by adding an entry to `DOC_PAGES`, its raw import to `sources.ts`, and its path to
-  `pages` in `vite.config.ts`. Nothing else knows the list.
+- Add a page by adding an entry to `DOC_PAGES` and its raw import to `sources.ts`; the prerender
+  list and the navigation read the registry. The « ⋯ » menu lists `MENU_DOC_PAGES`: every page but
+  the guide's chapters, which its sommaire reaches.
 
 ## The app Pages — one route per Page, one Scenario in the URL
 
