@@ -27,6 +27,11 @@ under `bun run dev` it happens per request. Same output either way — which is 
   route's `pendingComponent`, the **Skeleton**, and returns **200**; `beforeLoad` and `loader` are
   skipped on the server. `validateSearch` still runs there, **three times per request**, so it must
   stay pure, cheap and side-effect-free.
+- **The router keeps the Skeleton no longer than the Page takes** (`defaultPendingMinMs: 0` in
+  `src/router.tsx`, #128). A painted Skeleton is a pending UI to the router, which by default holds
+  it 500 ms from hydration — measured, the floor under every first load. The Skeleton is the live
+  frame's own layout, so there is nothing to flash. What the first load costs, how it is measured
+  and what was tried: [`docs/performance/first-load.md`](../performance/first-load.md).
 - A `validateSearch` must **omit** keys it rejects, and must never return `{ key: undefined }` or
   a coerced value: either makes the server emit a **307** to the canonical URL before any client
   code runs, which destroys the evidence the ignored-keys banner needs.
