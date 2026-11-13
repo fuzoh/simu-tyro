@@ -32,7 +32,12 @@ import { xTicks } from "@/components/chart/profile.tsx";
 import { useHover } from "@/components/chart/use-hover.ts";
 import { NO_SPAN_LINE, TENSION_COPY } from "@/lib/chart/copy.ts";
 import { RIDER_REACH_PX } from "@/lib/chart/hover.ts";
-import { tensionLines, tensionProfile, tensionScene } from "@/lib/chart/tension.ts";
+import {
+  tensionLines,
+  tensionProfile,
+  tensionScene,
+  unloadedTension,
+} from "@/lib/chart/tension.ts";
 import { formatAtX, formatQuantity, unitLabel } from "@/lib/format/quantity.ts";
 import {
   axisLabel,
@@ -75,10 +80,12 @@ export function TensionChart({
   const { scenario } = useAppState();
   const xD = scenario.rider.xD;
   const unit = scenario.unit;
-  // The passager's exact solve and two `sampleTension`s, keyed on `x_D` like the coupe's rider.
+  // The unloaded curve no passager position moves, keyed on the solved half alone; then the
+  // passager's exact solve and one `sampleTension`, keyed on `x_D` like the coupe's rider.
+  const unloaded = useMemo(() => (solved === null ? null : unloadedTension(solved)), [solved]);
   const profile = useMemo(
-    () => (solved === null ? null : tensionProfile(solved, xD)),
-    [solved, xD],
+    () => (solved === null || unloaded === null ? null : tensionProfile(solved, xD, unloaded)),
+    [solved, unloaded, xD],
   );
 
   return (

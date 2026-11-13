@@ -28,6 +28,7 @@ import {
   tensionLines,
   tensionProfile,
   tensionScene,
+  unloadedTension,
 } from "./tension.ts";
 
 /** The scenario's half, composed as the app root composes it. */
@@ -60,6 +61,13 @@ describe("the curves agree with the anchor tensions the screen prints", () => {
     const one = tensionProfile(base, 20).unloaded;
     const other = tensionProfile(base, 130).unloaded;
     expect(Array.from(one.Ts)).toEqual(Array.from(other.Ts));
+  });
+
+  it("a held unloaded curve is reused as is, so a scrub never re-samples it", () => {
+    const unloaded = unloadedTension(base);
+    expect(Array.from(unloaded.Ts)).toEqual(Array.from(tensionProfile(base, 75).unloaded.Ts));
+    expect(tensionProfile(base, 20, unloaded).unloaded).toBe(unloaded);
+    expect(tensionProfile(base, 130, unloaded).unloaded).toBe(unloaded);
   });
 
   // Both sides of the passager: near A, at mid-span and near B.

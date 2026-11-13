@@ -59,13 +59,25 @@ export type TensionProfile = {
 };
 
 /**
+ * The unloaded line's curve — the half of the graph no passager position moves, so the component
+ * memoises it on the solved half alone and a scrub never re-samples it.
+ */
+export function unloadedTension(base: SceneBase): TensionCurve {
+  return curveOf(sampleTension(base.unloaded, TENSION_SAMPLES));
+}
+
+/**
  * The two curves at the passager's position.
  *
  * @param base the solved half, as the gates leave it — the caller keeps `null` for itself.
  * @param requestedXD the Scenario's `x_D`, clamped into `[0, L]` like the coupe's.
+ * @param unloaded {@link unloadedTension} of the same `base`, when the caller already holds it.
  */
-export function tensionProfile(base: SceneBase, requestedXD: number): TensionProfile {
-  const unloaded = curveOf(sampleTension(base.unloaded, TENSION_SAMPLES));
+export function tensionProfile(
+  base: SceneBase,
+  requestedXD: number,
+  unloaded: TensionCurve = unloadedTension(base),
+): TensionProfile {
   const resolved = solveRider(base, requestedXD);
   const loaded = resolved === null ? null : curveOf(sampleTension(resolved.state, TENSION_SAMPLES));
   return {

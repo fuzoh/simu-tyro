@@ -53,7 +53,8 @@ export function App({ page }: { page: string }) {
  * **One sweep, two readers.** The scene's expensive half is computed here, at the `useSweep` seam,
  * and handed to both consumers: the charts draw it and the Rail's output half reports it. A memo
  * inside each would run the sweep and the §11 reducer twice per parameter change. `x_D` is not one
- * of its inputs, so a scrub still re-runs nothing but `placeRider`, inside the Chart Block.
+ * of its inputs, so a scrub still re-runs nothing but the passager's exact solve: `placeRider`
+ * inside the Chart Block and, on Avancé, the tension graph's `tensionProfile` (#119).
  *
  * **One unloaded line, two readers**, for the same reason one rung down: the scene sweeps it and
  * both halves of the Rail print it, and neither the sweep nor the `L₀` bisection may run twice per
@@ -99,7 +100,7 @@ function Live({ page }: { page: string }) {
   /**
    * The tension graph closes the Page (#119): under the Chart Block from three columns, after the
    * Rail's last section below. `threeColumns()` decides where it is *mounted*, as it does the vue
-   * de dessus — one graph, one solve per `x_D`, never a hidden twin.
+   * de dessus — one mounted graph, never a hidden twin.
    */
   const three = threeColumns(viewport.width);
   const tension = (

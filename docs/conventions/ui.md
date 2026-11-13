@@ -477,7 +477,9 @@ the two scales are *deliberately mismatched*, which is the whole point (« v1 bu
   to `useDeduced()`, which formats it with `deducedFrom`, and to `useScene()`
   (`src/components/app/use-scene.ts`), § 2's `useSweep` seam: the Chart Block *and* the Rail's
   output half read the same traverse, so the memo lives once in `app.tsx` and the value is passed
-  down. `x_D` is deliberately not one of their inputs — a scrub re-runs `placeRider` alone. The gate
+  down. `x_D` is deliberately not one of their inputs — a scrub re-runs `placeRider` and, on Avancé,
+  the tension graph's `tensionProfile` (#119): the same exact solve at the same `x_D`, run once more
+  for the graph's own state (~40 µs), while its unloaded curve is memoised on the solved half. The gate
   report and the `Résultats` hold through a scrub the same way: both key on `useTraverse()`
   (`src/components/app/use-traverse.ts`), the Scenario without `x_D` memoised on `traverseInputs`'
   fields, and tier one reads the form's text through `sameGatedText`, which ignores `x_D`'s.
