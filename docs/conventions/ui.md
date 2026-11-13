@@ -211,6 +211,22 @@ Each button's hover names its key (`gimbalHint`), and a keyboard glyph's hover l
 turns the camera and never scrolls the page. The north needle is `Navigation2` turned by the camera's heading: a shape, not a printed
 number.
 
+**The Vue embarquée replaces the Gimbal while it plays** (#126). « Vue embarquée » is the Gimbal's
+last button (key 3), under the two Vues prédéfinies, `size="sm"` and `.touch-44` like them; off,
+with its reason on the wrapper's hover as `MapControls` does for « 3D », while no motion is
+proposed (`EMBARK_BLOCKED`). Inside, the same corner holds one row of `icon-sm` buttons — lecture or
+pause, recommencer, the head turned left, the eyes raised, lowered, the head turned right, the
+keyboard glyph — and « Quitter la vue embarquée » under it, on the Gimbal's hit-box rule
+(`after:-z-1` inside `isolate`). The focus lands on « Lecture » on entering and back on the canvas on
+leaving, so the keys keep answering. The read-out sits over the bottom-left corner on
+`bg-background/80`, clear of the attribution (`right-20`): which ride and « estimation » with an
+`ⓘ`, then `t / durée · x · vitesse` in mono, then how the motion ends. A drag on the canvas turns the
+head; CesiumJS's own gestures are off. The space bar on a button is the button's press, and Escape on
+an open infobulle's icon closes the bubble before it leaves the view. **Statique has none**: it never
+says « estimation » (#91), so its map passes no rides, shows no button and lists no key 3; the
+embarked words live apart from `mapLabelTable` (`embarkedLabelTable`), in the tables of Avancé and
+Terrain alone.
+
 **The carte claire has no raster twin, so the Vue 3D drapes its nearest one.** The carte claire is
 swisstopo's vector `ch.swisstopo.lightbasemap.vt`, which CesiumJS cannot drape; the WMTS
 capabilities read on 2026-11-08 offer no raster light base map (only its relief shading), so the

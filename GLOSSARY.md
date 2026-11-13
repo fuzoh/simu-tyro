@@ -489,14 +489,15 @@ with its Banane, the Ligne A–B and the Trajectoire — the coupe's curves, wit
 own. Context, not measurement: it states nothing the coupe does not. Anchors drag there as on
 the carte: the line follows the pointer, the recalculation waits for the release. The camera
 moves by the Gimbal, by the keys once the view has the focus, and to the two Vues
-prédéfinies. Loaded only when chosen.
+prédéfinies; on Avancé and Terrain it also rides the passager's computed motion in the Vue embarquée. Loaded only when chosen.
 _Avoid_: 3D map, globe, scene, viewer
 
 **Gimbal**:
 The camera's controls over the corner of the Vue 3D: a north needle that turns with the
 camera and puts north up when pressed, a turn left or right around the line's centre, the
-inclinaison up or down, the zoom, and the two Vues prédéfinies. Each button has its key, and
-its hover names it. It moves the camera and nothing else: no anchor, no Scenario.
+inclinaison up or down, the zoom, the two Vues prédéfinies and, where the Page plays a ride, the
+Vue embarquée. Each button has its key, and its hover names it. It moves the camera and nothing
+else: no anchor, no Scenario.
 _Avoid_: boussole (avoided for the Rose des vents too), navigation control, widget
 
 **Vue prédéfinie**:
@@ -517,6 +518,21 @@ The Vue prédéfinie square across the line, A on the left of the screen as on t
 with a margin. The camera stands on the right of A → B, the side that puts A on the left of the
 screen. The view the Vue 3D opens on. Key 2.
 _Avoid_: vue de profil, vue de côté
+
+**Vue embarquée**:
+The Vue 3D from the passager's seat (#126): the eye hangs under the pulley, inside the gabarit du
+passager — 1,6 m above its foot, never above the pulley, a convention — and is carried along the
+ride with the Vent entered at the engine's own times and positions, swings back included, to the
+arrival, the Point d'arrêt or the last instant computed for a ride that never settles. One second
+on screen is one second of the ride. The head turns a full circle, and the eyes up or down,
+independently of the motion, playing or paused. Lecture, pause, recommencer and « Quitter la vue
+embarquée », which puts the camera back where it stood. An estimation. While it plays the loaded
+line — the passager's at the Position du passager — is hidden and the Trajectoire shown. Off, and
+saying why, while no ride is read, while the ride never leaves the departure or while an anchor is
+dragged; a new ride ends the one playing. The Gimbal's button and key 3, on Avancé and Terrain —
+never on Statique, which says no estimation. Not a Vue prédéfinie: it rides, and has its own
+controls.
+_Avoid_: vue passager, vue subjective, animation, simulation, VR
 
 **Rose des vents**:
 The compass rose drawn on the vue de dessus, with a handle that sets the Vent's direction and force by dragging. It edits the azimuth directly: on the north-up map the handle stands where the wind comes from. Its reading gives that azimuth and, from the line's bearing, where the wind comes from relative to the line A → B (« Vent d'ouest (264°), 30 km/h : par la gauche à l'avant, 312° par rapport à la ligne A → B »). Without A and B on the map it has no handle and says why. On Terrain it is read-only. It sets the wind that draws the Banane.
