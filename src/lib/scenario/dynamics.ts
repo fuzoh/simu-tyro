@@ -10,7 +10,7 @@
  * passager. Nothing here feeds the statics or the Verdict.
  */
 
-import type { DerivedMaterial, QuasiStatic, Ride, TrolleyFriction } from "@/lib/sim";
+import type { DerivedMaterial, QuasiStatic, Ride, RideInput, TrolleyFriction } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { G } from "@/lib/format/quantity.ts";
@@ -103,13 +103,9 @@ export function readDynamics(
   if (traverse.coverage < 1) return null;
 
   const path = ridePath(traverse.steps, unloaded.span);
-  const rho = airDensityOf(dynamics.rho, profile);
-  const trolley = trolleyOf(material.family, dynamics);
-  const posed = { path, m: rider.mp, CdA: dynamics.CdA, rho: rho.value, trolley };
-  const calm = ride({ ...posed, windAlong: 0 });
-  const along =
-    bearing === null ? 0 : windComponents(kmhToMs(wind.speedKmh), wind.directionDeg, bearing).along;
-  const windy = along === 0 ? calm : ride({ ...posed, windAlong: along });
+  const { posed, along, rho } = poseRides({ material, rider, wind, dynamics }, profile, bearing);
+  const calm = ride({ ...posed, path, windAlong: 0 });
+  const windy = along === 0 ? calm : ride({ ...posed, path, windAlong: along });
 
   // The member's own `μ`, kg/m: its weight per metre over the `g` that made it.
   const linearMass = unloaded.material.w / G;
@@ -119,7 +115,7 @@ export function readDynamics(
 
   const warnings: DynamicsWarningId[] = [];
   if (exceeded) warnings.push("quasi-static");
-  if (trolley.law === "coulomb") warnings.push("steel-trolley-unconfirmed");
+  if (posed.trolley.law === "coulomb") warnings.push("steel-trolley-unconfirmed");
 
   return {
     estimate: true,
@@ -130,6 +126,41 @@ export function readDynamics(
     quasiStatic: { ...worst, exceeded },
     warnings,
   };
+}
+
+/** What a Scenario's rides are posed with, whatever trajectory they run on. */
+export type RidePosing = {
+  /** Everything of a ride but its trajectory and its wind. */
+  readonly posed: Omit<RideInput, "path" | "windAlong">;
+  /** The Vent's component along A → B, m/s — `0` without a bearing to project it on. */
+  readonly along: number;
+  readonly rho: DynamicsReading["rho"];
+};
+
+/**
+ * The passager, the trolley and the air of a Scenario's rides — the one place they are read off it,
+ * so a ride over another trajectory of the same Scenario (`./reach.ts`) is posed as these are.
+ *
+ * @param profile the **active** imported profil, `null` on a manual line.
+ * @param bearing the bearing of A → B, degrees from north, or `null` without Positions.
+ */
+export function poseRides(
+  {
+    material,
+    rider,
+    wind,
+    dynamics,
+  }: Pick<ScenarioDraft, "material" | "wind" | "dynamics"> & {
+    readonly rider: Pick<ScenarioDraft["rider"], "mp">;
+  },
+  profile: Trace | null,
+  bearing: number | null,
+): RidePosing {
+  const rho = airDensityOf(dynamics.rho, profile);
+  const trolley = trolleyOf(material.family, dynamics);
+  const along =
+    bearing === null ? 0 : windComponents(kmhToMs(wind.speedKmh), wind.directionDeg, bearing).along;
+  return { posed: { m: rider.mp, CdA: dynamics.CdA, rho: rho.value, trolley }, along, rho };
 }
 
 /**
