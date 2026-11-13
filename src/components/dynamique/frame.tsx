@@ -5,7 +5,8 @@
  * results, the coupe and the curve, in a column that is the layout contract's query container.
  *
  * The Skeleton's two chart frames are the live ones' bands: the profile band over the shared
- * proportions and the strip band under it, both functions of the column's width.
+ * proportions and the strip band under it, both functions of the column's width. The proposal of a
+ * height for B (#121) is the last region, under them.
  */
 
 import type { ReactNode } from "react";
@@ -24,6 +25,7 @@ export function DynamiqueFrame({
   outputs,
   section,
   sectionRef,
+  proposal,
 }: {
   /** The Skeleton sets it: `aria-busy`, and no `aria-live` region, no spinner. */
   busy?: boolean;
@@ -35,6 +37,8 @@ export function DynamiqueFrame({
   section: ReactNode;
   /** The charts' one `ResizeObserver`, on their query container. */
   sectionRef?: (node: HTMLElement | null) => void;
+  /** The proposal of a height for B (#121), or the Skeleton's empty line. */
+  proposal: ReactNode;
 }) {
   return (
     <ColumnsFrame busy={busy} fields={fields} strip={strip}>
@@ -46,6 +50,11 @@ export function DynamiqueFrame({
         <div className="@container min-w-0" ref={sectionRef}>
           {section}
         </div>
+      </Region>
+      {/* Last, under the charts: what it holds is as long as its answer — a refusal is a line, a
+          proposal a dozen — and above them it would move the coupe each time it lands. */}
+      <Region title={SECTION.proposal}>
+        <div className="px-3">{proposal}</div>
       </Region>
     </ColumnsFrame>
   );
@@ -69,6 +78,8 @@ export function DynamiqueSkeleton() {
         </div>
       }
       outputs={<DynamiqueOutputSkeleton />}
+      // The target's line, empty: the proposal is whatever the search answers.
+      proposal={<p className="min-h-4 text-xs" />}
       section={
         <>
           <BannerSlot />

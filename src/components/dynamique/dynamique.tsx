@@ -11,7 +11,7 @@
  * sweep, and none while the Wind or Ride Gate withholds them.
  */
 
-import { useMemo } from "react";
+import { useDeferredValue, useMemo } from "react";
 
 import type { DynamiqueSolved } from "@/lib/dynamique/scene.ts";
 import type { FieldId } from "@/lib/rail/fields.ts";
@@ -25,12 +25,14 @@ import { useViewport } from "@/components/app/use-viewport.ts";
 import { DynamiqueCharts } from "@/components/chart/dynamique.tsx";
 import { useChartWidth } from "@/components/chart/use-chart-width.ts";
 import { banner, pageReport } from "@/lib/app/banner.ts";
-import { DYNAMIQUE_GATES, INCOMPLETE } from "@/lib/dynamique/copy.ts";
+import { DYNAMIQUE_GATES, INCOMPLETE, REACH_COPY } from "@/lib/dynamique/copy.ts";
 import { dynamiqueOutputs } from "@/lib/dynamique/outputs.ts";
+import { reachProposal, reachSearch } from "@/lib/dynamique/reach.ts";
 
 import { DynamiqueFields, shownOnDynamique } from "./fields.tsx";
 import { DynamiqueFrame } from "./frame.tsx";
 import { DynamiqueOutputTiles } from "./outputs.tsx";
+import { ReachProposal } from "./reach.tsx";
 
 /** @param page the router path of the Page — every link it writes opens it. */
 export function Dynamique({ page }: { page: string }) {
@@ -51,6 +53,8 @@ function Live({ page }: { page: string }) {
     rail,
     rides: reading,
     surfaces,
+    traverse,
+    unloaded,
     copyDiagnostic,
   } = usePage({
     page,
@@ -84,6 +88,17 @@ function Live({ page }: { page: string }) {
           base: solved,
           rides: reading === null || model === null ? null : { reading, outputs: model },
         };
+  // The proposal of a height for B (#121) re-runs the whole chain a dozen times, so it is posed off
+  // what the rides were read from and searched **after** the frame that prints them: a keystroke
+  // paints its own results first, and the proposal of the Scenario before it stands meanwhile —
+  // dimmed and `aria-busy`, so a height is never read as this Scenario's while it is another's.
+  const search = useMemo(
+    () => reachSearch({ unloaded, traverse, trace: state.trace, rides: reading, clearance }),
+    [unloaded, traverse, state.trace, reading, clearance],
+  );
+  const posed = useDeferredValue(search);
+  const proposal = useMemo(() => (posed === null ? null : reachProposal(posed)), [posed]);
+
   // A ride withheld by the gates, or a solved but incomplete traverse, says why where the curve
   // and the tiles would be.
   const said = cause ?? rideCause ?? (solved !== null && model === null ? INCOMPLETE : null);
@@ -98,6 +113,14 @@ function Live({ page }: { page: string }) {
           <p className="text-muted-foreground text-xs">{said}</p>
         ) : (
           <DynamiqueOutputTiles model={model} />
+        )
+      }
+      proposal={
+        // None without a ride on this very frame: the search may still hold the Scenario before it.
+        model === null || proposal === null ? (
+          <p className="text-muted-foreground text-xs">{REACH_COPY.noRide}</p>
+        ) : (
+          <ReachProposal model={proposal} stale={posed !== search} />
         )
       }
       section={
