@@ -55,8 +55,11 @@ quotes and fails when they drift.
   nothing is projected: the ride and the Banane run without wind, the wind fields are disabled, and
   a carried Vent is kept as given with a notice — never a Blocking Error. A wind value the Wind
   Gate refuses (`ws=-5`, `ww=95`) is one with or without a bearing, and its field stays typable
-  so that the breach can be repaired (`fieldUnavailable`). Moving an anchor changes
-  the components and never `wd`.
+  so that the breach can be repaired (`fieldUnavailable`). A withheld Vent is drawn as none, so
+  the rose's handle waits at the centre: it is offered there only where a drag lifts the breach —
+  `ws=-5` — and never over a refused profile, where the drag would replace the speed and the
+  direction the Scenario holds and lift nothing (`windControls`, `src/lib/map/wind-rose.ts`).
+  Moving an anchor changes the components and never `wd`.
 - **The Vent's profile is a prescribed scenario, read locally, and refused until it is read**
   (#120, `docs/simulation-theory.md` §8.4). `windAt(field, x, L, bearing)`
   (`src/lib/sim/wind-profile.ts`) is the one entry a spatial reader takes — at its own `x`, for
