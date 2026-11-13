@@ -100,6 +100,7 @@ describe("the public surface", () => {
     const surface = {
       solveSpan: sim.solveSpan,
       sampleCable: sim.sampleCable,
+      sampleTension: sim.sampleTension,
       solveAtHorizontalPosition: sim.solveAtHorizontalPosition,
       sweep: sim.sweep,
       zGroundAt: sim.zGroundAt,

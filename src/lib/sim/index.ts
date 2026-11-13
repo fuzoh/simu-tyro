@@ -50,8 +50,11 @@ export type {
 } from "./types.ts";
 
 // —— catenary.ts — §4.1 closed form ————————————————————————————————————————————————————————
-// `levelSpanShortcut` stays module-local by § 2: a fast path, not a call site.
-export { sampleCable } from "./catenary.ts";
+// `levelSpanShortcut` stays module-local by § 2: a fast path, not a call site. `sampleTension` is
+// `sampleCable`'s twin for §2's `T(s)` (#119): Avancé draws the internal tension along the line, and
+// the alternative was re-deriving §6.1's piecewise `V(s)` in the app — the « physics in the UI » § 5
+// forbids.
+export { sampleCable, sampleTension } from "./catenary.ts";
 
 // —— solve.ts — §5 damped Newton, §5.2 seeds and retries, §4.3 degenerate branches ——————————
 // `Iterate` is `solveSpan`'s optional warm start; a caller cannot name that parameter without it.

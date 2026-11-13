@@ -9,11 +9,13 @@ import {
   Z2,
   Z3,
   Z4,
+  Z5,
   scannedPositionTolerance,
 } from "./__fixtures__/theory-15.ts";
 import {
   levelSpanShortcut,
   sampleCable,
+  sampleTension,
   tensionAt,
   verticalTensionAt,
   xAt,
@@ -381,5 +383,106 @@ describe("a loaded state samples through its kink — §6.1's piecewise V(s)", (
     expect(xAt(shuffled, Z4.in.L0)).toBe(xAt(ordered, Z4.in.L0));
     expect(zAt(shuffled, Z4.in.L0)).toBe(zAt(ordered, Z4.in.L0));
     expect(shuffled.loads.map((load) => load.s)).toEqual([70, 20]);
+  });
+});
+
+/** `sampleTension`'s interleaved pairs, split. */
+function tensionPairs(samples: Float64Array): { xs: number[]; Ts: number[] } {
+  const xs: number[] = [];
+  const Ts: number[] = [];
+  for (let i = 0; i < samples.length; i += 2) {
+    xs.push(samples[i]);
+    Ts.push(samples[i + 1]);
+  }
+  return { xs, Ts };
+}
+
+describe("sampleTension — §2's T(s) along the line, §6.1's node on both sides (#119)", () => {
+  test("unloaded: n + 1 pairs, the ends are Z3's T_A and T_B, T decreasing towards the lower B", () => {
+    const state = stateOf({ H: Z3.out.H, V0: Z3.out.V0, w: Z3.in.w, EA: Z3.in.EA, L0: Z3.in.L0 });
+    const { xs, Ts } = tensionPairs(sampleTension(state, 120));
+    expect(xs).toHaveLength(121);
+    expect(xs[0]).toBe(0);
+    expect(Math.abs(xs[120] - Z3.in.L)).toBeLessThan(1e-4);
+    expect(relativeError(Ts[0], Z3.out.TA)).toBeLessThan(TOLERANCE.solvedScalar);
+    expect(relativeError(Ts[120], Z3.out.TB)).toBeLessThan(TOLERANCE.solvedScalar);
+    // Every sample is §2's magnitude at its own `s`, and never below `H` — `H` is its floor.
+    for (let i = 0; i <= 120; i++) {
+      const s = (Z3.in.L0 * i) / 120;
+      expect(Ts[i]).toBeCloseTo(tensionAt(state, s), 9);
+      expect(Ts[i]).toBeGreaterThanOrEqual(Z3.out.H * (1 - 1e-12));
+    }
+    for (let i = 1; i < xs.length; i++) expect(xs[i]).toBeGreaterThan(xs[i - 1]);
+  });
+
+  test("Z4, level span, load at mid-span: equal ends and an equal jump either side of the node", () => {
+    const state = stateOf({
+      H: Z4.out.H,
+      V0: Z4.out.V0,
+      w: Z4.in.w,
+      EA: Z4.in.EA,
+      L0: Z4.in.L0,
+      loads: [{ P: Z4.in.P, s: Z4.out.sP }],
+    });
+    // n = 7 keeps the node off the grid.
+    const { xs, Ts } = tensionPairs(sampleTension(state, 7));
+    expect(xs).toHaveLength(8 + 2);
+    expect(relativeError(Ts[0], Z4.out.TA)).toBeLessThan(TOLERANCE.solvedScalar);
+    expect(relativeError(Ts.at(-1) ?? 0, Z4.out.TB)).toBeLessThan(TOLERANCE.solvedScalar);
+    const node = xs.findIndex((x, i) => i > 0 && x === xs[i - 1]);
+    expect(Math.abs(xs[node] - Z4.in.xD)).toBeLessThan(1e-4);
+    // Symmetry: |V| is the same on both sides of the node, so the two magnitudes agree.
+    expect(relativeError(Ts[node - 1], Ts[node])).toBeLessThan(1e-12);
+    expect(Ts[node]).toBeCloseTo(
+      Math.hypot(Z4.out.H, Z4.out.V0 + Z4.in.w * Z4.out.sP + Z4.in.P),
+      6,
+    );
+  });
+
+  test("Z5, the node off-centre: the two sides differ, and their V differ by exactly P", () => {
+    const VB = Z5.out.V0 + Z5.in.w * Z5.in.L0 + Z5.in.P;
+    const state = {
+      ...stateOf({ H: Z5.out.H, V0: Z5.out.V0, w: Z5.in.w, EA: Z5.in.EA, L0: Z5.in.L0 }),
+      VB,
+      loads: [{ P: Z5.in.P, s: Z5.in.sD }],
+    };
+    const { xs, Ts } = tensionPairs(sampleTension(state, 200));
+    const node = xs.findIndex((x, i) => i > 0 && x === xs[i - 1]);
+    expect(Math.abs(xs[node] - Z5.out.xD)).toBeLessThan(1e-3);
+    const below = Ts[node - 1];
+    const above = Ts[node];
+    // « Do not impose T₁ = T₂ at the node » — §6.1.
+    expect(Math.abs(above - below)).toBeGreaterThan(1);
+    const V = (T: number) => Math.sqrt(T * T - Z5.out.H * Z5.out.H);
+    // Below the node V < 0 (descending side) and above it V > 0 here, so the jump is |V⁻| + |V⁺|.
+    expect(V(below) + V(above)).toBeCloseTo(Z5.in.P, 6);
+    expect(relativeError(Ts.at(-1) ?? 0, Math.hypot(Z5.out.H, VB))).toBeLessThan(1e-12);
+    // The x order holds through the node: one repeated x, every other step strictly increasing.
+    const repeated = xs.flatMap((x, i) => (i > 0 && x <= xs[i - 1] ? [i] : []));
+    expect(repeated).toEqual([node]);
+    expect(xs[node]).toBe(xs[node - 1]);
+  });
+
+  test("a node on a grid point: the s⁻ pair, the s⁺ pair, then the grid pair on the s⁺ side", () => {
+    const state = stateOf({
+      H: Z4.out.H,
+      V0: Z4.out.V0,
+      w: Z4.in.w,
+      EA: Z4.in.EA,
+      L0: Z4.in.L0,
+      loads: [{ P: Z4.in.P, s: Z4.in.L0 / 2 }],
+    });
+    const { xs, Ts } = tensionPairs(sampleTension(state, 2));
+    expect(xs).toHaveLength(5);
+    expect(xs[1]).toBe(xs[2]);
+    expect(xs[3]).toBeCloseTo(xs[2], 12);
+    expect(Ts[3]).toBe(Ts[2]);
+    expect(Ts[1]).toBeCloseTo(Math.hypot(Z4.out.H, Z4.out.V0 + (Z4.in.w * Z4.in.L0) / 2), 9);
+  });
+
+  test("n must be a positive integer, as for sampleCable", () => {
+    const state = stateOf({ H: Z1.out.H, V0: Z1.out.V0, w: Z1.in.w, EA: Z1.in.EA, L0: Z1.in.L0 });
+    expect(() => sampleTension(state, 0)).toThrow(RangeError);
+    expect(() => sampleTension(state, 1.5)).toThrow(RangeError);
   });
 });
