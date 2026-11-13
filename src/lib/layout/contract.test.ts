@@ -670,7 +670,10 @@ describe("Avancé's three columns — the middle column is the chart column", ()
         "<TopMap frame={frame} solved={solved} windCause={windCause} />",
     };
     for (const [page, element] of Object.entries(pages)) {
-      expect(read(page)).toContain('import { TopMap } from "@/components/map/top-map.tsx";');
+      // Through the vue de dessus's door (#128): the same `TopMap`, MapLibre fetched beside the Page.
+      expect(read(page)).toContain(
+        'import { TopMap } from "@/components/map/deferred-top-map.tsx";',
+      );
       expect(read(page)).toContain(element);
     }
     const avance = readdirSync(join(root, "src/components/app")).map((name) =>

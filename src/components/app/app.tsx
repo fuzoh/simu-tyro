@@ -20,7 +20,7 @@ import type { ViewportFit } from "@/lib/layout/collapse.ts";
 import { ChartBlock } from "@/components/chart/chart-block.tsx";
 import { TensionChart } from "@/components/chart/tension.tsx";
 import { useChartWidth } from "@/components/chart/use-chart-width.ts";
-import { TopMap } from "@/components/map/top-map.tsx";
+import { TopMap } from "@/components/map/deferred-top-map.tsx";
 import { RailHeaderControls, RailInputs } from "@/components/rail/inputs.tsx";
 import { RailOutputs } from "@/components/rail/outputs.tsx";
 import { TopViewFrame } from "@/components/statique/top-view.tsx";

@@ -17,6 +17,8 @@ import { App } from "@/components/app/app.tsx";
 import { LoadFailure } from "@/components/app/load-failure.tsx";
 import { LinkRefusalSurface } from "@/components/app/refusal.tsx";
 import { Skeleton } from "@/components/app/skeleton.tsx";
+import { prefetchTopMap } from "@/components/map/load-top-map.ts";
+import { threeColumns } from "@/lib/layout/contract.ts";
 
 export const Route = createFileRoute("/_app/avance")({
   /**
@@ -42,6 +44,14 @@ export const Route = createFileRoute("/_app/avance")({
    * to `null`. The choice was Skeleton or blank page.
    */
   pendingComponent: Skeleton,
+  /**
+   * The vue de dessus's module, on the wire beside the Page's chunk (#128, `_app.index.tsx`) — only
+   * where the middle column will show the map. Below B2 Avancé never starts it (`app.tsx`), so a
+   * phone does not download MapLibre for an empty frame.
+   */
+  loader: () => {
+    if (threeColumns(window.innerWidth)) prefetchTopMap();
+  },
   /**
    * For **genuine load failures only**. § 7 once named this the refusal's owner; amendment E struck
    * that sentence — `validateSearch` no longer throws for § 8's three refusal classes, so no

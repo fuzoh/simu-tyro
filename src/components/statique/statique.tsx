@@ -21,7 +21,7 @@ import { usePage } from "@/components/app/use-page.ts";
 import { useViewport } from "@/components/app/use-viewport.ts";
 import { ChartBlock } from "@/components/chart/chart-block.tsx";
 import { useChartWidth } from "@/components/chart/use-chart-width.ts";
-import { TopMap } from "@/components/map/top-map.tsx";
+import { TopMap } from "@/components/map/deferred-top-map.tsx";
 import { banner, pageReport } from "@/lib/app/banner.ts";
 import { shownOnStatique, STATIQUE_GATES } from "@/lib/statique/fields.ts";
 import { statiqueOutputs } from "@/lib/statique/outputs.ts";

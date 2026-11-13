@@ -21,7 +21,7 @@ import { AppStoreProvider } from "@/components/app/store.tsx";
 import { useReadingPage } from "@/components/app/use-page.ts";
 import { ChartBlock } from "@/components/chart/chart-block.tsx";
 import { useChartWidth } from "@/components/chart/use-chart-width.ts";
-import { TopMap } from "@/components/map/top-map.tsx";
+import { TopMap } from "@/components/map/deferred-top-map.tsx";
 import { gateOf } from "@/lib/rail/fields.ts";
 import { STATIQUE_GATES } from "@/lib/statique/fields.ts";
 import { terrainView } from "@/lib/terrain-page/view.ts";
