@@ -172,9 +172,11 @@ describe("solveSpatial — failure is a value", () => {
     const result = solveSpatial(calm({ L: 100, h: 0, L0: 100.5, w: 0, EA: 1e7 }), {
       seed: [100, 0, 0],
     });
-    expect(result.ok).toBe(false);
-    if (result.ok || result.failure.kind !== "no-convergence") return;
-    expect(result.failure.closure).toBeGreaterThan(closureTolerance(100));
+    expect(result).toMatchObject({ ok: false, failure: { kind: "no-convergence" } });
+    // A straight shot at least 100,5 m long ends 0,5 m or more from an anchor 100 m away.
+    const closure =
+      !result.ok && result.failure.kind === "no-convergence" ? result.failure.closure : Number.NaN;
+    expect(closure).toBeGreaterThanOrEqual(0.5);
   });
 });
 
