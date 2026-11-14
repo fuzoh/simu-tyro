@@ -174,8 +174,14 @@ describe("FIRST_RUN_SCENARIO — § 9's shipped inputs", () => {
     expect(FIRST_RUN_SCENARIO.tensioningSide).toBe("A");
     // The mouflage — `mt` absent, likewise (#86).
     expect(FIRST_RUN_SCENARIO.tensioningDevice).toBe("pulley");
-    // No wind — `ws` and `wd` absent, likewise (#87).
-    expect(FIRST_RUN_SCENARIO.wind).toEqual({ speedKmh: 0, directionDeg: 0 });
+    // No wind — `ws` and `wd` absent, likewise (#87) — and its profile uniform at the shipped
+    // width: `ww` and `wa` absent (#120).
+    expect(FIRST_RUN_SCENARIO.wind).toEqual({
+      speedKmh: 0,
+      directionDeg: 0,
+      widthPct: 50,
+      attenuationPct: 0,
+    });
   });
 
   test("Tension de pose is the active Tightness segment, at 263,4 daN (2634 N)", () => {

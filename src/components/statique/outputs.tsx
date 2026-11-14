@@ -15,7 +15,7 @@ import { createContext, use } from "react";
 import type { StatiqueOutput, StatiqueOutputs, StatiqueVerdict } from "@/lib/statique/outputs.ts";
 
 import { TONE_CLASS } from "@/components/app/banner.tsx";
-import { HelpText } from "@/components/docs/help-text.tsx";
+import { Tip } from "@/components/rail/controls.tsx";
 import { VERDICT_TONE } from "@/lib/app/tone.ts";
 import { STATIQUE_TILE_MAX_PX } from "@/lib/layout/contract.ts";
 import { OUTPUT_LABEL } from "@/lib/statique/copy.ts";
@@ -90,9 +90,12 @@ export function TileFrame({
   wide = false,
   value,
   note,
+  tips,
   children,
 }: {
   label: string;
+  /** The tile's infobulles — an Avertissement's ⚠, an explanation's `ⓘ` — beside its label (#122). */
+  tips?: ReactNode;
   /** « sur toute la traversée », under the label it scopes. */
   scope?: string | null;
   /** The Verdict: across both columns on a phone, where it is the headline, and in a block. */
@@ -101,7 +104,7 @@ export function TileFrame({
   value?: ReactNode;
   /** The qualifier or the reason under it, `text-xs` tall when empty. */
   note?: ReactNode;
-  /** Below both lines: an Avertissement, which no Skeleton can foresee. */
+  /** Below both lines, in the open. */
   children?: ReactNode;
 }) {
   const layout = use(GridLayout);
@@ -113,7 +116,16 @@ export function TileFrame({
         wide && layout === "row" && "@min-[56rem]:col-span-1",
       )}
     >
-      <span className="text-muted-foreground text-xs">{label}</span>
+      {tips === undefined || tips === null || tips === false ? (
+        <span className="text-muted-foreground text-xs">{label}</span>
+      ) : (
+        // `min-h-4` and `size-3` icons: the label's line is as tall with them as without, so a
+        // warning landing on a tile moves nothing in the grid.
+        <span className="flex min-h-4 items-center gap-1">
+          <span className="text-muted-foreground text-xs">{label}</span>
+          {tips}
+        </span>
+      )}
       {scope !== null && <span className="text-muted-foreground text-xs">{scope}</span>}
       {/* `min-h-6` and `min-h-4` are `text-base`'s and `text-xs`'s line heights. */}
       <div className="flex min-h-6 flex-col">{value}</div>
@@ -133,6 +145,9 @@ function OutputTile({ output }: { output: StatiqueOutput }) {
         )
       }
       scope={output.scope}
+      tips={
+        output.warning !== null && <Tip label={output.label} text={output.warning} tone="warning" />
+      }
       value={
         output.value === null ? (
           <span className="text-muted-foreground text-xs">{output.absent}</span>
@@ -142,13 +157,7 @@ function OutputTile({ output }: { output: StatiqueOutput }) {
           </span>
         )
       }
-    >
-      {output.warning !== null && (
-        <p className="text-warning text-xs">
-          ⚠ <HelpText text={output.warning} />
-        </p>
-      )}
-    </TileFrame>
+    />
   );
 }
 

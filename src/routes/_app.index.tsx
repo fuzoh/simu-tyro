@@ -12,12 +12,22 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { LoadFailure } from "@/components/app/load-failure.tsx";
 import { LinkRefusalSurface } from "@/components/app/refusal.tsx";
+import { prefetchTopMap } from "@/components/map/load-top-map.ts";
 import { StatiqueSkeleton } from "@/components/statique/frame.tsx";
 import { Statique } from "@/components/statique/statique.tsx";
 
 export const Route = createFileRoute("/_app/")({
   ssr: false,
   pendingComponent: StatiqueSkeleton,
+  /**
+   * Starts the vue de dessus's module on the wire beside the Page's own chunk (#128) — the Page
+   * renders without it and the map lands in its frame when it is here (`load-top-map.ts`). A
+   * loader, because the router runs it as it starts fetching the component, and it stays in the
+   * critical chunk: one `import()` and nothing else, so it costs that chunk a line.
+   */
+  loader: () => {
+    prefetchTopMap();
+  },
   errorComponent: LoadFailure,
   component: StatiqueRoute,
 });

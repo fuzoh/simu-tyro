@@ -31,6 +31,10 @@ export const STATIQUE_FIELDS = [
   "regime",
   "windSpeed",
   "windDirection",
+  // The Vent's profile (#120): rows of this Page once the profile is consumed, and before that
+  // only while the gates refuse the value held (`isWindProfileFieldShown`).
+  "windWidth",
+  "windAttenuation",
   "usage",
   "hClearMin",
   "hRider",

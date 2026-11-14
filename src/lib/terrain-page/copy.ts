@@ -20,7 +20,7 @@ import {
   RIDE_LABEL,
 } from "@/lib/dynamique/copy.ts";
 import { peekBadgeLabel, veBadgeLabel } from "@/lib/layout/contract.ts";
-import { mapLabelTable } from "@/lib/map/copy.ts";
+import { embarkedLabelTable, mapLabelTable } from "@/lib/map/copy.ts";
 import { cellLabel, cellsOf, READ_OUT_SCOPE } from "@/lib/rail/cells.ts";
 import { lowerFirst } from "@/lib/rail/fields.ts";
 import { GATE_CONSEQUENCE } from "@/lib/rail/gates.ts";
@@ -72,6 +72,7 @@ export function terrainLabelTable(): readonly string[] {
     NO_REGIME_BANNER_BY_REGISTER.terrain,
     ...Object.values(SECTION),
     ...mapLabelTable(),
+    ...embarkedLabelTable(),
     ...cellsOf("terrain").map((id) => cellLabel(id, "terrain")),
     READ_OUT_SCOPE,
     ...Object.values(LAYER_LABEL).flatMap(({ full, short }) => [full, short]),

@@ -1,0 +1,1022 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import type { ControlRow } from "./controls.ts";
+import type { Outputs, Row } from "./run.ts";
+
+import { baseCase, baseCases, COEFFICIENTS, VARIANTS, variantsOf, windCase } from "./cases.ts";
+import {
+  buildReport,
+  clearanceOffset,
+  controlsCsv,
+  differenceCell,
+  extreme,
+  fr,
+  inputsCsv,
+  rowsCsv,
+  scientific,
+  signed,
+  table,
+} from "./report.ts";
+import { runFixedLength, runPoseTension } from "./run.ts";
+
+describe("numbers, the French way", () => {
+  it("fr: a decimal comma, a true minus, no sign on a rounded zero", () => {
+    expect(fr(1234.567, 1)).toBe("1234,6");
+    expect(fr(-0.25, 2)).toBe("−0,25");
+    expect(fr(-0.0004, 3)).toBe("0,000");
+    expect(fr(Number.NaN, 2)).toBe("—");
+  });
+
+  it("signed: a plus on what is above zero once rounded", () => {
+    expect(signed(0.25, 2)).toBe("+0,25");
+    expect(signed(-0.25, 2)).toBe("−0,25");
+    expect(signed(0.0004, 3)).toBe("0,000");
+  });
+
+  it("scientific: mantissa and a power of ten", () => {
+    expect(scientific(1.6e-9)).toBe("1,6×10⁻⁹");
+    expect(scientific(1e-6)).toBe("1,0×10⁻⁶");
+    expect(scientific(-2.34e-4)).toBe("−2,3×10⁻⁴");
+    expect(scientific(0)).toBe("0");
+  });
+});
+
+describe("differenceCell — no percentage of nothing, no small number for nothing", () => {
+  it("prints the absolute difference and, where it exists, the relative one", () => {
+    expect(differenceCell({ absolute: 578.4, relative: 0.186, resolved: true }, 1)).toBe(
+      "+578,4 (+18,6 %)",
+    );
+    expect(differenceCell({ absolute: -0.325, relative: null, resolved: true }, 3)).toBe("−0,325");
+  });
+
+  it("says a failure is a failure and an unresolved difference is under the floor", () => {
+    expect(differenceCell(null, 1)).toBe("échec");
+    expect(differenceCell({ absolute: 5e-5, relative: 1e-5, resolved: false }, 3)).toBe(
+      "< plancher",
+    );
+  });
+
+  it("does not print a resolved difference as zero, nor a tiny share as 0,0 %", () => {
+    expect(differenceCell({ absolute: 2.3e-4, relative: 4e-5, resolved: true }, 3)).toBe(
+      "2,3×10⁻⁴ (< 0,1 %)",
+    );
+  });
+
+  it("prints a norm without a sign", () => {
+    expect(differenceCell({ absolute: 581, relative: 0.186, resolved: true }, 1, true)).toBe(
+      "581,0 (18,6 %)",
+    );
+  });
+});
+
+describe("table", () => {
+  it("escapes a pipe inside a cell", () => {
+    expect(table(["a", "|f_n|"], [["1", "2"]])).toBe("| a | \\|f_n\\| |\n| --- | --- |\n| 1 | 2 |");
+  });
+});
+
+/** One base case of each comparison is enough to build every section. */
+const part = baseCases().filter((base) => base.id === "acier-12|niveau|vide|travers-20");
+const fixed = runFixedLength(part);
+const pose = runPoseTension({
+  lines: [part[0].line],
+  geometries: [part[0].geometry],
+  winds: [part[0].wind],
+});
+const passing: ControlRow = {
+  family: "§15 sans vent",
+  subject: "Z1",
+  quantity: "H",
+  unit: "N",
+  expected: 1423.94,
+  found: 1423.944,
+  bar: 0.0057,
+  pass: true,
+  source: "simulation-theory.md §15 Z1",
+};
+
+describe("extreme", () => {
+  it("finds the difference of greatest magnitude and the row it is on, the reference left out", () => {
+    const found = extreme(fixed, "Tmax", () => true)!;
+    expect(found.row.variant.id).not.toBe("N");
+    for (const row of fixed.slice(1)) {
+      const gap = Math.abs(row.outputs!.Tmax - fixed[0].outputs!.Tmax);
+      expect(Math.abs(found.difference.absolute)).toBeGreaterThanOrEqual(gap);
+    }
+  });
+
+  it("has nothing to give when no row is kept", () => {
+    expect(extreme(fixed, "Tmax", () => false)).toBeNull();
+  });
+});
+
+describe("buildReport — controls gate the conclusions (§18.6)", () => {
+  it("prints both comparisons, apart, when every control passes", () => {
+    const report = buildReport({ fixed, pose, controls: [passing] });
+    expect(report).toContain("**Tous les contrôles passent.**");
+    expect(report).toContain("## 6. Comparaison principale — longueur non tendue identique");
+    expect(report).toContain("## 7. Comparaison séparée — tension de pose identique");
+    expect(report).toContain("## 8. Lecture");
+    expect(report).not.toContain("Diagnostic");
+    expect(report.indexOf("## 4. Contrôles")).toBeLessThan(report.indexOf("## 6. Comparaison"));
+  });
+
+  it("stops at the diagnostic, with no comparison, when one control fails", () => {
+    const failing: ControlRow = { ...passing, found: 1500, pass: false };
+    const report = buildReport({ fixed, pose, controls: [passing, failing] });
+    expect(report).toContain("## 5. Diagnostic — pas de conclusion sur la physique");
+    expect(report).toContain("**Grandeurs en échec :**");
+    expect(report).not.toContain("Comparaison principale");
+    expect(report).not.toContain("## 8. Lecture");
+  });
+
+  it("lists a failed row as a failure, and gives it no difference", () => {
+    const broken = fixed.map((row, i) =>
+      i === 3
+        ? { ...row, status: "non convergé" as const, detail: "fermeture 7.1e+1 m", outputs: null }
+        : row,
+    );
+    const report = buildReport({ fixed: broken, pose, controls: [passing] });
+    expect(report).toContain("**Cas en échec**");
+    expect(report).toContain("fermeture 7.1e+1 m");
+    expect(report).not.toContain("Aucun cas en échec");
+  });
+
+  it("goes on past a failed row, and says it is left out rather than that everything passes", () => {
+    const fail = (rows: readonly Row[], indices: readonly number[]): Row[] =>
+      rows.map((row, i) =>
+        indices.includes(i) ? { ...row, status: "raffinement hors tolérance" as const } : row,
+      );
+    const one = buildReport({ fixed: fail(fixed, [3]), pose, controls: [passing] });
+    expect(one).toContain(
+      "**Tous les contrôles du prototype passent ; 1 ligne en échec, listée ci-dessus, est exclue des écarts.**",
+    );
+    expect(one).not.toContain("**Tous les contrôles passent.**");
+    // A row is not a control: the comparison is still printed, without that row.
+    expect(one).toContain("## 6. Comparaison principale — longueur non tendue identique");
+    expect(one).not.toContain("Diagnostic");
+    // Rows of both comparisons are counted together.
+    const three = buildReport({
+      fixed: fail(fixed, [3, 4]),
+      pose: fail(pose, [7]),
+      controls: [passing],
+    });
+    expect(three).toContain(
+      "**Tous les contrôles du prototype passent ; 3 lignes en échec, listées ci-dessus, sont exclues des écarts.**",
+    );
+  });
+
+  it("calls the probes probes and adopts nothing", () => {
+    const report = buildReport({ fixed, pose, controls: [passing] });
+    expect(report).toContain("sonde de sensibilité");
+    expect(report).toContain("publiée non transférable");
+    expect(report).toContain("Aucun n'est adopté");
+    expect(report).toContain("Décision de production encore ouverte");
+  });
+
+  it("names the straight span between the anchors as the glossary does: ligne A–B", () => {
+    const report = buildReport({ fixed, pose, controls: [passing] });
+    expect(report).toContain("N·m par mètre de ligne A–B");
+    expect(report).toContain("au-dessus** de la ligne A–B");
+    // GLOSSARY.md, Span — avoided: « corde » for the chord (a corde is a line of the matrix) and
+    // « droite A–B ».
+    expect(report).not.toContain("mètre de corde");
+    expect(report).not.toContain("droite A–B");
+  });
+
+  it("names a member of a line as the glossary does: a ligne, not a « brin » nor a « montage »", () => {
+    // The textile line is the one with two Brins porteurs: one of its cases, under the reference.
+    const rope = baseCases().filter((base) => base.id === "corde-bandit-11|niveau|vide|travers-20");
+    const report = buildReport({
+      fixed: [...fixed, ...runFixedLength(rope, VARIANTS.slice(0, 1))],
+      pose,
+      controls: [passing],
+    });
+    expect(report).toContain(
+      "| brins porteurs | 2 ; la ligne calculée porte la moitié du poids du passager | convention |",
+    );
+    // GLOSSARY.md, Brins porteurs — avoided: « brin » for one member, and « montage ».
+    expect(report).not.toMatch(/\bbrin\b/i);
+    expect(report).not.toMatch(/montage/i);
+  });
+
+  describe("under another clock", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("carries no date and no duration: the same rows give the same report another day", () => {
+      vi.useFakeTimers({ now: new Date("2026-11-14T08:00:00Z") });
+      const today = buildReport({ fixed, pose, controls: [passing] });
+      // Four years and some hours later, on a clock that has also run for longer.
+      vi.setSystemTime(new Date("2030-02-03T17:45:12Z"));
+      vi.advanceTimersByTime(90_000);
+      expect(buildReport({ fixed, pose, controls: [passing] })).toBe(today);
+    });
+  });
+});
+
+/** One section of the report: from its heading to the next heading of its level or above. */
+function section(report: string, heading: string): string {
+  const from = report.indexOf(`\n${heading}`);
+  if (from === -1) throw new Error(`no « ${heading} » in the report`);
+  const level = heading.indexOf(" ");
+  const rest = report.slice(from + 1 + heading.length);
+  const next = rest.search(new RegExp(`\\n#{1,${level}} `));
+  return heading + (next === -1 ? rest : rest.slice(0, next));
+}
+
+/** The cells of the first row of a table that starts with `start`, each under its column's header. */
+function cellsOf(text: string, start: string): Record<string, string> {
+  const lines = text.split("\n");
+  const at = lines.findIndex((line) => line.startsWith(start));
+  if (at === -1) throw new Error(`no row « ${start} »`);
+  // The header stands just above the rule of the row's table.
+  let rule = at;
+  while (!lines[rule].startsWith("| --- ")) rule--;
+  const cells = (line: string): string[] => line.slice(2, -2).split(" | ");
+  const row = cells(lines[at]);
+  return Object.fromEntries(cells(lines[rule - 1]).map((header, i) => [header, row[i]]));
+}
+
+describe("buildReport — an adjusted matrix is reported as it was run", () => {
+  // Another C_D⊥, probes listed largest first, one axial drag, and a near-head wind 10° off the
+  // line instead of 5°.
+  const variants = variantsOf({
+    ...COEFFICIENTS,
+    normal: 1.1,
+    liftMagnitudes: [0.3, 0.1],
+    axial: [0.05],
+  });
+  const { line, geometry, load } = part[0];
+  const wind = windCase(20, { id: "quasi-face", name: "presque de face", from: 10 });
+  const adjusted = {
+    fixed: runFixedLength([baseCase(line, geometry, load, wind)], variants),
+    pose: runPoseTension({ lines: [line], geometries: [geometry], winds: [wind], variants }),
+    controls: [passing],
+  };
+  const report = buildReport(adjusted);
+
+  it("prints each coefficient as it was written, not rounded to a column", () => {
+    expect(report).toContain("|f_a\\|, sonde C_t = 0,05");
+    expect(report).toContain("|f_L\\| binormale, sonde C_L = 0,3");
+    expect(report).toContain("traînée axiale, C_t = 0,05");
+    expect(report).toContain("portance binormale ±0,3 et axiale 0,05");
+    expect(report).toContain("plus petites sondes (C_L = ±0,1, C_t = 0,05)");
+    expect(report).toContain("|f_n\\|, C_D⊥ = 1,1");
+    expect(report).toContain("`C_D⊥ = 1,1` est lui-même un ordre de grandeur");
+    // Nothing of the default matrix is left: neither its probes nor their rounding.
+    expect(report).not.toMatch(/C_t = 0,1\b/);
+    expect(report).not.toMatch(/C_L = ±?0,5\b/);
+    expect(report).not.toContain("C_D⊥ = 1,2");
+  });
+
+  it("states in section 3 the coefficients and the installation that were run", () => {
+    const coefficients = section(report, "### Coefficients aérodynamiques");
+    expect(coefficients).toContain("| C_D⊥ | 1,1 | publiée non transférable |");
+    expect(coefficients).toContain("| C_L | 0 ; ±0,3 ; ±0,1 | sonde de sensibilité |");
+    expect(coefficients).toContain("| C_t | 0 ; 0,05 | sonde de sensibilité |");
+    const installation = section(report, "### Installation");
+    expect(installation).toContain("| portée | 150 m |");
+    // One level geometry and one wind: neither the −18 m nor the winds of the delivered matrix.
+    expect(installation).toContain("| dénivelé | 0 m |");
+    expect(installation).toContain("| vent | uniforme et horizontal ; 20 m/s ; de 10° |");
+    // The textile line was not run: its inputs are not listed.
+    const inputs = section(report, "## 3. Entrées et provenance");
+    expect(inputs).toContain("### Câble acier 12 mm");
+    expect(inputs).not.toContain("Courant Bandit");
+  });
+
+  it("shows the largest probes by their size, wherever they stand in the list", () => {
+    const byWind = section(report, "### Écarts vent par vent, aux plus grandes sondes");
+    expect(byWind).toContain("portance binormale, C_L = ±0,3");
+    expect(byWind).toContain("portance impaire en lacet, C_L = ±0,3");
+    expect(byWind).not.toContain("C_L = ±0,1");
+  });
+
+  it("reports the length of each model for the probes that were run", () => {
+    const lengths = section(report, "### Longueur de chaque modèle");
+    for (const id of ["NL-b+0.3", "NL-b-0.3", "NL-y+0.3", "NL-y-0.3", "NA-0.05"]) {
+      expect(lengths).toContain(`ΔL₀ \`${id}\` (mm)`);
+    }
+    // One wind, five differences of length, none of them a failure.
+    const [row] = lengths.split("\n").filter((text) => text.startsWith("| acier-12 |"));
+    expect(row.split("|").slice(6, 11)).toHaveLength(5);
+    expect(row).not.toContain("échec");
+    expect(row).not.toContain("—");
+  });
+
+  it("tabulates the wind that was run, and no wind that was not", () => {
+    const byWind = section(report, "### Écarts vent par vent, aux plus grandes sondes");
+    expect(byWind).toContain("| 20 m/s presque de face (10°) | portance binormale, C_L = ±0,3 |");
+    expect(byWind).not.toContain("(5°)");
+    expect(byWind).not.toContain("de travers");
+    expect(byWind).not.toContain("échec");
+    expect(report).toContain("| Vents | `quasi-face-20` |");
+  });
+
+  it("says of the two orientation laws only what the laws it ran allow", () => {
+    expect(report).toContain("sous deux lois de dépendance à l'angle de lacet");
+    expect(report).toContain("les deux lois testées répondent différemment");
+    const oneLaw = variantsOf({ ...COEFFICIENTS, liftLaws: ["yaw-odd"] });
+    const alone = buildReport({
+      fixed: runFixedLength(part, oneLaw),
+      pose: runPoseTension({
+        lines: [line],
+        geometries: [geometry],
+        winds: [wind],
+        variants: oneLaw,
+      }),
+      controls: [passing],
+    });
+    expect(alone).toContain("sous une seule des deux lois de dépendance à l'angle de lacet");
+    expect(alone).toContain(
+      "Une seule des deux lois d'orientation de §18.3 est jouée ici — la loi impaire en lacet",
+    );
+    expect(alone).not.toContain("les deux lois testées");
+    expect(alone).not.toContain("portance binormale");
+    expect(alone).not.toContain("n'est pas recroisée");
+  });
+
+  it("counts the matrix it was given", () => {
+    // 1 reference + 2 laws × 2 magnitudes × 2 signs + 1 axial + 2 magnitudes × 2 signs × 1 axial;
+    // the separate comparison runs both load states.
+    expect(variants).toHaveLength(14);
+    expect(report).toContain(
+      "Soit 1 cas de base, chacun sous 14 variantes de coefficients : 14 lignes dans la comparaison principale, 28 dans la comparaison séparée.",
+    );
+  });
+});
+
+describe("buildReport — the length of each model is a difference like any other (§18.6)", () => {
+  // The unloaded row of one model, or of the reference, with something injected on it.
+  const withUnloaded = (id: string, patch: Partial<Row>): Row[] =>
+    pose.map((row) =>
+      row.base.load.id === "vide" && row.variant.id === id ? { ...row, ...patch } : row,
+    );
+  const reference = pose.find((row) => row.base.load.id === "vide" && row.variant.id === "N")!;
+  /** The five ΔL₀ cells of the one wind run: NL-b+0.5, NL-b-0.5, NL-y+0.5, NL-y-0.5, NA-0.1. */
+  const shifts = (rows: readonly Row[]): string[] => {
+    const lengths = section(
+      buildReport({ fixed, pose: rows, controls: [passing] }),
+      "### Longueur de chaque modèle",
+    );
+    const [line] = lengths.split("\n").filter((text) => text.startsWith("| acier-12 |"));
+    return line
+      .split("|")
+      .map((cell) => cell.trim())
+      .slice(6, 11);
+  };
+
+  it("prints a length difference above the floor in millimetres, with its sign", () => {
+    expect(shifts(withUnloaded("NA-0.1", { L0: reference.L0 + 2e-4 }))[4]).toBe("+0,2");
+    expect(shifts(withUnloaded("NA-0.1", { L0: reference.L0 - 0.0123 }))[4]).toBe("−12,3");
+  });
+
+  it("writes no number for a length difference under the 0,1 mm floor", () => {
+    expect(shifts(withUnloaded("NA-0.1", { L0: reference.L0 + 5e-5 }))[4]).toBe("< plancher");
+    expect(shifts(withUnloaded("NA-0.1", { L0: reference.L0 - 5e-5 }))[4]).toBe("< plancher");
+  });
+
+  it("gives no difference to a model whose unloaded line failed its checks, its length known", () => {
+    const failed = shifts(
+      withUnloaded("NL-b+0.5", { status: "raffinement hors tolérance", detail: "écart 2e-5 m" }),
+    );
+    expect(failed[0]).toBe("échec");
+    // The other models keep theirs: a downward lift needs a longer line for the same pose.
+    expect(failed[1]).toMatch(/^\+\d+,\d$/);
+  });
+
+  it("gives no difference to any model when the reference failed its checks", () => {
+    expect(shifts(withUnloaded("N", { status: "bilan hors tolérance" }))).toEqual(
+      Array.from({ length: 5 }, () => "échec"),
+    );
+  });
+});
+
+describe("buildReport — a group without a row is not a failure", () => {
+  // Two base cases that share neither their speed nor their load state.
+  const cases = baseCases().filter(
+    ({ id }) =>
+      id === "acier-12|niveau|vide|travers-10" || id === "acier-12|niveau|passager|travers-20",
+  );
+  const sparse = runFixedLength(cases);
+  const bySize = section(
+    buildReport({ fixed: sparse, pose, controls: [passing] }),
+    "### Écarts par taille de sonde",
+  );
+  const cells = (speed: string, state: string) =>
+    bySize
+      .split("\n")
+      .find((text) => text.startsWith(`| portance binormale, C_L = ±0,5 | ${speed} | ${state} |`))!
+      .split(" | ")
+      .slice(3, 10);
+
+  it("prints « — » where the matrix holds no case, and figures where it does", () => {
+    expect(cells("20 m/s", "vide")).toEqual(["—", "—", "—", "—", "—", "—", "—"]);
+    expect(cells("10 m/s", "passager")).toEqual(["—", "—", "—", "—", "—", "—", "—"]);
+    expect(cells("10 m/s", "vide").some((cell) => cell === "—" || cell === "échec")).toBe(false);
+  });
+
+  it("still prints « échec » for a group whose rows are there and gave no difference", () => {
+    const failed = sparse.map((row) =>
+      row.base.wind.speed === 10 && row.variant.model !== "normale"
+        ? { ...row, status: "non convergé" as const, outputs: null }
+        : row,
+    );
+    const table = section(
+      buildReport({ fixed: failed, pose, controls: [passing] }),
+      "### Écarts par taille de sonde",
+    );
+    expect(table).toContain("| portance binormale, C_L = ±0,5 | 10 m/s | vide | échec | échec |");
+  });
+});
+
+describe("buildReport — the garde on the prescribed ground", () => {
+  const moved = (rows: readonly Row[], shift: (row: Row, i: number) => number): Row[] =>
+    rows.map((row, i) =>
+      row.outputs === null
+        ? row
+        : { ...row, outputs: { ...row.outputs, clearance: row.outputs.clearance + shift(row, i) } },
+    );
+
+  it("says the gabarit clears the ground when every garde is positive", () => {
+    const report = buildReport({ fixed, pose, controls: [passing] });
+    expect(report).toContain("aucune garde lue ici n'est un contact");
+    expect(report).not.toContain("atteint ou traverse le sol prescrit");
+  });
+
+  it("says a contact is a contact: a ground 30 m higher is reached by every line", () => {
+    const report = buildReport({ fixed: moved(fixed, () => -30), pose, controls: [passing] });
+    expect(report).toContain(
+      `**le gabarit atteint ou traverse le sol prescrit dans ${fixed.length} lignes sur ${fixed.length + pose.length}**`,
+    );
+    expect(report).not.toContain("aucune garde lue ici n'est un contact");
+    expect(report).toMatch(/Plus petite garde de toute la matrice : −1\d,\d\d m/);
+  });
+
+  it("clearanceOffset: garde + flèche is the 20 m of the anchors less the 2,1 m gabarit", () => {
+    expect(clearanceOffset(fixed)).toBeCloseTo(17.9, 9);
+    // One line over a ground that is not parallel to A–B: the garde no longer mirrors the flèche.
+    expect(clearanceOffset(moved(fixed, (_, i) => (i === 4 ? 0.5 : 0)))).toBeNull();
+    expect(clearanceOffset([])).toBeNull();
+  });
+
+  it("where the garde only mirrors the flèche, says so and prints no percentage of it", () => {
+    const report = buildReport({ fixed, pose, controls: [passing] });
+    expect(report).toContain("la garde vaut 17,9 m moins la flèche");
+    expect(report).toContain("`Δgarde = −Δflèche`");
+    const bySize = section(report, "### Écarts par taille de sonde");
+    const row = bySize
+      .split("\n")
+      .find((text) => text.startsWith("| portance binormale, C_L = ±0,5 | 20 m/s | vide |"))!
+      .split(" | ");
+    // Δflèche keeps its percentage; Δgarde is the same length with the other sign, and bare.
+    expect(row[4]).toMatch(/^−\d,\d{3} \(−\d+,\d %\)$/);
+    expect(row[7]).toBe(row[4].replace(/ \(.*$/, "").replace("−", "+"));
+  });
+
+  it("where it does not, prints the garde like any other difference", () => {
+    const uneven = moved(fixed, (row) => (row.variant.model === "normale" ? 0 : 0.5));
+    const report = buildReport({ fixed: uneven, pose, controls: [passing] });
+    const main = section(report, "## 6. Comparaison principale");
+    expect(main).not.toContain("Δgarde = −Δflèche");
+    const row = section(report, "### Écarts par taille de sonde")
+      .split("\n")
+      .find((text) => text.startsWith("| portance binormale, C_L = ±0,5 | 20 m/s | vide |"))!
+      .split(" | ");
+    expect(row[7]).toMatch(/^\+\d,\d{3} \(\+\d+,\d %\)$/);
+  });
+});
+
+/**
+ * Rows nothing solved, every figure written by hand: one base case under the reference and under
+ * one variant of each other model. The differences are round numbers, so that what a cell must
+ * print is read off this fixture — never off the report.
+ */
+const REFERENCE: Outputs = {
+  TA: 1000,
+  TB: 1250,
+  Tmax: 2000,
+  HA: 800,
+  // Norms 1000 N and 1250 N.
+  reactionA: [800, 0, -600],
+  reactionB: [-1000, 0, -750],
+  sag: 5,
+  rise: 0,
+  sway: 1,
+  combined: 4,
+  clearance: 10,
+  normalMean: 2,
+  normalMax: 2.5,
+  liftMean: 0,
+  liftMax: 0,
+  axialMean: 0,
+  axialMax: 0,
+  stretch: 1.5,
+};
+
+function hand(id: string, outputs: Partial<Outputs> = {}, patch: Partial<Row> = {}): Row {
+  return {
+    convention: "L0 fixe",
+    base: part[0],
+    variant: VARIANTS.find((variant) => variant.id === id)!,
+    L0: 150.5,
+    status: "ok",
+    detail: "",
+    outputs: { ...REFERENCE, ...outputs },
+    residuals: { closure: 1e-7, force: 2e-7, moment: 3e-5, jump: 4e-8, continuity: 5e-10 },
+    refinement: { length: 6e-7, force: 7e-6 },
+    iterations: 9,
+    ...patch,
+  };
+}
+
+const HAND: readonly Row[] = [
+  hand("N"),
+  // The largest lift alone: +100 N on 2000 N of T_max; +0,5 m on 5 m of flèche, −0,25 m on 1 m
+  // of déport, +0,8 m on 4 m of écart maximal, −0,3 m on 10 m of garde; and the reactions moved
+  // by (0, 30, 40) and (0, −60, −80): 50 N on 1000 N at A, 100 N on 1250 N at B.
+  hand("NL-b+0.5", {
+    Tmax: 2100,
+    sag: 5.5,
+    sway: 0.75,
+    combined: 4.8,
+    clearance: 9.7,
+    reactionA: [800, 30, -560],
+    reactionB: [-1000, -60, -830],
+  }),
+  // The smallest lift alone: +10 N, +0,05 m, −0,03 m.
+  hand("NL-b+0.05", { Tmax: 2010, sag: 5.05, clearance: 9.97 }),
+  // The axial drag alone: +300 N, and lengths that move by millimetres — 2, −4, 3 and −1.
+  hand("NA-0.1", { Tmax: 2300, sag: 5.002, sway: 0.996, combined: 4.003, clearance: 9.999 }),
+  // The two together: +200 N, +0,4 m, −0,2 m on 1 m of déport, −0,5 m.
+  hand("NLA-b+0.5-0.1", { Tmax: 2200, sag: 5.4, sway: 0.8, combined: 4.6, clearance: 9.5 }),
+];
+
+/** {@link HAND} with the outputs of one variant written anew, or its row patched. */
+const handWith = (id: string, outputs: Partial<Outputs>, patch: Partial<Row> = {}): Row[] =>
+  HAND.map((row) => (row.variant.id === id ? hand(id, outputs, patch) : row));
+
+describe("buildReport — each figure of section 6 stands under its own header", () => {
+  const main = section(
+    buildReport({ fixed: HAND, pose, controls: [passing] }),
+    "## 6. Comparaison principale",
+  );
+
+  it("tabulates the reference's own results", () => {
+    const reference = section(main, "### Résultats de référence — traînée normale seule");
+    expect(cellsOf(reference, "| acier-12 | niveau | vide | travers-20 |")).toEqual({
+      Ligne: "acier-12",
+      Géométrie: "niveau",
+      Charge: "vide",
+      Vent: "travers-20",
+      "L₀ (m)": "150,5000",
+      "T_A (N)": "1000,0",
+      "T_max (N)": "2000,0",
+      "Flèche (m)": "5,000",
+      "Déport latéral (m)": "1,000",
+      "Écart maximal à A–B (m)": "4,000",
+      "Garde (m)": "10,000",
+    });
+  });
+
+  it("tabulates each difference from the reference by probe size", () => {
+    const bySize = section(main, "### Écarts par taille de sonde");
+    expect(cellsOf(bySize, "| portance binormale, C_L = ±0,5 | 20 m/s | vide |")).toEqual({
+      Sonde: "portance binormale, C_L = ±0,5",
+      Vent: "20 m/s",
+      Charge: "vide",
+      "ΔT_max (N)": "+100,0 (+5,0 %)",
+      "Δflèche (m)": "+0,500 (+10,0 %)",
+      "Δdéport latéral (m)": "−0,250 (−25,0 %)",
+      "Δécart maximal à A–B (m)": "+0,800 (+20,0 %)",
+      "Δgarde (m)": "−0,300 (−3,0 %)",
+      // A reaction's shift is a norm: 50 N of 1000 N, 100 N of 1250 N.
+      "‖ΔR_A‖ (N)": "50,0 (5,0 %)",
+      "‖ΔR_B‖ (N)": "100,0 (8,0 %)",
+      "Remontée max. (m)": "aucune",
+    });
+  });
+
+  it("tabulates the same differences wind by wind", () => {
+    const byWind = section(main, "### Écarts vent par vent, aux plus grandes sondes");
+    expect(cellsOf(byWind, "| 20 m/s de travers (90°) | portance binormale, C_L = ±0,5 |")).toEqual(
+      {
+        Vent: "20 m/s de travers (90°)",
+        Sonde: "portance binormale, C_L = ±0,5",
+        "ΔT_max (N)": "+100,0 (+5,0 %)",
+        "Δflèche (m)": "+0,500 (+10,0 %)",
+        "Δdéport latéral (m)": "−0,250 (−25,0 %)",
+        "Δgarde (m)": "−0,300 (−3,0 %)",
+      },
+    );
+  });
+});
+
+describe("buildReport — the state of the two matrices is read off their rows", () => {
+  const state = (rows: readonly Row[]): string =>
+    section(buildReport({ fixed: rows, pose, controls: [passing] }), "### État des deux matrices");
+  const check = (rows: readonly Row[], name: string) =>
+    cellsOf(state(rows), `| L₀ fixe — ${name} |`);
+
+  it("prints the worst of each residual under its own name, against its own bar", () => {
+    const of = (name: string) => check(HAND, name);
+    expect(of("lignes").Obtenu).toBe("5");
+    expect(of("en échec")).toMatchObject({ Obtenu: "0", Passe: "oui" });
+    expect(of("pire fermeture aux ancrages")).toMatchObject({
+      Obtenu: "1,0×10⁻⁷ m",
+      Tolérance: "1,0×10⁻⁶ m",
+      Passe: "oui",
+    });
+    expect(of("pire bilan des forces")).toMatchObject({
+      Obtenu: "2,0×10⁻⁷ N",
+      Tolérance: "1,0×10⁻⁶ N",
+      Passe: "oui",
+    });
+    // 3×10⁻⁵ N·m over the 150 m of the ligne A–B.
+    expect(of("pire bilan des moments, par mètre de ligne A–B")).toMatchObject({
+      Obtenu: "2,0×10⁻⁷ N·m/m",
+      Tolérance: "1,0×10⁻⁶ N·m/m",
+      Passe: "oui",
+    });
+    expect(of("pire saut au passager")).toMatchObject({ Obtenu: "4,0×10⁻⁸ N", Passe: "oui" });
+    expect(of("pire continuité au passager")).toMatchObject({
+      Obtenu: "5,0×10⁻¹⁰ m",
+      Tolérance: "1,0×10⁻⁹ m",
+      Passe: "oui",
+    });
+    expect(of("pire raffinement, longueurs")).toMatchObject({
+      Obtenu: "6,0×10⁻⁷ m",
+      Tolérance: "1,0×10⁻⁵ m",
+      Passe: "oui",
+    });
+    expect(of("pire raffinement, forces")).toMatchObject({
+      Obtenu: "7,0×10⁻⁶ N",
+      Tolérance: "1,0×10⁻⁴ N",
+      Passe: "oui",
+    });
+  });
+
+  it("says « non » of a residual over its bar, and of a matrix that holds a failed row", () => {
+    // A force balance thirty times its bar on one row, which fails for it; the rest as before.
+    const loose = handWith(
+      "NA-0.1",
+      {},
+      {
+        status: "bilan hors tolérance",
+        residuals: { closure: 1e-7, force: 3e-5, moment: 3e-5, jump: 4e-8, continuity: 5e-10 },
+      },
+    );
+    expect(check(loose, "pire bilan des forces")).toMatchObject({
+      Obtenu: "3,0×10⁻⁵ N",
+      Passe: "**non**",
+    });
+    expect(check(loose, "en échec")).toMatchObject({ Obtenu: "1", Passe: "**non**" });
+    expect(check(loose, "pire saut au passager").Passe).toBe("oui");
+    // A jump at the rider and a refinement gap over their own bars, on another row.
+    const unsettled = handWith(
+      "NL-b+0.05",
+      {},
+      {
+        status: "raffinement hors tolérance",
+        residuals: { closure: 1e-7, force: 2e-7, moment: 3e-5, jump: 4e-6, continuity: 5e-10 },
+        refinement: { length: 2e-5, force: 7e-6 },
+      },
+    );
+    expect(check(unsettled, "pire saut au passager").Passe).toBe("**non**");
+    expect(check(unsettled, "pire raffinement, longueurs").Passe).toBe("**non**");
+    expect(check(unsettled, "pire raffinement, forces").Passe).toBe("oui");
+    expect(check(unsettled, "pire bilan des forces").Passe).toBe("oui");
+  });
+});
+
+describe("buildReport — section 8 states the figures the reading rests on", () => {
+  const reading = (rows: readonly Row[]): string =>
+    section(buildReport({ fixed: rows, pose, controls: [passing] }), "## 8. Lecture");
+
+  it("gives the lift its tension, its flèche and its garde, at the largest and the smallest probe", () => {
+    const text = reading(HAND);
+    expect(text).toContain(
+      "Portance, plus grande sonde (`C_L = ±0,5`) : `T_max` +100,0 N (+5,0 %), flèche +0,500 m (+10,0 %), garde −0,300 m (−3,0 %).",
+    );
+    expect(text).toContain(
+      "Plus petite sonde (`±0,05`) : `T_max` +10,0 N (+0,5 %), flèche +0,050 m (+1,0 %), garde −0,030 m (−0,3 %).",
+    );
+  });
+
+  it("names the greatest difference of each added force and of the two together, with its row", () => {
+    const text = reading(HAND);
+    const of = (family: string) => cellsOf(text, `| acier-12 | ${family} |`);
+    const at = "niveau, vide, travers-20";
+    // The axial drag moves the tension most, and the lift's row does not take it for its own.
+    expect(of("portance, toutes sondes")["ΔT_max (N)"]).toBe(`+100,0 (+5,0 %) — ${at}, NL-b+0.5`);
+    expect(of("traînée axiale, toutes sondes")["ΔT_max (N)"]).toBe(
+      `+300,0 (+15,0 %) — ${at}, NA-0.1`,
+    );
+    // The fourth model of the brief has its own row: it is in the matrix the caption speaks of.
+    const together = of("portance et traînée axiale ensemble, toutes sondes");
+    expect(together["ΔT_max (N)"]).toBe(`+200,0 (+10,0 %) — ${at}, NLA-b+0.5-0.1`);
+    expect(together["Δflèche (m)"]).toBe(`+0,400 (+8,0 %) — ${at}, NLA-b+0.5-0.1`);
+    expect(together["Δdéport latéral (m)"]).toBe(`−0,200 (−20,0 %) — ${at}, NLA-b+0.5-0.1`);
+    expect(together["Δgarde (m)"]).toBe(`−0,500 (−5,0 %) — ${at}, NLA-b+0.5-0.1`);
+    expect(of("plus petites sondes (C_L = ±0,05, C_t = 0,1)")["ΔT_max (N)"]).toBe(
+      `+300,0 (+15,0 %) — ${at}, NA-0.1`,
+    );
+  });
+
+  it("gives the axial drag its tension, and the greatest of the lengths it moves", () => {
+    // The déport moves most: 4 mm.
+    expect(reading(HAND)).toContain(
+      "Traînée axiale (`C_t` jusqu'à 0,1) : `T_max` +300,0 N (+15,0 %) ; aucune longueur ne bouge de plus de 0,004 m.",
+    );
+  });
+
+  it("writes no number for lengths that all stay under the floor (§18.6)", () => {
+    // 0,05 mm of flèche and −0,02 mm of déport: both under the 0,1 mm floor.
+    const still = handWith("NA-0.1", { Tmax: 2300, sag: 5.00005, sway: 0.99998 });
+    const text = reading(still);
+    expect(text).toContain(
+      "`T_max` +300,0 N (+15,0 %) ; aucune longueur ne bouge au-dessus du plancher.",
+    );
+    expect(text).not.toContain("aucune longueur ne bouge de plus de");
+    expect(text).not.toContain("×10⁻⁵");
+  });
+
+  it("says a failure is a failure when no axial row passed its checks", () => {
+    const failed = handWith("NA-0.1", { Tmax: 2300 }, { status: "raffinement hors tolérance" });
+    expect(reading(failed)).toContain(
+      "Traînée axiale (`C_t` jusqu'à 0,1) : `T_max` échec ; longueurs : échec.",
+    );
+  });
+});
+
+describe("buildReport — section 5 gives each load in N/m and as a share of the self-weight", () => {
+  // The same rows on a line of 4 N/m, so that a share is read by hand; each row has its own
+  // mean stretch, and a load under one name is never the number under another.
+  const round = (row: Row): Row => {
+    const { line } = row.base;
+    return {
+      ...row,
+      base: { ...row.base, line: { ...line, material: { ...line.material, w: 4 } } },
+    };
+  };
+  const rows = [
+    hand("N"),
+    hand("NL-b+0.5", { normalMean: 1.9, liftMean: 1, axialMean: 0.3, stretch: 1.2 }),
+    hand("NL-y+0.5", { normalMean: 1.8, liftMean: 0.6, axialMean: 0.4, stretch: 1 }),
+    hand("NA-0.1", { normalMean: 1.7, liftMean: 0.7, axialMean: 0.1, stretch: 2 }),
+  ].map(round);
+  const loads = section(
+    buildReport({ fixed: rows, pose, controls: [passing] }),
+    "## 5. Charges distribuées",
+  );
+  const shown = cellsOf(loads, "| 20 m/s de travers (90°) |");
+
+  it("prints the mean of each force under its own header", () => {
+    expect(loads).toContain("Poids propre `w = 4,000 N/m`.");
+    // The reference's normal drag, then the lift of each law and the axial drag of the largest
+    // probes: 2, 1, 0,6 and 0,1 N/m.
+    expect(shown["\\|f_n\\|, C_D⊥ = 1,2"]).toMatch(/^2,000 /);
+    expect(shown["\\|f_L\\| binormale, sonde C_L = 0,5"]).toMatch(/^1,000 /);
+    expect(shown["\\|f_L\\| impaire en lacet, sonde C_L = 0,5"]).toMatch(/^0,600 /);
+    expect(shown["\\|f_a\\|, sonde C_t = 0,1"]).toMatch(/^0,100 /);
+  });
+
+  it("takes the share on one metre: the force per unstretched metre, λ·|f|, over w (§18.5)", () => {
+    // 2 N/m × 1,5 / 4 N/m = 75 %; 1 × 1,2 / 4 = 30 %; 0,6 × 1 / 4 = 15 %; 0,1 × 2 / 4 = 5 %.
+    expect(shown["\\|f_n\\|, C_D⊥ = 1,2"]).toBe("2,000 (75,0 %)");
+    expect(shown["\\|f_L\\| binormale, sonde C_L = 0,5"]).toBe("1,000 (30,0 %)");
+    expect(shown["\\|f_L\\| impaire en lacet, sonde C_L = 0,5"]).toBe("0,600 (15,0 %)");
+    expect(shown["\\|f_a\\|, sonde C_t = 0,1"]).toBe("0,100 (5,0 %)");
+    expect(loads).toContain("`λ·|f|` rapporté à `w`");
+  });
+});
+
+describe("buildReport — « Remontée max. » says what a group does above A–B", () => {
+  const bySize = (rows: readonly Row[]): string =>
+    section(
+      buildReport({ fixed: rows, pose, controls: [passing] }),
+      "### Écarts par taille de sonde",
+    );
+  const rise = (rows: readonly Row[], probe: string, speed = "20 m/s"): string =>
+    cellsOf(bySize(rows), `| ${probe} | ${speed} | vide |`)["Remontée max. (m)"];
+  const largest = "portance binormale, C_L = ±0,5";
+
+  it("prints the greatest rise of the group, in metres", () => {
+    expect(rise(handWith("NL-b+0.5", { rise: 1.22 }), largest)).toBe("1,220");
+  });
+
+  it("says « aucune » of rows that are there and do not rise — not the « — » of an empty group", () => {
+    expect(rise(HAND, largest)).toBe("aucune");
+    // 0,05 mm above A–B is under the floor: not a rise that is read.
+    expect(rise(handWith("NL-b+0.5", { rise: 5e-5 }), largest)).toBe("aucune");
+    // No case of the matrix at 10 m/s here: the group holds no row.
+    const elsewhere = {
+      ...part[0],
+      wind: windCase(10, { id: "travers", name: "de travers", from: 90 }),
+    };
+    const sparse = [...HAND, hand("N", {}, { base: elsewhere })];
+    expect(rise(sparse, largest, "10 m/s")).toBe("—");
+    const reading = bySize(HAND);
+    expect(reading).toContain("« — » : le groupe ne contient aucune ligne");
+    expect(reading).toContain(
+      "« aucune » : aucune ligne du groupe ne remonte au-dessus de la ligne A–B",
+    );
+  });
+
+  it("reads no rise off a row that failed its checks", () => {
+    const failed = handWith("NL-b+0.5", { rise: 3 }, { status: "bilan hors tolérance" });
+    expect(rise(failed, largest)).toBe("échec");
+  });
+});
+
+describe("the CSV tables", () => {
+  it("rowsCsv: one line per row, the reference without differences, the others with", () => {
+    const lines = rowsCsv(fixed).trimEnd().split("\n");
+    expect(lines).toHaveLength(1 + VARIANTS.length);
+    const header = lines[0].split(",");
+    expect(header.slice(0, 2)).toEqual(["convention", "cas"]);
+    const at = (line: string, column: string) => line.split(",")[header.indexOf(column)];
+    expect(at(lines[1], "variante")).toBe("N");
+    expect(at(lines[1], "ecart_Tmax_N")).toBe("");
+    expect(at(lines[1], "statut")).toBe("ok");
+    const lifted = lines.find((line) => at(line, "variante") === "NL-b-0.5")!;
+    expect(Number(at(lifted, "ecart_Tmax_N"))).toBeCloseTo(
+      fixed.find((row) => row.variant.id === "NL-b-0.5")!.outputs!.Tmax - fixed[0].outputs!.Tmax,
+      2,
+    );
+    expect(at(lifted, "loi_portance")).toBe("binormal");
+    expect(at(lifted, "C_L")).toBe("-0.5");
+  });
+
+  it("rowsCsv: a difference under the floor is flagged and left empty, not written as a number", () => {
+    const [reference, other] = fixed;
+    const noisy: Row = {
+      ...other,
+      outputs: {
+        ...reference.outputs!,
+        // 0,05 mm of flèche is under the 0,1 mm floor; 100 N of tension is far above it.
+        sag: reference.outputs!.sag + 5e-5,
+        Tmax: reference.outputs!.Tmax + 100,
+      },
+    };
+    const [header, first, second] = rowsCsv([reference, noisy])
+      .trimEnd()
+      .split("\n")
+      .map((text) => text.split(","));
+    const at = (cells: string[], column: string) => cells[header.indexOf(column)];
+    expect(at(second, "ecart_fleche_m")).toBe("");
+    expect(at(second, "ecart_relatif_fleche")).toBe("");
+    expect(at(second, "ecart_resolu_fleche")).toBe("non");
+    expect(at(second, "ecart_Tmax_N")).toBe("100");
+    // Four significant figures in the table.
+    expect(Number(at(second, "ecart_relatif_Tmax"))).toBeCloseTo(100 / reference.outputs!.Tmax, 4);
+    expect(at(second, "ecart_resolu_Tmax")).toBe("oui");
+    // The reference has no difference to resolve: all three cells stay empty.
+    expect(at(first, "ecart_Tmax_N")).toBe("");
+    expect(at(first, "ecart_resolu_Tmax")).toBe("");
+    expect(header).toContain("ecart_max_AB_m");
+    expect(header).toContain("ecart_resolu_ecart_max_AB");
+  });
+
+  it("rowsCsv: writes each load, mean and maximum, in its own column", () => {
+    const loaded = hand("NLA-b+0.5-0.1", {
+      normalMean: 2.1,
+      normalMax: 2.2,
+      liftMean: 2.3,
+      liftMax: 2.4,
+      axialMean: 2.5,
+      axialMax: 2.6,
+      stretch: 1.07,
+    });
+    const [header, , cells] = rowsCsv([hand("N"), loaded])
+      .trimEnd()
+      .split("\n")
+      .map((text) => text.split(","));
+    const at = (column: string) => Number(cells[header.indexOf(column)]);
+    expect(at("fn_moyen_N_m")).toBe(2.1);
+    expect(at("fn_max_N_m")).toBe(2.2);
+    expect(at("fL_moyen_N_m")).toBe(2.3);
+    expect(at("fL_max_N_m")).toBe(2.4);
+    expect(at("fa_moyen_N_m")).toBe(2.5);
+    expect(at("fa_max_N_m")).toBe(2.6);
+    expect(at("lambda_moyen")).toBe(1.07);
+  });
+
+  it("rowsCsv: writes every output and every check of a row under its own header", () => {
+    // No two figures of this row are the same number.
+    const row = hand(
+      "NLA-b+0.5-0.1",
+      {
+        TA: 1001,
+        TB: 1002,
+        Tmax: 1003,
+        HA: 1004,
+        reactionA: [1005, 1006, 1007],
+        reactionB: [1008, 1009, 1010],
+        sag: 1.1,
+        rise: 1.2,
+        sway: 1.3,
+        combined: 1.4,
+        clearance: 1.5,
+      },
+      {
+        L0: 150.123456789,
+        residuals: {
+          closure: 3.1e-7,
+          force: 3.2e-7,
+          moment: 3.3e-5,
+          jump: 3.4e-8,
+          continuity: 3.5e-10,
+        },
+        refinement: { length: 3.6e-7, force: 3.7e-6 },
+        iterations: 38,
+      },
+    );
+    const [header, , cells] = rowsCsv([hand("N"), row])
+      .trimEnd()
+      .split("\n")
+      .map((text) => text.split(","));
+    const text = (column: string) => cells[header.indexOf(column)];
+    const at = (column: string) => Number(text(column));
+    expect(text("convention")).toBe("L0 fixe");
+    expect(text("cas")).toBe("acier-12|niveau|vide|travers-20");
+    expect(text("ligne")).toBe("acier-12");
+    expect(text("geometrie")).toBe("niveau");
+    expect(text("charge")).toBe("vide");
+    expect(text("vent")).toBe("travers-20");
+    expect(at("vitesse_m_s")).toBe(20);
+    expect(at("direction_deg")).toBe(90);
+    expect(text("modele")).toBe("normale+portance+axiale");
+    expect(text("variante")).toBe("NLA-b+0.5-0.1");
+    expect(at("C_D")).toBe(1.2);
+    expect(at("C_L")).toBe(0.5);
+    expect(at("C_t")).toBe(0.1);
+    expect(text("statut")).toBe("ok");
+    // Nine significant figures on the length: the ΔL₀ of the separate comparison are millimetres
+    // on 150 m.
+    expect(at("L0_m")).toBe(150.123457);
+    expect(at("TA_N")).toBe(1001);
+    expect(at("TB_N")).toBe(1002);
+    expect(at("Tmax_N")).toBe(1003);
+    expect(at("HA_N")).toBe(1004);
+    expect(["RAx_N", "RAy_N", "RAz_N"].map(at)).toEqual([1005, 1006, 1007]);
+    expect(["RBx_N", "RBy_N", "RBz_N"].map(at)).toEqual([1008, 1009, 1010]);
+    expect(at("fleche_m")).toBe(1.1);
+    expect(at("remontee_m")).toBe(1.2);
+    expect(at("deport_m")).toBe(1.3);
+    expect(at("ecart_max_AB_m")).toBe(1.4);
+    expect(at("garde_m")).toBe(1.5);
+    expect(at("fermeture_m")).toBe(3.1e-7);
+    expect(at("bilan_forces_N")).toBe(3.2e-7);
+    expect(at("bilan_moments_N_m")).toBe(3.3e-5);
+    expect(at("saut_passager_N")).toBe(3.4e-8);
+    expect(at("continuite_m")).toBe(3.5e-10);
+    expect(at("raffinement_m")).toBe(3.6e-7);
+    expect(at("raffinement_N")).toBe(3.7e-6);
+    expect(at("iterations")).toBe(38);
+  });
+
+  it("rowsCsv: writes each difference from the reference under the name of its quantity", () => {
+    const lines = rowsCsv(HAND)
+      .trimEnd()
+      .split("\n")
+      .map((text) => text.split(","));
+    const [header] = lines;
+    const lifted = lines.find((cells) => cells[header.indexOf("variante")] === "NL-b+0.5")!;
+    const at = (column: string) => Number(lifted[header.indexOf(column)]);
+    // Absolute, then relative to the reference: 2000 N, 5 m, 1 m, 4 m, 10 m, 1000 N, 1250 N.
+    expect([at("ecart_Tmax_N"), at("ecart_relatif_Tmax")]).toEqual([100, 0.05]);
+    expect([at("ecart_fleche_m"), at("ecart_relatif_fleche")]).toEqual([0.5, 0.1]);
+    expect([at("ecart_deport_m"), at("ecart_relatif_deport")]).toEqual([-0.25, -0.25]);
+    expect([at("ecart_ecart_max_AB_m"), at("ecart_relatif_ecart_max_AB")]).toEqual([0.8, 0.2]);
+    expect([at("ecart_garde_m"), at("ecart_relatif_garde")]).toEqual([-0.3, -0.03]);
+    expect([at("ecart_RA_N"), at("ecart_relatif_RA")]).toEqual([50, 0.05]);
+    expect([at("ecart_RB_N"), at("ecart_relatif_RB")]).toEqual([100, 0.08]);
+  });
+
+  it("controlsCsv and inputsCsv quote a field that holds the delimiter", () => {
+    expect(controlsCsv([{ ...passing, source: "a, b" }])).toContain('oui,"a, b"\n');
+    const inputs = inputsCsv([...fixed, ...pose]);
+    expect(inputs.split("\n")[0]).toBe("objet,grandeur,valeur,provenance,source");
+    expect(inputs).toContain('coefficients,C_L,"0 ; ±0,05 ; ±0,2 ; ±0,5",sonde de sensibilité,');
+  });
+
+  it("inputsCsv lists the inputs of the rows it is given, not those of the delivered matrix", () => {
+    const variants = variantsOf({ ...COEFFICIENTS, liftMagnitudes: [0.3, 0.1], axial: [0.05] });
+    const subjects = (text: string) => new Set(text.split("\n").map((line) => line.split(",")[0]));
+    const adjusted = inputsCsv(runFixedLength(part, variants));
+    expect(adjusted).toContain('coefficients,C_L,"0 ; ±0,3 ; ±0,1",sonde de sensibilité,');
+    expect(adjusted).toContain('coefficients,C_t,"0 ; 0,05",sonde de sensibilité,');
+    expect(adjusted).toContain("installation,dénivelé,0 m,scénario,");
+    expect(adjusted).toContain(
+      "installation,vent,uniforme et horizontal ; 20 m/s ; de 90°,scénario,",
+    );
+    // One steel case, unloaded: neither the textile line nor a rider is an input of these rows.
+    expect(subjects(adjusted)).toEqual(
+      new Set(["objet", "acier-12", "installation", "coefficients", ""]),
+    );
+    expect(adjusted).not.toContain("installation,passager,");
+  });
+});

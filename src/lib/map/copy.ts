@@ -6,16 +6,21 @@
  */
 
 import type { Positions, Wind } from "@/lib/scenario/types.ts";
+import type { RideEnd } from "@/lib/sim";
 
-import { formatQuantity, formatValue } from "@/lib/format/quantity.ts";
+import { RIDE_LABEL } from "@/lib/dynamique/copy.ts";
+import { formatAtX, formatQuantity, formatValue } from "@/lib/format/quantity.ts";
 import { WIND_UNPLACED } from "@/lib/rail/gates.ts";
+import { msToKmh } from "@/lib/sim";
 import { formatLv95, inLv95Domain, lv95FromWgs84 } from "@/lib/terrain/lv95.ts";
-import { label } from "@/lib/vocabulary/labels.ts";
+import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 import type { Fond } from "./display.ts";
 import type { Anchor } from "./gesture.ts";
 import type { MeasurePoints, MeasureReading } from "./measure.ts";
+import type { EmbarkBlock, EmbarkedReading } from "./vue-3d-embarquee.ts";
 import type { Vue3dBlock } from "./vue-3d.ts";
+import type { ProfilePreview } from "./wind-rose.ts";
 
 import { FONDS } from "./display.ts";
 import { fondAttribution } from "./style.ts";
@@ -42,6 +47,16 @@ export const MAP_COPY = {
   roseCalm: "Pas de vent. Glissez la poignée de la rose pour en régler la direction et la force.",
   /** The same calm on a rose that has no handle (#101). */
   calm: "Pas de vent.",
+  /** The profile's pad and its preview (#120): their accessible name, and the preview's title. */
+  profile: heading("windProfile", "terrain"),
+  /** The profile's handle, which has no label of its own: a hover says what each axis does. */
+  profileHandle:
+    "Glissez pour régler le profil du vent : vers la droite, plus large ; vers le haut, plus atténué aux ancrages",
+  /** The pad's two axes, written on it: they are the screen's, whatever the wind's direction. */
+  profileWider: "plus large →",
+  profileSheltered: "↑ plus atténué",
+  /** The pad's one command: the attenuation back to zero, and nothing else of the Vent. */
+  uniformWind: heading("uniformWind", "terrain"),
   /** The ambient note under a drawn Banane (#96): a shape, never a distance. */
   bananeNote: "Banane : allure, pas une distance.",
   /** The switch that puts the Vue 3D in the vue de dessus's place (#95). */
@@ -81,6 +96,12 @@ export const GIMBAL_COPY = {
   keys: "Clavier, après un clic dans la Vue 3D",
 } as const;
 
+/**
+ * The Vue embarquée's name (#126): not a Vue prédéfinie — it rides, and has its own controls — so
+ * not in {@link GIMBAL_COPY}, whose words every Page's map lists, Statique's included.
+ */
+const VUE_EMBARQUEE_NAME = "Vue embarquée";
+
 /** The keys of the Vue 3D, as the hover help lists them: the key, then what it does. */
 export const VUE_3D_KEYS = [
   ["← / →", "tourner autour de la ligne"],
@@ -89,19 +110,115 @@ export const VUE_3D_KEYS = [
   ["+ / −", "zoom"],
   ["1", GIMBAL_COPY.vueDuDepart],
   ["2", GIMBAL_COPY.vueLaterale],
+  ["3", VUE_EMBARQUEE_NAME],
   ["N", GIMBAL_COPY.north.toLocaleLowerCase("fr")],
 ] as const;
 
-/** The hover help over the Gimbal: one line per key. */
-export function vue3dKeysHelp(): string {
-  return [`${GIMBAL_COPY.keys} :`, ...VUE_3D_KEYS.map(([key, does]) => `${key} : ${does}`)].join(
-    "\n",
-  );
+/**
+ * The hover help over the Gimbal: one line per key.
+ *
+ * @param embarks the Page plays rides: without, key 3 enters no Vue embarquée and is not listed.
+ */
+export function vue3dKeysHelp(embarks = true): string {
+  const keys = VUE_3D_KEYS.filter(([key]) => embarks || key !== "3");
+  return [`${GIMBAL_COPY.keys} :`, ...keys.map(([key, does]) => `${key} : ${does}`)].join("\n");
 }
 
 /** A Gimbal button's hover: its name and the key that does the same. */
 export function gimbalHint(name: string, key: string): string {
   return `${name} (${key})`;
+}
+
+/**
+ * The Vue embarquée's words (#126): the Gimbal's button that enters it, its own controls, and the
+ * read-out of the ride it plays — an estimation, as every dynamic value.
+ */
+export const EMBARQUEE_COPY = {
+  /** The Gimbal's button, and the view's name. */
+  enter: VUE_EMBARQUEE_NAME,
+  /** The controls' accessible name. */
+  title: "Lecture de la Vue embarquée",
+  play: "Lecture",
+  pause: "Pause",
+  restart: "Recommencer",
+  exit: "Quitter la vue embarquée",
+  lookLeft: "Tourner la tête vers la gauche",
+  lookRight: "Tourner la tête vers la droite",
+  lookUp: "Lever les yeux",
+  lookDown: "Baisser les yeux",
+  /** Which of Dynamique's two rides is played: the one the Vent entered pushes. */
+  ride: `Mouvement calculé ${RIDE_LABEL.windy.toLocaleLowerCase("fr")}`,
+  estimate: label("estimate", "terrain"),
+  /** The hover help's heading. */
+  keys: "Clavier, dans la Vue embarquée",
+} as const;
+
+/** The keys of the Vue embarquée, as its hover help lists them. */
+export const VUE_EMBARQUEE_KEYS = [
+  ["← / →", "tourner la tête"],
+  ["↑ / ↓", "lever / baisser les yeux"],
+  [
+    "Espace",
+    `${EMBARQUEE_COPY.play.toLocaleLowerCase("fr")} / ${EMBARQUEE_COPY.pause.toLocaleLowerCase("fr")}`,
+  ],
+  ["R", EMBARQUEE_COPY.restart.toLocaleLowerCase("fr")],
+  ["Échap", EMBARQUEE_COPY.exit.toLocaleLowerCase("fr")],
+] as const;
+
+/** The hover help over the Vue embarquée's controls: one line per key, and the drag. */
+export function embarkedKeysHelp(): string {
+  return [
+    `${EMBARQUEE_COPY.keys} :`,
+    ...VUE_EMBARQUEE_KEYS.map(([key, does]) => `${key} : ${does}`),
+    "Glisser dans la vue : tourner la tête",
+  ].join("\n");
+}
+
+/**
+ * What the Vue embarquée is, behind its `ⓘ`: whose clock moves the eye, where the eye stands, and
+ * what the view hides while it plays.
+ */
+export const EMBARQUEE_HELP =
+  `La caméra suit les temps et les positions du mouvement calculé ${RIDE_LABEL.windy.toLocaleLowerCase("fr")}, ` +
+  "retours en arrière compris, jusqu'au dernier instant calculé : une seconde à l'écran est une seconde du mouvement. " +
+  `C'est une ${label("estimate", "terrain")} — le passager est un point matériel sur la ${label("trajectory", "terrain")} figée, pas une mesure. ` +
+  `L'œil est sous la poulie, à 1,6 m au-dessus du bas du ${label("riderEnvelope", "terrain")}, jamais au-dessus de la poulie [CONVENTION]. ` +
+  "La tête tourne librement, en lecture comme en pause. " +
+  `Pendant la vue embarquée la ${label("loadedLine", "terrain")}, celle du passager à sa position saisie, est masquée et la ${label("trajectory", "terrain")} montrée.`;
+
+/** Why the Vue embarquée is off: on the hover of its button and behind the `ⓘ` beside it. */
+export const EMBARK_BLOCKED = {
+  "no-ride": "Vue embarquée : aucun mouvement calculé pour ce scénario.",
+  "no-motion": "Vue embarquée : le mouvement calculé ne quitte pas le départ.",
+  gesture: "Vue embarquée : en attente du nouveau calcul de la ligne.",
+} as const satisfies Record<EmbarkBlock, string>;
+
+/**
+ * The read-out at an instant: the ride's time against its last computed instant, the pulley's
+ * abscissa and its speed — negative on a swing back, the sign the engine gives.
+ */
+export function embarkedReadingLine({ t, duration, x, v }: EmbarkedReading): string {
+  return [
+    `t ${formatValue("duration", t)} / ${formatQuantity("duration", duration)}`,
+    `x ${formatQuantity("extremumX", x)}`,
+    formatQuantity("speedKmh", msToKmh(v)),
+  ].join(" · ");
+}
+
+/**
+ * How the motion computed ends, said from the start: the arrival at B, the Point d'arrêt, or a
+ * swing the engine stopped following — the playback stops at its last computed instant.
+ */
+export function embarkedEndLine(end: RideEnd): string {
+  const at = formatQuantity("duration", end.t);
+  switch (end.kind) {
+    case "arrival":
+      return `Fin : arrivée en B à ${formatQuantity("speedKmh", msToKmh(end.v))}, ${at}.`;
+    case "stop":
+      return `Fin : arrêt ${formatAtX(end.x)}, ${at}.`;
+    case "unsettled":
+      return `Fin : mouvement non stabilisé — la lecture s'arrête au dernier instant calculé, ${at}.`;
+  }
 }
 
 /** The Mesure's words (#98). */
@@ -236,7 +353,11 @@ export function describeRelative(relativeDeg: number): string {
  *   Vent is then not applied, and the reading says so — or, with no Vent, why the rose has no handle.
  * @param handle the rose has a handle to set the wind with — not on the Page Terrain (#101).
  */
-export function windReading(wind: Wind, bearing: number | null, handle = true): string {
+export function windReading(
+  wind: Pick<Wind, "speedKmh" | "directionDeg">,
+  bearing: number | null,
+  handle = true,
+): string {
   if (wind.speedKmh === 0) {
     if (!handle) return MAP_COPY.calm;
     return bearing === null ? WIND_UNPLACED.reason : MAP_COPY.roseCalm;
@@ -251,6 +372,41 @@ export function windReading(wind: Wind, bearing: number | null, handle = true): 
 
 function mod360(degrees: number): number {
   return ((degrees % 360) + 360) % 360;
+}
+
+/**
+ * The profile's preview in words (#120), one reading a line: the speed at mid-span, the speed at
+ * the anchors, and the width — in percent of the span and, where the span is known, in metres,
+ * which are a reading and never an entry. A uniform wind says so, and that the width it keeps has
+ * no effect: a width that changes nothing is not told as a wind that varies.
+ */
+export function profileReading(preview: ProfilePreview): readonly string[] {
+  const share = `${formatQuantity("windWidth", preview.width)} de la ${label("span", "terrain")}`;
+  const width =
+    preview.widthMetres === null
+      ? share
+      : `${share}, soit ${formatQuantity("L", preview.widthMetres)}`;
+  if (preview.uniform) {
+    return [
+      `${heading("uniformWind", "terrain")} : ${formatQuantity("windSpeed", preview.midKmh)} sur toute la ligne`,
+      `${heading("windWidth", "terrain")} gardée, sans effet : ${width}`,
+    ];
+  }
+  return [
+    `Milieu : ${formatQuantity("windSpeed", preview.midKmh)}`,
+    `${heading("anchors", "terrain")} : ${formatQuantity("windSpeed", preview.anchorKmh)}`,
+    `${heading("windWidth", "terrain")} : ${width}`,
+  ];
+}
+
+/**
+ * The same readings as one line under a map that has no pad for them (#120) — the Page Terrain's,
+ * the Mesure's, the frame that stands in for a map that could not arrive — or `null` under a
+ * uniform wind, where the line the rose already reads says everything.
+ */
+export function profileCaption(preview: ProfilePreview): string | null {
+  if (preview.uniform) return null;
+  return `${heading("windProfile", "terrain")} — ${profileReading(preview).join(" · ")}.`;
 }
 
 /** What the next click does, said under the map — `null` when a click does nothing. */
@@ -279,7 +435,7 @@ export function mapLabelTable(): readonly string[] {
     ...Object.values(FOND_LABEL),
     ...Object.values(MAP_COPY),
     ...Object.values(GIMBAL_COPY),
-    vue3dKeysHelp(),
+    vue3dKeysHelp(false),
     ...Object.values(VUE_3D_BLOCKED),
     ...Object.values(VUE_3D_BLOCKED_READ_ONLY),
     ...Object.values(MEASURE_COPY),
@@ -292,5 +448,20 @@ export function mapLabelTable(): readonly string[] {
       clickHint(anchor, { A: null, B: null }) ?? "",
       clickHint(anchor, { A: { lat: 0, lon: 0 }, B: { lat: 0, lon: 0 } }) ?? "",
     ]),
+  ];
+}
+
+/**
+ * The Vue embarquée's fixed words (#126), apart from {@link mapLabelTable}: they say « estimation »,
+ * which the Page Statique never does. Avancé and Terrain show them, but Avancé keeps no label
+ * table, so Terrain's alone consumes them.
+ */
+export function embarkedLabelTable(): readonly string[] {
+  return [
+    vue3dKeysHelp(),
+    ...Object.values(EMBARQUEE_COPY),
+    embarkedKeysHelp(),
+    EMBARQUEE_HELP,
+    ...Object.values(EMBARK_BLOCKED),
   ];
 }

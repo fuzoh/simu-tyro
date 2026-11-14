@@ -10,7 +10,7 @@
 import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 
 import { buttonVariants } from "@/components/ui/button.tsx";
-import { DOC_PAGES } from "@/lib/docs/pages.ts";
+import { DOC_GROUPS, docPagesIn } from "@/lib/docs/pages.ts";
 
 export const Route = createFileRoute("/docs")({
   component: DocsLayout,
@@ -31,20 +31,27 @@ function DocsLayout() {
       </header>
       <div className="mx-auto flex w-full max-w-6xl flex-1 gap-6 px-3 py-4">
         <nav aria-label="Pages de documentation" className="hidden w-56 shrink-0 md:block">
-          <ul className="sticky top-[56px] flex flex-col gap-1">
-            {DOC_PAGES.map((page) => (
-              <li key={page.slug}>
-                <Link
-                  activeProps={{ className: "text-foreground font-medium" }}
-                  className="text-muted-foreground hover:text-foreground block py-1 text-xs leading-snug"
-                  params={{ slug: page.slug }}
-                  to="/docs/$slug"
-                >
-                  {page.title}
-                </Link>
-              </li>
+          <div className="sticky top-[56px] flex flex-col gap-3">
+            {DOC_GROUPS.map((group) => (
+              <div key={group.id}>
+                <p className="text-muted-foreground text-xs font-medium">{group.title}</p>
+                <ul className="flex flex-col gap-1">
+                  {docPagesIn(group.id).map((page) => (
+                    <li key={page.slug}>
+                      <Link
+                        activeProps={{ className: "text-foreground font-medium" }}
+                        className="text-muted-foreground hover:text-foreground block py-1 text-xs leading-snug"
+                        params={{ slug: page.slug }}
+                        to="/docs/$slug"
+                      >
+                        {page.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </div>
         </nav>
         <main className="min-w-0 flex-1">
           <Outlet />

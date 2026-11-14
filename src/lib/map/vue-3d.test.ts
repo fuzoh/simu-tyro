@@ -21,10 +21,13 @@ import { placeSpan } from "@/lib/scenario/geometry.ts";
 import { DEFAULT_LAYERS } from "@/lib/session/session.ts";
 import { TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
 
+import type { EarthPoint, Vue3dScene } from "./vue-3d.ts";
+
 import { mapStyle, wmtsTiles } from "./style.ts";
 import {
   CAMERA_REACH,
   DRAPED,
+  onlyLoadedMoved,
   vue3dFollowing,
   vue3dLayers,
   vue3dPlacement,
@@ -442,5 +445,106 @@ describe("the coupe's layers in the Vue 3D (#111)", () => {
 
   test("the Banane bows the Ligne à vide, never the Trajectoire", () => {
     expect(drawn(10).trajectory).toEqual(drawn(0).trajectory);
+  });
+});
+
+describe("a passager dragged along the coupe moves the loaded line alone (#130)", () => {
+  const scene = solved(trial());
+  const at = (xD: number, { across = 0, line = scene } = {}) =>
+    vue3dScene({ placement: placed(line), solved: line, rider: placeRider(line, xD), across });
+
+  test("another position along the same line: only the loaded line moved", () => {
+    const before = at(100);
+    const after = at(300);
+    expect(after.loaded).not.toEqual(before.loaded);
+    expect(onlyLoadedMoved(before, after)).toBe(true);
+  });
+
+  test("the same position, built anew: nothing but the loaded line could have moved", () => {
+    expect(onlyLoadedMoved(at(100), at(100))).toBe(true);
+  });
+
+  test("a Vent bows the Ligne à vide: the line is drawn anew", () => {
+    expect(onlyLoadedMoved(at(100), at(300, { across: 10 }))).toBe(false);
+  });
+
+  test("a heavier passager moves the Trajectoire: the line is drawn anew", () => {
+    const heavier = solved(trial({ rider: { ...trial().rider, mp: 200 } }));
+    expect(onlyLoadedMoved(at(100), at(100, { line: heavier }))).toBe(false);
+  });
+
+  test("an anchor raised moves its Fil à plomb and the Ligne A–B: the line is drawn anew", () => {
+    const raised = solved(trial({ anchors: { ...ANCHORS, zB: 3 } }));
+    expect(onlyLoadedMoved(at(100), at(100, { line: raised }))).toBe(false);
+  });
+
+  test("two Brins porteurs instead of one: the members are drawn anew", () => {
+    const two = solved(trial({ carryingLines: 2 }));
+    expect(onlyLoadedMoved(at(100), at(100, { line: two }))).toBe(false);
+  });
+
+  // One part of the scene changed at a time, the loaded line kept: each part `onlyLoadedMoved`
+  // compares has to send the scene to be drawn anew on its own, or a change to it alone would
+  // leave the old one drawn. A real change moves several parts together, as the cases above do.
+  const nudged = (point: EarthPoint): EarthPoint => ({ ...point, lat: point.lat + 1e-6 });
+  const base = at(100);
+  const { A, B } = base.fils;
+  const [first, ...rest] = base.trajectory ?? [];
+  if (base.unloaded === null || first === undefined) {
+    throw new Error("the trial line solves, its passager placed");
+  }
+  const [unloadedHead, ...unloadedRest] = base.unloaded;
+  const [runHead, ...runRest] = first;
+  if (unloadedHead === undefined || runHead === undefined) {
+    throw new Error("the Ligne à vide and the Trajectoire have vertices");
+  }
+  test.each<[string, Vue3dScene]>([
+    [
+      "end A",
+      { ...base, ends: { ...base.ends, A: { ...base.ends.A, lat: base.ends.A.lat + 1e-6 } } },
+    ],
+    [
+      "end B",
+      { ...base, ends: { ...base.ends, B: { ...base.ends.B, lon: base.ends.B.lon + 1e-6 } } },
+    ],
+    ...(["foot", "anchor", "top"] as const).flatMap((point): [string, Vue3dScene][] => [
+      [
+        `Fil à plomb A's ${point}`,
+        { ...base, fils: { A: { ...A, [point]: nudged(A[point]) }, B } },
+      ],
+      [
+        `Fil à plomb B's ${point}`,
+        { ...base, fils: { A, B: { ...B, [point]: nudged(B[point]) } } },
+      ],
+    ]),
+    ["the Ligne A–B", { ...base, ligneAB: [base.ligneAB[0], nudged(base.ligneAB[1])] }],
+    ["the Ligne à vide", { ...base, unloaded: [nudged(unloadedHead), ...unloadedRest] }],
+    ["the Ligne à vide gone", { ...base, unloaded: null }],
+    ["the Trajectoire", { ...base, trajectory: [[nudged(runHead), ...runRest], ...rest] }],
+    ["the Trajectoire gone", { ...base, trajectory: null }],
+    // The same first member and one more: what an offset-by-offset comparison alone would miss.
+    ["the members' count", { ...base, membersPx: [...base.membersPx, MEMBER_GAP_PX] }],
+    ["a member's offset", { ...base, membersPx: [MEMBER_GAP_PX] }],
+  ])("%s alone changed: the line is drawn anew", (_, changed) => {
+    expect(onlyLoadedMoved(base, changed)).toBe(false);
+    expect(onlyLoadedMoved(changed, base)).toBe(false);
+  });
+
+  test("a loaded line taken away or brought back, the rest kept: the line is drawn anew", () => {
+    const noLoaded = { ...base, loaded: null };
+    expect(onlyLoadedMoved(base, noLoaded)).toBe(false);
+    expect(onlyLoadedMoved(noLoaded, base)).toBe(false);
+  });
+
+  test("a passager no longer placed, or placed again, takes the solve's lines away or back", () => {
+    const unplaced = vue3dScene({
+      placement: placed(scene),
+      solved: scene,
+      rider: null,
+      across: 0,
+    });
+    expect(onlyLoadedMoved(at(100), unplaced)).toBe(false);
+    expect(onlyLoadedMoved(unplaced, at(100))).toBe(false);
+    expect(onlyLoadedMoved(unplaced, unplaced)).toBe(false);
   });
 });

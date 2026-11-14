@@ -236,6 +236,8 @@ export function Shell({
   strip,
   tight = false,
   views,
+  columnTail,
+  railTail,
 }: {
   /** The Skeleton sets it. No `aria-live` region and no spinner — see {@link Skeleton}. */
   busy?: boolean;
@@ -288,6 +290,18 @@ export function Shell({
    * Skeleton passes nothing: there is nothing to measure before hydration.
    */
   chartRef?: (node: HTMLElement | null) => void;
+  /**
+   * What closes the Page from three columns: under the Chart Block, **inside its box**, so it takes
+   * the block's width, its 1984 px letterbox and the observer's measure — Avancé's tension graph
+   * (#119). The Page mounts it here or in {@link railTail}, never both, by `threeColumns()`.
+   */
+  columnTail?: ReactNode;
+  /**
+   * The same, below B2: the last thing in the Rail's run, after « Ce que cet outil ne calcule
+   * pas » — the foot of the stacked Page. The block above is budgeted and pinned; the Rail is the
+   * scroller, so this is where the Page ends.
+   */
+  railTail?: ReactNode;
 }) {
   return (
     <div
@@ -395,6 +409,9 @@ export function Shell({
               {right}
             </aside>
           )}
+          {railTail !== undefined && (
+            <div className="three-columns:hidden w-full shrink-0">{railTail}</div>
+          )}
         </div>
         {/* No horizontal padding here: `GUTTER` lives **inside** the two SVGs, as the x scale's own
             range `[gutter, width − gutter]`, so that one object aligns both charts. Padding the
@@ -446,6 +463,7 @@ export function Shell({
             ref={chartRef}
           >
             {chart}
+            {columnTail}
           </div>
         </div>
       </div>
@@ -469,9 +487,12 @@ export function RailHeader({ children }: { children?: ReactNode }) {
 export function RailSection({
   title,
   aside,
+  tips,
   children,
 }: {
   title: string;
+  /** The section's infobulles, beside its title (#122). */
+  tips?: ReactNode;
   /**
    * § 6's scope label — « sur toute la traversée » — and § 9's « aucun régime choisi » beside it,
    * on the heading itself so the scope and the reduction are read in one glance. It is one of the
@@ -485,6 +506,9 @@ export function RailSection({
     <section className="border-border border-t px-3 py-3">
       <h2 className="font-heading text-muted-foreground flex flex-wrap items-baseline gap-x-2 text-xs font-semibold tracking-wide uppercase">
         {title}
+        {tips !== undefined && tips !== null && (
+          <span className="inline-flex items-center gap-1 self-center normal-case">{tips}</span>
+        )}
         {aside !== undefined && aside !== null && (
           <span className="text-muted-foreground/70 text-xs normal-case">{aside}</span>
         )}

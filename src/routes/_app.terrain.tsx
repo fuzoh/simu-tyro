@@ -12,12 +12,17 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { LoadFailure } from "@/components/app/load-failure.tsx";
 import { LinkRefusalSurface } from "@/components/app/refusal.tsx";
+import { prefetchTopMap } from "@/components/map/load-top-map.ts";
 import { TerrainSkeleton } from "@/components/terrain-page/frame.tsx";
 import { Terrain } from "@/components/terrain-page/terrain.tsx";
 
 export const Route = createFileRoute("/_app/terrain")({
   ssr: false,
   pendingComponent: TerrainSkeleton,
+  /** The vue de dessus's module, on the wire beside the Page's chunk — `_app.index.tsx`, #128. */
+  loader: () => {
+    prefetchTopMap();
+  },
   errorComponent: LoadFailure,
   component: TerrainRoute,
 });

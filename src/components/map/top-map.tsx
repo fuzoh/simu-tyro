@@ -20,6 +20,11 @@
  * - **The Banane is drawn, not computed** (#96): the wind's cross component alone sets how far the
  *   line bows (`@/lib/map/banane.ts`). It has its own source in every style, redrawn with the wind
  *   and with the anchors during a drag, and the note under the map says it is a shape, not a distance.
+ * - **The Vent's controls are one rule's** (#94, #120): `windControls`
+ *   (`@/lib/map/wind-rose.ts`) says whether the rose's handle and the profile's pad stand and
+ *   whether the profile is read out, for this map and for the frame that stands in for it
+ *   (`./deferred-top-map.tsx`). A withheld Vent is drawn as none; the rose's handle then waits at
+ *   the centre only where a drag from there lifts the breach, never over a refused profile.
  * - **The Vue 3D is behind one door** (#95): the « 3D » switch stands it in the map's place, and its
  *   renderer is fetched through `./load-vue-3d.ts` the first time it is chosen — never imported
  *   here. Whatever stops it (no network, no WebGL) brings the vue de dessus back with « Vue 3D
@@ -40,18 +45,27 @@
  *   renderer beside the scene, never in it, so a toggle redraws nothing. On the Page Terrain, whose
  *   coupe hides while the 3D is shown, no strip stands beside it, and the view keeps its own lines
  *   (`vue3dLayers` with `viewStrip: false`).
+ * - **The Vue embarquée plays the rides the Page already read** (#126): the ride with the Vent
+ *   entered, as the gates leave it (`gatedRides`), placed on the line the Vue 3D stands — never a
+ *   ride of its own. While none is read, while it never leaves the departure, or while an anchor is
+ *   dragged — its rides are then the last release's — the Gimbal's « Vue embarquée » is off and says
+ *   why. A Page that passes no rides — Statique, which never says « estimation » (#91) — has no
+ *   Vue embarquée at all. A new ride ends the one playing: the camera goes back where it stood, and
+ *   the reader enters again on the new one, never on the motion of another Scenario.
  * - **One gesture machine for both views** (#97): an anchor dragged in the Vue 3D is sent to the
  *   same `send` as a marker, so its release is the same new line, recomputed by the same rule.
  * - **On the Page Terrain the map writes nothing** (#101): no click places an anchor, no anchor is
- *   taken in either view, the rose has no handle and no Fond or Couche pentes is offered — the Fond
- *   is the one the Session holds. The Mesure stays, being the map's own, as #98 drew it — no aperçu,
+ *   taken in either view, the rose has no handle — nor the Vent's profile a pad (#120) — and no
+ *   Fond or Couche pentes is offered — the Fond is the one the Session holds. The Mesure stays,
+ *   being the map's own, as #98 drew it — no aperçu,
  *   no Repère d'ancrage, no « Repères » (#107); the coupe stands under the map, and the switch flips
- *   the two together between « 2D » and « 3D ».
+ *   the two together between « 2D » and « 3D ». The coupe is placed by `./deferred-top-map.tsx`,
+ *   outside this module, which only says whether the Vue 3D stands alone (`readOnly.onShows3d`).
  */
 
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { GeoJSONSource } from "maplibre-gl";
-import type { ReactNode, RefObject } from "react";
+import type { RefObject } from "react";
 
 import { Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl } from "maplibre-gl";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
@@ -64,36 +78,36 @@ import type { Fond, MapDisplay } from "@/lib/map/display.ts";
 import type { Anchor, MapEvent, MapGesture } from "@/lib/map/gesture.ts";
 import type { MeasurePoints, MeasureReading } from "@/lib/map/measure.ts";
 import type { FondHealth, MapStyle, MeasureDrawing } from "@/lib/map/style.ts";
+import type { EmbarkedCommand, EmbarkedReading, Vue3dRide } from "@/lib/map/vue-3d-embarquee.ts";
 import type { Vue3dBlock, Vue3dLayers, Vue3dScene } from "@/lib/map/vue-3d.ts";
+import type { FieldId } from "@/lib/rail/fields.ts";
+import type { DynamicsReading } from "@/lib/scenario/dynamics.ts";
 import type { Position, Positions } from "@/lib/scenario/types.ts";
+import type { Ride } from "@/lib/sim";
 import type { Fetch } from "@/lib/terrain/geoadmin.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { useAppDispatch, useAppState } from "@/components/app/store.tsx";
 import { useHover } from "@/components/chart/use-hover.ts";
-import {
-  MapOverCoupe,
-  plainDrawing,
-  TOP_VIEW_BOX,
-  TopViewFrame,
-} from "@/components/statique/top-view.tsx";
+import { plainDrawing, TOP_VIEW_BOX, TopViewFrame } from "@/components/statique/top-view.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { Toggle } from "@/components/ui/toggle.tsx";
+import { probeSpan, probeTag, probeTagOf } from "@/lib/app/probe.ts";
 import { coupeLines, coupeReading } from "@/lib/chart/hover.ts";
 import { placeRider } from "@/lib/chart/scene.ts";
 import { bananeAcross } from "@/lib/map/banane.ts";
 import {
-  anchorReading,
-  BANANE_HELP,
   clickHint,
+  EMBARK_BLOCKED,
   FOND_LABEL,
   MAP_COPY,
   MEASURE_COPY,
   measureHint,
   measureLines,
+  profileCaption,
   VUE_3D_BLOCKED,
   VUE_3D_BLOCKED_READ_ONLY,
   windReading,
@@ -119,8 +133,14 @@ import {
   SWISSTOPO_COVERAGE,
 } from "@/lib/map/style.ts";
 import { vue3dKeyCommand } from "@/lib/map/vue-3d-camera.ts";
+import {
+  embarkBlock,
+  embarkedKeyCommand,
+  isEmbarkKey,
+  vue3dRide,
+} from "@/lib/map/vue-3d-embarquee.ts";
 import { drapedAttribution, vue3dLayers, vue3dPlacement, vue3dScene } from "@/lib/map/vue-3d.ts";
-import { roseReference } from "@/lib/map/wind-rose.ts";
+import { profilePreview, roseReference, windControls } from "@/lib/map/wind-rose.ts";
 import { windBearing } from "@/lib/rail/gates.ts";
 import { geoadminNotice, loadGeoadminProfile } from "@/lib/terrain/geoadmin.ts";
 import { profilRunsBetween } from "@/lib/terrain/trace.ts";
@@ -129,9 +149,10 @@ import { cn } from "@/lib/utils.ts";
 import type { Vue3d } from "./vue-3d-renderer.ts";
 
 import { loadVue3d } from "./load-vue-3d.ts";
+import { MapCaption } from "./map-caption.tsx";
 import { useMeasure } from "./use-measure.ts";
-import { Gimbal } from "./vue-3d-gimbal.tsx";
-import { WindRose } from "./wind-rose.tsx";
+import { EmbarkedControls, Gimbal } from "./vue-3d-gimbal.tsx";
+import { WindProfilePad, WindRose } from "./wind-rose.tsx";
 
 // MapLibre cannot find its worker inside a bundle; Vite hands over the file's URL.
 setWorkerUrl(workerUrl);
@@ -147,18 +168,31 @@ const FIT = { padding: 48, maxZoom: 16 } as const;
  *   the Vue 3D draws the same line the coupe does, or none.
  * @param windCause why the Wind Gate withholds the Vent, or `null`: while it stands no Banane bows
  *   and the rose draws no wind, and the line under the map says it in place of the rose's reading.
- * @param readOnly the Page Terrain's visualisation (#101), whose `coupe` stands under the map in 2D.
+ * @param windCulprits the fields that breach stands on (`ErrorSurfaces.windCulprits`), empty
+ *   without one: the rose's handle is offered over a withheld Vent only where a drag of it lifts
+ *   them (`windControls`).
+ * @param readOnly the Page Terrain's visualisation (#101). Its coupe stands under the map in 2D and
+ *   is hidden while the Vue 3D stands alone; the map does not hold it — `./deferred-top-map.tsx`
+ *   does, so the coupe keeps its place, its focus and its state when this module arrives (#128) —
+ *   and tells its holder, through `onShows3d`, which of the two it shows.
+ * @param rides the passager's two rides as the gates leave them (`gatedRides`), off the same solved
+ *   half — `null` while none is read: the Vue embarquée plays the one with the Vent entered. Absent
+ *   on a Page that prints no ride, whose Vue 3D then offers none.
  */
 export function TopMap({
   frame,
+  rides,
   solved,
   windCause,
+  windCulprits,
   readOnly,
 }: {
   frame: SceneFrame | null;
+  rides?: DynamicsReading | null;
   solved: SceneBase | null;
   windCause: string | null;
-  readOnly?: { readonly coupe: ReactNode };
+  windCulprits: readonly FieldId[];
+  readOnly?: { readonly onShows3d: (shows3d: boolean) => void };
 }) {
   const { scenario, map: display, trace, layers } = useAppState();
   const dispatch = useAppDispatch();
@@ -177,15 +211,24 @@ export function TopMap({
   const [lost3d, setLost3d] = useState(false);
   const shows3d = display.view === "3d" && placement.ok && !lost3d;
   const lose3d = useCallback(() => setLost3d(true), [setLost3d]);
+  // Said before the paint, so the coupe never shows beside the Vue 3D nor misses under the map.
+  const onShows3d = readOnly?.onShows3d;
+  useLayoutEffect(() => onShows3d?.(shows3d), [onShows3d, shows3d]);
   const renderer = useVue3dRenderer(shows3d, lose3d);
-  // A withheld Vent is drawn as none, and the rose's handle waits at the centre, where a drag sets a
-  // Vent the gates accept.
+  // A withheld Vent is drawn as none, which parks the rose's handle at the centre. It is offered
+  // there only where a drag sets a Vent the gates accept — a refused speed — and not under a
+  // refused profile, where the drag would overwrite the speed and the direction the Scenario holds
+  // and lift nothing (`windControls`).
   const wind = windCause === null ? scenario.wind : { ...scenario.wind, speedKmh: 0 };
   // The Vent is geographic: the line it is projected on is the one drawn, a dragged anchor included.
   // Without A and B there is none, and no Vent bows it — the gates' one check, `windBearing`.
   const bearing = windBearing({ positions: drawn });
   const across = bananeAcross(wind, bearing);
   const scene3d = useVue3dScene(shows3d, frame, profil, solved, across);
+  const ride = rides?.windy ?? null;
+  const ride3d = useVue3dRide(shows3d, frame, profil, ride);
+  // While an anchor moves or its profil loads, the rides on hand are the last release's.
+  const embarkBlocked = embarkBlock(ride, ride3d, gesture.kind === "idle");
   // The View Strip's layers where the strip stands beside the Vue 3D; on the Page Terrain it hides
   // with the coupe while the 3D is shown, and toggles out of reach decide nothing.
   const layers3d = useMemo(() => vue3dLayers(layers, { viewStrip: !locked }), [locked, layers]);
@@ -205,6 +248,17 @@ export function TopMap({
   // rose turns by the line's bearing to stand where the wind comes from on that drawing.
   const reference = roseReference(bearing, plain !== null && plain.unoriented !== null);
   const rose = useRef<HTMLDivElement>(null);
+  // Which of the Vent's controls stand here is one rule's (`windControls`), the fallback frame's
+  // too: the rose's handle, and — once the physics reads it — the profile's pad and its preview
+  // (#120), never drawn as legal while the gates withhold the Vent. Under a map without the pad —
+  // the Page Terrain's, the Mesure's — the caption carries the preview's readings.
+  const controls = windControls({
+    culprits: windCulprits,
+    placed: reference !== null,
+    locked,
+    measuring,
+  });
+  const preview = controls.preview ? profilePreview(scenario.wind, frame?.L ?? null) : null;
   const [project, setProject] = useState<Project | null>(null);
   // The line is read under the pointer only while nothing else is using the pointer on the map.
   // The line the map draws is the portée's own only where the coupe's profil runs between its ends.
@@ -268,24 +322,22 @@ export function TopMap({
   const view = (
     <TopViewFrame
       caption={
-        <>
-          {(["A", "B"] as const).map((anchor) => (
-            <span className="font-mono" key={anchor}>
-              {anchorReading(anchor, drawn)}
-            </span>
-          ))}
-          {!shows3d && <span>{windCause ?? windReading(wind, bearing, !locked)}</span>}
-          <span>{gestureLine}</span>
-          {!shows3d && unavailable && (
-            <span>{[MAP_COPY.unavailable, plain?.unoriented].filter(Boolean).join(" · ")}</span>
-          )}
-          {bananeShown && <span title={BANANE_HELP}>{MAP_COPY.bananeNote}</span>}
-          {placement.ok ? (
-            lost3d && <span>{MAP_COPY.vue3dUnavailable}</span>
-          ) : (
-            <span>{blockedWhy[placement.block]}</span>
-          )}
-        </>
+        <MapCaption
+          banane={bananeShown}
+          gesture={gestureLine}
+          positions={drawn}
+          profile={shows3d || controls.pad || preview === null ? null : profileCaption(preview)}
+          unavailable={!shows3d && unavailable}
+          unoriented={plain?.unoriented ?? null}
+          vue3d={
+            placement.ok ? (
+              lost3d && <span>{MAP_COPY.vue3dUnavailable}</span>
+            ) : (
+              <span>{blockedWhy[placement.block]}</span>
+            )
+          }
+          wind={shows3d ? null : (windCause ?? windReading(wind, bearing, !locked))}
+        />
       }
       controls={
         <MapControls
@@ -309,12 +361,15 @@ export function TopMap({
             ) : (
               <Vue3dHost
                 display={display}
+                embarkBlocked={embarkBlocked === null ? null : EMBARK_BLOCKED[embarkBlocked]}
+                embarks={rides !== undefined}
                 // A view that never idles takes no anchor: the Page Terrain only looks at the line.
                 idle={!locked && gesture.kind === "idle"}
                 layers={layers3d}
                 onGesture={send}
                 onUnavailable={lose3d}
                 renderer={renderer}
+                ride={embarkBlocked === null ? ride3d : null}
                 scene={scene3d}
               />
             )}
@@ -389,13 +444,22 @@ export function TopMap({
             <WindRose
               hostRef={rose}
               onWind={
-                locked
-                  ? undefined
-                  : (next) => dispatch({ type: "scénario/modifié", patch: { wind: next } })
+                controls.handle
+                  ? (next) => dispatch({ type: "scénario/modifié", patch: { wind: next } })
+                  : undefined
               }
               reference={reference}
               wind={wind}
             />
+            {controls.pad && (
+              <WindProfilePad
+                onWind={(next) => dispatch({ type: "scénario/modifié", patch: { wind: next } })}
+                preview={preview}
+                // As the Scenario holds it, a withheld Vent included: the handle stands on what a
+                // drag would rewrite.
+                wind={scenario.wind}
+              />
+            )}
             <Attribution text={fondAttribution(display.fond)} />
             {read !== null && read.reading !== null && (
               <HoverReadout at={read.at} lines={coupeLines(read.reading, "terrain")} />
@@ -405,11 +469,7 @@ export function TopMap({
       }
     />
   );
-  return readOnly === undefined ? (
-    view
-  ) : (
-    <MapOverCoupe coupe={shows3d ? null : readOnly.coupe} map={view} />
-  );
+  return view;
 }
 
 /** The Mesure's distances, over the map's bottom-left corner so the caption's height never moves. */
@@ -506,6 +566,10 @@ function Vue3dLoading() {
  *
  * @param idle the gesture machine waits for a gesture, so an anchor may be taken.
  * @param layers which of the scene's lines are shown: a change shows or hides, and draws nothing.
+ * @param ride the ride the Vue embarquée may play, `null` while it proposes none; a new one ends the
+ *   one playing.
+ * @param embarkBlocked why it proposes none, `null` when `ride` stands.
+ * @param embarks the Page plays rides at all: without, the Gimbal has no « Vue embarquée ».
  */
 function Vue3dHost({
   renderer,
@@ -513,6 +577,9 @@ function Vue3dHost({
   display,
   idle,
   layers,
+  ride,
+  embarkBlocked,
+  embarks,
   onGesture,
   onUnavailable,
 }: {
@@ -521,12 +588,19 @@ function Vue3dHost({
   display: MapDisplay;
   idle: boolean;
   layers: Vue3dLayers;
+  ride: Vue3dRide | null;
+  embarkBlocked: string | null;
+  embarks: boolean;
   onGesture: (event: MapEvent) => void;
   onUnavailable: () => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<Vue3d | null>(null);
   const [heading, setHeading] = useState(0);
+  // The ride the reader entered the Vue embarquée on: riding only while it is still the one on hand.
+  const [embarkedOn, setEmbarkedOn] = useState<Vue3dRide | null>(null);
+  const riding = embarkedOn !== null && embarkedOn === ride ? embarkedOn : null;
+  const [reading, setReading] = useState<EmbarkedReading | null>(null);
   const fallen = useRef(onUnavailable);
   const gestured = useRef(onGesture);
   useLayoutEffect(() => {
@@ -548,6 +622,7 @@ function Vue3dHost({
       onGesture: (event: MapEvent) => gestured.current(event),
       onUnavailable: fail,
       onHeading: setHeading,
+      onEmbarked: setReading,
       label: MAP_COPY.vue3dTitle,
     };
     renderer.openVue3d(node, options).then((open) => {
@@ -564,8 +639,19 @@ function Vue3dHost({
   }, [renderer]);
 
   useEffect(() => {
-    view?.show(scene, display, idle, layers);
+    if (view === null) return;
+    probeSpan("vue3d:show", probeTagOf(scene), () => view.show(scene, display, idle, layers));
   }, [view, scene, display, idle, layers]);
+
+  useEffect(() => {
+    view?.embark(riding);
+  }, [view, riding]);
+
+  /** Out of the Vue embarquée: the focus goes back to the view, so its keys still answer. */
+  const leave = useCallback(() => {
+    setEmbarkedOn(null);
+    container.current?.querySelector("canvas")?.focus({ preventScroll: true });
+  }, []);
 
   // The keys reach the view only from inside it: the canvas — a focusable `application` once pressed
   // or tabbed to — or a Gimbal button. Handled, a key's default, the page scrolling under an arrow,
@@ -575,6 +661,20 @@ function Vue3dHost({
     const node = region.current;
     if (node === null || view === null) return;
     const keyed = (event: KeyboardEvent) => {
+      if (riding !== null) {
+        const command = embarkedKeyCommand(event);
+        if (command === null || !embarkedKeyApplies(command, event.target)) return;
+        event.preventDefault();
+        if (command.kind === "exit") leave();
+        else view.ride(command);
+        return;
+      }
+      if (isEmbarkKey(event)) {
+        if (ride === null) return;
+        event.preventDefault();
+        setEmbarkedOn(ride);
+        return;
+      }
       const command = vue3dKeyCommand(event);
       if (command === null) return;
       event.preventDefault();
@@ -582,7 +682,7 @@ function Vue3dHost({
     };
     node.addEventListener("keydown", keyed);
     return () => node.removeEventListener("keydown", keyed);
-  }, [view]);
+  }, [view, riding, ride, leave]);
 
   return (
     <div aria-label={MAP_COPY.vue3dTitle} className="absolute inset-0" ref={region} role="region">
@@ -592,11 +692,54 @@ function Vue3dHost({
       />
       {view === null ? (
         <Vue3dLoading />
+      ) : riding === null ? (
+        <Gimbal
+          embark={embarks ? { blocked: embarkBlocked } : null}
+          headingDeg={heading}
+          onCommand={(command) => view.command(command)}
+          onEmbark={() => {
+            if (ride !== null) setEmbarkedOn(ride);
+          }}
+        />
       ) : (
-        <Gimbal headingDeg={heading} onCommand={(command) => view.command(command)} />
+        <EmbarkedControls
+          onCommand={(command) => view.ride(command)}
+          onExit={leave}
+          reading={reading}
+        />
       )}
     </div>
   );
+}
+
+/**
+ * Does a key of the Vue embarquée act here? The space bar on a button is the button's own press, and
+ * Escape on an open infobulle's icon closes the bubble, not the view.
+ */
+function embarkedKeyApplies({ kind }: EmbarkedCommand, target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return true;
+  if (kind === "toggle") return target.tagName !== "BUTTON";
+  if (kind === "exit") return !target.hasAttribute("data-popup-open");
+  return true;
+}
+
+/**
+ * The ride the Vue embarquée may play, while the Vue 3D is shown: the gated ride placed on the line
+ * the view stands — `null` without one, or for a ride that never leaves the departure.
+ */
+function useVue3dRide(
+  shown: boolean,
+  frame: SceneFrame | null,
+  profil: Trace | null,
+  ride: Ride | null,
+): Vue3dRide | null {
+  const { positions, rider } = useAppState().scenario;
+  const { hRider } = rider;
+  return useMemo(() => {
+    if (!shown || ride === null) return null;
+    const at = vue3dPlacement(positions, frame, profil);
+    return at.ok ? vue3dRide({ placement: at.placement, ride, hRider }) : null;
+  }, [shown, positions, frame, profil, ride, hRider]);
 }
 
 /**
@@ -616,8 +759,11 @@ function useVue3dScene(
     if (!shown) return null;
     const at = vue3dPlacement(positions, frame, profil);
     if (!at.ok) return null;
-    const placed = solved === null ? null : placeRider(solved, xD);
-    return vue3dScene({ placement: at.placement, solved, rider: placed, across });
+    return probeSpan("vue3d:scene", xD, () => {
+      const placed = solved === null ? null : placeRider(solved, xD);
+      const scene = vue3dScene({ placement: at.placement, solved, rider: placed, across });
+      return probeTag(scene, xD);
+    });
   }, [shown, positions, frame, profil, solved, xD, across]);
 }
 

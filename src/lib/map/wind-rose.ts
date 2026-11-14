@@ -17,11 +17,32 @@
  *   parks the handle on the outer ring and stays what was typed.
  * - **What the handle writes is what a field can hold**: whole km/h and whole degrees, the display
  *   grain of the two fields, so a gesture and a typed value agree to the last digit.
+ * - **Each handle writes its own fields and keeps the rest of the Vent** (#120). The direction
+ *   handle leaves the profile as it is, a speed of zero included; the profile's handle leaves the
+ *   speed and the direction.
+ * - **The profile's handle has fixed screen axes**: right is wider, up is more attenuated, whatever
+ *   the wind's direction and however the drawing is turned — it reads no {@link RoseReference}. Its
+ *   travel is a rectangle, a pixel never skips a percent, and a value outside its domain parks it
+ *   on the nearest edge without being rewritten until a drag says otherwise.
+ * - **The preview is A on the left, B on the right**, always: it draws the profile along the line,
+ *   which is not the pad's horizontal axis. Its three speeds are evaluated at the anchors and at
+ *   mid-span, never read off a sample; and a profile the gates refuse has no preview — it is not
+ *   drawn as though it were legal.
+ * - **A control is offered only where it may write, and a parked handle only where its drag
+ *   mends** ({@link windControls}). Neither handle stands on a map that writes nothing or on a
+ *   line without a bearing, and the profile's pad and preview wait for the profile to be read by
+ *   the physics (`WIND_PROFILE_ACTIVE`). A Vent the Wind Gate withholds is drawn as none, which
+ *   parks the direction handle at the centre: it is offered there only while every breach stands
+ *   on the speed or the direction it writes. Under a refused profile a drag from the centre would
+ *   write a speed and a direction over the ones the Scenario holds, and lift nothing.
  */
 
+import type { FieldId } from "@/lib/rail/fields.ts";
 import type { Wind } from "@/lib/scenario/types.ts";
 
 import { roundToDisplay } from "@/lib/format/quantity.ts";
+import { WIND_PROFILE_ACTIVE, windProfileOf } from "@/lib/scenario/wind.ts";
+import { WIND_PROFILE, windProfileSpeed } from "@/lib/sim";
 
 /** Where the rose's scale stops, km/h. The outer ring. */
 export const ROSE_MAX_KMH = 60;
@@ -71,7 +92,10 @@ export function azimuthOf(screen: number, { north }: RoseReference): number {
 }
 
 /** Where the handle stands for a wind: the centre without wind, the outer ring at the scale's end. */
-export function handleOffset(wind: Wind, reference: RoseReference): RoseOffset {
+export function handleOffset(
+  wind: Pick<Wind, "speedKmh" | "directionDeg">,
+  reference: RoseReference,
+): RoseOffset {
   const radius =
     (Math.min(Math.max(wind.speedKmh, 0), ROSE_MAX_KMH) / ROSE_MAX_KMH) * ROSE_RADIUS_PX;
   const bearing = radians(screenBearing(wind.directionDeg, reference));
@@ -80,8 +104,9 @@ export function handleOffset(wind: Wind, reference: RoseReference): RoseOffset {
 }
 
 /**
- * The Vent a handle dropped at `offset` writes. Without a whole km/h of speed there is no direction
- * to read off a point at the centre, so the previous one stays.
+ * The Vent a handle dropped at `offset` writes: its speed and its direction, **the profile kept as
+ * it was**. Without a whole km/h of speed there is no direction to read off a point at the centre,
+ * so the previous one stays.
  */
 export function windFromOffset(offset: RoseOffset, reference: RoseReference, previous: Wind): Wind {
   const distance = Math.hypot(offset.x, offset.y);
@@ -89,10 +114,171 @@ export function windFromOffset(offset: RoseOffset, reference: RoseReference, pre
     "windSpeed",
     Math.min((distance / ROSE_RADIUS_PX) * ROSE_MAX_KMH, ROSE_MAX_KMH),
   );
-  if (speedKmh === 0) return { speedKmh, directionDeg: previous.directionDeg };
+  if (speedKmh === 0) return { ...previous, speedKmh };
   const screen = mod360((Math.atan2(offset.x, -offset.y) * 180) / Math.PI);
   return {
+    ...previous,
     speedKmh,
     directionDeg: mod360(roundToDisplay("windDirection", azimuthOf(screen, reference))),
+  };
+}
+
+/**
+ * The rectangle the profile's handle travels (#120), px: at least 100 × 100, so that each of the 81
+ * widths and of the 101 attenuations has a pixel of its own. A drawing choice, never a scenario's.
+ */
+export const PROFILE_PAD_PX = { width: 120, height: 100 } as const;
+
+const clamp01 = (share: number) => Math.min(Math.max(share, 0), 1);
+
+/**
+ * Where the profile's handle stands, px from the pad's **top-left** corner, `y` downward: the
+ * width from left to right over its domain, the attenuation from bottom to top over its own. Read
+ * as the fields read it (`windProfileOf`); a value outside its domain stands on the nearest edge.
+ */
+export function profileHandleOffset(wind: Pick<Wind, "widthPct" | "attenuationPct">): RoseOffset {
+  const { width, attenuation } = windProfileOf(wind);
+  const across = WIND_PROFILE.width;
+  const up = WIND_PROFILE.attenuation;
+  return {
+    x: clamp01((width - across.min) / (across.max - across.min)) * PROFILE_PAD_PX.width,
+    y: (1 - clamp01((attenuation - up.min) / (up.max - up.min))) * PROFILE_PAD_PX.height,
+  };
+}
+
+/**
+ * The Vent a profile handle dropped at `offset` writes: its width and its attenuation on the grain
+ * of their fields, **the speed and the direction kept as they were**. A point outside the pad is
+ * read on its nearest edge, so a drag never writes a percent outside its domain.
+ */
+export function windFromProfileOffset(offset: RoseOffset, previous: Wind): Wind {
+  const across = WIND_PROFILE.width;
+  const up = WIND_PROFILE.attenuation;
+  const u = clamp01(offset.x / PROFILE_PAD_PX.width);
+  const v = clamp01(1 - offset.y / PROFILE_PAD_PX.height);
+  return {
+    ...previous,
+    widthPct: roundToDisplay("windWidth", across.min + u * (across.max - across.min)),
+    attenuationPct: roundToDisplay("windAttenuation", up.min + v * (up.max - up.min)),
+  };
+}
+
+/** The fields the direction handle writes — the only breaches a drag of it can lift. */
+const ROSE_HANDLE_FIELDS: ReadonlySet<FieldId> = new Set<FieldId>(["windSpeed", "windDirection"]);
+
+/** What a vue de dessus knows of itself and of the Vent, for {@link windControls} to decide on. */
+export type WindControlsInput = {
+  /**
+   * The fields the Wind Gate's breaches stand on (`windCulprits`, `@/lib/app/banner.ts`); empty
+   * while the Vent may be read.
+   */
+  readonly culprits: readonly FieldId[];
+  /** The line has a bearing: A and B are on the map ({@link roseReference} is not `null`). */
+  readonly placed: boolean;
+  /** The map writes nothing: the Page Terrain's (#101), or the frame that has no rose at all. */
+  readonly locked: boolean;
+  /** The Mesure is on (#98): the map's clicks are the ruler's. */
+  readonly measuring: boolean;
+};
+
+/** Which of the Vent's controls a vue de dessus offers, and whether it reads the profile out. */
+export type WindControls = {
+  /** The rose's direction handle is offered. */
+  readonly handle: boolean;
+  /** The profile's pad is mounted (#120). */
+  readonly pad: boolean;
+  /**
+   * The profile is read out (#120): {@link profilePreview} drawn on the pad, or said under a map
+   * that has none (`profileCaption`).
+   */
+  readonly preview: boolean;
+};
+
+/**
+ * The Vent's controls on a vue de dessus — the one rule the live map and its fallback frame read.
+ *
+ * - **The direction handle** stands where the map may write and the line has a bearing. Over a
+ *   withheld Vent it waits at the centre, and is offered only while a drag from there lifts what
+ *   withholds it: every culprit is the speed or the direction the handle writes (`ws=-5`). Under a
+ *   refused profile — one no calculation reads yet, a percent out of its domain — it is not: the
+ *   drag would replace the speed and the direction the Scenario holds and leave the breach
+ *   standing. The profile's own field, its Fix Action and its pad repair it.
+ * - **The profile's pad** stands on the same maps — one that writes, a line with a bearing — once
+ *   the profile is read by the physics, and not while the Mesure holds the map. Its handle stands
+ *   on the percents the Scenario holds, withheld or not, so a drag of it overwrites nothing it
+ *   does not set, and it stays over a withheld Vent.
+ * - **The profile is read out** once it is read by the physics, on a line that has a bearing, and
+ *   never while the gates withhold the Vent: what is refused is not shown as though applied.
+ *
+ * @param active does the physics read the Vent's profile? `WIND_PROFILE_ACTIVE` when absent, which
+ *   is what the app passes: a parameter only so that both sides of the activation are tested.
+ */
+export function windControls(
+  { culprits, placed, locked, measuring }: WindControlsInput,
+  active: boolean = WIND_PROFILE_ACTIVE,
+): WindControls {
+  const writes = placed && !locked;
+  return {
+    handle: writes && culprits.every((field) => ROSE_HANDLE_FIELDS.has(field)),
+    pad: active && writes && !measuring,
+    preview: active && placed && culprits.length === 0,
+  };
+}
+
+/** The segments the preview's curve is drawn with. */
+export const PROFILE_PREVIEW_STEPS = 48;
+
+/** The profile of a Vent as its preview shows it: A on the left, mid-span, B on the right. */
+export type ProfilePreview = {
+  /** The speed at mid-span, km/h — the entered speed. */
+  readonly midKmh: number;
+  /** The speed at both anchors, km/h. */
+  readonly anchorKmh: number;
+  /** No attenuation: the curve is level, and the width is kept without effect. */
+  readonly uniform: boolean;
+  /** The largeur à mi-atténuation as it is read, % of the span. */
+  readonly width: number;
+  /** That width along the line, m — a reading, never a second entry. `null` without a span. */
+  readonly widthMetres: number | null;
+  /** The two half-gap points the width is measured between, as shares of the span from A. */
+  readonly marks: readonly [number, number];
+  /**
+   * The curve from A to B: the share of the span, and the speed there as a share of the speed at
+   * mid-span — so a Vent without speed still draws the shape its two percents describe.
+   */
+  readonly curve: readonly { readonly xi: number; readonly share: number }[];
+};
+
+function within(value: number, { min, max }: { readonly min: number; readonly max: number }) {
+  return value >= min && value <= max;
+}
+
+/**
+ * The preview of a Vent's profile, or `null` where there is none to draw: a percent outside its
+ * domain or a speed that is not one — what the Wind Gate refuses is not drawn as though legal.
+ *
+ * @param span the horizontal span, m, or `null` when it is not known: the width in metres is then
+ *   left out, and the percent stands alone.
+ */
+export function profilePreview(wind: Wind, span: number | null): ProfilePreview | null {
+  const profile = windProfileOf(wind);
+  const legal =
+    within(profile.width, WIND_PROFILE.width) &&
+    within(profile.attenuation, WIND_PROFILE.attenuation) &&
+    wind.speedKmh >= 0 &&
+    Number.isFinite(wind.speedKmh);
+  if (!legal) return null;
+  const lambda = profile.width / 100;
+  return {
+    midKmh: windProfileSpeed(wind.speedKmh, profile, 0.5),
+    anchorKmh: windProfileSpeed(wind.speedKmh, profile, 0),
+    uniform: profile.attenuation === 0,
+    width: profile.width,
+    widthMetres: span !== null && span > 0 ? lambda * span : null,
+    marks: [(1 - lambda) / 2, (1 + lambda) / 2],
+    curve: Array.from({ length: PROFILE_PREVIEW_STEPS + 1 }, (_, step) => {
+      const xi = step / PROFILE_PREVIEW_STEPS;
+      return { xi, share: windProfileSpeed(1, profile, xi) };
+    }),
   };
 }

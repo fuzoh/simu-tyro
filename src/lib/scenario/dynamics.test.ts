@@ -55,7 +55,11 @@ function reading(
 }
 
 function windy(directionDeg: number, bearing: number | null = NORTH) {
-  return reading({ ...SHIPPED, wind: { speedKmh: 50, directionDeg } }, null, bearing);
+  return reading(
+    { ...SHIPPED, wind: { ...SHIPPED.wind, speedKmh: 50, directionDeg } },
+    null,
+    bearing,
+  );
 }
 
 function lowest(one: Ride): number {

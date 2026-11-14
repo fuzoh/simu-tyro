@@ -37,7 +37,14 @@ import { readDynamics } from "@/lib/scenario/dynamics.ts";
 import type { BannerOccupant } from "./banner.ts";
 import type { EngineRefusal } from "./refusals.ts";
 
-import { banner, noResultCause, rideCause, standingReport, windCause } from "./banner.ts";
+import {
+  banner,
+  noResultCause,
+  rideCause,
+  standingReport,
+  windCause,
+  windCulprits,
+} from "./banner.ts";
 import { engineRefusal } from "./refusals.ts";
 import { suppression } from "./suppression.ts";
 
@@ -75,6 +82,12 @@ export type ErrorSurfaces = {
    * dessus draws no Banane and no wind on the rose, and says this where the rose's reading goes.
    */
   readonly windCause: string | null;
+  /**
+   * The fields {@link windCause}'s breaches stand on, in the report's order; empty while the Vent
+   * may be read. The vue de dessus offers the rose's handle over a withheld Vent only where a drag
+   * of it lifts them — the speed and the direction it writes, never a refused profile (#120).
+   */
+  readonly windCulprits: readonly FieldId[];
   /**
    * « Vent saisi non appliqué : … » — the Vent the Scenario carries has no line to be projected on,
    * since A or B is not on the map — or `null`. Not a cause: nothing is withheld, the rides are
@@ -144,6 +157,7 @@ export function errorSurfaces({
     clearance: !removed.clearance,
     rideCause: rideCause({ report, refusal, saisie, register }),
     windCause: windCause({ report, saisie, register }),
+    windCulprits: windCulprits({ report, saisie }),
     windNotice: windNotice(report, traverse.wind),
   };
 }

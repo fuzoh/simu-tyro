@@ -545,15 +545,76 @@ describe("searchToScenario — the read side of § 7's key table", () => {
 
   it("reads `ws` and `wd` absent as no wind — and neither completes nor names them (#87)", () => {
     const { search, completed } = complete("?L=250&h=-40");
-    expect(searchToScenario(search).wind).toEqual({ speedKmh: 0, directionDeg: 0 });
+    expect(searchToScenario(search).wind).toMatchObject({ speedKmh: 0, directionDeg: 0 });
     expect(search.ws).toBeUndefined();
     expect(search.wd).toBeUndefined();
     expect(completed).not.toContain("ws");
     expect(completed).not.toContain("wd");
-    expect(decode("?L=250&ws=50&wd=45").wind).toEqual({ speedKmh: 50, directionDeg: 45 });
+    expect(decode("?L=250&ws=50&wd=45").wind).toMatchObject({ speedKmh: 50, directionDeg: 45 });
     // Each key stands alone: a direction without a speed, and a speed without a direction.
-    expect(decode("?L=250&wd=270").wind).toEqual({ speedKmh: 0, directionDeg: 270 });
-    expect(decode("?L=250&ws=30").wind).toEqual({ speedKmh: 30, directionDeg: 0 });
+    expect(decode("?L=250&wd=270").wind).toMatchObject({ speedKmh: 0, directionDeg: 270 });
+    expect(decode("?L=250&ws=30").wind).toMatchObject({ speedKmh: 30, directionDeg: 0 });
+  });
+
+  it("reads `ww` and `wa` absent as the uniform wind — and neither completes nor names them (#120)", () => {
+    // A link older than the keys: its wind is read whole, at the shipped width and unattenuated.
+    const { search, completed } = complete("?L=250&h=-40&ws=30&wd=264");
+    expect(searchToScenario(search).wind).toEqual({
+      speedKmh: 30,
+      directionDeg: 264,
+      widthPct: 50,
+      attenuationPct: 0,
+    });
+    for (const key of ["ww", "wa"] as const) {
+      expect(search[key]).toBeUndefined();
+      expect(completed).not.toContain(key);
+    }
+    // In percent, as the fields show them — `wa=50` is 50 %, never a fraction — and each alone.
+    expect(decode("?L=250&wa=50").wind).toMatchObject({ widthPct: 50, attenuationPct: 50 });
+    expect(decode("?L=250&ww=25").wind).toMatchObject({ widthPct: 25, attenuationPct: 0 });
+    expect(decode("?L=250&ww=30&wa=75").wind).toMatchObject({ widthPct: 30, attenuationPct: 75 });
+  });
+
+  it("keeps a profile out of its domain as it arrived, for the form to refuse (ADR-0001)", () => {
+    expect(decode("?L=250&ww=95&wa=110").wind).toMatchObject({ widthPct: 95, attenuationPct: 110 });
+    expect(decode("?L=250&ww=9&wa=-1").wind).toMatchObject({ widthPct: 9, attenuationPct: -1 });
+    // Nor is a value between two steps rounded on the way in or on the way out.
+    const between = decode("?L=250&ww=50.4&wa=0.4");
+    expect(between.wind).toMatchObject({ widthPct: 50.4, attenuationPct: 0.4 });
+    expect(scenarioToSearch({ ...firstRunDefaults(), wind: between.wind })).toMatchObject({
+      ww: 50.4,
+      wa: 0.4,
+    });
+    const out = scenarioToSearch({
+      ...firstRunDefaults(),
+      wind: { speedKmh: 30, directionDeg: 0, widthPct: 95, attenuationPct: -1 },
+    });
+    expect(out).toMatchObject({ ww: 95, wa: -1 });
+  });
+
+  it("writes `ww` and `wa` each only off what ships, so older links stay string-identical", () => {
+    const shipped = firstRunDefaults();
+    expect(scenarioToSearch(shipped)).not.toHaveProperty("ww");
+    expect(scenarioToSearch(shipped)).not.toHaveProperty("wa");
+    // A width kept through a uniform wind travels alone, and so does an attenuation at 50 %.
+    const narrow = scenarioToSearch({ ...shipped, wind: { ...shipped.wind, widthPct: 25 } });
+    expect(narrow.ww).toBe(25);
+    expect(narrow).not.toHaveProperty("wa");
+    const sheltered = scenarioToSearch({
+      ...shipped,
+      wind: { ...shipped.wind, attenuationPct: 60 },
+    });
+    expect(sheltered.wa).toBe(60);
+    expect(sheltered).not.toHaveProperty("ww");
+    // After `wd` and before `cda`, whatever the Page the link opens on.
+    const both = {
+      ...shipped,
+      wind: { speedKmh: 30, directionDeg: 264, widthPct: 30, attenuationPct: 75 },
+      dynamics: { ...shipped.dynamics, CdA: 0.5 },
+    };
+    expect(canonicalLink(scenarioToSearch(both), "/dynamique")).toContain(
+      "&ws=30&wd=264&ww=30&wa=75&cda=0.5&",
+    );
   });
 
   it("reads the four coordinates absent as Positions unknown — and neither completes nor names them (#90)", () => {
@@ -601,7 +662,7 @@ describe("searchToScenario — the read side of § 7's key table", () => {
   it("reads the ride's keys absent as §12.2's defaults — and neither completes nor names them (#89)", () => {
     for (const fam of ["ac", "tx"] as const) {
       const { search, completed } = complete(`?L=250&fam=${fam}`);
-      for (const key of ["cda", "f0", "kv", "mur", "rho"] as const) {
+      for (const key of ["cda", "f0", "kv", "mur", "rho", "cib"] as const) {
         expect(search[key]).toBeUndefined();
         expect(completed).not.toContain(key);
       }
@@ -611,6 +672,7 @@ describe("searchToScenario — the read side of § 7's key table", () => {
         F0: 15,
         kv: 1.5,
         mu: 0.015,
+        reachTarget: 90,
       });
     }
   });
@@ -641,6 +703,31 @@ describe("searchToScenario — the read side of § 7's key table", () => {
   it("keeps a typed ρ, and a non-positive C_dA as it arrived (ADR-0001)", () => {
     expect(decode("?L=250&rho=1.069").dynamics.rho).toBe(1.069);
     expect(decode("?L=250&cda=-0.1").dynamics.CdA).toBe(-0.1);
+  });
+
+  it("reads `cib` as the target of the farthest point, and absent as the shipped 90 % (#121)", () => {
+    expect(decode("?L=250").dynamics.reachTarget).toBe(90);
+    expect(decode("?L=250&cib=75").dynamics.reachTarget).toBe(75);
+    // Under either family: the target is no trolley's.
+    expect(decode("?L=250&fam=tx&cib=60").dynamics.reachTarget).toBe(60);
+  });
+
+  it("keeps a target at B, past it or under mid-span as it arrived (ADR-0001)", () => {
+    for (const out of [100, 120, 49, -5]) {
+      expect(decode(`?L=250&cib=${out}`).dynamics.reachTarget).toBe(out);
+    }
+  });
+
+  it("writes `cib` only off the shipped target, so older links stay string-identical", () => {
+    const shipped = firstRunDefaults();
+    expect(scenarioToSearch(shipped)).not.toHaveProperty("cib");
+    const typed = { ...shipped, dynamics: { ...shipped.dynamics, reachTarget: 75 } };
+    expect(scenarioToSearch(typed).cib).toBe(75);
+    // Avancé writes it, Dynamique opens the same query under its own path (ADR-0002).
+    const onAvance = canonicalLink(scenarioToSearch(typed), "/avance");
+    const onDynamique = canonicalLink(scenarioToSearch(typed), "/dynamique");
+    expect(onAvance.replace("/avance", "")).toBe(onDynamique.replace("/dynamique", ""));
+    expect(decode(onDynamique.replace("/dynamique", "")).dynamics.reachTarget).toBe(75);
   });
 
   it("keeps a Maestro that arrives beside a câble, as given (ADR-0001)", () => {

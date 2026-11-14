@@ -12,14 +12,13 @@
 
 import type { ReactNode } from "react";
 
-import { area, line } from "d3-shape";
+import { area } from "d3-shape";
 
 import type { SceneFrame } from "@/lib/chart/scene.ts";
 import type {
   CoupeScene,
   CurveScene,
   DynamiqueSolved,
-  PxPath,
   Rides,
   StopMarker,
 } from "@/lib/dynamique/scene.ts";
@@ -28,6 +27,7 @@ import type { SharedX } from "@/lib/layout/contract.ts";
 import { BannerSlot, ProfileBand, StripBand } from "@/components/app/shell.tsx";
 import { HoverRule, HoverTip } from "@/components/chart/hover.tsx";
 import { xTicks } from "@/components/chart/profile.tsx";
+import { pathOf } from "@/components/chart/px-path.ts";
 import { type HoverHandlers, metresOn, useHover } from "@/components/chart/use-hover.ts";
 import { NO_SPAN_LINE } from "@/lib/chart/copy.ts";
 import { type CoupeReading, coupeLines, RIDER_REACH_PX } from "@/lib/chart/hover.ts";
@@ -36,15 +36,6 @@ import { coupeAt, curveHover } from "@/lib/dynamique/hover.ts";
 import { dynamiqueScene } from "@/lib/dynamique/scene.ts";
 import { axisLabel, CELL_WRAP_PX } from "@/lib/layout/contract.ts";
 import { cn } from "@/lib/utils.ts";
-
-/** A path through pixel points, `null` for none. */
-const stroke = line<readonly [number, number]>()
-  .x((point) => point[0])
-  .y((point) => point[1]);
-
-function pathOf(points: PxPath): string | undefined {
-  return stroke([...points]) ?? undefined;
-}
 
 /**
  * The Page's chart region: the banner slot, the coupe and the curve. `width` is `null` until the

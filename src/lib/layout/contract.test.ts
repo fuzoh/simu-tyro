@@ -58,6 +58,8 @@ import {
   STATIQUE_TILE_MAX_PX,
   STRIP,
   STRIP_POLICY_BAND,
+  TENSION_CHART,
+  tensionChartHeight,
   THREE_COLUMN_PX,
   threeColumns,
   stripOuterHeight,
@@ -224,6 +226,13 @@ describe("§ 5 — the layout contract", () => {
 
   it("the strip ceiling is 200 px — the over-feeding it exists to bound", () => {
     expect(stripOuterHeight(10_000)).toBe(200);
+  });
+
+  it("the tension graph is a band of the width alone, 180 to 300 px (#119)", () => {
+    expect(tensionChartHeight(0)).toBe(TENSION_CHART.min);
+    expect(tensionChartHeight(innerWidth(390))).toBe(180);
+    expect(tensionChartHeight(1000)).toBeCloseTo(220, 9);
+    expect(tensionChartHeight(innerWidth(1984))).toBe(TENSION_CHART.max);
   });
 
   it("B1 is exactly 624 px of chart column, not 625", () => {
@@ -649,15 +658,26 @@ describe("Avancé's three columns — the middle column is the chart column", ()
     // #12: « la colonne du milieu reprend les vues et gestes de Statique … Aucune vue propre ».
     // The gestures themselves are pure view models (`@/lib/map/`), and the Rail reading what they
     // write is `@/lib/rail/values.test.ts`'s; what is source is that both Pages stand the very same
-    // component, with the same three inputs, and that Avancé's own files draw no map of their own.
+    // component, with the same inputs — the line's two halves, and what the Wind Gate withholds
+    // of the Vent with the fields it withholds it for (#120) — and that Avancé's own files draw no
+    // map of their own. Avancé adds the rides it already prints (#126), for the Vue embarquée;
+    // Statique, which never says « estimation » (#91), passes none and its map offers no ride.
     const root = fileURLToPath(new URL("../../..", import.meta.url));
     const read = (path: string) => readFileSync(join(root, path), "utf8");
-    const pages = ["src/components/app/app.tsx", "src/components/statique/statique.tsx"];
-    for (const page of pages) {
-      expect(read(page)).toContain('import { TopMap } from "@/components/map/top-map.tsx";');
+    // The element as written, whatever lines the formatter folds it over.
+    const folded = (source: string) => source.replace(/\s+/g, " ");
+    const pages = {
+      "src/components/app/app.tsx":
+        "<TopMap frame={frame} rides={rides} solved={solved} windCause={windCause} windCulprits={windCulprits} />",
+      "src/components/statique/statique.tsx":
+        "<TopMap frame={frame} solved={solved} windCause={windCause} windCulprits={windCulprits} />",
+    };
+    for (const [page, element] of Object.entries(pages)) {
+      // Through the vue de dessus's door (#128): the same `TopMap`, MapLibre fetched beside the Page.
       expect(read(page)).toContain(
-        "<TopMap frame={frame} solved={solved} windCause={windCause} />",
+        'import { TopMap } from "@/components/map/deferred-top-map.tsx";',
       );
+      expect(folded(read(page))).toContain(element);
     }
     const avance = readdirSync(join(root, "src/components/app")).map((name) =>
       read(`src/components/app/${name}`),
@@ -1628,6 +1648,15 @@ describe("§ 5 — the two mechanisms the layout may not use", () => {
     // prose — the mechanism is why the rest of the layout can ignore it — and only one calls it.
     const readers = FILES.filter((path) =>
       /window\.(innerHeight|outerHeight|visualViewport)|screen\.height/.test(read(path)),
+    );
+    expect(readers).toStrictEqual(["src/components/app/use-viewport.ts"]);
+  });
+
+  it("one file reads a window width, and it is the viewport hook", () => {
+    // #128: Avancé's route `loader` decides whether to fetch the map from the width, and it reads it
+    // through `viewportWidth()` rather than a second `window.innerWidth` beside the hook.
+    const readers = FILES.filter((path) =>
+      /window\.(innerWidth|outerWidth)|screen\.width/.test(read(path)),
     );
     expect(readers).toStrictEqual(["src/components/app/use-viewport.ts"]);
   });

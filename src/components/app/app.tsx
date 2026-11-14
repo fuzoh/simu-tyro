@@ -18,8 +18,9 @@
 import type { ViewportFit } from "@/lib/layout/collapse.ts";
 
 import { ChartBlock } from "@/components/chart/chart-block.tsx";
+import { TensionChart } from "@/components/chart/tension.tsx";
 import { useChartWidth } from "@/components/chart/use-chart-width.ts";
-import { TopMap } from "@/components/map/top-map.tsx";
+import { TopMap } from "@/components/map/deferred-top-map.tsx";
 import { RailHeaderControls, RailInputs } from "@/components/rail/inputs.tsx";
 import { RailOutputs } from "@/components/rail/outputs.tsx";
 import { TopViewFrame } from "@/components/statique/top-view.tsx";
@@ -52,7 +53,8 @@ export function App({ page }: { page: string }) {
  * **One sweep, two readers.** The scene's expensive half is computed here, at the `useSweep` seam,
  * and handed to both consumers: the charts draw it and the Rail's output half reports it. A memo
  * inside each would run the sweep and the §11 reducer twice per parameter change. `x_D` is not one
- * of its inputs, so a scrub still re-runs nothing but `placeRider`, inside the Chart Block.
+ * of its inputs, so a scrub still re-runs nothing but the passager's exact solve: `placeRider`
+ * inside the Chart Block and, on Avancé, the tension graph's `tensionProfile` (#119).
  *
  * **One unloaded line, two readers**, for the same reason one rung down: the scene sweeps it and
  * both halves of the Rail print it, and neither the sweep nor the `L₀` bisection may run twice per
@@ -93,8 +95,33 @@ function Live({ page }: { page: string }) {
     navigationHeight: NAV_BAR,
   };
   const collapse = useCollapse({ fits: fitsWholeBlock(fit), compact: compactRequired(fit) });
-  const { cause, clearance, frame, occupant, results, rideCause, saisie, solved, windCause } =
-    surfaces;
+  const {
+    cause,
+    clearance,
+    frame,
+    occupant,
+    results,
+    rideCause,
+    saisie,
+    solved,
+    windCause,
+    windCulprits,
+  } = surfaces;
+  /**
+   * The tension graph closes the Page (#119): under the Chart Block from three columns, after the
+   * Rail's last section below. `threeColumns()` decides where it is *mounted*, as it does the vue
+   * de dessus — one mounted graph, never a hidden twin.
+   */
+  const three = threeColumns(viewport.width);
+  const tension = (
+    <TensionChart
+      cause={cause}
+      frame={frame}
+      saisie={saisie?.message ?? null}
+      solved={solved}
+      width={width}
+    />
+  );
 
   return (
     // `RailInputs` owns the Rail's field rows and hands back the two sections they live in, so the
@@ -163,9 +190,17 @@ function Live({ page }: { page: string }) {
           // the middle column shows it — a map started in a `display: none` box holds a WebGL
           // context for nothing and has no size to fit its camera to; below B2 the box keeps the
           // Skeleton's empty frame.
+          columnTail={three ? tension : undefined}
+          railTail={three ? undefined : tension}
           views={
-            threeColumns(viewport.width) ? (
-              <TopMap frame={frame} solved={solved} windCause={windCause} />
+            three ? (
+              <TopMap
+                frame={frame}
+                rides={rides}
+                solved={solved}
+                windCause={windCause}
+                windCulprits={windCulprits}
+              />
             ) : (
               <TopViewFrame />
             )

@@ -31,6 +31,9 @@ const ALWAYS: readonly FieldId[] = [
   "regime",
   "windSpeed",
   "windDirection",
+  // The Vent's profile (#120): Statique's own, their rows standing as the gates say.
+  "windWidth",
+  "windAttenuation",
   "usage",
   "hClearMin",
   "hRider",

@@ -306,7 +306,11 @@ function halfAngles({ fovDeg, aspectRatio }: Lens) {
     : { tanHalfWidth: tan * aspect, tanHalfHeight: tan };
 }
 
-function headingOf(east: number, north: number): number {
+/**
+ * The heading of a direction on the level, degrees clockwise from north in [0, 360): `0` for no
+ * direction at all. The Vue du départ and the Vue embarquée both look along A → B with it.
+ */
+export function headingOf(east: number, north: number): number {
   return east === 0 && north === 0 ? 0 : normalise(degrees(Math.atan2(east, north)));
 }
 
@@ -314,7 +318,8 @@ function dot(a: readonly number[], b: readonly number[]): number {
   return a.reduce((sum, value, i) => sum + value * (b[i] ?? 0), 0);
 }
 
-function normalise(deg: number): number {
+/** An angle brought into [0, 360) degrees. */
+export function normalise(deg: number): number {
   return ((deg % 360) + 360) % 360;
 }
 

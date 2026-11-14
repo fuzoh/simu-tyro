@@ -16,6 +16,35 @@ Ces rapports documentent observations, dérivations et accès partiels séparém
 note au commit `6bada50`, avant intégration de leurs compléments. Les recommandations ne sont pas
 une spécification d'implémentation ni un dimensionnement de sécurité.
 
+## Expérience numérique
+
+| Rapport | Objet | Statut |
+| --- | --- | --- |
+| [Portance et traînée axiale](lift-axial-drag-experiment.md) | #134 : traînée normale seule contre l'ajout d'une portance et d'une traînée axiale, sur une matrice statique acier et textile | **Généré** par `bun experiments/spatial-aero-134/matrix.ts`, rejoué le 2026-11-14 sur le moteur `src/lib/sim/` au commit `a5034e6` ; contrat `docs/simulation-theory.md` §18 ; sondes de sensibilité, aucun coefficient adopté, décision de production ouverte |
+
+Ce rapport-là n'est pas une revue de la note : il se rejoue. Son code, ses tests et ses tableaux
+sont dans `experiments/spatial-aero-134/`. Il ne porte ni date ni commit, pour que
+`matrix.ts --check` le compare exactement à ce que le code produit ; la date et l'état du moteur
+de la dernière régénération sont ceux de la ligne ci-dessus, à mettre à jour avec lui. Rien ne
+le compare automatiquement à ce que le code produit — la suite de tests résout la comparaison
+principale sans relire ce fichier : après un changement sous `src/lib/sim/`, lancer `--check`.
+
+Les chiffres et les fichiers attribués à #134 dans les notes antérieures du dossier
+(`production-aerodynamics-followup.md` §4.5, `inversion-followup.md`,
+`triage-decisions-consolidated.md`, `descent-views-contract-followup.md`) décrivent un arbre de
+travail de recherche qui n'a pas été livré avec elles : **ils ne se rejouent pas et sont
+remplacés par ce rapport**, dont la matrice, les lignes et les conventions diffèrent. Il en va de
+même du premier commentaire de l'issue #134, « Experiment delivered » (2026-11-10) : il décrit un
+essai antérieur — des tests sous `src/lib/sim/spatial-aero-134.test.ts`, 2048 lignes à L₀ fixe,
+une ligne en échec à tension de pose et ses propres chiffres — et non ce qui est livré ici, dont
+les tests sont `experiments/spatial-aero-134/*.test.ts` et dont chaque comparaison a 1944 lignes,
+aucune en échec. Il est caduc ; à dire dans l'issue quand ce travail est publié.
+
+Deux écarts à connaître : la traînée axiale y suit l'air, à l'inverse du signe écrit dans
+`line-lift-axial-drag-significance.md` §3 et `production-aerodynamics-followup.md` §4.1 (§18.3
+l'explique, à confirmer par le mainteneur) ; et une seconde loi d'orientation de la portance,
+impaire en lacet, y est jouée à côté de la loi binormale.
+
 ## Lecture et provenance
 
 Les liens DOI, URL, pages et équations effectivement consultés sont conservés dans chaque rapport.

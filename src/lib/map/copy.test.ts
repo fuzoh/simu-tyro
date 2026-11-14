@@ -12,17 +12,29 @@ import { lineBearing } from "@/lib/scenario/geometry.ts";
 import { TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
 import { exactTermsIn, proscribedIn } from "@/lib/vocabulary/labels.ts";
 
+import type { EmbarkedReading } from "./vue-3d-embarquee.ts";
+import type { ProfilePreview } from "./wind-rose.ts";
+
 import {
   anchorReading,
   BANANE_HELP,
   clickHint,
   describeRelative,
+  EMBARK_BLOCKED,
+  embarkedEndLine,
+  embarkedLabelTable,
+  embarkedKeysHelp,
+  embarkedReadingLine,
+  EMBARQUEE_COPY,
+  EMBARQUEE_HELP,
   GIMBAL_COPY,
   gimbalHint,
   MAP_COPY,
   mapLabelTable,
   measureHint,
   measureLines,
+  profileCaption,
+  profileReading,
   vue3dKeysHelp,
   windReading,
 } from "./copy.ts";
@@ -110,6 +122,100 @@ describe("the wind's reading", () => {
     expect(windReading({ speedKmh: 25, directionDeg: 60 }, trial, false)).toBe(
       windReading({ speedKmh: 25, directionDeg: 60 }, trial),
     );
+  });
+});
+
+/**
+ * The profile's previews, written by hand (#120): 30 km/h at mid-span on a 150 m span. Attenuated
+ * by 40 %, the anchors read 30 × 0,6 = 18 km/h and 70 % of the span is 105 m; uniform, both ends
+ * read the entered speed and 50 % of the span is 75 m.
+ */
+const ATTENUATED: ProfilePreview = {
+  midKmh: 30,
+  anchorKmh: 18,
+  uniform: false,
+  width: 70,
+  widthMetres: 105,
+  marks: [0.15, 0.85],
+  curve: [],
+};
+const UNIFORM: ProfilePreview = {
+  midKmh: 30,
+  anchorKmh: 30,
+  uniform: true,
+  width: 50,
+  widthMetres: 75,
+  marks: [0.25, 0.75],
+  curve: [],
+};
+
+describe("the profile's reading (#120)", () => {
+  test("says the speed at mid-span, at the anchors, and the width in percent and in metres", () => {
+    expect(profileReading(ATTENUATED)).toEqual([
+      "Milieu : 30 km/h",
+      "Ancrages : 18 km/h",
+      "Largeur à mi-atténuation : 70 % de la portée, soit 105,0 m",
+    ]);
+  });
+
+  test("without a span the width stands in percent alone: no length is made up", () => {
+    expect(profileReading({ ...ATTENUATED, widthMetres: null })).toEqual([
+      "Milieu : 30 km/h",
+      "Ancrages : 18 km/h",
+      "Largeur à mi-atténuation : 70 % de la portée",
+    ]);
+  });
+
+  test("a speed reads on the grain of its field, whole km/h", () => {
+    // 45 % below 30 km/h is 16,5 km/h, which the field would print 17.
+    expect(profileReading({ ...ATTENUATED, anchorKmh: 16.5 })[1]).toBe("Ancrages : 17 km/h");
+    // Fully attenuated, the anchors are without wind.
+    expect(profileReading({ ...ATTENUATED, anchorKmh: 0 })[1]).toBe("Ancrages : 0 km/h");
+  });
+
+  test("a uniform wind says so, and that the width it keeps has no effect", () => {
+    expect(profileReading(UNIFORM)).toEqual([
+      "Vent uniforme : 30 km/h sur toute la ligne",
+      "Largeur à mi-atténuation gardée, sans effet : 50 % de la portée, soit 75,0 m",
+    ]);
+    expect(profileReading({ ...UNIFORM, widthMetres: null })[1]).toBe(
+      "Largeur à mi-atténuation gardée, sans effet : 50 % de la portée",
+    );
+  });
+
+  test("under a map that has no pad it is one line, and none for a uniform wind", () => {
+    expect(profileCaption(ATTENUATED)).toBe(
+      "Profil du vent — Milieu : 30 km/h · Ancrages : 18 km/h · " +
+        "Largeur à mi-atténuation : 70 % de la portée, soit 105,0 m.",
+    );
+    // The rose's own reading already says everything a uniform wind has to say.
+    expect(profileCaption(UNIFORM)).toBeNull();
+  });
+
+  test("the pad's words: its name, its two axes, its one command", () => {
+    expect(MAP_COPY.profile).toBe("Profil du vent");
+    expect(MAP_COPY.profileWider).toBe("plus large →");
+    expect(MAP_COPY.profileSheltered).toBe("↑ plus atténué");
+    expect(MAP_COPY.uniformWind).toBe("Vent uniforme");
+    expect(MAP_COPY.profileHandle).toBe(
+      "Glissez pour régler le profil du vent : vers la droite, plus large ; vers le haut, plus atténué aux ancrages",
+    );
+  });
+
+  test("it is a width at half-attenuation: never a plateau, a zone, a Q — nor a forecast", () => {
+    const words = [
+      ...profileReading(ATTENUATED),
+      ...profileReading(UNIFORM),
+      profileCaption(ATTENUATED) ?? "",
+      MAP_COPY.profile,
+      MAP_COPY.profileHandle,
+      MAP_COPY.profileWider,
+      MAP_COPY.profileSheltered,
+      MAP_COPY.uniformWind,
+    ];
+    for (const line of words) {
+      expect(line).not.toMatch(/plateau|zone|\bQ\b|prévision|prévu|météo/i);
+    }
   });
 });
 
@@ -208,8 +314,14 @@ describe("the Gimbal's hover help (#111)", () => {
       "+ / − : zoom",
       "1 : Vue du départ",
       "2 : Vue latérale",
+      "3 : Vue embarquée",
       "N : nord en haut",
     ]);
+  });
+
+  test("leaves out key 3 where the Page plays no ride", () => {
+    expect(vue3dKeysHelp(false).split("\n")).not.toContain("3 : Vue embarquée");
+    expect(vue3dKeysHelp(false).split("\n")).toHaveLength(vue3dKeysHelp().split("\n").length - 1);
   });
 
   test("a button's hover names the key that does the same", () => {
@@ -217,13 +329,98 @@ describe("the Gimbal's hover help (#111)", () => {
   });
 });
 
+describe("the Vue embarquée's words (#126)", () => {
+  const reading = (patch: Partial<EmbarkedReading> = {}): EmbarkedReading => ({
+    t: 12.34,
+    duration: 45.67,
+    x: 123.45,
+    v: 10,
+    playing: true,
+    ended: false,
+    end: { kind: "arrival", v: 12.5, t: 45.67 },
+    ...patch,
+  });
+
+  test("the read-out is the ride's time against its last instant, the abscissa and the speed", () => {
+    expect(embarkedReadingLine(reading())).toBe("t 12,3 / 45,7 s · x 123,5 m · 36 km/h");
+  });
+
+  test("a swing back reads a negative speed, the engine's sign", () => {
+    expect(embarkedReadingLine(reading({ v: -2.5 }))).toBe("t 12,3 / 45,7 s · x 123,5 m · -9 km/h");
+  });
+
+  test("says from the start how the motion computed ends: arrival, Point d'arrêt or no rest", () => {
+    expect(embarkedEndLine({ kind: "arrival", v: 12.5, t: 45.67 })).toBe(
+      "Fin : arrivée en B à 45 km/h, 45,7 s.",
+    );
+    expect(embarkedEndLine({ kind: "stop", x: 229.31, t: 85.1 })).toBe(
+      "Fin : arrêt à x 229,3 m, 85,1 s.",
+    );
+    expect(embarkedEndLine({ kind: "unsettled", t: 300 })).toBe(
+      "Fin : mouvement non stabilisé — la lecture s'arrête au dernier instant calculé, 300,0 s.",
+    );
+  });
+
+  test("is an estimation of the ride with the Vent entered, and its help says so", () => {
+    expect(EMBARQUEE_COPY.estimate).toBe("estimation");
+    expect(EMBARQUEE_COPY.ride).toBe("Mouvement calculé avec le vent saisi");
+    expect(EMBARQUEE_HELP).toContain("estimation");
+    expect(EMBARQUEE_HELP).toContain("gabarit du passager");
+    expect(EMBARQUEE_HELP).toContain("retours en arrière compris");
+  });
+
+  test("its hover help lists its keys and the drag", () => {
+    expect(embarkedKeysHelp().split("\n")).toEqual([
+      "Clavier, dans la Vue embarquée :",
+      "← / → : tourner la tête",
+      "↑ / ↓ : lever / baisser les yeux",
+      "Espace : lecture / pause",
+      "R : recommencer",
+      "Échap : quitter la vue embarquée",
+      "Glisser dans la vue : tourner la tête",
+    ]);
+  });
+
+  test("stays out of the table the Page Statique reads, which never says « estimation »", () => {
+    const shared = mapLabelTable().join("\n").toLocaleLowerCase("fr");
+    expect(shared).not.toContain("estimation");
+    // Statique's map shows no « Vue embarquée » button: its name is the embarked table's alone.
+    expect(shared).not.toContain("vue embarquée");
+    expect(embarkedLabelTable()).toContain(EMBARQUEE_HELP);
+    expect(embarkedLabelTable()).toContain(EMBARQUEE_COPY.enter);
+  });
+
+  test("says why it is off", () => {
+    expect(EMBARK_BLOCKED["no-ride"]).toBe(
+      "Vue embarquée : aucun mouvement calculé pour ce scénario.",
+    );
+    expect(Object.keys(EMBARK_BLOCKED).sort()).toEqual(["gesture", "no-motion", "no-ride"]);
+  });
+});
+
 describe("every line the map prints stays in the terrain register", () => {
   const lines = [
     ...mapLabelTable(),
+    ...embarkedLabelTable(),
+    embarkedReadingLine({
+      t: 1,
+      duration: 2,
+      x: 3,
+      v: 4,
+      playing: false,
+      ended: false,
+      end: { kind: "stop", x: 3, t: 2 },
+    }),
+    embarkedEndLine({ kind: "arrival", v: 12.5, t: 45.67 }),
+    embarkedEndLine({ kind: "stop", x: 229.31, t: 85.1 }),
+    embarkedEndLine({ kind: "unsettled", t: 300 }),
     ...Object.values(READINGS).flat(),
     windReading({ speedKmh: 25, directionDeg: 60 }, lineBearing(TRIAL_ENDS)),
     windReading({ speedKmh: 25, directionDeg: 60 }, null),
     windReading({ speedKmh: 0, directionDeg: 0 }, null),
+    ...profileReading(ATTENUATED),
+    ...profileReading(UNIFORM),
+    profileCaption(ATTENUATED) ?? "",
     ...(["A", "B"] as const).flatMap((anchor) => [
       anchorReading(anchor, TRIAL_ENDS) ?? "",
       anchorReading(anchor, { A: PARIS, B: PARIS }) ?? "",

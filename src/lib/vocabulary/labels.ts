@@ -109,6 +109,8 @@ export type TermId =
   | "tensionLimit"
   | "arrivalSpeed"
   | "stopPoint"
+  | "farthestPoint"
+  | "reachTarget"
   | "banana"
   | "position"
   | "latitude"
@@ -118,6 +120,10 @@ export type TermId =
   | "wind"
   | "windSpeed"
   | "windDirection"
+  | "windProfile"
+  | "windWidth"
+  | "windAttenuation"
+  | "uniformWind"
   | "dragArea"
   | "trolleyConstantFriction"
   | "trolleySpeedFriction"
@@ -126,6 +132,8 @@ export type TermId =
   | "estimate"
   | "traverse"
   | "unloadedLine"
+  | "loadedLine"
+  | "internalTension"
   | "trajectory"
   | "seeWholeLine"
   | "page";
@@ -266,6 +274,10 @@ export const LABELS = {
   tensionLimit: same("limite de tension"),
   arrivalSpeed: same("vitesse d'arrivée"),
   stopPoint: same("point d'arrêt"),
+  // How close to B the passager comes over the whole ride, and where that is wanted (#121): never
+  // the point d'arrêt, which a ride that swings back leaves far behind.
+  farthestPoint: same("point le plus loin"),
+  reachTarget: same("cible du point le plus loin"),
   banana: same("banane"),
   position: same("position"),
   latitude: same("latitude"),
@@ -275,6 +287,12 @@ export const LABELS = {
   wind: same("vent"),
   windSpeed: same("vitesse du vent"),
   windDirection: same("direction du vent"),
+  // The Vent's profile (#120): a prescribed scenario, so no word of a forecast. The width is read
+  // between the two half-gap points — never a plateau's, never an equaliser's Q.
+  windProfile: same("profil du vent"),
+  windWidth: same("largeur à mi-atténuation"),
+  windAttenuation: same("atténuation aux ancrages"),
+  uniformWind: same("vent uniforme"),
   // The ride's constants (#89) are set on Avancé only, in the SSF page's own words where it has some.
   dragArea: exactOnly("surface de traînée C_dA"),
   trolleyConstantFriction: exactOnly("frottement constant de la poulie F₀"),
@@ -284,6 +302,9 @@ export const LABELS = {
   estimate: same("estimation"),
   traverse: same("traversée"),
   unloadedLine: same("ligne à vide"),
+  loadedLine: same("ligne chargée"),
+  // The tension the line carries at one point of it, at the passager's position (#119). Avancé's.
+  internalTension: exactOnly("tension interne"),
   trajectory: same("trajectoire"),
   seeWholeLine: same("voir toute la ligne"),
   page: same("Page"),

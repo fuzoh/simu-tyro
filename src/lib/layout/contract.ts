@@ -87,6 +87,16 @@ export const STRIP = { factor: 0.16, min: 96, max: 200 } as const;
 /** One touch-height row: the layer toggles, « ×1 vraie échelle » and the typed `x`. */
 export const VIEW_STRIP = 44;
 
+/**
+ * Avancé's tension graph (#119), its whole SVG: `clamp(0,22 × W_inner, 180, 300)`. A band like the
+ * strip — a function of the width it is drawn at and never of the window — under the Chart Block,
+ * where nothing is fitted to a height: the middle column scrolls from B2, and the Rail does below.
+ * The floor holds the caption row, a 108 px plot and the two rows under it (the ticks and the
+ * x axis's name); the ceiling stops a 1984 px block's graph from out-growing the coupe's strip by
+ * more than half again.
+ */
+export const TENSION_CHART = { factor: 0.22, min: 180, max: 300 } as const;
+
 /** One read-out cell row. How many the row wraps to is {@link cellRows}'s. */
 export const CELL_ROW = 52;
 
@@ -459,6 +469,16 @@ export function profileOuterHeight(wInner: number, ceiling: number = PROFILE_PLO
 export function stripOuterHeight(wInner: number): number {
   const raw = STRIP.factor * wInner;
   return raw < STRIP.min ? STRIP.min : raw > STRIP.max ? STRIP.max : raw;
+}
+
+/** The tension graph's outer height (#119): `clamp(0,22 × W_inner, 180, 300)`. */
+export function tensionChartHeight(wInner: number): number {
+  const raw = TENSION_CHART.factor * wInner;
+  return raw < TENSION_CHART.min
+    ? TENSION_CHART.min
+    : raw > TENSION_CHART.max
+      ? TENSION_CHART.max
+      : raw;
 }
 
 /**
@@ -933,8 +953,11 @@ export type ClearanceDomain = {
   readonly empty: boolean;
 };
 
-/** The 1-2-5 decade ladder, rounding **outward** — `1,76 → 2`, `6,1 → 10`, `0,04 → 0,05`. */
-function niceStep(raw: number): number {
+/**
+ * The 1-2-5 decade ladder, rounding **outward** — `1,76 → 2`, `6,1 → 10`, `0,04 → 0,05`. Exported
+ * for the tension graph's axis (#119), which steps its ticks on the same ladder.
+ */
+export function niceStep(raw: number): number {
   if (!Number.isFinite(raw) || raw <= 0) return CLEARANCE_EMPTY.step;
   const decade = 10 ** Math.floor(Math.log10(raw));
   const mantissa = raw / decade;

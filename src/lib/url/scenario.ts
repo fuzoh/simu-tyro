@@ -255,8 +255,11 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
       | "zan"
       | "ws"
       | "wd"
+      | "ww"
+      | "wa"
       | "cda"
       | "rho"
+      | "cib"
       | "lata"
       | "lona"
       | "latb"
@@ -272,8 +275,9 @@ export type CompletedSearch = { readonly refused?: never } & Pick<
  * `mbf`/`ea`/`mu` absent is « non surchargée », which differs from « equal to the formula value »,
  * `mbl` absent — with `mu`, under `fam=tx` — is § 9's rope nobody typed, `bp` absent is one
  * Brin porteur, `cp` absent is the Mise en tension at A, `mt` absent is the mouflage, `zan` absent
- * is the shipped Zones d'ancrage, `ws` / `wd` absent is no wind, `cda` / `f0` / `kv` / `mur` / `rho` absent is §12.2's default for the ride, the
- * four coordinates absent are Positions unknown and `ph` absent is a profil that runs between them:
+ * is the shipped Zones d'ancrage, `ws` / `wd` absent is no wind, `ww` / `wa` absent is its uniform
+ * profile at the shipped width, `cda` / `f0` / `kv` / `mur` / `rho` absent is §12.2's default for the ride,
+ * `cib` absent is the shipped target of the passager's farthest point, the four coordinates absent are Positions unknown and `ph` absent is a profil that runs between them:
  * completing any would rewrite, and name in the strip, every link older than the key.
  */
 const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>([
@@ -284,11 +288,14 @@ const NEVER_COMPLETED: ReadonlySet<SearchKey> = new Set<SearchKey>([
   "zan",
   "ws",
   "wd",
+  "ww",
+  "wa",
   "cda",
   "f0",
   "kv",
   "mur",
   "rho",
+  "cib",
   "lata",
   "lona",
   "latb",
@@ -335,8 +342,8 @@ export type Completion = {
  *
  * Three groups are exempt, all of them § 7's meanings of absence:
  *
- * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, `cp`, `mt`, `zan`, `ws`, `wd`, the ride's constants, the
- *    Positions and `ph`, the Overrides and the textile blanks. Under `fam=tx`
+ * 1. {@link NEVER_COMPLETED}: `reg`, `bp`, `cp`, `mt`, `zan`, `ws`, `wd`, `ww`, `wa`, the ride's constants, `cib`,
+ *    the Positions and `ph`, the Overrides and the textile blanks. Under `fam=tx`
  *    **no rope is invented**: § 9 ships `MBL` and `μ` « vides et requis », because one made-up
  *    `MBL` decides the verdict, and those two blocking errors are the correct arrival state.
  *    Polyester's `k` stays blank too, because §13.2 publishes none.
@@ -558,7 +565,14 @@ export function searchToScenario(search: CompletedSearch): ScenarioDraft {
       xD: clampX(search.x, spanOf(search)),
     },
     // Absent **is** no wind, each key on its own: a link may state a direction before any speed.
-    wind: { speedKmh: search.ws ?? 0, directionDeg: search.wd ?? 0 },
+    // Its profile likewise (#120): absent **is** the shipped width and no attenuation — the
+    // uniform wind every link older than the keys reads. Kept as given, out of domain included.
+    wind: {
+      speedKmh: search.ws ?? 0,
+      directionDeg: search.wd ?? 0,
+      widthPct: search.ww ?? FIRST_RUN_SCENARIO.wind.widthPct,
+      attenuationPct: search.wa ?? FIRST_RUN_SCENARIO.wind.attenuationPct,
+    },
     dynamics: dynamics(search),
     positions: {
       A: positionOf(search.lata, search.lona),
@@ -584,6 +598,8 @@ function dynamics(search: CompletedSearch): DynamicsConstants {
     F0: search.f0 === undefined ? DYNAMICS.textile.F0 : newtonsFromDaN(search.f0),
     kv: search.kv ?? DYNAMICS.textile.kv,
     mu: search.mur ?? DYNAMICS.steel.mu,
+    // Absent **is** the shipped target — a link older than the key reads it.
+    reachTarget: search.cib ?? FIRST_RUN_SCENARIO.dynamics.reachTarget,
   };
 }
 
@@ -663,11 +679,16 @@ export function scenarioToSearch(scenario: Scenario): CompletedSearch {
   if (rider.anchorZone !== FIRST_RUN_SCENARIO.rider.anchorZone) out.zan = rider.anchorZone;
   out.daf = rider.DAF;
   // Each is written only off its default, because no wind is both keys **absent**.
-  if (scenario.wind.speedKmh !== 0) out.ws = scenario.wind.speedKmh;
-  if (scenario.wind.directionDeg !== 0) out.wd = scenario.wind.directionDeg;
+  const { wind } = scenario;
+  if (wind.speedKmh !== 0) out.ws = wind.speedKmh;
+  if (wind.directionDeg !== 0) out.wd = wind.directionDeg;
+  // The profile's two percents (#120), each absent at what ships: a uniform wind writes neither,
+  // so the links written before the keys stay string-identical.
+  if (wind.widthPct !== FIRST_RUN_SCENARIO.wind.widthPct) out.ww = wind.widthPct;
+  if (wind.attenuationPct !== FIRST_RUN_SCENARIO.wind.attenuationPct) out.wa = wind.attenuationPct;
   // Likewise the ride's constants: §12.2's defaults are the keys **absent**, `F₀` in daN, and only
   // the active family's trolley travels.
-  const { CdA, rho, F0, kv, mu } = scenario.dynamics;
+  const { CdA, rho, F0, kv, mu, reachTarget } = scenario.dynamics;
   if (CdA !== DYNAMICS.CdA) out.cda = CdA;
   if (material.family === "textile") {
     if (F0 !== DYNAMICS.textile.F0) out.f0 = daNFromNewtons(F0);
@@ -676,6 +697,9 @@ export function scenarioToSearch(scenario: Scenario): CompletedSearch {
     out.mur = mu;
   }
   if (rho !== null) out.rho = rho;
+  // The shipped target is `cib` **absent**, so the links written before the key stay
+  // string-identical.
+  if (reachTarget !== FIRST_RUN_SCENARIO.dynamics.reachTarget) out.cib = reachTarget;
   out.x = rider.xD;
   // Unknown is the four keys **absent**, so a link with no Position stays string-identical.
   const { A, B } = scenario.positions;

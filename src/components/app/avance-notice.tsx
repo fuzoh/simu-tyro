@@ -8,6 +8,7 @@ import type { FieldId, GateId } from "@/lib/rail/fields.ts";
 
 import { jumpToField } from "@/components/app/banner.tsx";
 import { PageLink } from "@/components/app/navigation-bar.tsx";
+import { Tip } from "@/components/rail/controls.tsx";
 import { buttonVariants } from "@/components/ui/button.tsx";
 import { AVANCE_NOTICE, avanceNoticeText } from "@/lib/app/avance-copy.ts";
 import { CENTRE_IN_RAIL } from "@/lib/layout/collapse.ts";
@@ -40,8 +41,10 @@ export function jumpOrAvance(field: FieldId, shown: boolean): void {
  */
 export function AvanceNotice({ gate }: { gate: GateId }) {
   return (
-    <div className="flex flex-col gap-1" role="status">
-      <p className="text-destructive text-xs">⛔ {avanceNoticeText(gate)}</p>
+    // The ⛔ in the open and its sentence behind it, announced by the icon's alert region (#122);
+    // the way out stays a link in the open.
+    <div className="flex items-center gap-1">
+      <Tip label={AVANCE_NOTICE.action} text={avanceNoticeText(gate)} tone="error" />
       <PageLink
         className={cn(buttonVariants({ variant: "outline", size: "sm" }), "touch-44 self-start")}
         id={AVANCE_LINK_ID}

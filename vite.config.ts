@@ -7,7 +7,9 @@ import viteReact from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 
+import { inlineAsset } from "./src/lib/app/inline-asset.ts";
 import { APP_PAGES } from "./src/lib/app/pages.ts";
+import { DOC_PAGES } from "./src/lib/docs/pages.ts";
 
 /**
  * Where the built app will be *served* from — `/` in dev and on any root-domain host, `/simu-tyro/`
@@ -22,6 +24,8 @@ const base = process.env.BASE_PATH ?? "/";
 const config = defineConfig({
   base,
   resolve: { tsconfigPaths: true },
+  // No font is inlined into the stylesheet the document waits on (#128): `src/lib/app/inline-asset.ts`.
+  build: { assetsInlineLimit: inlineAsset },
   plugins: [
     devtools(),
     tailwindcss(),
@@ -48,8 +52,8 @@ const config = defineConfig({
        * provenance argument that puts `ssr: false` on the app Pages does not apply, and a shared
        * `/docs/modele#s-10-4` should land on the text with a **200** rather than on `404.html`.
        * `autoStaticPathsDiscovery` stays off: `/` must remain the SPA shell, and `$slug` is not a
-       * static path — the documentation pages are listed here by hand, the app Pages from their
-       * table.
+       * static path — the documentation pages are listed from their registry, the app Pages from
+       * their table.
        */
       prerender: { enabled: true, autoStaticPathsDiscovery: false, crawlLinks: false },
       pages: [
@@ -64,7 +68,7 @@ const config = defineConfig({
           prerender: { enabled: true, outputPath: `${path}/index.html` },
         })),
         { path: "/docs", prerender: { enabled: true, outputPath: "/docs/index.html" } },
-        ...["modele", "algorithme", "simulation", "cable", "corde"].map((slug) => ({
+        ...DOC_PAGES.map(({ slug }) => ({
           path: `/docs/${slug}`,
           prerender: { enabled: true, outputPath: `/docs/${slug}/index.html` },
         })),
@@ -93,7 +97,9 @@ const config = defineConfig({
     environment: "node",
     // Colocated, one test file per source file, `.ts` only (a `.tsx` test would be
     // a component test, which this project does not have). No `tests/` directory.
-    include: ["src/**/*.test.ts"],
+    // `experiments/` holds isolated numerical experiments nothing under `src/` imports; their
+    // tests sit beside them under the same rules — voir docs/conventions/testing.md.
+    include: ["src/**/*.test.ts", "experiments/**/*.test.ts"],
     benchmark: {
       // `benchmark.enabled` stays unset: only `vitest bench` turns it on, so a bench never
       // executes inside `bun run test`.
