@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ControlRow } from "./controls.ts";
-import type { Row } from "./run.ts";
+import type { Outputs, Row } from "./run.ts";
 
 import { baseCase, baseCases, COEFFICIENTS, VARIANTS, variantsOf, windCase } from "./cases.ts";
 import {
@@ -473,6 +473,92 @@ describe("buildReport — the garde on the prescribed ground", () => {
       .find((text) => text.startsWith("| portance binormale, C_L = ±0,5 | 20 m/s | vide |"))!
       .split(" | ");
     expect(row[7]).toMatch(/^\+\d,\d{3} \(\+\d+,\d %\)$/);
+  });
+});
+
+/**
+ * Rows nothing solved, every figure written by hand: one base case under the reference and under
+ * one variant of each other model. The differences are round numbers, so that what a cell must
+ * print is read off this fixture — never off the report.
+ */
+const REFERENCE: Outputs = {
+  TA: 1000,
+  TB: 1250,
+  Tmax: 2000,
+  HA: 800,
+  // Norms 1000 N and 1250 N.
+  reactionA: [800, 0, -600],
+  reactionB: [-1000, 0, -750],
+  sag: 5,
+  rise: 0,
+  sway: 1,
+  combined: 4,
+  clearance: 10,
+  normalMean: 2,
+  normalMax: 2.5,
+  liftMean: 0,
+  liftMax: 0,
+  axialMean: 0,
+  axialMax: 0,
+};
+
+function hand(id: string, outputs: Partial<Outputs> = {}, patch: Partial<Row> = {}): Row {
+  return {
+    convention: "L0 fixe",
+    base: part[0],
+    variant: VARIANTS.find((variant) => variant.id === id)!,
+    L0: 150.5,
+    status: "ok",
+    detail: "",
+    outputs: { ...REFERENCE, ...outputs },
+    residuals: { closure: 1e-7, force: 2e-7, moment: 3e-5, jump: 4e-8, continuity: 5e-10 },
+    refinement: { length: 6e-7, force: 7e-6 },
+    iterations: 9,
+    ...patch,
+  };
+}
+
+const HAND: readonly Row[] = [
+  hand("N"),
+  // The largest lift alone: +100 N on 2000 N, +0,5 m on 5 m of flèche, −0,3 m on 10 m of garde.
+  hand("NL-b+0.5", { Tmax: 2100, sag: 5.5, sway: 0.75, combined: 4.8, clearance: 9.7 }),
+  // The smallest lift alone: +10 N, +0,05 m, −0,03 m.
+  hand("NL-b+0.05", { Tmax: 2010, sag: 5.05, clearance: 9.97 }),
+  // The axial drag alone: +300 N, and lengths that move by millimetres — 2, −4, 3 and −1.
+  hand("NA-0.1", { Tmax: 2300, sag: 5.002, sway: 0.996, combined: 4.003, clearance: 9.999 }),
+];
+
+/** {@link HAND} with the outputs of one variant written anew, or its row patched. */
+const handWith = (id: string, outputs: Partial<Outputs>, patch: Partial<Row> = {}): Row[] =>
+  HAND.map((row) => (row.variant.id === id ? hand(id, outputs, patch) : row));
+
+describe("buildReport — section 8 states the figures the reading rests on", () => {
+  const reading = (rows: readonly Row[]): string =>
+    section(buildReport({ fixed: rows, pose, controls: [passing] }), "## 8. Lecture");
+
+  it("gives the axial drag its tension, and the greatest of the lengths it moves", () => {
+    // The déport moves most: 4 mm.
+    expect(reading(HAND)).toContain(
+      "Traînée axiale (`C_t` jusqu'à 0,1) : `T_max` +300,0 N (+15,0 %) ; aucune longueur ne bouge de plus de 0,004 m.",
+    );
+  });
+
+  it("writes no number for lengths that all stay under the floor (§18.6)", () => {
+    // 0,05 mm of flèche and −0,02 mm of déport: both under the 0,1 mm floor.
+    const still = handWith("NA-0.1", { Tmax: 2300, sag: 5.00005, sway: 0.99998 });
+    const text = reading(still);
+    expect(text).toContain(
+      "`T_max` +300,0 N (+15,0 %) ; aucune longueur ne bouge au-dessus du plancher.",
+    );
+    expect(text).not.toContain("aucune longueur ne bouge de plus de");
+    expect(text).not.toContain("×10⁻⁵");
+  });
+
+  it("says a failure is a failure when no axial row passed its checks", () => {
+    const failed = handWith("NA-0.1", { Tmax: 2300 }, { status: "raffinement hors tolérance" });
+    expect(reading(failed)).toContain(
+      "Traînée axiale (`C_t` jusqu'à 0,1) : `T_max` échec ; longueurs : échec.",
+    );
   });
 });
 

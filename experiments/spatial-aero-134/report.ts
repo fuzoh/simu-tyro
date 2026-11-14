@@ -967,6 +967,24 @@ function headline(rows: readonly Row[]): string {
   );
 }
 
+/**
+ * What the lengths do under one added force, in words: the greatest of their differences. Under
+ * §18.6's floor it is not a number to print — the tables say « < plancher » of it, and so does
+ * this — and where no row gave a difference there is none to read.
+ */
+function lengthsStatement(differences: readonly (Difference | null)[]): string {
+  let most: Difference | null = null;
+  for (const found of differences) {
+    if (found === null) continue;
+    if (most === null || Math.abs(found.absolute) > Math.abs(most.absolute)) most = found;
+  }
+  if (most === null) return "longueurs : échec";
+  if (!most.resolved) return "aucune longueur ne bouge au-dessus du plancher";
+  const size = Math.abs(most.absolute);
+  const length = Number(size.toFixed(3)) === 0 ? scientific(size) : fr(size, 3);
+  return `aucune longueur ne bouge de plus de ${length} m`;
+}
+
 /** The headline figures as one sentence per line of the matrix — figures only, no adjective. */
 function findings(rows: readonly Row[]): string {
   const axes = axesOf(rows);
@@ -989,13 +1007,10 @@ function findings(rows: readonly Row[]): string {
         return `\`T_max\` ${cell("Tmax", 1, "N")}, flèche ${cell("sag", 3, "m")}, garde ${cell("clearance", 3, "m")}`;
       };
       const dragged = ({ model }: Variant): boolean => model === "normale+axiale";
-      const moved = Math.max(
-        ...(["sag", "sway", "combined", "clearance"] as const).map((metric) =>
-          Math.abs(among(metric, dragged)?.absolute ?? Number.NaN),
-        ),
+      const lengths = lengthsStatement(
+        (["sag", "sway", "combined", "clearance"] as const).map((metric) => among(metric, dragged)),
       );
-      const length = Number(moved.toFixed(3)) === 0 ? scientific(moved) : fr(moved, 3);
-      return `- **${line.label}.** Portance, plus grande sonde (\`C_L = ±${french(lift.top)}\`) : ${liftAt(lift.top)}. Plus petite sonde (\`±${french(lift.low)}\`) : ${liftAt(lift.low)}. Traînée axiale (\`C_t\` jusqu'à ${french(axial.top)}) : \`T_max\` ${differenceCell(among("Tmax", dragged), 1, false, "N")} ; aucune longueur ne bouge de plus de ${length} m.`;
+      return `- **${line.label}.** Portance, plus grande sonde (\`C_L = ±${french(lift.top)}\`) : ${liftAt(lift.top)}. Plus petite sonde (\`±${french(lift.low)}\`) : ${liftAt(lift.low)}. Traînée axiale (\`C_t\` jusqu'à ${french(axial.top)}) : \`T_max\` ${differenceCell(among("Tmax", dragged), 1, false, "N")} ; ${lengths}.`;
     })
     .join("\n");
 }
