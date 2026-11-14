@@ -182,10 +182,10 @@ const TEXTILE_LINE: LineCase = {
     },
     {
       name: "brins porteurs",
-      value: "2 ; le brin calculé porte la moitié du poids du passager",
+      value: "2 ; la ligne calculée porte la moitié du poids du passager",
       provenance: "convention",
       source:
-        "§8.1, partage 50/50 `[CONVENTION]`, non validé ; montage à deux cordes de l'essai du 2026-11-01",
+        "§8.1, partage 50/50 `[CONVENTION]`, non validé ; les deux lignes de l'essai du 2026-11-01",
     },
   ],
 };

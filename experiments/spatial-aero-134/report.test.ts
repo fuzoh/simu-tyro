@@ -184,6 +184,22 @@ describe("buildReport — controls gate the conclusions (§18.6)", () => {
     expect(report).not.toContain("droite A–B");
   });
 
+  it("names a member of a line as the glossary does: a ligne, not a « brin » nor a « montage »", () => {
+    // The textile line is the one with two Brins porteurs: one of its cases, under the reference.
+    const rope = baseCases().filter((base) => base.id === "corde-bandit-11|niveau|vide|travers-20");
+    const report = buildReport({
+      fixed: [...fixed, ...runFixedLength(rope, VARIANTS.slice(0, 1))],
+      pose,
+      controls: [passing],
+    });
+    expect(report).toContain(
+      "| brins porteurs | 2 ; la ligne calculée porte la moitié du poids du passager | convention |",
+    );
+    // GLOSSARY.md, Brins porteurs — avoided: « brin » for one member, and « montage ».
+    expect(report).not.toMatch(/\bbrin\b/i);
+    expect(report).not.toMatch(/montage/i);
+  });
+
   describe("under another clock", () => {
     afterEach(() => {
       vi.useRealTimers();

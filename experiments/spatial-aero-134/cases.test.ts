@@ -57,6 +57,23 @@ describe("LINES — every property is cited arithmetic, none is invented", () =>
     expect(inputs.every(({ source }) => source.length > 10)).toBe(true);
   });
 
+  it("names a member as the glossary does: a ligne, never a « brin » nor a « montage »", () => {
+    // GLOSSARY.md, Brins porteurs — the row's name is the glossary's term; what it avoids is
+    // « brin » for one member (a brin is a strand inside a câble) and « montage » for the rig.
+    const printed = [
+      ...LINES.flatMap((candidate) => candidate.inputs),
+      ...DELIVERED,
+      ...coefficientSources(VARIANTS),
+    ].flatMap(({ value, source }) => [value, source]);
+    for (const text of printed) {
+      expect(text).not.toMatch(/\bbrin\b/i);
+      expect(text).not.toMatch(/montage/i);
+    }
+    const members = line("corde-bandit-11").inputs.find(({ name }) => name === "brins porteurs")!;
+    expect(members.value).toBe("2 ; la ligne calculée porte la moitié du poids du passager");
+    expect(members.source).toContain("les deux lignes de l'essai du 2026-11-01");
+  });
+
   it("files as product data only what the dated sheet states", () => {
     const classOf = (name: string) =>
       line("corde-bandit-11").inputs.find((input) => input.name === name)?.provenance;

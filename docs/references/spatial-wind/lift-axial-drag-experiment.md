@@ -59,7 +59,7 @@ Identifiant `corde-bandit-11`. Ce que le solveur consomme : `w = 0,7161 N/m`, `E
 | charge de rupture | 3 100 daN | fiche produit | fiches datées ; la page produit affiche 3 000 daN |
 | raideur axiale | EA = k·MBL = 1,27 × 31 000 N = 39,37 kN | dérivée de la fiche, non confirmée | arithmétique sur l'allongement de la fiche (2,5 % de 50 à 150 kg), pas une donnée Courant ; la page produit dit 3,5 % (§13.2) |
 | tension de pose | 1 400 N à l'ancrage A, à vide | scénario | valeur empruntée à l'essai du 2026-11-01 sur cette corde, pose 1,52 → 1,40 kN (`docs/mesures dynamometre/README.md`) ; relevée sur 435 m et transposée ici à 150 m : pas une mesure de cette installation |
-| brins porteurs | 2 ; le brin calculé porte la moitié du poids du passager | convention | §8.1, partage 50/50 `[CONVENTION]`, non validé ; montage à deux cordes de l'essai du 2026-11-01 |
+| brins porteurs | 2 ; la ligne calculée porte la moitié du poids du passager | convention | §8.1, partage 50/50 `[CONVENTION]`, non validé ; les deux lignes de l'essai du 2026-11-01 |
 
 ### Installation
 
