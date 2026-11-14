@@ -210,5 +210,13 @@ the real app in a real browser instead
   reference chart column), and the drag frame time against a 16,7 ms vsync.
 - **The end-to-end walkthroughs** no unit test spans: a link arriving, a CSV import, a steel ⇄ textile
   family flip, a régime chosen, the narrow-screen keyboard.
+- **Two wall-clock protocols on the production build**, each a harness under `scripts/` that
+  drives Chromium and a report under `docs/performance/` that holds its protocol and its figures:
+  the first load ([`first-load.md`](../performance/first-load.md), `scripts/first-load.ts`, #128)
+  and the passager dragged on the coupe while the Vue 3D is open
+  ([`rider-drag.md`](../performance/rider-drag.md), `scripts/rider-drag.ts`, #130). Neither CI nor
+  `bun run test` runs them: after a change to what one measures — the routes' chunks and what a
+  Page loads first, or the Vue 3D's renderer and the scrub — re-run its harness and read the result
+  against the report.
 
 Anything expressible as a pure function stays in Vitest and must not be duplicated there.

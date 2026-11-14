@@ -58,11 +58,14 @@ src/
     ├── sim/       # physics engine: catenary, solver, sweep, clearance, verdict
     ├── terrain/   # terrain profile import (CSV)
     └── …          # scenario, url, session, chart, format helpers
+experiments/               # isolated numerical experiments on the engine, outside the app
+scripts/                   # performance harnesses run by hand on a production build
 docs/
 ├── guide/                 # the step-by-step guide, in French — first group served at `/docs`
 ├── simulation-theory.md   # the contract the engine implements
 ├── conventions/           # how the code is written, per area
-└── references/            # source research reports
+├── performance/           # what the harnesses measured, and their protocols
+└── references/            # source research reports, and the experiments' archived reports
 GLOSSARY.md                # domain vocabulary
 ```
 
