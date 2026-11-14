@@ -162,18 +162,32 @@ describe("matrixHealth", () => {
       residuals: null,
       refinement: null,
     };
+    // Two rows over a bar, each the worst of the matrix on the residuals the other is not.
     const loose: Row = {
       ...base,
       status: "bilan hors tolérance",
       residuals: { closure: 1e-7, force: 3e-5, moment: 0.3, jump: 0, continuity: 0 },
+      refinement: { length: 7e-6, force: 2e-5 },
     };
-    const health = matrixHealth([base, failed, loose]);
-    expect(health.rows).toBe(3);
+    const unsettled: Row = {
+      ...base,
+      status: "raffinement hors tolérance",
+      residuals: { closure: 5e-8, force: 1e-6, moment: 0.1, jump: 2e-5, continuity: 4e-9 },
+      refinement: { length: 3e-6, force: 8e-4 },
+    };
+    const health = matrixHealth([base, failed, loose, unsettled]);
+    expect(health.rows).toBe(4);
     expect(health.statuses.ok).toBe(1);
     expect(health.statuses["non convergé"]).toBe(1);
     expect(health.statuses["bilan hors tolérance"]).toBe(1);
+    expect(health.statuses["raffinement hors tolérance"]).toBe(1);
+    expect(health.worst.closure).toBe(1e-7);
     expect(health.worst.force).toBe(3e-5);
     // 0,3 N·m over the 150 m chord of the first case.
     expect(health.worst.momentPerMetre).toBeCloseTo(0.002, 12);
+    expect(health.worst.jump).toBe(2e-5);
+    expect(health.worst.continuity).toBe(4e-9);
+    expect(health.worst.refinementLength).toBe(7e-6);
+    expect(health.worst.refinementForce).toBe(8e-4);
   });
 });

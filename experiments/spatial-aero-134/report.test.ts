@@ -534,8 +534,18 @@ function hand(id: string, outputs: Partial<Outputs> = {}, patch: Partial<Row> = 
 
 const HAND: readonly Row[] = [
   hand("N"),
-  // The largest lift alone: +100 N on 2000 N, +0,5 m on 5 m of flèche, −0,3 m on 10 m of garde.
-  hand("NL-b+0.5", { Tmax: 2100, sag: 5.5, sway: 0.75, combined: 4.8, clearance: 9.7 }),
+  // The largest lift alone: +100 N on 2000 N of T_max; +0,5 m on 5 m of flèche, −0,25 m on 1 m
+  // of déport, +0,8 m on 4 m of écart maximal, −0,3 m on 10 m of garde; and the reactions moved
+  // by (0, 30, 40) and (0, −60, −80): 50 N on 1000 N at A, 100 N on 1250 N at B.
+  hand("NL-b+0.5", {
+    Tmax: 2100,
+    sag: 5.5,
+    sway: 0.75,
+    combined: 4.8,
+    clearance: 9.7,
+    reactionA: [800, 30, -560],
+    reactionB: [-1000, -60, -830],
+  }),
   // The smallest lift alone: +10 N, +0,05 m, −0,03 m.
   hand("NL-b+0.05", { Tmax: 2010, sag: 5.05, clearance: 9.97 }),
   // The axial drag alone: +300 N, and lengths that move by millimetres — 2, −4, 3 and −1.
@@ -548,9 +558,152 @@ const HAND: readonly Row[] = [
 const handWith = (id: string, outputs: Partial<Outputs>, patch: Partial<Row> = {}): Row[] =>
   HAND.map((row) => (row.variant.id === id ? hand(id, outputs, patch) : row));
 
+describe("buildReport — each figure of section 6 stands under its own header", () => {
+  const main = section(
+    buildReport({ fixed: HAND, pose, controls: [passing] }),
+    "## 6. Comparaison principale",
+  );
+
+  it("tabulates the reference's own results", () => {
+    const reference = section(main, "### Résultats de référence — traînée normale seule");
+    expect(cellsOf(reference, "| acier-12 | niveau | vide | travers-20 |")).toEqual({
+      Ligne: "acier-12",
+      Géométrie: "niveau",
+      Charge: "vide",
+      Vent: "travers-20",
+      "L₀ (m)": "150,5000",
+      "T_A (N)": "1000,0",
+      "T_max (N)": "2000,0",
+      "Flèche (m)": "5,000",
+      "Déport latéral (m)": "1,000",
+      "Écart maximal à A–B (m)": "4,000",
+      "Garde (m)": "10,000",
+    });
+  });
+
+  it("tabulates each difference from the reference by probe size", () => {
+    const bySize = section(main, "### Écarts par taille de sonde");
+    expect(cellsOf(bySize, "| portance binormale, C_L = ±0,5 | 20 m/s | vide |")).toEqual({
+      Sonde: "portance binormale, C_L = ±0,5",
+      Vent: "20 m/s",
+      Charge: "vide",
+      "ΔT_max (N)": "+100,0 (+5,0 %)",
+      "Δflèche (m)": "+0,500 (+10,0 %)",
+      "Δdéport latéral (m)": "−0,250 (−25,0 %)",
+      "Δécart maximal à A–B (m)": "+0,800 (+20,0 %)",
+      "Δgarde (m)": "−0,300 (−3,0 %)",
+      // A reaction's shift is a norm: 50 N of 1000 N, 100 N of 1250 N.
+      "‖ΔR_A‖ (N)": "50,0 (5,0 %)",
+      "‖ΔR_B‖ (N)": "100,0 (8,0 %)",
+      "Remontée max. (m)": "aucune",
+    });
+  });
+
+  it("tabulates the same differences wind by wind", () => {
+    const byWind = section(main, "### Écarts vent par vent, aux plus grandes sondes");
+    expect(cellsOf(byWind, "| 20 m/s de travers (90°) | portance binormale, C_L = ±0,5 |")).toEqual(
+      {
+        Vent: "20 m/s de travers (90°)",
+        Sonde: "portance binormale, C_L = ±0,5",
+        "ΔT_max (N)": "+100,0 (+5,0 %)",
+        "Δflèche (m)": "+0,500 (+10,0 %)",
+        "Δdéport latéral (m)": "−0,250 (−25,0 %)",
+        "Δgarde (m)": "−0,300 (−3,0 %)",
+      },
+    );
+  });
+});
+
+describe("buildReport — the state of the two matrices is read off their rows", () => {
+  const state = (rows: readonly Row[]): string =>
+    section(buildReport({ fixed: rows, pose, controls: [passing] }), "### État des deux matrices");
+  const check = (rows: readonly Row[], name: string) =>
+    cellsOf(state(rows), `| L₀ fixe — ${name} |`);
+
+  it("prints the worst of each residual under its own name, against its own bar", () => {
+    const of = (name: string) => check(HAND, name);
+    expect(of("lignes").Obtenu).toBe("5");
+    expect(of("en échec")).toMatchObject({ Obtenu: "0", Passe: "oui" });
+    expect(of("pire fermeture aux ancrages")).toMatchObject({
+      Obtenu: "1,0×10⁻⁷ m",
+      Tolérance: "1,0×10⁻⁶ m",
+      Passe: "oui",
+    });
+    expect(of("pire bilan des forces")).toMatchObject({
+      Obtenu: "2,0×10⁻⁷ N",
+      Tolérance: "1,0×10⁻⁶ N",
+      Passe: "oui",
+    });
+    // 3×10⁻⁵ N·m over the 150 m of the ligne A–B.
+    expect(of("pire bilan des moments, par mètre de ligne A–B")).toMatchObject({
+      Obtenu: "2,0×10⁻⁷ N·m/m",
+      Tolérance: "1,0×10⁻⁶ N·m/m",
+      Passe: "oui",
+    });
+    expect(of("pire saut au passager")).toMatchObject({ Obtenu: "4,0×10⁻⁸ N", Passe: "oui" });
+    expect(of("pire continuité au passager")).toMatchObject({
+      Obtenu: "5,0×10⁻¹⁰ m",
+      Tolérance: "1,0×10⁻⁹ m",
+      Passe: "oui",
+    });
+    expect(of("pire raffinement, longueurs")).toMatchObject({
+      Obtenu: "6,0×10⁻⁷ m",
+      Tolérance: "1,0×10⁻⁵ m",
+      Passe: "oui",
+    });
+    expect(of("pire raffinement, forces")).toMatchObject({
+      Obtenu: "7,0×10⁻⁶ N",
+      Tolérance: "1,0×10⁻⁴ N",
+      Passe: "oui",
+    });
+  });
+
+  it("says « non » of a residual over its bar, and of a matrix that holds a failed row", () => {
+    // A force balance thirty times its bar on one row, which fails for it; the rest as before.
+    const loose = handWith(
+      "NA-0.1",
+      {},
+      {
+        status: "bilan hors tolérance",
+        residuals: { closure: 1e-7, force: 3e-5, moment: 3e-5, jump: 4e-8, continuity: 5e-10 },
+      },
+    );
+    expect(check(loose, "pire bilan des forces")).toMatchObject({
+      Obtenu: "3,0×10⁻⁵ N",
+      Passe: "**non**",
+    });
+    expect(check(loose, "en échec")).toMatchObject({ Obtenu: "1", Passe: "**non**" });
+    expect(check(loose, "pire saut au passager").Passe).toBe("oui");
+    // A jump at the rider and a refinement gap over their own bars, on another row.
+    const unsettled = handWith(
+      "NL-b+0.05",
+      {},
+      {
+        status: "raffinement hors tolérance",
+        residuals: { closure: 1e-7, force: 2e-7, moment: 3e-5, jump: 4e-6, continuity: 5e-10 },
+        refinement: { length: 2e-5, force: 7e-6 },
+      },
+    );
+    expect(check(unsettled, "pire saut au passager").Passe).toBe("**non**");
+    expect(check(unsettled, "pire raffinement, longueurs").Passe).toBe("**non**");
+    expect(check(unsettled, "pire raffinement, forces").Passe).toBe("oui");
+    expect(check(unsettled, "pire bilan des forces").Passe).toBe("oui");
+  });
+});
+
 describe("buildReport — section 8 states the figures the reading rests on", () => {
   const reading = (rows: readonly Row[]): string =>
     section(buildReport({ fixed: rows, pose, controls: [passing] }), "## 8. Lecture");
+
+  it("gives the lift its tension, its flèche and its garde, at the largest and the smallest probe", () => {
+    const text = reading(HAND);
+    expect(text).toContain(
+      "Portance, plus grande sonde (`C_L = ±0,5`) : `T_max` +100,0 N (+5,0 %), flèche +0,500 m (+10,0 %), garde −0,300 m (−3,0 %).",
+    );
+    expect(text).toContain(
+      "Plus petite sonde (`±0,05`) : `T_max` +10,0 N (+0,5 %), flèche +0,050 m (+1,0 %), garde −0,030 m (−0,3 %).",
+    );
+  });
 
   it("names the greatest difference of each added force and of the two together, with its row", () => {
     const text = reading(HAND);
@@ -749,6 +902,98 @@ describe("the CSV tables", () => {
     expect(at("fa_moyen_N_m")).toBe(2.5);
     expect(at("fa_max_N_m")).toBe(2.6);
     expect(at("lambda_moyen")).toBe(1.07);
+  });
+
+  it("rowsCsv: writes every output and every check of a row under its own header", () => {
+    // No two figures of this row are the same number.
+    const row = hand(
+      "NLA-b+0.5-0.1",
+      {
+        TA: 1001,
+        TB: 1002,
+        Tmax: 1003,
+        HA: 1004,
+        reactionA: [1005, 1006, 1007],
+        reactionB: [1008, 1009, 1010],
+        sag: 1.1,
+        rise: 1.2,
+        sway: 1.3,
+        combined: 1.4,
+        clearance: 1.5,
+      },
+      {
+        L0: 150.123456789,
+        residuals: {
+          closure: 3.1e-7,
+          force: 3.2e-7,
+          moment: 3.3e-5,
+          jump: 3.4e-8,
+          continuity: 3.5e-10,
+        },
+        refinement: { length: 3.6e-7, force: 3.7e-6 },
+        iterations: 38,
+      },
+    );
+    const [header, , cells] = rowsCsv([hand("N"), row])
+      .trimEnd()
+      .split("\n")
+      .map((text) => text.split(","));
+    const text = (column: string) => cells[header.indexOf(column)];
+    const at = (column: string) => Number(text(column));
+    expect(text("convention")).toBe("L0 fixe");
+    expect(text("cas")).toBe("acier-12|niveau|vide|travers-20");
+    expect(text("ligne")).toBe("acier-12");
+    expect(text("geometrie")).toBe("niveau");
+    expect(text("charge")).toBe("vide");
+    expect(text("vent")).toBe("travers-20");
+    expect(at("vitesse_m_s")).toBe(20);
+    expect(at("direction_deg")).toBe(90);
+    expect(text("modele")).toBe("normale+portance+axiale");
+    expect(text("variante")).toBe("NLA-b+0.5-0.1");
+    expect(at("C_D")).toBe(1.2);
+    expect(at("C_L")).toBe(0.5);
+    expect(at("C_t")).toBe(0.1);
+    expect(text("statut")).toBe("ok");
+    // Nine significant figures on the length: the ΔL₀ of the separate comparison are millimetres
+    // on 150 m.
+    expect(at("L0_m")).toBe(150.123457);
+    expect(at("TA_N")).toBe(1001);
+    expect(at("TB_N")).toBe(1002);
+    expect(at("Tmax_N")).toBe(1003);
+    expect(at("HA_N")).toBe(1004);
+    expect(["RAx_N", "RAy_N", "RAz_N"].map(at)).toEqual([1005, 1006, 1007]);
+    expect(["RBx_N", "RBy_N", "RBz_N"].map(at)).toEqual([1008, 1009, 1010]);
+    expect(at("fleche_m")).toBe(1.1);
+    expect(at("remontee_m")).toBe(1.2);
+    expect(at("deport_m")).toBe(1.3);
+    expect(at("ecart_max_AB_m")).toBe(1.4);
+    expect(at("garde_m")).toBe(1.5);
+    expect(at("fermeture_m")).toBe(3.1e-7);
+    expect(at("bilan_forces_N")).toBe(3.2e-7);
+    expect(at("bilan_moments_N_m")).toBe(3.3e-5);
+    expect(at("saut_passager_N")).toBe(3.4e-8);
+    expect(at("continuite_m")).toBe(3.5e-10);
+    expect(at("raffinement_m")).toBe(3.6e-7);
+    expect(at("raffinement_N")).toBe(3.7e-6);
+    expect(at("iterations")).toBe(38);
+  });
+
+  it("rowsCsv: writes each difference from the reference under the name of its quantity", () => {
+    const lines = rowsCsv(HAND)
+      .trimEnd()
+      .split("\n")
+      .map((text) => text.split(","));
+    const [header] = lines;
+    const lifted = lines.find((cells) => cells[header.indexOf("variante")] === "NL-b+0.5")!;
+    const at = (column: string) => Number(lifted[header.indexOf(column)]);
+    // Absolute, then relative to the reference: 2000 N, 5 m, 1 m, 4 m, 10 m, 1000 N, 1250 N.
+    expect([at("ecart_Tmax_N"), at("ecart_relatif_Tmax")]).toEqual([100, 0.05]);
+    expect([at("ecart_fleche_m"), at("ecart_relatif_fleche")]).toEqual([0.5, 0.1]);
+    expect([at("ecart_deport_m"), at("ecart_relatif_deport")]).toEqual([-0.25, -0.25]);
+    expect([at("ecart_ecart_max_AB_m"), at("ecart_relatif_ecart_max_AB")]).toEqual([0.8, 0.2]);
+    expect([at("ecart_garde_m"), at("ecart_relatif_garde")]).toEqual([-0.3, -0.03]);
+    expect([at("ecart_RA_N"), at("ecart_relatif_RA")]).toEqual([50, 0.05]);
+    expect([at("ecart_RB_N"), at("ecart_relatif_RB")]).toEqual([100, 0.08]);
   });
 
   it("controlsCsv and inputsCsv quote a field that holds the delimiter", () => {
