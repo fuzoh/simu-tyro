@@ -575,15 +575,17 @@ Chaque cellule est l'écart au modèle de référence — traînée normale seul
 
 ### Les plus grands écarts de la comparaison principale
 
-Écart de plus grande valeur absolue sur toute la matrice à `L₀` fixe, avec le cas et la variante où il se produit.
+Écart de plus grande valeur absolue sur toute la matrice à `L₀` fixe, avec le cas et la variante où il se produit : pour la portance seule, pour la traînée axiale seule, puis pour les deux ensemble. L'entrée « plus petites sondes » ne retient que la plus petite sonde de chaque force, seule.
 
 | Ligne | Force ajoutée | ΔT_max (N) | Δflèche (m) | Δdéport latéral (m) | Δgarde (m) | Remontée max. (m) |
 | --- | --- | --- | --- | --- | --- | --- |
 | acier-12 | portance, toutes sondes | +578,4 (+18,6 %) — niveau, vide, travers-20, NL-b-0.5 | −0,619 (−12,3 %) — incline, vide, travers-20, NL-b+0.5 | +0,698 (+21,0 %) — incline, vide, travers-20, NL-b+0.5 | +0,619 — incline, vide, travers-20, NL-b+0.5 | — |
 | acier-12 | traînée axiale, toutes sondes | +21,9 (+0,8 %) — niveau, vide, quasi-face-20, NA-0.1 | −2,3×10⁻⁴ (< 0,1 %) — incline, vide, quasi-dos-20, NA-0.1 | < plancher — incline, vide, oblique-20, NA-0.1 | 2,3×10⁻⁴ — incline, vide, quasi-dos-20, NA-0.1 | — |
+| acier-12 | portance et traînée axiale ensemble, toutes sondes | +578,4 (+18,6 %) — niveau, vide, travers-20, NLA-b-0.5-0.1 | −0,619 (−12,3 %) — incline, vide, travers-20, NLA-b+0.5-0.02 | +0,698 (+21,0 %) — incline, vide, travers-20, NLA-b+0.5-0.1 | +0,619 — incline, vide, travers-20, NLA-b+0.5-0.02 | — |
 | acier-12 | plus petites sondes (C_L = ±0,05, C_t = 0,02) | +56,6 (+1,8 %) — niveau, vide, travers-20, NL-b-0.05 | −0,048 (−1,0 %) — incline, vide, travers-20, NL-b+0.05 | +0,061 (+1,8 %) — incline, vide, travers-20, NL-b+0.05 | +0,048 — incline, vide, travers-20, NL-b+0.05 | — |
 | corde-bandit-11 | portance, toutes sondes | +110,9 (+5,4 %) — incline, passager, travers-20, NL-b-0.5 | +2,383 (+188,2 %) — incline, vide, travers-20, NL-b-0.5 | −0,325 — incline, vide, quasi-dos-20, NL-y+0.5 | −2,383 — incline, vide, travers-20, NL-b-0.5 | 1,219 |
 | corde-bandit-11 | traînée axiale, toutes sondes | +20,1 (+1,4 %) — niveau, vide, quasi-dos-20, NA-0.1 | +0,002 (< 0,1 %) — incline, passager, oblique-20, NA-0.1 | +0,001 (< 0,1 %) — niveau, vide, oblique-20, NA-0.1 | −0,002 — incline, passager, oblique-20, NA-0.1 | — |
+| corde-bandit-11 | portance et traînée axiale ensemble, toutes sondes | +111,0 (+5,4 %) — incline, passager, travers-20, NLA-b-0.5-0.1 | +2,383 (+188,2 %) — incline, vide, travers-20, NLA-b-0.5-0.1 | +0,229 (+4,8 %) — incline, passager, travers-20, NLA-b+0.5-0.1 | −2,383 — incline, vide, travers-20, NLA-b-0.5-0.1 | 1,219 |
 | corde-bandit-11 | plus petites sondes (C_L = ±0,05, C_t = 0,02) | +10,8 (+0,5 %) — incline, passager, travers-20, NL-b-0.05 | −0,247 (−19,5 %) — incline, vide, travers-20, NL-b+0.05 | −0,033 — incline, vide, quasi-dos-20, NL-y+0.05 | +0,247 — incline, vide, travers-20, NL-b+0.05 | — |
 
 - **Câble acier 12 mm, 6×19 âme métallique, 1770.** Portance, plus grande sonde (`C_L = ±0,5`) : `T_max` +578,4 N (+18,6 %), flèche −0,619 m (−12,3 %), garde +0,619 m. Plus petite sonde (`±0,05`) : `T_max` +56,6 N (+1,8 %), flèche −0,048 m (−1,0 %), garde +0,048 m. Traînée axiale (`C_t` jusqu'à 0,1) : `T_max` +21,9 N (+0,8 %) ; aucune longueur ne bouge de plus de 2,3×10⁻⁴ m.

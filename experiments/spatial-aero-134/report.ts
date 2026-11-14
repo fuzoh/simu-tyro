@@ -927,7 +927,11 @@ ${readingOf(pose)} Regroupés ici : toutes les géométries, toutes les directio
 ${amplitudeTables(pose)}`;
 }
 
-/** The overall extremes, per line and per added force: the figures the reading rests on. */
+/**
+ * The overall extremes, per line and per added force: the figures the reading rests on. Each of
+ * the three models compared with the reference has its row, so that together they hold every
+ * variant of the matrix; the last row is a part of the first two.
+ */
 function headline(rows: readonly Row[]): string {
   const axes = axesOf(rows);
   const { lift, axial } = probesOf(axes.variants);
@@ -935,6 +939,10 @@ function headline(rows: readonly Row[]): string {
   const families: readonly Probe[] = [
     { label: "portance, toutes sondes", keep: ({ model }) => model === "normale+portance" },
     { label: "traînée axiale, toutes sondes", keep: ({ model }) => model === "normale+axiale" },
+    {
+      label: "portance et traînée axiale ensemble, toutes sondes",
+      keep: ({ model }) => model === "normale+portance+axiale",
+    },
     {
       label: `plus petites sondes (C_L = ±${french(lift.low)}, C_t = ${french(axial.low)})`,
       keep: ({ model, aero }) =>
@@ -1033,7 +1041,7 @@ function readingSection({ fixed }: Experiment): string {
 
 ### Les plus grands écarts de la comparaison principale
 
-Écart de plus grande valeur absolue sur toute la matrice à \`L₀\` fixe, avec le cas et la variante où il se produit.
+Écart de plus grande valeur absolue sur toute la matrice à \`L₀\` fixe, avec le cas et la variante où il se produit : pour la portance seule, pour la traînée axiale seule, puis pour les deux ensemble. L'entrée « plus petites sondes » ne retient que la plus petite sonde de chaque force, seule.
 
 ${headline(fixed)}
 

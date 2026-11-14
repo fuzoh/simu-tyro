@@ -226,6 +226,19 @@ function section(report: string, heading: string): string {
   return heading + (next === -1 ? rest : rest.slice(0, next));
 }
 
+/** The cells of the first row of a table that starts with `start`, each under its column's header. */
+function cellsOf(text: string, start: string): Record<string, string> {
+  const lines = text.split("\n");
+  const at = lines.findIndex((line) => line.startsWith(start));
+  if (at === -1) throw new Error(`no row « ${start} »`);
+  // The header stands just above the rule of the row's table.
+  let rule = at;
+  while (!lines[rule].startsWith("| --- ")) rule--;
+  const cells = (line: string): string[] => line.slice(2, -2).split(" | ");
+  const row = cells(lines[at]);
+  return Object.fromEntries(cells(lines[rule - 1]).map((header, i) => [header, row[i]]));
+}
+
 describe("buildReport — an adjusted matrix is reported as it was run", () => {
   // Another C_D⊥, probes listed largest first, one axial drag, and a near-head wind 10° off the
   // line instead of 5°.
@@ -526,6 +539,8 @@ const HAND: readonly Row[] = [
   hand("NL-b+0.05", { Tmax: 2010, sag: 5.05, clearance: 9.97 }),
   // The axial drag alone: +300 N, and lengths that move by millimetres — 2, −4, 3 and −1.
   hand("NA-0.1", { Tmax: 2300, sag: 5.002, sway: 0.996, combined: 4.003, clearance: 9.999 }),
+  // The two together: +200 N, +0,4 m, −0,2 m on 1 m of déport, −0,5 m.
+  hand("NLA-b+0.5-0.1", { Tmax: 2200, sag: 5.4, sway: 0.8, combined: 4.6, clearance: 9.5 }),
 ];
 
 /** {@link HAND} with the outputs of one variant written anew, or its row patched. */
@@ -535,6 +550,26 @@ const handWith = (id: string, outputs: Partial<Outputs>, patch: Partial<Row> = {
 describe("buildReport — section 8 states the figures the reading rests on", () => {
   const reading = (rows: readonly Row[]): string =>
     section(buildReport({ fixed: rows, pose, controls: [passing] }), "## 8. Lecture");
+
+  it("names the greatest difference of each added force and of the two together, with its row", () => {
+    const text = reading(HAND);
+    const of = (family: string) => cellsOf(text, `| acier-12 | ${family} |`);
+    const at = "niveau, vide, travers-20";
+    // The axial drag moves the tension most, and the lift's row does not take it for its own.
+    expect(of("portance, toutes sondes")["ΔT_max (N)"]).toBe(`+100,0 (+5,0 %) — ${at}, NL-b+0.5`);
+    expect(of("traînée axiale, toutes sondes")["ΔT_max (N)"]).toBe(
+      `+300,0 (+15,0 %) — ${at}, NA-0.1`,
+    );
+    // The fourth model of the brief has its own row: it is in the matrix the caption speaks of.
+    const together = of("portance et traînée axiale ensemble, toutes sondes");
+    expect(together["ΔT_max (N)"]).toBe(`+200,0 (+10,0 %) — ${at}, NLA-b+0.5-0.1`);
+    expect(together["Δflèche (m)"]).toBe(`+0,400 (+8,0 %) — ${at}, NLA-b+0.5-0.1`);
+    expect(together["Δdéport latéral (m)"]).toBe(`−0,200 (−20,0 %) — ${at}, NLA-b+0.5-0.1`);
+    expect(together["Δgarde (m)"]).toBe(`−0,500 (−5,0 %) — ${at}, NLA-b+0.5-0.1`);
+    expect(of("plus petites sondes (C_L = ±0,05, C_t = 0,1)")["ΔT_max (N)"]).toBe(
+      `+300,0 (+15,0 %) — ${at}, NA-0.1`,
+    );
+  });
 
   it("gives the axial drag its tension, and the greatest of the lengths it moves", () => {
     // The déport moves most: 4 mm.
