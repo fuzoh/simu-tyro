@@ -74,6 +74,12 @@ Decided in the wayfinder ticket _Engine API, execution model and module layout_.
   a `source` field naming its § (e.g. `"simulation-theory.md §15 Z4"`). The golden canonical
   links of the URL codec live in `src/lib/url/__fixtures__/canonical-links.ts`, tagged
   `[MEASURED]`.
+- **`theory-15.ts` is also read from outside `src/`**: it is the one module an experiment may
+  import past the engine's barrel, so that §15 is quoted and never retyped.
+  `experiments/spatial-aero-134/` imports it in four test files and in `controls.ts`, which its
+  command runs. The barrel check of `src/lib/sim/index.test.ts` walks `src/` only: moving or
+  renaming the module is a change to that experiment too
+  ([simulation.md](simulation.md#experiments-are-not-the-engine)).
 - **`Z7` (thermal) is deliberately absent** — its physics is out of scope for v1. Add it with the
   feature, not before, as `Z8` arrived with the passager's ride (#89).
 - Benches are `*.bench.ts`, colocated too — see [Benches](#benches).

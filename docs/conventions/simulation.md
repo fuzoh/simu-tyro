@@ -43,14 +43,26 @@ probes**, its report is archived in `docs/references/spatial-wind/`, and **nothi
 may import from it**: a value or a solver moves from an experiment into the engine only through
 the reference and a decision of the maintainer, never by reuse.
 
-The dependency runs one way, and it is real: the experiment reads the engine (`deriveSteel`,
-`deriveTextile`, `solveSpan`, `resolveL0`, the constants), so its archived report and tables are
-a function of `src/lib/sim/`. Neither CI nor `bun run test` compares them with what the code now
-produces: the suite solves the main comparison once and checks its rows and its controls
-(`controls.test.ts`), which catches a broken prototype, not a figure that moved. **After a change
-under `src/lib/sim/`, run `bun experiments/spatial-aero-134/matrix.ts --check`**; if a file
-differs, regenerate and update the date and the engine commit in the dossier's index
+The dependency runs one way, and it is real: the experiment reads the engine — through the barrel
+`@/lib/sim`: `deriveSteel`, `deriveTextile`, `solveSpan`, `resolveL0`, `windComponents`,
+`zGroundAt` and the constants; and, past it, §15's fixtures (below) — so its archived report and
+tables are a function of `src/lib/sim/`. Neither CI nor `bun run test` compares them with what
+the code now produces: the suite solves the main comparison once and checks its rows and its
+controls (`controls.test.ts`), which catches a broken prototype, not a figure that moved. **After
+a change under `src/lib/sim/`, run `bun experiments/spatial-aero-134/matrix.ts --check`**; if a
+file differs, regenerate and update the date and the engine commit in the dossier's index
 (`experiments/spatial-aero-134/README.md` § Rejouer).
+
+**One path past the barrel, and only that one.** `src/lib/sim/index.ts` is the one import path
+into the engine, and `index.test.ts` enforces it by walking `src/` — it does not walk
+`experiments/`. An experiment keeps to the barrel too, with a single exception:
+`@/lib/sim/__fixtures__/theory-15.ts`, §15's fixtures, which
+[testing.md](testing.md#fixture-rules) forbids retyping. `experiments/spatial-aero-134/` imports
+it in four test files and in `controls.ts` — a module the command runs, not a test: §18.6's
+no-wind return to §15 is computed from it, so `results/controls.csv` and the report's control
+table depend on that module. Moving or renaming it is a change to the experiment — the barrel
+check staying green says nothing of `experiments/`. No other deep path into `src/lib/sim/` is
+allowed from there.
 
 ## Rules
 
