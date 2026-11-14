@@ -36,13 +36,21 @@
  *   notice where the results would have read it. {@link windBearing} is the one check: the fields,
  *   the rose, the rides and the notice all read it, so a link, a Session and a click cannot
  *   disagree. Like an absent régime it is a flag on the report, never an entry on the blocking
- *   list: it hides no result.
+ *   list: it hides no result. One wind field is not disabled: the one whose value the gates
+ *   refuse, which stays typable so that its repair is on the Page ({@link fieldUnavailable}).
  * - **The passager's ride has two gates of its own**, past the three: the Wind Gate (the Vent, #87)
  *   and the Ride Gate (§12.2's constants, #89 and the ride-gates fix). Their fields reach no
  *   statics number, but ADR-0001 keeps them as they arrive **and** gates them, so a negative wind
  *   speed withholds the Banane, the rose's reading and the ride rather than blowing the other way,
  *   and a negative `C_dA` withholds the ride rather than speeding it up. A Wind breach removes the
  *   ride too, since it reads the Vent.
+ * - **A profile of the Vent no reader takes is refused, never read as a uniform wind** (#120). The
+ *   ride, the Banane and the rose's reading take one speed for the whole line. Until the physics
+ *   reads the field (`WIND_PROFILE_ACTIVE`), a profile that is not uniform — a link or a Session
+ *   brought it — is kept as given and breaches the Wind Gate, with a Fix Action back to the uniform
+ *   wind: what would have read the Vent is withheld rather than computed under another one. A
+ *   percent outside its domain is refused in either state. And the Scenario's own breach outlasts
+ *   an emptied field: a profile field cleared over a refused value is not « Saisie en cours ».
  * - **§5.4's chord bound is not here.** `L₀ > chord/(1 + T_break/EA)` needs `EA` and `MBF`, so
  *   evaluating it would re-derive physics in the UI. It stays in the engine and surfaces as
  *   « Tension impossible », an engine refusal — never a field error and never a gate.
@@ -75,11 +83,12 @@ import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { lineBearing, spanOfGeometry } from "@/lib/scenario/geometry.ts";
+import { isWindUniform, WIND_PROFILE_ACTIVE } from "@/lib/scenario/wind.ts";
 import { isFamilyAllowed, REGIMES, regimeMismatch, TERMINATIONS } from "@/lib/sim";
 import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 import type { Deduced } from "./deduced.ts";
-import type { FieldId, FieldIssue, FieldIssueKind, GateId } from "./fields.ts";
+import type { FieldContext, FieldId, FieldIssue, FieldIssueKind, GateId } from "./fields.ts";
 
 import {
   checkField,
@@ -145,16 +154,17 @@ export function passedGates(
 }
 
 /**
- * § 7's four Fix Actions, and the fifth ADR-0001 admits for an end the line cannot use. **Their
- * labels describe the effect of pressing them** (invariant 2): a *message* states a property of
- * the world, and a verb naming the effect is accurate whether the state was entered or arrived on
- * the first frame of a link.
+ * § 7's four Fix Actions, the fifth ADR-0001 admits for an end the line cannot use, and the sixth
+ * it admits for a profile of the Vent no reader takes (#120). **Their labels describe the effect of
+ * pressing them** (invariant 2): a *message* states a property of the world, and a verb naming the
+ * effect is accurate whether the state was entered or arrived on the first frame of a link.
  */
 export type FixActionId =
   | "passer-au-cable"
   | "passer-en-usage-temporaire"
   | "choisir-un-autre-regime"
-  | "passer-a-la-terminaison-de-depart";
+  | "passer-a-la-terminaison-de-depart"
+  | "passer-au-vent-uniforme";
 
 export type FixAction = { readonly id: FixActionId; readonly label: string };
 
@@ -167,6 +177,11 @@ const FIX: Record<Exclude<FixActionId, "passer-a-la-terminaison-de-depart">, Fix
   },
   // A **focus** action, not a value-setting one: no single correct régime exists.
   "choisir-un-autre-regime": { id: "choisir-un-autre-regime", label: "Choisir un autre régime" },
+  // « Vent uniforme » (`uniformWind`): the attenuation to zero, and nothing else of the Vent.
+  "passer-au-vent-uniforme": {
+    id: "passer-au-vent-uniforme",
+    label: `Passer au ${label("uniformWind", "terrain")}`,
+  },
 };
 
 /** The régime's Fix Action and its message's subject on a simplified Page, which says marge exigée. */
@@ -216,7 +231,8 @@ export type GateReport = {
    * The line has no bearing — A or B is not on the map — so the Vent can be neither set nor
    * applied: {@link windBearing} is `null`. **Not an error and not a gate breach**: the rides run
    * without wind and every result stays, while the wind fields are disabled with
-   * {@link WIND_UNPLACED}'s reason and {@link windNotice} says a carried Vent is not applied.
+   * {@link WIND_UNPLACED}'s reason ({@link fieldUnavailable}) and {@link windNotice} says a carried
+   * Vent is not applied.
    */
   readonly windNeedsPositions: boolean;
 };
@@ -240,13 +256,106 @@ export function windBearing({ positions }: Pick<ScenarioDraft, "positions">): nu
   return lineBearing(positions);
 }
 
-/** Why a field cannot be typed into, or `null` when it can: the Vent's two, without Positions. */
+/** The two fields of the Vent's profile (#120), in rail order. */
+export const WIND_PROFILE_FIELDS = [
+  "windWidth",
+  "windAttenuation",
+] as const satisfies readonly FieldId[];
+
+export type WindProfileFieldId = (typeof WIND_PROFILE_FIELDS)[number];
+
+/** Every field that types the Vent: none can be set without a line to project it on. */
+const WIND_FIELDS: ReadonlySet<FieldId> = new Set<FieldId>([
+  "windSpeed",
+  "windDirection",
+  ...WIND_PROFILE_FIELDS,
+]);
+
+/**
+ * Why a field cannot be typed into, or `null` when it can: the Vent's own, without Positions.
+ *
+ * **A field whose value the gates refuse is never disabled.** A link can carry `ww=95` or `ws=-5`
+ * without Positions; the breach withholds the rides whether or not the Vent is applied, and no
+ * Fix Action repairs a number out of its domain — it is retyped where its message stands.
+ * Disabled, nothing on the Page would lift it. The field stays typable until the caret leaves it
+ * — « 30 » over a refused « −5 » is accepted at its first digit — and is then the Vent's like the
+ * others: disabled, with the reason.
+ *
+ * @param focused the field the caret is in, or `null`. A disabled field takes no caret, so a wind
+ *   field is focused without Positions only through a value that was refused.
+ */
 export function fieldUnavailable(
   id: FieldId,
-  report: Pick<GateReport, "windNeedsPositions">,
+  report: Pick<GateReport, "windNeedsPositions" | "errors">,
+  focused: FieldId | null = null,
 ): string | null {
-  if (id !== "windSpeed" && id !== "windDirection") return null;
-  return report.windNeedsPositions ? WIND_UNPLACED.reason : null;
+  if (!WIND_FIELDS.has(id) || !report.windNeedsPositions) return null;
+  if (id === focused || report.errors.some((error) => error.field === id)) return null;
+  return WIND_UNPLACED.reason;
+}
+
+/**
+ * Is a field of the Vent's profile on screen (#120)? Once the profile is consumed, always — beside
+ * the Vent's other two, on every Page that types them. Before, **only while the gates refuse the
+ * value it holds**: a link or a Session brought it, and its message, its Fix Action and its repair
+ * need a row to stand on. The profile's controls are otherwise not offered before their activation.
+ */
+export function isWindProfileFieldShown(
+  id: WindProfileFieldId,
+  report: Pick<GateReport, "errors">,
+  active: boolean = WIND_PROFILE_ACTIVE,
+): boolean {
+  return active || report.errors.some((error) => error.field === id);
+}
+
+/**
+ * The breach of a profile that is not uniform while no reader takes the field (#120), in § 7's
+ * fixed template: the rule as a property of the world, and the value echoed in the field's unit.
+ */
+export function windProfileUnreadMessage(
+  attenuation: number,
+  register: Register = "exact",
+): string {
+  return `⛔ ${fieldErrorLabel("windAttenuation", register)} — aucun calcul ne lit encore le ${label("windProfile", register)} : seul le ${label("uniformWind", register)} (${formatQuantity("windAttenuation", 0)}) est accepté. Valeur : ${formatQuantity("windAttenuation", attenuation)}.`;
+}
+
+/**
+ * The Vent's profile **as the Scenario holds it**, where the gates refuse it: a percent outside
+ * its domain, and — while no reader takes the field — an attenuation that is not zero.
+ *
+ * Read off the Scenario and never off the form, so that what a link or a Session carries stays
+ * refused whatever the field's text is doing.
+ */
+function refusedWindProfile(
+  { wind, unit }: Pick<TraverseScenario, "wind" | "unit">,
+  context: FieldContext,
+  active: boolean,
+): ReadonlyMap<FieldId, BlockingError> {
+  const held = { windWidth: wind.widthPct, windAttenuation: wind.attenuationPct };
+  const refused = new Map<FieldId, BlockingError>();
+  for (const field of WIND_PROFILE_FIELDS) {
+    const issue = checkField(field, displayField(field, held[field], unit), context);
+    if (issue === null) continue;
+    refused.set(field, {
+      gate: "wind",
+      kind: issue.kind,
+      field,
+      alsoOutlined: [],
+      message: issue.message,
+      fixes: [],
+    });
+  }
+  if (!active && !refused.has("windAttenuation") && !isWindUniform(wind)) {
+    refused.set("windAttenuation", {
+      gate: "wind",
+      kind: "invalid",
+      field: "windAttenuation",
+      alsoOutlined: [],
+      message: windProfileUnreadMessage(wind.attenuationPct, context.register),
+      fixes: [FIX["passer-au-vent-uniforme"]],
+    });
+  }
+  return refused;
 }
 
 /**
@@ -285,6 +394,11 @@ export type GateInput = {
   readonly issues?: readonly FieldIssue[];
   /** The Page's vocabulary, which names the fields in the messages. `exact` when absent. */
   readonly register?: Register;
+  /**
+   * Does the physics read the Vent's profile (#120)? `WIND_PROFILE_ACTIVE` when absent, which is
+   * what the app passes: a parameter only so that both sides of the activation are tested.
+   */
+  readonly windProfileActive?: boolean;
 };
 
 /**
@@ -511,8 +625,10 @@ export function evaluateGates({
   clearance = null,
   issues = [],
   register = "exact",
+  windProfileActive = WIND_PROFILE_ACTIVE,
 }: GateInput): GateReport {
   const mode = geometryMode(scenario);
+  const context = fieldContext(scenario, register);
   const errors: BlockingError[] = [];
   /** One breach per field: a scenario-level check never doubles a standing form issue. */
   const claimed = new Set<FieldId>();
@@ -523,11 +639,18 @@ export function evaluateGates({
     errors.push(error);
   };
 
+  // The Vent's profile the Scenario holds, where it is refused (#120) — read before the form's
+  // text, which may not stand in for it.
+  const heldProfile = refusedWindProfile(scenario, context, windProfileActive);
+
   // ── Tier one, as the form currently sees it ────────────────────────────────────────────────
   for (const issue of issues) {
     if (!isFieldActive(issue.field, scenario)) continue;
     const gate = gateOf(issue.field, mode);
     if (gate === null) continue;
+    // A profile field emptied over a refused value is not mid-edit: the Scenario still holds a
+    // profile no reader takes, and « Saisie en cours » would lift the Wind Gate off it.
+    if (issue.kind === "empty" && heldProfile.has(issue.field)) continue;
     push({
       gate,
       kind: issue.kind,
@@ -537,6 +660,12 @@ export function evaluateGates({
       fixes: [],
     });
   }
+
+  // ── The Vent's profile, as a link or a Session can carry it (#120) ──────────────────────────
+  // Out of its domain, or not uniform while nothing reads the field: kept as given (ADR-0001) and
+  // refused here, so the ride, the Banane and the rose are withheld rather than read under a
+  // uniform wind. A text the form itself refuses on the same field keeps its own message.
+  for (const breach of heldProfile.values()) push(breach);
 
   // ── §10.4, the use-class gate — family first ───────────────────────────────────────────────
   // The boundary is a **use-class boundary, not a physical ban**, and the transition path is a
@@ -610,7 +739,6 @@ export function evaluateGates({
   // ── Every number the Scenario holds, as a link can carry it ────────────────────────────────
   // `?L=-5` restores state faithfully, including invalid state, and must light up here on the first
   // frame even though nobody has typed into the field yet.
-  const context = fieldContext(scenario, register);
   for (const field of GATED_FIELDS) {
     const value = FIELD_ACCESS[field].read(scenario);
     if (value === undefined) continue;

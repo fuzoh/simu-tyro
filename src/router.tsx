@@ -28,6 +28,17 @@ export function getRouter() {
      * window itself.
      */
     scrollRestoration: false,
+    /**
+     * **No minimum time on the Skeleton (#128).** Every app Page is `ssr: false`, so the document
+     * arrives with its Skeleton already painted, and the router treats that as a pending UI it must
+     * keep for `pendingMinMs` — 500 ms by default, counted from hydration (`offerPending`,
+     * `presentedPending ? Date.now() + min`). On a first load that was the floor under every Page:
+     * measured, the live frame landed 500 ms after hydration however early its chunks had arrived.
+     * The minimum exists to stop a spinner flashing; the Skeleton is the live frame's own layout
+     * (`components/app/shell.tsx`), so there is nothing to flash, and a Page now lands when it is
+     * ready. `pendingMs` keeps its default: a Page switch still shows no Skeleton under 1 s.
+     */
+    defaultPendingMinMs: 0,
     defaultPreload: "intent",
     defaultPreloadStaleTime: 0,
   });

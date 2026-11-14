@@ -80,7 +80,7 @@ empty `ui/`.
 `--radius: 0`, which is what the installed `base-lyra` style already assumes — its `button` and
 `native-select` are `rounded-none` in every size variant. So a freshly-added component needs no
 patch, forever. `rounded-full` survives for **circular marks only** (status dots, the rider grab
-handle, the vue de dessus's anchor markers, its hover point and the rose des vents's handle): a dot is a shape, not a corner radius. `rounded-md`, `rounded-sm` and bare `rounded`
+handle, the vue de dessus's anchor markers, its hover point, the rose des vents's handle and its profile pad's): a dot is a shape, not a corner radius. `rounded-md`, `rounded-sm` and bare `rounded`
 appear nowhere.
 
 ### One control height: 28 px
@@ -211,12 +211,73 @@ Each button's hover names its key (`gimbalHint`), and a keyboard glyph's hover l
 turns the camera and never scrolls the page. The north needle is `Navigation2` turned by the camera's heading: a shape, not a printed
 number.
 
+**The Vue embarquée replaces the Gimbal while it plays** (#126). « Vue embarquée » is the Gimbal's
+last button (key 3), under the two Vues prédéfinies, `size="sm"` and `.touch-44` like them; off
+while no motion is proposed (`EMBARK_BLOCKED`), with its reason on the wrapper's hover as
+`MapControls` does for « 3D » **and behind an `ⓘ` beside the button**: « 3D »'s reason is also a
+line of the caption, this one is printed nowhere else, and a disabled button takes neither the
+keyboard's focus nor a tap (#122's rule, below). The `ⓘ` hangs outside the Gimbal's column
+(`absolute left-full`), so the column keeps its width when a reason comes or goes — while an anchor
+is dragged, for one. Inside, the same corner holds one row of `icon-sm` buttons — lecture or
+pause, recommencer, the head turned left, the eyes raised, lowered, the head turned right, the
+keyboard glyph — and « Quitter la vue embarquée » under it, on the Gimbal's hit-box rule
+(`after:-z-1` inside `isolate`). The focus lands on « Lecture » on entering and back on the canvas on
+leaving, so the keys keep answering. The read-out sits over the bottom-left corner on
+`bg-background/80`, clear of the attribution (`right-20`): which ride and « estimation » with an
+`ⓘ`, then `t / durée · x · vitesse` in mono, then how the motion ends. A drag on the canvas turns the
+head; CesiumJS's own gestures are off. The space bar on a button is the button's press, and Escape on
+an open infobulle's icon closes the bubble before it leaves the view. **Statique has none**: it never
+says « estimation » (#91), so its map passes no rides, shows no button and lists no key 3; the
+embarked words — the button's « Vue embarquée » included, kept out of `GIMBAL_COPY` — live apart
+from `mapLabelTable` (`embarkedLabelTable`), in Terrain's label table alone: Avancé shows them but
+keeps no label table.
+
 **The carte claire has no raster twin, so the Vue 3D drapes its nearest one.** The carte claire is
 swisstopo's vector `ch.swisstopo.lightbasemap.vt`, which CesiumJS cannot drape; the WMTS
 capabilities read on 2026-11-08 offer no raster light base map (only its relief shading), so the
 Vue 3D drapes `ch.swisstopo.pixelkarte-grau`, the grey national map — light, neutral, the ligne
 A–B legible on it. `DRAPED` in `src/lib/map/vue-3d.ts` is the table; the orthophoto and the carte
 nationale drape the very tiles the vue de dessus shows.
+
+## Infobulles: labels in the open, explanations behind an icon (#122)
+
+On the four Pages only **labels, values, units and controls** are printed in the open. Every
+explanation, note, Avertissement and blocking field error sits behind an icon — `Tip` in
+`src/components/rail/controls.tsx`, its pure half (`tipText`, `tipName`, `disclosureTips`) in
+`src/lib/app/tip.ts`.
+
+- **Three tones, three icons, three tokens.** `ⓘ` (`Info`, `text-muted-foreground`) for help and
+  notes, `⚠` (`TriangleAlert`, `text-warning`) for an Avertissement, `⛔` (`OctagonX`,
+  `text-destructive`) for a blocking field error. A warning or an error is seen without opening
+  anything; only its words moved.
+- **Hover, keyboard focus and touch.** It is Base UI's popover with `openOnHover`, so a tap opens
+  it and a link inside it stays reachable (a tooltip closes before its link can be pressed). A
+  `:focus-visible` focus opens it too, without moving the focus (`initialFocus={false}`); Tab then
+  walks into the bubble's links before leaving it. The focus Base UI hands back to the icon on
+  Escape does not reopen it (`opensOnFocus`), so one Escape closes the bubble. The popover's own flex column is neutralised by
+  one wrapper `div`, or each segment of a sentence — a `§` link, the words around it — would stand
+  on a line of its own.
+- **One `ⓘ` per row.** A row's help, its field meaning, its ambient note and why an option is
+  disabled join in one bubble, in that order (`Row`'s and `ReadOut`'s `notes`, `RowTips`). The
+  icons sit in the label's line, so a warning landing moves no row and no tile.
+- **A blocking error still announces itself.** The `⛔` carries a visually hidden copy of its
+  message in a `role="alert"` region — what `FieldError` did when the message was printed.
+- **What stays in the open, and why.** The Verdict and its reason; « Saisie en cours » and a field's
+  empty-state line (it says the numbers on screen are not this text's); every cause sentence that
+  *replaces* a value — « Aucun résultat — … » in a tile, a plot, the read-out row, a region, and
+  the proposal's refusal — because a sentence standing where a number would is what keeps a missing
+  result from reading as a usable one; commands (Fix Actions, « Ouvrir la Page Avancé », « Passer en
+  mouflage »); the terrain's source line and the swisstopo attribution its terms ask to sit beside
+  the data; the vue de dessus's caption, whose lines are readings and the live gesture's prompt in a
+  height the layout reserves; Provenance's aggregate summary (« ⚠ N valeurs sans référence
+  normative confirmée »), which is a count and the toggle of its `<details>`, not an explanation —
+  the entries and their chips are behind it. The terrain lines in the open keep their glyph, `✓`
+  for a check that passed and `ℹ` for one that could not be made, so the two never read alike. The
+  Banane note's explanation moved from a `title` — which the mouse
+  alone could read — to an `ⓘ`.
+- **Where a section's notes go.** On its heading: `Group`'s `tip`, `Region`'s and `RailSection`'s
+  `tips`. « Ce que cet outil ne calcule pas » keeps its heading in the open and its lines behind the
+  heading's `ⓘ`; §8.3's formula stays behind its own chip inside that bubble.
 
 ## Avancé's three columns
 
@@ -240,9 +301,12 @@ and `max-w-[1984px]`, and `contract.test.ts` holds the two together. B2 and B3 a
   `src/` for the retyping). The column is `wide-rail:w-144`, `2 × 288`; the Rail Header and the
   `Paramètres` heading stay across it, and the groups under them flow in **CSS columns**
   (`wide-rail:columns-2`), each group `break-inside-avoid`, `space-y-3` between groups and the
-  wrapper's own `gap-3` between the two columns: each column is `(576 − 1 − 24 − 12) / 2 = 269,5`
-  px, against the `288 − 1 − 24 = 263` px a group has in the 288 px column (both measured, the
-  column's hairline counted). Columns rather than a grid because a column box flows the groups in the
+  wrapper's `wide-rail:gap-6` (24 px) between the two columns, split by a 1px `column-rule` in
+  `--border` (the colour of the Page's other dividers, #123): each column is
+  `(576 − 1 − 24 − 24) / 2 = 263,5` px (the rule is drawn in the middle of the gap and takes no
+  width), against the `288 − 1 − 24 = 263` px a group has in the 288 px column (the column's
+  hairline counted; computed from the classes, routing.md's 269,5 px is the earlier gap-3
+  measurement). Columns rather than a grid because a column box flows the groups in the
   DOM's order, down the left column and then down the right: the reading order, the order on screen
   and the Tab order are one, with no `order` to keep in step and no split point to choose by hand.
   The browser balances the two, so which group opens the right column depends on the groups'
@@ -357,6 +421,19 @@ and `max-w-[1984px]`, and `contract.test.ts` holds the two together. B2 and B3 a
   handlers.
 - **`Valeurs déduites` holds editable rows**, so it shares `Paramètres`' field-row context: `RailInputs`
   owns the context and hands the two sections back through a render prop.
+- **The tension graph closes the Page (#119).** `Tension interne le long de la ligne`, at the
+  passager's position: the ligne à vide dashed and the ligne chargée solid, as on the coupe, against
+  the distance from A, on the coupe's own `SharedX`. From B2 it stands **inside the Chart Block's
+  box**, under the read-out cells (the Shell's `columnTail`), so it takes the block's width, its
+  1984 px letterbox and the one observer's measure; below B2 it is the last thing in the Rail's run,
+  after « Ce que cet outil ne calcule pas » (`railTail`). `threeColumns()` decides which slot it is
+  *mounted* in, as for the vue de dessus — never a hidden twin. Its height is `tensionChartHeight()`
+  in `contract.ts`, a band of the width alone (180–300 px); below B2 the Rail's scroller may be a
+  classic scrollbar narrower than the block, so the SVG scales through its `viewBox` rather than
+  reflowing. The y axis starts at zero: along one line the tension moves by a few percent of
+  itself, and a fitted baseline would draw that as a cliff. With two Brins porteurs every value is
+  one line's under the normal 50/50 share, said on the axis, in a note and in the hover — never the
+  sum. The numbers are `@/lib/chart/tension.ts`'s, over the engine's `sampleTension`.
 
 ## Statique's first row
 
@@ -416,7 +493,45 @@ arithmetic over the shell, measured by `agent-browser` (`docs/conventions/routin
   is then cut to « Pentes sup… », its whole name in its title — the select gives way first, so
   390 px still reads « Pentes supérieures à 30° » whole. Accepted: the brief puts the switch at
   1024, and the map is the wider of the two from 1106.
+- **The Vent's profile pad does not fit this map, and is not shown yet** (#120): `WindProfilePad`
+  is mounted only once `WIND_PROFILE_ACTIVE` is on. Turned on locally (2026-11-13) it is
+  310 × 182 px in a fixed corner of the frame, which clips: on the 285 × 189 map at 1024 it runs
+  33 px past the right edge and 41 px past the bottom, « Vent uniforme » out of reach; on a
+  390 px phone (map 364 × 242) it stacks to 178 × 338 and runs 144 px past the bottom; at 768 it
+  fits and covers the rose's centre. **Not accepted — a precondition of the activation**: the pad
+  is to open on demand, clear of the rose and of the frame's clip, and to be driven at 390, 768,
+  1024 and 1440 before the flag is turned on. Its box is the map overlays' — `px-1 py-1`, square,
+  `gap-3` between its two columns.
 - **The Skeleton is the same tree** (`StatiqueFrame`), so it lands in the same boxes at every width.
+
+## Dynamique's proposal
+
+The Page Dynamique's third region, « Proposition pour l'ancrage B » (#121), stands **last, under
+the charts** (`DynamiqueFrame`'s `proposal` slot). Its height is its answer's — a refusal is three
+lines, a proposal a screenful — so above the coupe it would move both charts each time
+an answer lands; under them it moves nothing.
+
+- **It is read, never pressed.** No button, no field, no link that edits the Scenario: the proposal
+  applies nothing, and the target it is held to is set on Avancé (« Cible du point le plus loin »,
+  in « Dynamique du passager »). The view model (`src/lib/dynamique/reach.ts`) decides every word;
+  `src/components/dynamique/reach.tsx` lays it out.
+- **One headline, then three tiles per ride.** The height variation is the one `TileFrame` alone on
+  its row; each of the candidate's rides is then a `RideGrid` of three — Point le plus loin, Distance
+  restante à B, Point d'arrêt — so the three are never read as one. With a wind along the line there
+  are two rides, the second headed « sans vent — comparaison ». Assumptions are muted `text-xs`
+  lines, the warnings `text-warning` behind a ⚠, like a tile's Avertissement. The assumption that
+  names the Tightness Driver kept also prints what it does to the line — longueur à vide and, when
+  it is not the driver, tension de pose, each « before → after » — and a target above 93 % adds
+  the warning « Cible haute … » (§12.2's measured bound).
+- **A refusal is a sentence in the foreground colour**, in the place of the tiles, never beside a
+  height.
+- **Searched after the frame that prints the rides** (`useDeferredValue`): the search re-runs the
+  whole chain a dozen times, so a keystroke paints its own results first. Meanwhile the answer of
+  the Scenario before it stays, **dimmed (`opacity-50`) and `aria-busy`**, so a height is never read
+  as this Scenario's while it is another's. Measured with `agent-browser` on the dev server
+  (2026-11-13, 1440 × 1000, the shipped line, « Masse » 120 → 100): stale mark 17 ms after the
+  input, the new answer (« Monter B de 14,9 m ») at 49 ms.
+- **Narrow**: at 390 px the tiles stack one per row and nothing overflows (`scrollWidth` 390).
 
 ## Charts
 
@@ -461,7 +576,9 @@ the two scales are *deliberately mismatched*, which is the whole point (« v1 bu
   to `useDeduced()`, which formats it with `deducedFrom`, and to `useScene()`
   (`src/components/app/use-scene.ts`), § 2's `useSweep` seam: the Chart Block *and* the Rail's
   output half read the same traverse, so the memo lives once in `app.tsx` and the value is passed
-  down. `x_D` is deliberately not one of their inputs — a scrub re-runs `placeRider` alone. The gate
+  down. `x_D` is deliberately not one of their inputs — a scrub re-runs `placeRider` and, on Avancé,
+  the tension graph's `tensionProfile` (#119): the same exact solve at the same `x_D`, run once more
+  for the graph's own state (~40 µs), while its unloaded curve is memoised on the solved half. The gate
   report and the `Résultats` hold through a scrub the same way: both key on `useTraverse()`
   (`src/components/app/use-traverse.ts`), the Scenario without `x_D` memoised on `traverseInputs`'
   fields, and tier one reads the form's text through `sameGatedText`, which ignores `x_D`'s.

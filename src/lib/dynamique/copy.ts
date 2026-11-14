@@ -14,9 +14,11 @@ import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 import { ASSUMED_NOTE, AVANCE_NOTICE, avanceNoticeText } from "@/lib/app/avance-copy.ts";
 import { refusalLabelTable } from "@/lib/app/refusal-copy.ts";
 import { COUPE_HOVER, NO_SPAN_LINE } from "@/lib/chart/copy.ts";
+import { formatQuantity } from "@/lib/format/quantity.ts";
 import { fieldLabel } from "@/lib/rail/fields.ts";
 import { GATE_CONSEQUENCE, WIND_UNPLACED } from "@/lib/rail/gates.ts";
 import { FIELD_NOTE } from "@/lib/rail/help.ts";
+import { REACH } from "@/lib/scenario/reach.ts";
 import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 /** The fields' groups, in the order the Page lists them. */
@@ -25,8 +27,18 @@ export const DYNAMIQUE_GROUPS = {
   wind: heading("wind", "terrain"),
 } as const;
 
-/** The fields the Page edits, in screen order — each through the Rail's own row and gates. */
-export const DYNAMIQUE_FIELDS = ["mp", "windSpeed", "windDirection"] as const;
+/**
+ * The fields the Page edits, in screen order — each through the Rail's own row and gates. The
+ * Vent's profile (#120) has its two rows once it is consumed, and before that only while the gates
+ * refuse the value held (`isWindProfileFieldShown`).
+ */
+export const DYNAMIQUE_FIELDS = [
+  "mp",
+  "windSpeed",
+  "windDirection",
+  "windWidth",
+  "windAttenuation",
+] as const;
 
 /**
  * The gates whose outputs the Page prints: the line its rides run on, and the rides — which read
@@ -38,6 +50,8 @@ export const DYNAMIQUE_GATES = ["solve", "wind", "ride"] as const satisfies read
 export const SECTION = {
   outputs: "Résultats",
   section: "Coupe, vitesse et accélération",
+  /** The proposal of a height for B (#121), under the charts so that it moves none of them. */
+  proposal: `Proposition pour l'${label("anchor", "terrain")} B`,
 } as const;
 
 /** The two rides, as the tiles, the markers and the hover name them. */
@@ -142,6 +156,52 @@ export const WARNING_COPY = {
   "steel-trolley-unconfirmed": null,
 } as const satisfies Record<DynamicsWarningId, string | null>;
 
+/**
+ * The proposal of a height for B (#121): the fixed words of `./reach.ts`'s sentences. « Proposition »
+ * and never « suggestion », which the glossary keeps off a Fix Action — this one presses nothing.
+ */
+export const REACH_COPY = {
+  /** The proposal's own tile, and its three ways to read. */
+  height: `Hauteur de l'${label("anchor", "terrain")} B`,
+  raise: "Monter B de",
+  lower: "Descendre B de",
+  keep: "Garder B à cette hauteur",
+  /** Under the proposed height: what it is, and that nothing was done with it. */
+  notApplied: `${ESTIMATE} · rien n'est appliqué`,
+  /** The three quantities a ride is read by, which are not one another. */
+  farthest: heading("farthestPoint", "terrain"),
+  remaining: "Distance restante à B",
+  stop: heading("stopPoint", "terrain"),
+  /** No distance is left: the passager is at B. */
+  noneLeft: "aucune : B est atteint",
+  ofSpan: `de la ${label("span", "terrain")}`,
+  beforeB: "avant B",
+  /** The Scenario as it stands, before any proposal. */
+  current: "Scénario actuel",
+  /** The candidate's rides: the one the target is held to, and the comparison without wind. */
+  proposed: "Avec la hauteur proposée",
+  proposedWindy: "Avec la hauteur proposée et le vent saisi",
+  proposedCalm: "Avec la hauteur proposée, sans vent — comparaison",
+  refused: "Aucune proposition",
+  /** Without a ride there is nothing to propose from; the Page says why there is none. */
+  noRide: `Aucune proposition pour l'${label("anchor", "terrain")} B sans ${ESTIMATE} de la ${label("traverse", "terrain")}.`,
+  /** The two sentences every proposal carries, whatever it proposes. */
+  noPromise: `${heading("estimate", "terrain")}, pas une garantie : elle ne promet ni que le ${label("passenger", "terrain")} s'arrête avant B, ni l'absence de collision.`,
+  movedB: `Déplacer réellement B peut changer le terrain sous la ${label("line", "terrain")} : le nouvel emplacement et son ${label("profile", "terrain")} sont à vérifier, puis tout le calcul à refaire avec eux.`,
+  /** What the proposal leaves alone, and what it did not judge. */
+  untouched: `Rien n'est modifié : ni les ${label("anchors", "terrain")}, ni le scénario. Ni le ${label("verdict", "terrain")} ni la ${label("requiredClearance", "terrain")} ne sont rejugés ici.`,
+  /**
+   * The target is above the highest one whose proposal stayed short of B under the two variations
+   * measured (`REACH.steadyMax`, §12.2): the domain still answers, and says what it is worth.
+   */
+  highTarget: `Cible haute : au-delà de ${formatQuantity("reachTarget", REACH.steadyMax)} de la ${label("span", "terrain")}, un ${label("wind", "terrain")} arrière de 10 km/h non saisi ou une traînée plus faible ont suffi, sur certaines des ${label("line", "terrain")}s essayées, à amener le ${label("passenger", "terrain")} jusqu'à B.`,
+  /** The comparison without wind reaches B at the proposed height. */
+  calmReachesB: `Sans vent, le ${label("passenger", "terrain")} ${ARRIVES_AT_END} à cette hauteur de B : la proposition ne tient que par le vent saisi.`,
+  /** The Tightness Driver a simplified Page does not name. */
+  avanceTension: "Tension réglée sur la Page Avancé",
+  kept: "conservée",
+} as const;
+
 /** The fixed strings the Page prints, for `./copy.test.ts`. */
 export function dynamiqueLabelTable(): readonly string[] {
   return [
@@ -173,6 +233,7 @@ export function dynamiqueLabelTable(): readonly string[] {
     COUPE_HOVER.fromFoot,
     ...Object.values(CONSTANTS_NOTE),
     ...Object.values(WARNING_COPY).filter((text) => text !== null),
+    ...Object.values(REACH_COPY),
     NO_SPAN_LINE,
     ...DYNAMIQUE_GATES.map((gate) => GATE_CONSEQUENCE[gate]),
     AVANCE_NOTICE.action,

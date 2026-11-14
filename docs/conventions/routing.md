@@ -27,6 +27,11 @@ under `bun run dev` it happens per request. Same output either way — which is 
   route's `pendingComponent`, the **Skeleton**, and returns **200**; `beforeLoad` and `loader` are
   skipped on the server. `validateSearch` still runs there, **three times per request**, so it must
   stay pure, cheap and side-effect-free.
+- **The router keeps the Skeleton no longer than the Page takes** (`defaultPendingMinMs: 0` in
+  `src/router.tsx`, #128). A painted Skeleton is a pending UI to the router, which by default holds
+  it 500 ms from hydration — measured, the floor under every first load. The Skeleton is the live
+  frame's own layout, so there is nothing to flash. What the first load costs, how it is measured
+  and what was tried: [`docs/performance/first-load.md`](../performance/first-load.md).
 - A `validateSearch` must **omit** keys it rejects, and must never return `{ key: undefined }` or
   a coerced value: either makes the server emit a **307** to the canonical URL before any client
   code runs, which destroys the evidence the ignored-keys banner needs.
@@ -56,26 +61,38 @@ under `bun run dev` it happens per request. Same output either way — which is 
 ## The documentation pages — `/docs`
 
 Added 2026-09-23. `src/routes/docs.tsx` (layout), `docs.index.tsx` and `docs.$slug.tsx` render the
-repository's own markdown — `docs/simulation-theory.md` and four reports under `docs/references/` —
-through `react-markdown` (+ `remark-gfm`, `remark-math`, `rehype-katex`). The registry is
-`src/lib/docs/pages.ts`; the bytes are `src/lib/docs/sources.ts`, raw `?raw` imports.
+repository's own markdown through `react-markdown` (+ `remark-gfm`, `remark-math`, `rehype-katex`),
+in three groups since #125: the step-by-step **guide** (`docs/guide/`, French), the **reference**
+(`docs/simulation-theory.md`) and the **original reports** under `docs/references/`, served
+verbatim. The registry is `src/lib/docs/pages.ts`; the bytes are `src/lib/docs/sources.ts`, raw
+`?raw` imports.
 
-- **They are SSR and prerendered, unlike the app Pages.** `vite.config.ts` lists the six paths under
-  `pages` with `prerender.enabled`, so the build emits `dist/client/docs/<slug>/index.html` as full
-  HTML and a shared `/docs/modele#s-10-4` lands with a **200**. `autoStaticPathsDiscovery` is
-  **off** so `/` stays the SPA shell. Under `bun run dev`, SPA mode serves the shell for every path
-  and the page renders client-side — same output, different status line.
+- **They are SSR and prerendered, unlike the app Pages.** `vite.config.ts` lists `/docs` and every
+  `DOC_PAGES` slug under `pages` with `prerender.enabled`, so the build emits
+  `dist/client/docs/<slug>/index.html` as full HTML and a shared `/docs/modele#s-10-4` lands with
+  a **200**. `autoStaticPathsDiscovery` is **off** so `/` stays the SPA shell. Under
+  `bun run dev`, SPA mode serves the shell for every path and the page renders client-side — same
+  output, different status line.
 - **Heading ids come from the section number, not the title**: `### 10.4 Use-class gate` renders as
   `id="s-10-4"` (`src/components/docs/markdown.tsx`, `@/lib/docs/refs.ts`). That number is the
   contract every `§` in `src/lib/rail/help.ts` and `provenance.ts` links to, through `HelpText`
   (`src/components/docs/help-text.tsx`). `src/lib/docs/refs.test.ts` fails on a `§` that names no
   heading of the theory file — so a renumbering of `docs/simulation-theory.md` is a test failure,
   not a dead link.
+- **A slug, once served, never changes, nor does a section anchor.** `src/lib/docs/links.test.ts`
+  freezes the five slugs and every anchor served before #125, so a reorganisation that would break
+  a bookmark or a shared `/docs/modele#s-10-4` fails a test instead. It also resolves every link
+  between pages to an existing heading, and checks the guide's sommaire reaches every sub-chapter.
+- **Pages link to each other by repository path** — `../simulation-theory.md#s-10-4`,
+  `2-statique.md#s-2-4` — so the files read the same on GitHub; `@/lib/docs/links.ts` resolves such
+  a link against the page's `path` and the renderer routes it (`basepath` applied). A relative link
+  to a file the app does not serve is printed as its path.
 - **The markdown is read in the route's `component`, never in its `loader`.** The router plugin
   code-splits the component and leaves the loader in the critical chunk; a `docSource` call in the
   loader ships ~150 kB of prose with the simulator. Measured: `index-*.js` 517 kB → 668 kB.
-- Add a page by adding an entry to `DOC_PAGES`, its raw import to `sources.ts`, and its path to
-  `pages` in `vite.config.ts`. Nothing else knows the list.
+- Add a page by adding an entry to `DOC_PAGES` and its raw import to `sources.ts`; the prerender
+  list and the navigation read the registry. The « ⋯ » menu lists `MENU_DOC_PAGES`: every page but
+  the guide's chapters, which its sommaire reaches.
 
 ## The app Pages — one route per Page, one Scenario in the URL
 
@@ -218,14 +235,17 @@ must not be enabled speculatively; a GitHub Pages deploy is the ask that spends 
 | `src/lib/terrain-page/` | the five tiles' view model (`view.ts`), read off Statique's and Dynamique's outputs so each tile says what those Pages say, and its copy (`copy.ts`) |
 | `src/components/dynamique/` | Dynamique's frame and Skeleton, fields and output tiles (its two SVG frames are `src/components/chart/dynamique.tsx`) — over the same store, form and writer as Avancé (`usePage`), in Statique's two-column layout |
 | `src/components/statique/` | Statique's frame and Skeleton (`frame.tsx`), its fields, outputs and vue de dessus's frame — over the same store, form and writer as Avancé (`usePage`) |
-| `src/components/map/top-map.tsx` | the vue de dessus as a MapLibre map (#93): the Fond de carte and Couche pentes controls, the anchors as markers, « Placer A / B », the attribution; the plain drawing where WebGL is missing. The « 3D » switch (#95), off with its reason without Positions or a profil, puts the Vue 3D in the map's place and falls back to 2D when it fails. The « Mesure » button (#98) turns a click on the map into a point of the ruler instead of an anchor; a hovering pointer draws its aperçu before each click, a dotted cross through A and through B is drawn in every mode, and « Repères » hides or shows every cross (#107). With `readOnly` (#101, Terrain): no anchor placed or dragged, no Fond, pentes, Repères or zoom control, no rose handle; the « Mesure » stays, as #98 drew it, and a « 2D » / « 3D » switch shows the map over the coupe it is handed, or the Vue 3D alone — with its Gimbal and keys (#111), but no View Strip beside it, so it draws the Ligne à vide and the loaded line whatever the strip's layers (`vue3dLayers` with `viewStrip: false`), as before #111 |
+| `src/components/map/top-map.tsx` | the vue de dessus as a MapLibre map (#93): the Fond de carte and Couche pentes controls, the anchors as markers, « Placer A / B », the attribution; the plain drawing where WebGL is missing. The « 3D » switch (#95), off with its reason without Positions or a profil, puts the Vue 3D in the map's place and falls back to 2D when it fails. The « Mesure » button (#98) turns a click on the map into a point of the ruler instead of an anchor; a hovering pointer draws its aperçu before each click, a dotted cross through A and through B is drawn in every mode, and « Repères » hides or shows every cross (#107). With `readOnly` (#101, Terrain): no anchor placed or dragged, no Fond, pentes, Repères or zoom control, no rose handle and no profile pad (#120); the « Mesure » stays, as #98 drew it, and a « 2D » / « 3D » switch shows the map over the coupe, or the Vue 3D alone — the coupe is `deferred-top-map.tsx`'s to place, and the map tells it which (`readOnly.onShows3d`) — with its Gimbal and keys (#111), but no View Strip beside it, so it draws the Ligne à vide and the loaded line whatever the strip's layers (`vue3dLayers` with `viewStrip: false`), as before #111 |
+| `src/components/map/load-top-map.ts` | the vue de dessus's door (#128), a dynamic `import()` of `top-map.tsx`: MapLibre lands in its own `top-map-*` chunk. Statique's, Terrain's and — from B2 — Avancé's route `loader` calls it, so the chunk is fetched in the same round as the Page's own and the Page renders without it. `load-top-map.test.ts` builds the client and holds the line: no MapLibre in what those three Pages download before they render |
+| `src/components/map/deferred-top-map.tsx` | what the Pages mount as `TopMap`: the live map once its module is here, the Skeleton's empty `TopViewFrame` until then, and if the module cannot arrive the plain drawing with its anchors, Vent line, Banane note and « fond de carte indisponible » — the no-WebGL caption (`map-caption.tsx`), with the Vent's profile in words under the Vent line once the physics reads it (#120, `windControls`), but no rose, « 3D » or Mesure, which need the module — a failure of the map's, never the Page's `errorComponent`. On Terrain it holds the coupe, at one place under the frame, so the map's arrival leaves the coupe mounted, and hides it while the live map says its Vue 3D stands alone |
+| `src/components/map/map-caption.tsx` | the lines under the vue de dessus, in one order, MapLibre-free: the anchors, the Vent, the Vent's profile in words where the map has no pad for it (#120, `profileCaption` — none before `WIND_PROFILE_ACTIVE` is on, none under a uniform wind), the gesture's hint, « fond de carte indisponible », the Banane's note, the Vue 3D's line — written by `top-map.tsx` and by `deferred-top-map.tsx`'s fallback |
 | `src/components/map/use-measure.ts` | the Mesure's state (#98), the map's own: whether it is on, its points and the profil asked for between them — never in the store, so in no Scenario, Session or link |
 | `src/components/map/load-vue-3d.ts` | the Vue 3D's one door, a dynamic `import()`: CesiumJS lands in its own `vue-3d-renderer-*` chunk, fetched on the first press of « 3D ». `load-vue-3d.test.ts` builds the client and holds the line: no CesiumJS in what `/` downloads, and that set within 10 % of its size before #95 |
 | `src/components/map/vue-3d-renderer.ts` | the CesiumJS view (#95), imperative behind `openVue3d` → `{ show, command, destroy }`: the relief, the draped Fond and Couche pentes, the Fils à plomb, the engine's lines, the Ligne A–B and the Trajectoire, each shown as the View Strip's layers say (#111); an anchor dragged on the relief (#97) — taken only under the pointer, the camera frozen until the press ends, on the canvas or off it, by a `pointercancel` or a window losing the focus (#111), the relief sampled at its finest before the gesture ends — reported to the same gesture machine as the markers; `command` moves the camera for the Gimbal and the keys (#111), the canvas focusable. `CESIUM_BASE_URL` is `BASE_URL` + `cesium/`, where `vite-plugin-static-copy` puts its workers and assets. Imported for its types only, anywhere else |
 | `src/components/map/vue-3d-gimbal.tsx` | the Gimbal (#111): north, orbit, inclinaison and zoom buttons and the two Vues prédéfinies over the Vue 3D's top-left corner, the keys in their hovers; a sibling of the canvas, statically imported by `top-map.tsx` — it holds no CesiumJS |
-| `src/components/map/wind-rose.tsx` | the rose des vents (#94): a sibling of the map, not inside it, so a gesture on its handle never reaches MapLibre's pan; it writes the Scenario's Vent as the handle moves. Without `onWind` it draws no handle (#101, Terrain) |
+| `src/components/map/wind-rose.tsx` | the rose des vents (#94): a sibling of the map, not inside it, so a gesture on its handle never reaches MapLibre's pan; it writes the Scenario's Vent as the handle moves. Without `onWind` it draws no handle (#101, Terrain; #120, a Vent withheld for its profile). The same file holds `WindProfilePad` (#120) — the profile's handle on fixed screen axes, the preview of the speed from A to B and « Vent uniforme » — and the one drag gesture both handles share (`useHandleDrag`, `Handle`). `top-map.tsx` mounts the pad only under `WIND_PROFILE_ACTIVE`, which is off: which control stands where is `windControls`'s (`src/lib/map/wind-rose.ts`) |
 | `src/lib/chart/hover.ts`, `hover-gesture.ts` | the hover (#99), shared by the coupe, the Dynamique's two charts and the vue de dessus: what is read at a distance from A (`zGroundAt` for the ground, nothing outside the portée) and when a pointer is reading — a mouse always, a finger once held 400 ms. `src/components/chart/use-hover.ts` wires it, `hover.tsx` draws it |
-| `src/lib/map/` | the map's pure halves: the style builder and « fond de carte indisponible » (`style.ts`), the click-and-drag state machine that asks for a profil only at a release, for the markers and the Vue 3D's anchors alike (`gesture.ts`), the rose's azimuth ↔ drawing conversions, north-up on the map and turned by the line's bearing on a level drawing (`wind-rose.ts`), the Vue 3D's earth coordinates, draped layers, why its switch is off and what follows a dragged anchor and which of the View Strip's layers it shows (`vue-3d.ts`), the Vues prédéfinies, the keys and the camera's steps (`vue-3d-camera.ts`), the Mesure's clicks, distances and offline fallback (`measure.ts`), what its source draws — points, ligne, the aperçu and the Repères d'ancrage (`measureData` and `measureDrawing` in `style.ts`), where the pointer stands on the line (`hover.ts`), the Session's display choice (`display.ts`), its copy (`copy.ts`). The Vue 3D and the hover put the profil on the earth only where `profilRunsBetween` (`src/lib/terrain/trace.ts`) says it runs between the two Positions; a link says it does not with `ph` |
+| `src/lib/map/` | the map's pure halves: the style builder and « fond de carte indisponible » (`style.ts`), the click-and-drag state machine that asks for a profil only at a release, for the markers and the Vue 3D's anchors alike (`gesture.ts`), the rose's azimuth ↔ drawing conversions, north-up on the map and turned by the line's bearing on a level drawing, the profile pad's offset ↔ percents conversions on fixed screen axes, the profile's preview from A to B (`profilePreview`), and which of the Vent's controls a vue de dessus offers — the rose's handle, the profile's pad, the profile read out — on both sides of `WIND_PROFILE_ACTIVE` (`windControls`, #120) (`wind-rose.ts`), the Vue 3D's earth coordinates, draped layers, why its switch is off and what follows a dragged anchor and which of the View Strip's layers it shows (`vue-3d.ts`), the Vues prédéfinies, the keys and the camera's steps (`vue-3d-camera.ts`), the Mesure's clicks, distances and offline fallback (`measure.ts`), what its source draws — points, ligne, the aperçu and the Repères d'ancrage (`measureData` and `measureDrawing` in `style.ts`), where the pointer stands on the line (`hover.ts`), the Session's display choice (`display.ts`), its copy, the profile's readings and caption line included (`copy.ts`). The Vue 3D and the hover put the profil on the earth only where `profilRunsBetween` (`src/lib/terrain/trace.ts`) says it runs between the two Positions; a link says it does not with `ph` |
 | `src/components/app/load-failure.tsx` | every app Page's `errorComponent`, for **genuine load failures only** |
 | `src/lib/app/pages.ts` | `APP_PAGES`, the table the navigation bar and the prerender list both read |
 | `src/components/app/navigation-bar.tsx` | `PageFrame` — the bar above, the Page's shell below, one viewport tall |

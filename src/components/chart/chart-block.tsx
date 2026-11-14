@@ -46,6 +46,7 @@ import {
   ViewStripSlot,
 } from "@/components/app/shell.tsx";
 import { useAppDispatch, useAppState } from "@/components/app/store.tsx";
+import { probeMark, probeSpan } from "@/lib/app/probe.ts";
 import { NO_SPAN_LINE } from "@/lib/chart/copy.ts";
 import { placeRider, snapToStep } from "@/lib/chart/scene.ts";
 import { roundToDisplay } from "@/lib/format/quantity.ts";
@@ -169,7 +170,7 @@ export function ChartBlock({
   // keyed on `x_D` alone. This is the only thing a drag frame recomputes.
   const scene = useMemo<ChartScene | null>(() => {
     if (solved === null) return null;
-    const rider = placeRider(solved, riderInput.xD);
+    const rider = probeSpan("coupe:rider", riderInput.xD, () => placeRider(solved, riderInput.xD));
     return rider === null ? null : { ...solved, rider };
   }, [solved, riderInput.xD]);
 
@@ -294,10 +295,9 @@ export function ChartBlock({
   /** A typed position is exact, clamped into `[0, L]` because `x_D` selects a view. */
   function moveRider(metres: number) {
     if (frame === null || inert) return;
-    dispatch({
-      type: "scénario/modifié",
-      patch: { rider: { ...riderInput, xD: clampX(metres, frame.L) } },
-    });
+    const xD = clampX(metres, frame.L);
+    probeMark("rider:asked", xD);
+    dispatch({ type: "scénario/modifié", patch: { rider: { ...riderInput, xD } } });
   }
 
   const rider = scene?.rider ?? null;

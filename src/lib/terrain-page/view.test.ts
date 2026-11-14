@@ -241,7 +241,10 @@ describe("the vitesse d'arrivée", () => {
 
   test("arrives on the shipped line without wind: km/h on the tile, m/s and « estimation » under", () => {
     const { reading } = ridesUnder(0, 0);
-    const { terrain } = pagesOn({ ...SHIPPED, wind: { speedKmh: 0, directionDeg: 0 } });
+    const { terrain } = pagesOn({
+      ...SHIPPED,
+      wind: { ...SHIPPED.wind, speedKmh: 0, directionDeg: 0 },
+    });
     if (reading.windy.end.kind !== "arrival") throw new Error("the shipped line arrives");
     expect(tile(terrain, "arrival")).toMatchObject({
       kind: "quantity",
@@ -258,7 +261,7 @@ describe("the vitesse d'arrivée", () => {
     const { terrain } = pagesOn({
       ...SHIPPED,
       positions: DUE_NORTH,
-      wind: { speedKmh: 50, directionDeg: 0 },
+      wind: { ...SHIPPED.wind, speedKmh: 50, directionDeg: 0 },
     });
     expect(tile(terrain, "arrival")).toMatchObject({
       kind: "word",
@@ -269,7 +272,10 @@ describe("the vitesse d'arrivée", () => {
 
   test("a Vent without Positions is not applied: the ride without wind, and the tile says why", () => {
     const still = tile(pagesOn(SHIPPED).terrain, "arrival");
-    const { terrain } = pagesOn({ ...SHIPPED, wind: { speedKmh: 50, directionDeg: 0 } });
+    const { terrain } = pagesOn({
+      ...SHIPPED,
+      wind: { ...SHIPPED.wind, speedKmh: 50, directionDeg: 0 },
+    });
     // The 50 km/h head wind that stops the passager above is not applied: the calm arrival stands.
     expect(tile(terrain, "arrival")).toEqual({
       ...still,

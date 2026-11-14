@@ -32,6 +32,9 @@
  *   `d ∉ [6, 26]` are **warnings** — non-blocking, needing no physics — and they live here beside
  *   the hard rule they are so easily confused with. The result-level ladder (`> 30 % MBL`,
  *   `flèche < 3 %`, `k` hors bande, the verdict) needs a solve and is § 6's, not this module's.
+ *   **A closed domain is a hard rule, not a band** (`within`, the Vent's profile, #120): where the
+ *   quantity has no value outside its interval, the interval blocks — a warning would hand a
+ *   reader a width of 95 % to evaluate.
  * - **Values are canonical on the way out.** § 3's « SI internally, always »: a field displays in
  *   the selected force unit and {@link commitField} returns **newtons**, rounded to the row's
  *   display precision so that the value in state *is* the value on screen — § 3's prefill rule,
@@ -54,7 +57,8 @@ import type { LabelId, Register } from "@/lib/vocabulary/labels.ts";
 
 import { formatQuantity, formatValue, fromDisplay, roundToDisplay } from "@/lib/format/quantity.ts";
 import { clampX } from "@/lib/scenario/geometry.ts";
-import { DYNAMICS, REGIMES } from "@/lib/sim";
+import { REACH } from "@/lib/scenario/reach.ts";
+import { DYNAMICS, REGIMES, WIND_PROFILE } from "@/lib/sim";
 import { heading, isHiddenTerm, label } from "@/lib/vocabulary/labels.ts";
 
 /**
@@ -107,25 +111,40 @@ export type FieldId =
   | "xD"
   | "windSpeed"
   | "windDirection"
+  | "windWidth"
+  | "windAttenuation"
   | "CdA"
   | "F0"
   | "kv"
   | "trolleyMu"
   | "rho"
+  | "reachTarget"
   | "latA"
   | "lonA"
   | "latB"
   | "lonB";
 
 /**
- * A field's tier-one hard rule — the whole of it. Two shapes, because § 7's message column has
- * two: a sign rule, and « the number must be readable at all ».
+ * A field's tier-one hard rule — the whole of it. Three shapes: a sign rule, a closed domain, and
+ * « the number must be readable at all ».
  */
 type HardRule =
   /** `> 0`. `sentence` is § 7's own wording of the rule, stated as a property of the world. */
   | { readonly kind: "positive"; readonly sentence: string }
   /** `≥ 0` — « une hauteur négative n'existe pas ». */
   | { readonly kind: "non-negative"; readonly sentence: string }
+  /**
+   * Inside `[min, max]`, both ends included, in the field's canonical unit — the Vent's profile
+   * (#120), whose shape has no value outside its domain. **Blocking, where a `band` warns**: a
+   * warning would let a reader evaluate the value. Judged **as the field prints it**, so the value
+   * the message echoes is the value refused and a link's `ww=90.4` is the 90 % it reads as.
+   */
+  | {
+      readonly kind: "within";
+      readonly min: number;
+      readonly max: number;
+      readonly sentence: string;
+    }
   /** Finite and nothing more: the only committed-invalid state is « nombre illisible ». */
   | { readonly kind: "finite" };
 
@@ -157,7 +176,10 @@ export type FieldSpec = {
   readonly optional?: true;
   /** § 3's warning column — non-blocking, and never a reason to withhold a number. */
   readonly warning: WarningRule | null;
-  /** Which gate this field's failure breaches. `null` for `x_D` and the Positions, in none. */
+  /**
+   * Which gate this field's failure breaches. `null` for `x_D`, the Positions and the target of the
+   * farthest point, in none.
+   */
   readonly gate: GateId | null;
 };
 
@@ -589,6 +611,36 @@ export const FIELDS = {
     warning: null,
     gate: "wind",
   },
+  // The Vent's profile (#120, §8.4): two percents with closed domains. Out of its domain a value
+  // is kept as given (ADR-0001) and refused — never clamped, and never read as a uniform wind.
+  windWidth: {
+    id: "windWidth",
+    label: heading("windWidth", "exact"),
+    errorLabel: heading("windWidth", "exact"),
+    quantity: "windWidth",
+    rule: {
+      kind: "within",
+      min: WIND_PROFILE.width.min,
+      max: WIND_PROFILE.width.max,
+      sentence: `une largeur entre ${formatQuantity("windWidth", WIND_PROFILE.width.min)} et ${formatQuantity("windWidth", WIND_PROFILE.width.max)} de la ${label("span", "exact")} est requise`,
+    },
+    warning: null,
+    gate: "wind",
+  },
+  windAttenuation: {
+    id: "windAttenuation",
+    label: heading("windAttenuation", "exact"),
+    errorLabel: heading("windAttenuation", "exact"),
+    quantity: "windAttenuation",
+    rule: {
+      kind: "within",
+      min: WIND_PROFILE.attenuation.min,
+      max: WIND_PROFILE.attenuation.max,
+      sentence: `une atténuation entre ${formatQuantity("windAttenuation", WIND_PROFILE.attenuation.min)} et ${formatQuantity("windAttenuation", WIND_PROFILE.attenuation.max)} est requise`,
+    },
+    warning: null,
+    gate: "wind",
+  },
   // The ride's constants (#89, #104): §12.2's, every one editable and labelled. The Ride Gate: only
   // the passager's ride reads them, so a bad one withholds it and nothing else.
   CdA: {
@@ -642,6 +694,24 @@ export const FIELDS = {
     optional: true,
     warning: null,
     gate: "ride",
+  },
+  // Where the passager's farthest point is wanted (#121). **In no gate**: no ride, garde or Verdict
+  // reads it — only the proposal of a height for B on Dynamique, which says itself why it gives
+  // none for a target outside the domain. So the band is a warning here, and a link's `cib=120` is
+  // kept as given (ADR-0001) without withholding a ride it has no part in.
+  reachTarget: {
+    id: "reachTarget",
+    label: heading("reachTarget", "exact"),
+    errorLabel: heading("reachTarget", "exact"),
+    quantity: "reachTarget",
+    rule: { kind: "finite" },
+    warning: {
+      kind: "band",
+      min: REACH.targetBand.min,
+      max: REACH.targetBand.max,
+      copy: `cible hors du domaine (${formatValue("reachTarget", REACH.targetBand.min)} – ${formatValue("reachTarget", REACH.targetBand.max)} % de la portée) : aucune hauteur de B n'est proposée [CONVENTION]`,
+    },
+    gate: null,
   },
   // The two Positions (#90). Both sit in no gate — their one reader is the Vent's bearing, and
   // without it the Vent is not applied rather than refused (`windBearing`) — and a blank pair is
@@ -972,11 +1042,14 @@ export function unreadableMessage(id: FieldId, raw: string, register?: Register)
 
 /**
  * Tier one on one field's raw text. **This is the whole of what a form validator may decide**:
- * emptiness, readability and a sign rule — no physics at all.
+ * emptiness, readability, and the field's one {@link HardRule} — a sign rule or a closed domain —
+ * no physics at all.
  *
- * @returns the standing issue, or `null` when the text is a value tier one accepts. An
- *   out-of-range-but-representable value is **valid here** and lights up as a warning or as an
- *   engine refusal — never as a second copy of a rule that lives downstream.
+ * @returns the standing issue, or `null` when the text is a value tier one accepts. A value
+ *   outside a **warning band** is valid here and lights up as a warning or as an engine refusal —
+ *   never as a second copy of a rule that lives downstream. A value outside a `within` domain
+ *   **blocks**: the rule is the field's own, not a reference's coverage, and the quantity has no
+ *   value there to compute with — the Vent's profile (#120) has no shape for a width of 95 %.
  */
 export function checkField(
   id: FieldId,
@@ -1018,6 +1091,16 @@ export function checkField(
         kind: "invalid",
         message: blocking(id, spec.rule.sentence, echo(id, shown, unit), context.register),
       };
+    case "within": {
+      // What the field would commit, which is what it prints: the canonical value on its grain.
+      const read = canonicalValue(id, shown, unit);
+      if (read >= spec.rule.min && read <= spec.rule.max) return null;
+      return {
+        field: id,
+        kind: "invalid",
+        message: blocking(id, spec.rule.sentence, echo(id, shown, unit), context.register),
+      };
+    }
   }
 }
 
@@ -1055,10 +1138,13 @@ export function warningFor(id: FieldId, value: number, context: FieldContext = {
  */
 export function commitField(id: FieldId, raw: string, context: FieldContext = {}): number | null {
   const shown = parseDecimal(raw);
-  if (shown === null) return null;
+  return shown === null ? null : canonicalValue(id, shown, context.unit ?? "daN");
+}
+
+/** A number read off the field's text → the canonical value, on the grain the field prints at. */
+function canonicalValue(id: FieldId, shown: number, unit: ForceUnit): number {
   const { quantity } = FIELDS[id];
   if (quantity === null) return shown;
-  const unit = context.unit ?? "daN";
   return roundToDisplay(quantity, fromDisplay(quantity, shown, unit), unit);
 }
 

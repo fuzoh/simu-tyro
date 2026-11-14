@@ -53,7 +53,7 @@ export function ridesUnder(
   profil: Trace | null = null,
   positions: Positions = DUE_NORTH,
 ) {
-  const withWind = { ...scenario, positions, wind: { speedKmh, directionDeg } };
+  const withWind = { ...scenario, positions, wind: { ...scenario.wind, speedKmh, directionDeg } };
   const unloaded = deriveUnloaded(unloadedInputs(withWind, profil));
   const frame = buildSceneFrame(unloaded.span);
   const base = buildSceneBase(frame, unloaded, sweepRiderOf(withWind));

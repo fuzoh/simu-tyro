@@ -145,10 +145,13 @@ export function ColumnsFrame({
 /** One of the right column's regions: a heading, then its occupant. */
 export function Region({
   title,
+  tips,
   className,
   children,
 }: {
   title: string;
+  /** The region's infobulles, beside its title (#122): its notes, its warnings. */
+  tips?: ReactNode;
   /** Where a Page's own layout places the region — Statique's first row (#109). */
   className?: string;
   children: ReactNode;
@@ -157,8 +160,11 @@ export function Region({
     <section
       className={cn("border-border flex flex-col gap-2 border-b py-3 last:border-b-0", className)}
     >
-      <h2 className="font-heading text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">
+      <h2 className="font-heading text-muted-foreground flex items-center gap-1 px-3 text-xs font-semibold tracking-wide uppercase">
         {title}
+        {tips !== undefined && tips !== null && (
+          <span className="inline-flex items-center gap-1 normal-case">{tips}</span>
+        )}
       </h2>
       {children}
     </section>

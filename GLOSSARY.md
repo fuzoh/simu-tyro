@@ -186,6 +186,15 @@ Position number for the traverse worst case signs off a line that fails 20 m fur
 along.
 _Avoid_: descente, envelope vs instant, global vs local, min vs current, worst case
 
+**Tension interne**:
+The tension the line carries at one point along it, `T = √(H² + V²)` there — a Position scope
+quantity: Avancé's graph at its foot draws it for the ligne à vide and the ligne chargée with the
+passager where the Scenario puts it, against the distance from A. Its two ends are the anchor
+tensions of that same instant, and at the passager it steps: the A side and the B side carry
+different tensions. Not the T max of the Résultats, which is the traverse's worst, and with two
+Brins porteurs always one line's under the normal 50/50 share, never the sum of the two.
+_Avoid_: tension max, tension totale, effort dans la ligne
+
 ### Safety
 
 **Verdict**:
@@ -257,14 +266,50 @@ component along it (positive toward B, so a tail wind) and one across it (positi
 it is a vector, never a whole `±` along the line. Moving an anchor therefore changes those
 components and never the Vent. **The Vent needs Positions**: without A and B on the map the line
 has no bearing, so the wind fields and the Rose des vents' handle are disabled with that reason,
-and the passager's ride and the Banane run without wind. A Vent a link or a Session carries without
+and the passager's ride and the Banane run without wind. A wind field whose value is refused — a
+Blocking Error on the Wind Gate, Positions or not — stays typable, so that it can be repaired
+where its message stands. A Vent a link or a Session carries without
 Positions is kept as given, never dropped, and the results read with it say it is not applied and
 why; it is not a Blocking Error and hides no result. No wind is speed 0 and direction 0, and it is
-what a link without `ws` and `wd` reads.
+what a link without `ws` and `wd` reads. The Vent may carry a Profil du vent; without one it is a
+Vent uniforme, which is what a link without `ww` and `wa` reads.
 _Avoid_: rafale, souffle, orientation du vent, direction relative à la ligne (as what is typed)
 
-**Zone centrale exposée**:
-The central plateau of the prescribed wind profile, where wind speed stays at its maximum before decreasing smoothly toward both anchors. Its exposed width is the length of that plateau along A–B, not the width of a bell-shaped peak.
+**Profil du vent**:
+How the speed of the Vent varies along A–B, as the user prescribes it: one symmetric bell, highest
+at mid-span — where it is the vitesse du vent entered — and falling to a residual speed at both
+anchors, with no plateau. Two percents set it, the Largeur à mi-atténuation and the Atténuation aux
+ancrages; the direction is the same along the whole line. It is the same at every height and every
+lateral position, and the line and the passager read the speed where they are — never its mean over
+the span. **A scenario that is typed, never a valley forecast**: no relief and no weather enters
+it. Its shape is `docs/simulation-theory.md` §8.4's. No computation reads it yet: until one does
+its controls are not offered, and a Vent that arrives with a profile that is not uniform is kept
+as given and refused — a Blocking Error on the Wind Gate, with « Passer au vent uniforme » — never
+computed as a uniform wind.
+_Avoid_: prévision, vent de vallée, plateau, zone centrale exposée, gaussienne, facteur Q
+
+**Largeur à mi-atténuation**:
+The width of the Profil du vent, in percent of the horizontal span: the distance between the two
+points where the wind speed is halfway between the speed at mid-span and the speed at the anchors
+— with 40 km/h at mid-span and 10 km/h at the anchors, where the wind is at 25 km/h. From 10 to
+90 %, in steps of one, 50 % shipped. Not the length of a plateau at the maximum speed, not a
+length stored in metres — the metres are a reading, the percent of the span on hand — and not an
+equaliser's Q. Under a Vent uniforme it is kept and has no effect.
+_Avoid_: largeur de plateau, zone centrale exposée, facteur Q, écart-type, largeur en mètres (as what is typed)
+
+**Atténuation aux ancrages**:
+How far the wind speed at both anchors sits below the speed at mid-span, in percent of that
+speed. 0 % is the Vent uniforme; 100 % is no wind at the anchors — an assumption that is typed,
+not a shelter that was observed. From 0 to 100 %, in steps of one. It scales a speed, never a
+force, and the speed at mid-span stays the vitesse du vent entered.
+_Avoid_: abri, rafale, réduction de force
+
+**Vent uniforme**:
+A Vent whose speed is the same along the whole line: an Atténuation aux ancrages of 0 %. It is
+what ships, and what a link or a Session older than the Profil du vent reads. « Vent uniforme »
+is also the command that sets that attenuation back to 0 % **and nothing else** — the speed, the
+direction and the Largeur à mi-atténuation stay. Not « pas de vent », which is a speed of 0.
+_Avoid_: vent constant, vent moyen
 
 **Marge exigée**:
 The margin the chosen Safety Regime demands. Not the margin the line actually has — that
@@ -300,6 +345,18 @@ _Avoid_: blocage, point mort, position finale, arrêt par le vent (as the only c
 The passager's speed at B on a ride that reaches it, in km/h and m/s. Terrain reads it with the Vent entered and Dynamique for both rides; a ride that stops short, or never settles, has none and says why instead. Always an estimation.
 _Avoid_: vitesse finale, vitesse maximale
 
+**Point le plus loin**:
+The farthest the passager gets toward B over the whole ride, swings back included — read with the **distance restante à B** from there. Not the Point d'arrêt: a passager who swings back comes to rest well short of where he turned, and a ride that reaches B has reached it wherever it rests afterwards. Always an estimation.
+_Avoid_: position maximale, portée atteinte, point d'arrêt (for it)
+
+**Cible du point le plus loin**:
+Where the Point le plus loin is wanted, as a share of the portée: 90 % shipped, 50 – 98 % its domain in whole percents, a convention — B itself and anything past it are excluded. A link's value between whole percents is read at the percent it prints as; above 93 % the proposal warns that a light tail wind or a lower drag reached B on lines measured. Set on Avancé in « Dynamique du passager » and read by the Proposition pour l'ancrage B alone: no ride, no garde and no Verdict reads it.
+_Avoid_: cible d'arrêt, objectif, consigne
+
+**Proposition pour l'ancrage B**:
+What Dynamique reads under its charts: by how much to raise or lower B, A fixed, for the Point le plus loin of the ride with the Vent entered to land on its cible — « Monter B de 17,6 m », « Descendre B de 0,4 m », « Garder B à cette hauteur ». The candidate is the Scenario's own chain run again with B moved in place over the profil as known — the Tightness Driver resolved afresh — and it is read by three values that are not one another (Point le plus loin, distance restante à B, Point d'arrêt), with the ride without wind beside it for comparison. It applies nothing: the Scenario and the ancrages stay as they are. An estimation, never a promise that the passager stops before B or that nothing is hit, and a B really moved stands on another ground, to be checked and computed again. Where the cible is out of its domain or out of reach, where the line stops solving on the way, where the garde is not judged or where the candidate would touch the profil outside the Zones d'ancrage, it says why and proposes no height.
+_Avoid_: suggestion, correction, recommandation, hauteur conseillée, réglage automatique
+
 **Estimation**:
 The word every dynamic value carries — Point d'arrêt, vitesse d'arrivée, durée, the speed and acceleration curves, the dynamic marks on the coupe. The passager's ride is a point mass on a frozen line with a fitted drag, not a measurement, and it never judges the Verdict. Never said of the statics, which Statique computes. The essai finds the engine *cohérent avec un essai* at the order of magnitude and shows nothing of the wind; the interface does not say *validé*, and what the essai does not show — the 50/50 share between two lignes — is *pas confirmé*.
 _Avoid_: prédiction, validé, précis, exact
@@ -309,7 +366,7 @@ The path of the passager's load over the whole traverse — where the trolley ha
 _Avoid_: parcours, chemin, animation
 
 **Dynamique du passager**:
-The Avancé group of what the ride is given beside the statics (§12.2): the **surface de traînée C_dA**, the **frottement constant de la poulie F₀** and the **frottement de la poulie proportionnel à la vitesse k_v** on a corde, the **frottement de la poulie μ** on a câble, and the **masse volumique de l'air ρ**. Set on Avancé only, each with its source; Dynamique says where they are set, not what they are. None is fitted on the essai.
+The Avancé group of what the ride is given beside the statics (§12.2): the **surface de traînée C_dA**, the **frottement constant de la poulie F₀** and the **frottement de la poulie proportionnel à la vitesse k_v** on a corde, the **frottement de la poulie μ** on a câble, and the **masse volumique de l'air ρ**. Set on Avancé only, each with its source; Dynamique says where they are set, not what they are. None is fitted on the essai. The group also holds the Cible du point le plus loin, which the ride does not read.
 _Avoid_: paramètres de la poulie
 
 **Rider Envelope**:
@@ -446,6 +503,16 @@ layout as the app, so it is correct at every width for free, and replaced wholes
 hydration.
 _Avoid_: loader, loading state, placeholder, spinner, shell (the shell is the document)
 
+**Infobulle**:
+The bubble behind an icon beside a label, on the four Pages: where every explanation, note,
+Avertissement and blocking field error is read, so that only labels, values, units and controls
+stand in the open. Three tones, each with its own icon — `ⓘ` an explanation or a note, `⚠` an
+Avertissement, `⛔` a blocking error — so a warning or an error is seen without opening anything;
+it opens on hover, on keyboard focus and on touch alike. What stays in the open: the Verdict and
+its reason, « Saisie en cours », and any sentence standing where a value would (« Aucun résultat
+— … »). Not the Provenance Chip, which is a pastille worn by a value.
+_Avoid_: tooltip, bulle d'aide, hint
+
 ### The map
 
 **Fond de carte**:
@@ -468,14 +535,15 @@ with its Banane, the Ligne A–B and the Trajectoire — the coupe's curves, wit
 own. Context, not measurement: it states nothing the coupe does not. Anchors drag there as on
 the carte: the line follows the pointer, the recalculation waits for the release. The camera
 moves by the Gimbal, by the keys once the view has the focus, and to the two Vues
-prédéfinies. Loaded only when chosen.
+prédéfinies; on Avancé and Terrain it also rides the passager's computed motion in the Vue embarquée. Loaded only when chosen.
 _Avoid_: 3D map, globe, scene, viewer
 
 **Gimbal**:
 The camera's controls over the corner of the Vue 3D: a north needle that turns with the
 camera and puts north up when pressed, a turn left or right around the line's centre, the
-inclinaison up or down, the zoom, and the two Vues prédéfinies. Each button has its key, and
-its hover names it. It moves the camera and nothing else: no anchor, no Scenario.
+inclinaison up or down, the zoom, the two Vues prédéfinies and, where the Page plays a ride, the
+Vue embarquée. Each button has its key, and its hover names it. It moves the camera and nothing
+else: no anchor, no Scenario.
 _Avoid_: boussole (avoided for the Rose des vents too), navigation control, widget
 
 **Vue prédéfinie**:
@@ -497,8 +565,23 @@ with a margin. The camera stands on the right of A → B, the side that puts A o
 screen. The view the Vue 3D opens on. Key 2.
 _Avoid_: vue de profil, vue de côté
 
+**Vue embarquée**:
+The Vue 3D from the passager's seat (#126): the eye hangs under the pulley, inside the gabarit du
+passager — 1,6 m above its foot, never above the pulley, a convention — and is carried along the
+ride with the Vent entered at the engine's own times and positions, swings back included, to the
+arrival, the Point d'arrêt or the last instant computed for a ride that never settles. One second
+on screen is one second of the ride. The head turns a full circle, and the eyes up or down,
+independently of the motion, playing or paused. Lecture, pause, recommencer and « Quitter la vue
+embarquée », which puts the camera back where it stood. An estimation. While it plays the loaded
+line — the passager's at the Position du passager — is hidden and the Trajectoire shown. Off, and
+saying why, while no ride is read, while the ride never leaves the departure or while an anchor is
+dragged; a new ride ends the one playing. The Gimbal's button and key 3, on Avancé and Terrain —
+never on Statique, which says no estimation. Not a Vue prédéfinie: it rides, and has its own
+controls.
+_Avoid_: vue passager, vue subjective, animation, simulation, VR
+
 **Rose des vents**:
-The compass rose drawn on the vue de dessus, with a handle that sets the Vent's direction and force by dragging. It edits the azimuth directly: on the north-up map the handle stands where the wind comes from. Its reading gives that azimuth and, from the line's bearing, where the wind comes from relative to the line A → B (« Vent d'ouest (264°), 30 km/h : par la gauche à l'avant, 312° par rapport à la ligne A → B »). Without A and B on the map it has no handle and says why. On Terrain it is read-only. It sets the wind that draws the Banane.
+The compass rose drawn on the vue de dessus, with a handle that sets the Vent's direction and force by dragging. It edits the azimuth directly: on the north-up map the handle stands where the wind comes from. Its reading gives that azimuth and, from the line's bearing, where the wind comes from relative to the line A → B (« Vent d'ouest (264°), 30 km/h : par la gauche à l'avant, 312° par rapport à la ligne A → B »). Without A and B on the map it has no handle and says why. On Terrain it is read-only. While the Wind Gate withholds the Vent it draws no wind, and its handle waits at the centre only where a drag from there repairs the Vent — a refused speed; over a refused Profil du vent it has no handle, since that drag would replace the Vent's speed and direction and repair nothing. It sets the wind that draws the Banane. A second handle sets the Profil du vent, on a pad of its own whose axes are the screen's and do not turn with the wind: to the right the Largeur à mi-atténuation grows, upward the Atténuation aux ancrages does, and a diagonal sets both. Beside it a preview draws the speed from A, on the left, through mid-span to B, with the speed at mid-span, the speed at the anchors and the width; « Vent uniforme » is its one command. Each handle writes its own values and keeps the rest of the Vent. Neither that handle nor the preview is offered until a computation reads the Profil du vent, and never on Terrain.
 _Avoid_: boussole, anémomètre
 
 **Fil à plomb**:

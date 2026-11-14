@@ -94,6 +94,12 @@ export type Polyline = {
   readonly zs: Float64Array;
 };
 
+/** A point in an SVG's user units — what a scene hands a chart once it has placed a point. */
+export type PxPoint = readonly [x: number, y: number];
+
+/** A polyline in an SVG's user units. */
+export type PxPath = readonly PxPoint[];
+
 /** One closed interval of rider positions, m. Signal 3 draws one tinted band per entry. */
 export type Band = { readonly from: number; readonly to: number };
 
@@ -463,17 +469,8 @@ function drawnGround({ L, terrain, bases }: PlacedSpan): {
 export function placeRider(base: SceneBase, requestedXD: number): SceneRider | null {
   const { span, P, terrain, hRider, anchorZone, L, h, unloadedCable } = base;
   const xD = clampX(requestedXD, L);
-  // §6.1 case 2 — outer bisection on `s_P`, inner 2×2 Newton, measured ≈40 µs. Snapping 99,7 to
-  // 101,2 and rewriting the field would discard user input silently for the sake of one code path.
-  const exact = solveAtHorizontalPosition(span, P, xD);
-  if (!exact.ok) return null;
-  const sP = exact.state.loads[0]?.s;
-  if (sP === undefined) return null;
-
-  // The same state, as the record the sweep publishes — `(x_D, z_D, T_A, T_B, θ)`, θ read on the
-  // below side of the kink like every other number in the app.
-  const resolved = sweepStep(span, P, sP, { H: exact.state.H, V0: exact.state.V0 });
-  if (!resolved.ok) return null;
+  const resolved = solveRider(base, xD);
+  if (resolved === null) return null;
   const { step, state } = resolved;
 
   // §11's **inner** minimum at this one rider position: the reducer, over a one-step traverse —
@@ -515,6 +512,32 @@ export function placeRider(base: SceneBase, requestedXD: number): SceneRider | n
     envelope: hRider,
     sagAtRider: (h * step.xD) / L - step.zD,
   };
+}
+
+/**
+ * The loaded line with the passager at `x_D`: § 5's exact §6.1-case-2 solve, then the same state as
+ * the record the sweep publishes. {@link placeRider} draws it on the coupe and reads its cells off
+ * it; Avancé's tension graph (#119) samples the very same state, so the graph's ends and the « T
+ * anc. A / B » cells are one solve and cannot disagree.
+ *
+ * @returns `null` when the exact solve refuses at this position.
+ */
+export function solveRider(
+  { span, P, L }: Pick<SceneBase, "span" | "P" | "L">,
+  requestedXD: number,
+): { step: SweepStep; state: SpanState } | null {
+  const xD = clampX(requestedXD, L);
+  // §6.1 case 2 — outer bisection on `s_P`, inner 2×2 Newton, measured ≈40 µs. Snapping 99,7 to
+  // 101,2 and rewriting the field would discard user input silently for the sake of one code path.
+  const exact = solveAtHorizontalPosition(span, P, xD);
+  if (!exact.ok) return null;
+  const sP = exact.state.loads[0]?.s;
+  if (sP === undefined) return null;
+
+  // The same state, as the record the sweep publishes — `(x_D, z_D, T_A, T_B, θ)`, θ read on the
+  // below side of the kink like every other number in the app.
+  const resolved = sweepStep(span, P, sP, { H: exact.state.H, V0: exact.state.V0 });
+  return resolved.ok ? { step: resolved.step, state: resolved.state } : null;
 }
 
 /**

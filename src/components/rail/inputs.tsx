@@ -42,7 +42,7 @@ import { createContext, Fragment, use, useEffect, useRef, useState } from "react
 import type { RailFormApi, RailFormState } from "@/components/app/use-rail-form.ts";
 import type { Deduced, DeducedSolve, ReadOutRow } from "@/lib/rail/deduced.ts";
 import type { FieldContext, FieldId } from "@/lib/rail/fields.ts";
-import type { BlockingError, FixActionId } from "@/lib/rail/gates.ts";
+import type { BlockingError, FixActionId, WindProfileFieldId } from "@/lib/rail/gates.ts";
 import type { PresetProvenance } from "@/lib/rail/presets.ts";
 import type { LadderRow } from "@/lib/rail/provenance.ts";
 import type { Results } from "@/lib/rail/results.ts";
@@ -64,7 +64,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.
 import { Separator } from "@/components/ui/separator.tsx";
 import { COPY_INCOMPLETE, copyLink } from "@/lib/app/persist.ts";
 import { siteOrigin } from "@/lib/app/site.ts";
-import { DOC_PAGES } from "@/lib/docs/pages.ts";
+import { MENU_DOC_PAGES } from "@/lib/docs/pages.ts";
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { deducedRows } from "@/lib/rail/deduced.ts";
 import {
@@ -96,9 +96,11 @@ import {
 } from "@/lib/rail/fields.ts";
 import {
   fieldUnavailable,
+  isWindProfileFieldShown,
   regimeUnavailableNote,
   TEXTILE_UNAVAILABLE_REASON,
   terminationOptions,
+  WIND_PROFILE_FIELDS,
 } from "@/lib/rail/gates.ts";
 import {
   DEDUCED_HELP,
@@ -137,6 +139,7 @@ import {
   TERMINATION_FIELD,
 } from "@/lib/rail/values.ts";
 import { airDensityOf } from "@/lib/scenario/dynamics.ts";
+import { uniformWind } from "@/lib/scenario/wind.ts";
 import { clearSession } from "@/lib/session/session.ts";
 import { isFamilyAllowed, isRegimeAvailable, REGIMES, TERMINATIONS } from "@/lib/sim";
 import { parseFailureMessage, parseProfileCsv, readFailure } from "@/lib/terrain/csv.ts";
@@ -153,7 +156,6 @@ import {
   Chip,
   Choice,
   ClampNote,
-  DisabledReason,
   FixButton,
   GroupHeading,
   InfoTip,
@@ -161,7 +163,9 @@ import {
   Picker,
   ReadOut,
   Row,
+  RowTips,
   Segmented,
+  Tip,
 } from "./controls.tsx";
 
 /**
@@ -186,9 +190,14 @@ export type RailRowContext = {
   readonly outlined: ReadonlySet<FieldId>;
   /**
    * Why a field cannot be typed into, or `null` — the gates' `fieldUnavailable`, read off the same
-   * report: the Vent's two fields without Positions.
+   * report: the Vent's fields without Positions, but for one the gates refuse or the caret is in.
    */
   readonly unavailable: (id: FieldId) => string | null;
+  /**
+   * Is this field of the Vent's profile on screen (#120)? The gates' `isWindProfileFieldShown`,
+   * read off the same report: before the profile is consumed, only a refused value has a row.
+   */
+  readonly windProfileShown: (id: WindProfileFieldId) => boolean;
   /** @returns the canonical value that **entered state**, or `null` when tier one refused. */
   readonly commit: (id: NumericFieldId, raw: string, settled: boolean) => number | null;
   /** A choice's write — a whole Scenario, through the store's one patch action. */
@@ -237,7 +246,7 @@ export function useFieldRows({
   const { scenario, trace } = useAppState();
   const dispatch = useAppDispatch();
   const regimePicker = useRef<HTMLSelectElement | null>(null);
-  const { form, text, setFocused, report } = rail;
+  const { form, text, focused, setFocused, report } = rail;
   const context = fieldContext(scenario, register);
 
   const breaches = new Map<FieldId, BlockingError>();
@@ -283,6 +292,10 @@ export function useFieldRows({
         return;
       case "passer-a-la-terminaison-de-depart":
         patch(applyShippedTerminations(scenario, breach));
+        return;
+      case "passer-au-vent-uniforme":
+        // The attenuation alone: the speed, the direction and the width stay as they are.
+        patch({ ...scenario, wind: uniformWind(scenario.wind) });
     }
   }
 
@@ -297,7 +310,8 @@ export function useFieldRows({
     register,
     breaches,
     outlined,
-    unavailable: (id) => fieldUnavailable(id, report),
+    unavailable: (id) => fieldUnavailable(id, report, focused),
+    windProfileShown: (id) => isWindProfileFieldShown(id, report),
     commit,
     patch,
     runFix,
@@ -425,9 +439,11 @@ export function RailInputs({
           groups stand on **two columns** — CSS columns, not a grid, because a column box flows the
           groups in the DOM's order, down the left column then down the right: the order on screen
           is the reading order and the Tab order, with no `order` to keep in step. `gap-3` is then
-          the gap between the two columns, `space-y-3` the one between groups, and no group is ever
-          cut across them (`break-inside-avoid` on each). The heading above stays across both. */}
-      <div className="wide-rail:block wide-rail:columns-2 wide-rail:space-y-3 wide-rail:*:break-inside-avoid mt-2 flex flex-col gap-3">
+          the gap on narrow widths, `wide-rail:gap-6` the one between the two columns, split by a
+          1px `column-rule` in `--border` (the colour of the Page's other dividers, #123);
+          `space-y-3` the one between groups, and no group is ever cut across them
+          (`break-inside-avoid` on each). The heading above stays across both. */}
+      <div className="wide-rail:block wide-rail:columns-2 wide-rail:space-y-3 wide-rail:*:break-inside-avoid wide-rail:gap-6 wide-rail:[column-rule:1px_solid_var(--border)] mt-2 flex flex-col gap-3">
         <Group title="Installation et régime">
           <UsageRow />
           <RegimeRow />
@@ -517,7 +533,7 @@ export function RailInputs({
                 // The **ambient** tier: plain status text, **no ⚠**. It fires on every textile
                 // line — a tyrolienne never enters §13.2's 10–30 % MBL band — so an alarm here
                 // would be permanent and therefore mute.
-                note={<AmbientNote text={rung("k")} />}
+                notes={[rung("k")]}
               />
             </>
           )}
@@ -601,9 +617,9 @@ export function RailInputs({
             <NumericRow
               hint="P/H"
               id="vRatio"
-              note={
-                <AmbientNote text="P / H : poids du passager sur la tension horizontale — plus il est grand, plus la ligne forme un V sous le passager." />
-              }
+              notes={[
+                "P / H : poids du passager sur la tension horizontale — plus il est grand, plus la ligne forme un V sous le passager.",
+              ]}
             />
           )}
           <RetensionNote />
@@ -649,6 +665,7 @@ export function RailInputs({
         <Group title={heading("wind", "exact")}>
           <NumericRow hint="km/h" id="windSpeed" />
           <NumericRow hint="°" id="windDirection" />
+          <WindProfileRows />
         </Group>
 
         {/* §12.2's constants, each editable and labelled, none silent (#89, #104). Only the
@@ -683,7 +700,7 @@ export function RailInputs({
               }
               id="trolleyMu"
               // The **ambient** tier, like `k`: it is said on every câble, so it carries no ⚠.
-              note={<AmbientNote text={STEEL_TROLLEY_NOTE} />}
+              notes={[STEEL_TROLLEY_NOTE]}
             />
           )}
           <NumericRow
@@ -691,19 +708,21 @@ export function RailInputs({
             hint="kg/m³"
             id="rho"
             idle={rho.idle}
-            note={<AmbientNote text={rho.note} />}
+            notes={[rho.note]}
           />
           {quasiStatic !== null && (
             <ReadOut
               help={QUASI_STATIC_HELP}
               label={QUASI_STATIC_LABEL}
+              notes={[quasiStatic.cause]}
               value={quasiStatic.value}
               warning={quasiStatic.warning}
             />
           )}
-          {quasiStatic?.cause != null && (
-            <p className="text-muted-foreground text-xs">{quasiStatic.cause}</p>
-          )}
+          {/* Where the farthest point is wanted (#121): no ride reads it. Dynamique answers it
+                with a height for B, and this row is the one place it is set. Its `ⓘ` is
+                `FIELD_HELP.reachTarget` alone, which already says what reads it. */}
+          <NumericRow hint="%" id="reachTarget" />
         </Group>
 
         {/* The Positions (#90): typed in WGS84, read in LV95. The statics never read them; the
@@ -830,11 +849,11 @@ export function RailInputs({
  * set — and nothing computed from it.
  */
 function RetensionNote() {
+  // The title stays in the open; the trial and its source are the `ⓘ`'s (#122).
   return (
-    <div className="border-border mt-2 flex flex-col gap-1 border-t pt-2">
+    <div className="border-border mt-2 flex items-center gap-1 border-t pt-2">
       <h4 className="text-xs font-semibold">{RETENSION.title}</h4>
-      <p className="text-muted-foreground text-xs">{RETENSION.text}</p>
-      <p className="text-muted-foreground text-xs">{RETENSION.source}</p>
+      <Tip label={RETENSION.title} text={`${RETENSION.text}\n\n${RETENSION.source}`} />
     </div>
   );
 }
@@ -863,6 +882,7 @@ export function NumericRow({
   hint,
   chip,
   note,
+  notes = [],
   warning,
   idle,
 }: {
@@ -871,7 +891,10 @@ export function NumericRow({
   label?: string;
   hint?: string;
   chip?: ReactNode;
+  /** Under the row, in the open: a transient note. Commands are the row's own Fix Actions. */
   note?: ReactNode;
+  /** The ambient tier — plain status, no ⚠ — behind the row's `ⓘ` (#122). */
+  notes?: readonly (string | null | undefined)[];
   /** § 6's Avertissement tier, beside § 3's own band warning — the row can carry either. */
   warning?: string | null;
   /**
@@ -946,14 +969,11 @@ export function NumericRow({
             }
             note={
               <>
-                {meaning !== undefined && (
-                  <p className="text-muted-foreground text-xs">{meaning}</p>
-                )}
-                {reason !== null && <DisabledReason reason={reason} />}
                 {note}
                 {breach !== undefined && <FixButtons breach={breach} onFix={runFix} />}
               </>
             }
+            notes={[meaning, reason, ...notes]}
             outlined={outlined.has(id)}
             warning={shown === null ? (warningFor(id, parsed, context) ?? warning ?? null) : null}
           />
@@ -961,6 +981,21 @@ export function NumericRow({
       }}
     </form.Field>
   );
+}
+
+/**
+ * The Vent's profile (#120) — its largeur à mi-atténuation and its atténuation aux ancrages, under
+ * the Vent's speed and direction on every Page that types them, each through {@link NumericRow}.
+ *
+ * Which rows stand is the gates' (`isWindProfileFieldShown`): none before the profile is consumed,
+ * but for a value a link or a Session brought and the Wind Gate refuses, whose row carries its
+ * message and its Fix Action.
+ */
+export function WindProfileRows() {
+  const { windProfileShown } = useRailRowContext();
+  return WIND_PROFILE_FIELDS.filter(windProfileShown).map((id) => (
+    <NumericRow hint="%" id={id} key={id} />
+  ));
 }
 
 /**
@@ -1107,11 +1142,12 @@ export function RailHeaderControls({
             </span>
           </Button>
           <Separator className="my-1" />
-          {/* The documentation — the theory the engine is built against and the reports behind
-              it, rendered at `/docs`. Links wearing `buttonVariants`, never `<Button render>`:
+          {/* The documentation — the guide's sommaire, the reference the engine is built against
+              and the reports behind it, rendered at `/docs`; the guide's chapters are one click
+              away from its sommaire. Links wearing `buttonVariants`, never `<Button render>`:
               they navigate, and Base UI's button would take the anchor's semantics away. */}
           <p className="text-muted-foreground px-2.5 text-xs">Documentation</p>
-          {DOC_PAGES.map((page) => (
+          {MENU_DOC_PAGES.map((page) => (
             <Link
               className={cn(
                 buttonVariants({ variant: "ghost", size: "sm" }),
@@ -1149,10 +1185,19 @@ const CLEAR_SESSION_CONFIRM =
  * {@link Row}'s `stacked` docblock records at the Rail's 288 px. The rows inside carry their own
  * `py-1`, so the group adds no gap of its own.
  */
-export function Group({ title, children }: { title: string; children: ReactNode }) {
+export function Group({
+  title,
+  tip,
+  children,
+}: {
+  title: string;
+  /** A note about the group, behind an `ⓘ` on its heading (#122). */
+  tip?: string | null;
+  children: ReactNode;
+}) {
   return (
     <section>
-      <GroupHeading title={title} />
+      <GroupHeading tip={tip} title={title} />
       <div className="mt-1">{children}</div>
     </section>
   );
@@ -1239,16 +1284,13 @@ export function RegimeRow() {
           ? undefined
           : { text: breach.message, blocking: breach.kind !== "empty" }
       }
-      // § 10.1's reason and § 7's Fix Action share the one full-width slot, reason first: it
-      // explains the state the Fix Action offers to leave.
+      // § 10.1's reason is the `ⓘ`'s (#122); § 7's Fix Action stays in the open, under the pair.
       note={
-        reason === null && fixes.length === 0 ? null : (
-          <>
-            {reason !== null && <DisabledReason reason={reason} />}
-            {breach !== undefined && <FixButtons breach={breach} onFix={runFix} />}
-          </>
+        fixes.length === 0 || breach === undefined ? null : (
+          <FixButtons breach={breach} onFix={runFix} />
         )
       }
+      notes={[reason]}
     />
   );
 }
@@ -1375,10 +1417,9 @@ export function TensioningDeviceRow({
               onClick={() => patch({ ...scenario, tensioningDevice: "pulley" })}
             />
           </div>
-        ) : steel ? (
-          <DisabledReason reason={MAESTRO_ROPE_ONLY} />
         ) : undefined
       }
+      notes={[warning === null && steel ? MAESTRO_ROPE_ONLY : null]}
       warning={warning}
     />
   );
@@ -1557,25 +1598,33 @@ function FileControls({
         </p>
       )}
       {failure !== null && (
-        <div className="flex flex-col gap-1">
-          {/* **Inline beneath the control, never in the banner slot** — nothing about the current
-              line changed, and a rejected file leaves the current terrain untouched. */}
-          <p className="text-destructive text-xs">⛔ {parseFailureMessage(failure)}</p>
-          <div className="flex flex-wrap gap-1">
-            <FixButton label={PROFILE_IMPORT_COPY.chooseAnother} onClick={onChoose} />
-          </div>
+        // **Beside the control, never in the banner slot** — nothing about the current line
+        // changed, and a rejected file leaves the current terrain untouched. The ⛔ is in the
+        // open and the message behind it (#122); the way out stays a button.
+        <div className="flex flex-wrap items-center gap-1">
+          <Tip
+            label={PROFILE_IMPORT_COPY.choose}
+            text={parseFailureMessage(failure)}
+            tone="error"
+          />
+          <FixButton label={PROFILE_IMPORT_COPY.chooseAnother} onClick={onChoose} />
         </div>
       )}
     </div>
   );
 }
 
+/** Why « Charger le profil geo.admin » is disabled. */
+const GEOADMIN_NEEDS_POSITIONS = "Les Positions A et B sont nécessaires.";
+
 /**
  * « Charger le profil geo.admin » (#103) — an explicit action, never a side effect of typing a
- * Position. Every outcome short of a profil is an **ambient** line under the button: the terrain on
- * screen stays as it was, because the profil is a connected extra on top of an app that computes
- * offline.
+ * Position. Every outcome short of a profil is **ambient**: the terrain on screen stays as it was,
+ * because the profil is a connected extra on top of an app that computes offline. A failed load is
+ * a ⚠ beside the button and the reason it is disabled joins its ⓘ (#122); only « Chargement… »
+ * stays a line under it, as the button's state.
  */
+
 function GeoadminControls() {
   const { scenario } = useAppState();
   const dispatch = useAppDispatch();
@@ -1609,12 +1658,19 @@ function GeoadminControls() {
         >
           Charger le profil geo.admin
         </Button>
-        <InfoTip label="Charger le profil geo.admin" text={GEOADMIN_HELP} />
+        {/* Why the button is disabled joins its explanation; a failed load is a ⚠ beside it —
+            the terrain on screen stays as it was, so it is not an error (#122). The load itself
+            stays in the open while it runs: it is the button's state, not an explanation. */}
+        <RowTips
+          label="Charger le profil geo.admin"
+          notes={[GEOADMIN_HELP, A === null || B === null ? GEOADMIN_NEEDS_POSITIONS : null]}
+          warning={A === null || B === null || loading ? null : notice}
+        />
       </div>
-      {A === null || B === null ? (
-        <AmbientNote text="Les Positions A et B sont nécessaires." />
-      ) : (
-        <AmbientNote text={loading ? "Chargement du profil geo.admin…" : notice} />
+      {A !== null && B !== null && loading && (
+        <p className="text-muted-foreground text-xs" role="status">
+          Chargement du profil geo.admin…
+        </p>
       )}
     </div>
   );
@@ -1657,14 +1713,8 @@ function TerminationRow({
       htmlFor={`rail-${id}`}
       label={`Terminaison ${end}`}
       message={breach === undefined ? undefined : { text: breach.message, blocking: true }}
-      note={
-        reason === null && breach === undefined ? null : (
-          <>
-            {reason !== null && <DisabledReason reason={reason} />}
-            {breach !== undefined && <FixButtons breach={breach} onFix={runFix} />}
-          </>
-        )
-      }
+      note={breach === undefined ? null : <FixButtons breach={breach} onFix={runFix} />}
+      notes={[reason]}
       outlined={outlined.has(id)}
     />
   );
@@ -1721,16 +1771,4 @@ export function DerivedRow({
 export function presetChip(provenance: PresetProvenance | undefined): ReactNode {
   if (provenance === undefined) return undefined;
   return <Chip detail={provenance.detail} label={provenance.label} tone={provenance.tone} />;
-}
-
-/**
- * The ladder's **ambient** rung: plain status text beside the value, with **no ⚠**.
- *
- * The tier is defined by a property rather than by taste — it fires *always*, so an alarm would
- * fire always and mean nothing. Textile `k` is its one case: §13.2 publishes the ratio for 10–30 %
- * MBL and a zip line stands at ≈0,6 % and rides at ≈6,3 %, so every rope is out of band.
- */
-export function AmbientNote({ text }: { text: string | null }) {
-  if (text === null) return null;
-  return <p className="text-muted-foreground text-xs">{text}</p>;
 }

@@ -178,3 +178,58 @@ export function sampleCable(state: SpanState, n: number): Float64Array {
   }
   return out;
 }
+
+/**
+ * §2's tension magnitude `T(s) = √(H² + V(s)²)` along the line, with §6.1's piecewise `V(s)` —
+ * the line's **internal tension** at `n + 1` points uniform in the material coordinate, returned as
+ * interleaved `x, T` pairs in ascending `s` (and so ascending `x`).
+ *
+ * **Each point load adds two pairs at its node**, both at `x(s_P)`: the `s_P⁻` side first
+ * (`V₀ + w·s_P + Σ earlier P`), then the `s_P⁺` side, `P` higher in `V`. §6.1 is explicit that the
+ * two magnitudes differ in general — « Do not impose `T₁ = T₂` at the node » — so a sampled curve
+ * that smoothed across the node would draw a tension no side of the line carries. The first pair is
+ * `T_A` and the last `T_B` exactly, by the same formula the solver reports them with.
+ *
+ * Analytic and pure like {@link sampleCable}: nothing is stored on the `SpanState`.
+ *
+ * @throws RangeError when `n` is not a positive integer — the same caller bug as `sampleCable`'s.
+ */
+export function sampleTension(state: SpanState, n: number): Float64Array {
+  if (!Number.isInteger(n) || n < 1) {
+    throw new RangeError(`sampleTension: n must be a positive integer, got ${n}`);
+  }
+  const loads = inSOrder(state.loads);
+  const shape: CableShape = { H: state.H, V0: state.V0, w: state.w, EA: state.EA, loads };
+  const out = new Float64Array(2 * (n + 1 + 2 * loads.length));
+  let k = 0;
+  const push = (x: number, V: number) => {
+    out[k++] = x;
+    out[k++] = Math.hypot(state.H, V);
+  };
+  let next = 0;
+  for (let i = 0; i <= n; i++) {
+    const s = i === n ? state.L0 : (state.L0 * i) / n;
+    // The nodes up to this grid point, in `s` order, before its own sample. A node on the grid
+    // point lands before it too, so the `s_P⁺` pair precedes the grid pair at the same `x`.
+    while (next < loads.length && loads[next].s <= s) {
+      const node = loads[next];
+      const below = verticalTensionAt(shape, node.s);
+      const x = xAt(shape, node.s);
+      push(x, below);
+      push(x, below + node.P);
+      next++;
+    }
+    // `verticalTensionAt` reads the `s⁻` side at a node; a grid point on a node is past it.
+    const onNode = next > 0 && loads[next - 1].s === s;
+    push(xAt(shape, s), verticalTensionAt(shape, s) + (onNode ? loads[next - 1].P : 0));
+  }
+  // A node past `L₀` is no node of this line; it still gets its pair, last, so the array is full.
+  while (next < loads.length) {
+    const node = loads[next++];
+    const below = verticalTensionAt(shape, node.s);
+    const x = xAt(shape, node.s);
+    push(x, below);
+    push(x, below + node.P);
+  }
+  return out;
+}

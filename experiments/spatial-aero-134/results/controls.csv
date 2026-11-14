@@ -1,0 +1,95 @@
+controle,cas,grandeur,unite,attendu,obtenu,tolerance,passe,source
+§15 sans vent,Z1,H,N,1423.94,1423.94,0.00569576,oui,simulation-theory.md §15 Z1
+§15 sans vent,Z1,V₀,N,-251.25,-251.25,0.001005,oui,simulation-theory.md §15 Z1
+§15 sans vent,Z1,V_B,N,251.25,251.25,0.001005,oui,simulation-theory.md §15 Z1
+§15 sans vent,Z1,T_max,N,1445.94,1445.94,0.00578376,oui,simulation-theory.md §15 Z1
+§15 sans vent,Z1,flèche,m,4.39987,4.39987,0.0000175995,oui,simulation-theory.md §15 Z1
+§15 sans vent,Z2,H,N,1442.11,1442.11,0.00576844,oui,simulation-theory.md §15 Z2
+§15 sans vent,Z2,V₀,N,-510,-510,0.00204,oui,simulation-theory.md §15 Z2
+§15 sans vent,Z2,T_A,N,1529.63,1529.63,0.00611852,oui,simulation-theory.md §15 Z2
+§15 sans vent,Z2,T_B,N,1529.63,1529.63,0.00611852,oui,simulation-theory.md §15 Z2
+§15 sans vent,Z2,flèche,m,8.75376,8.75376,0.000035015,oui,simulation-theory.md §15 Z2
+§15 sans vent,Z3,H,N,1286.38,1286.38,0.00514552,oui,simulation-theory.md §15 Z3
+§15 sans vent,Z3,V₀,N,-468.701,-468.701,0.0018748,oui,simulation-theory.md §15 Z3
+§15 sans vent,Z3,V_B,N,141.299,141.299,0.000565196,oui,simulation-theory.md §15 Z3
+§15 sans vent,Z3,T_A,N,1369.11,1369.11,0.00547644,oui,simulation-theory.md §15 Z3
+§15 sans vent,Z3,T_B,N,1294.12,1294.12,0.00517648,oui,simulation-theory.md §15 Z3
+§15 sans vent,Z3,flèche,m,7.0811,7.0811,0.00005,oui,simulation-theory.md §15 Z3
+§15 sans vent,Z4,H,N,7898.16,7898.16,0.0315926,oui,simulation-theory.md §15 Z4
+§15 sans vent,Z4,V₀,N,-1091,-1091,0.004364,oui,simulation-theory.md §15 Z4
+§15 sans vent,Z4,V_B,N,1091,1091,0.004364,oui,simulation-theory.md §15 Z4
+§15 sans vent,Z4,T_A,N,7973.16,7973.16,0.0318926,oui,simulation-theory.md §15 Z4
+§15 sans vent,Z4,T_B,N,7973.16,7973.16,0.0318926,oui,simulation-theory.md §15 Z4
+§15 sans vent,Z4,z au passager,m,-5.31434,-5.31434,0.0000212574,oui,simulation-theory.md §15 Z4
+§15 sans vent,Z5,H,N,7765.67,7765.67,0.0310627,oui,simulation-theory.md §15 Z5
+§15 sans vent,Z5,V₀,N,-973.369,-973.369,0.00389348,oui,simulation-theory.md §15 Z5
+§15 sans vent,Z5,x au passager,m,59.9578,59.9578,0.000239831,oui,simulation-theory.md §15 Z5
+§15 sans vent,Z5,z au passager,m,-5.19064,-5.19064,0.0000207626,oui,simulation-theory.md §15 Z5
+moteur plan sans vent,acier-12|niveau|vide|calme,H,N,2602.91,2602.91,0.0104116,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,acier-12|niveau|vide|calme,T_A,N,2634,2634,0.010536,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,acier-12|niveau|vide|calme,T_B,N,2634,2634,0.010536,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,acier-12|niveau|vide|calme,T_max,N,2634,2634,0.010536,oui,"`solveSpan`, moteur plan (§4–§6)"
+variantes sans vent,acier-12|niveau|vide|calme,plus grand écart de longueur,m,0,0,0.0001,oui,"sans vent, toute force aérodynamique est nulle : les modèles coïncident"
+variantes sans vent,acier-12|niveau|vide|calme,plus grand écart de force,N,0,0,0.001,oui,"sans vent, toute force aérodynamique est nulle : les modèles coïncident"
+moteur plan sans vent,acier-12|niveau|passager|calme,H,N,8150.1,8150.1,0.0326004,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,acier-12|niveau|passager|calme,T_A,N,8210.26,8210.27,0.032841,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,acier-12|niveau|passager|calme,T_B,N,8210.26,8210.27,0.032841,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,acier-12|niveau|passager|calme,T_max,N,8210.26,8210.27,0.032841,oui,"`solveSpan`, moteur plan (§4–§6)"
+variantes sans vent,acier-12|niveau|passager|calme,plus grand écart de longueur,m,0,0,0.0001,oui,"sans vent, toute force aérodynamique est nulle : les modèles coïncident"
+variantes sans vent,acier-12|niveau|passager|calme,plus grand écart de force,N,0,0,0.001,oui,"sans vent, toute force aérodynamique est nulle : les modèles coïncident"
+moteur plan sans vent,acier-12|incline|vide|calme,H,N,2535.58,2535.58,0.0101423,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,acier-12|incline|vide|calme,T_A,N,2634,2634,0.010536,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,acier-12|incline|vide|calme,T_B,N,2537.54,2537.54,0.0101502,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,acier-12|incline|vide|calme,T_max,N,2634,2634,0.010536,oui,"`solveSpan`, moteur plan (§4–§6)"
+variantes sans vent,acier-12|incline|vide|calme,plus grand écart de longueur,m,0,0,0.0001,oui,"sans vent, toute force aérodynamique est nulle : les modèles coïncident"
+variantes sans vent,acier-12|incline|vide|calme,plus grand écart de force,N,0,0,0.001,oui,"sans vent, toute force aérodynamique est nulle : les modèles coïncident"
+moteur plan sans vent,acier-12|incline|passager|calme,H,N,7934.43,7934.43,0.0317377,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,acier-12|incline|passager|calme,T_A,N,8172.15,8172.15,0.0326886,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,acier-12|incline|passager|calme,T_B,N,7934.5,7934.5,0.031738,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,acier-12|incline|passager|calme,T_max,N,8172.15,8172.15,0.0326886,oui,"`solveSpan`, moteur plan (§4–§6)"
+variantes sans vent,acier-12|incline|passager|calme,plus grand écart de longueur,m,0,0,0.0001,oui,"sans vent, toute force aérodynamique est nulle : les modèles coïncident"
+variantes sans vent,acier-12|incline|passager|calme,plus grand écart de force,N,0,0,0.001,oui,"sans vent, toute force aérodynamique est nulle : les modèles coïncident"
+moteur plan sans vent,corde-bandit-11|niveau|vide|calme,H,N,1399.04,1399.04,0.00559615,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,corde-bandit-11|niveau|vide|calme,T_A,N,1400,1400,0.0056,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,corde-bandit-11|niveau|vide|calme,T_B,N,1400,1400,0.0056,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,corde-bandit-11|niveau|vide|calme,T_max,N,1400,1400,0.0056,oui,"`solveSpan`, moteur plan (§4–§6)"
+variantes sans vent,corde-bandit-11|niveau|vide|calme,plus grand écart de longueur,m,0,0,0.0001,oui,"sans vent, toute force aérodynamique est nulle : les modèles coïncident"
+variantes sans vent,corde-bandit-11|niveau|vide|calme,plus grand écart de force,N,0,0,0.001,oui,"sans vent, toute force aérodynamique est nulle : les modèles coïncident"
+moteur plan sans vent,corde-bandit-11|niveau|passager|calme,H,N,1924.87,1924.87,0.00769949,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,corde-bandit-11|niveau|passager|calme,T_A,N,1955.75,1955.75,0.00782301,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,corde-bandit-11|niveau|passager|calme,T_B,N,1955.75,1955.75,0.00782301,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,corde-bandit-11|niveau|passager|calme,T_max,N,1955.75,1955.75,0.00782301,oui,"`solveSpan`, moteur plan (§4–§6)"
+variantes sans vent,corde-bandit-11|niveau|passager|calme,plus grand écart de longueur,m,0,0,0.0001,oui,"sans vent, toute force aérodynamique est nulle : les modèles coïncident"
+variantes sans vent,corde-bandit-11|niveau|passager|calme,plus grand écart de force,N,0,0,0.001,oui,"sans vent, toute force aérodynamique est nulle : les modèles coïncident"
+moteur plan sans vent,corde-bandit-11|incline|vide|calme,H,N,1382.88,1382.88,0.00553152,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,corde-bandit-11|incline|vide|calme,T_A,N,1400,1400,0.0056,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,corde-bandit-11|incline|vide|calme,T_B,N,1387.55,1387.55,0.0055502,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,corde-bandit-11|incline|vide|calme,T_max,N,1400,1400,0.0056,oui,"`solveSpan`, moteur plan (§4–§6)"
+variantes sans vent,corde-bandit-11|incline|vide|calme,plus grand écart de longueur,m,0,0,0.0001,oui,"sans vent, toute force aérodynamique est nulle : les modèles coïncident"
+variantes sans vent,corde-bandit-11|incline|vide|calme,plus grand écart de force,N,0,0,0.001,oui,"sans vent, toute force aérodynamique est nulle : les modèles coïncident"
+moteur plan sans vent,corde-bandit-11|incline|passager|calme,H,N,1902,1902,0.007608,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,corde-bandit-11|incline|passager|calme,T_A,N,1988.73,1988.73,0.00795491,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,corde-bandit-11|incline|passager|calme,T_B,N,1905.31,1905.31,0.00762124,oui,"`solveSpan`, moteur plan (§4–§6)"
+moteur plan sans vent,corde-bandit-11|incline|passager|calme,T_max,N,1988.73,1988.73,0.00795491,oui,"`solveSpan`, moteur plan (§4–§6)"
+variantes sans vent,corde-bandit-11|incline|passager|calme,plus grand écart de longueur,m,0,0,0.0001,oui,"sans vent, toute force aérodynamique est nulle : les modèles coïncident"
+variantes sans vent,corde-bandit-11|incline|passager|calme,plus grand écart de force,N,0,0,0.001,oui,"sans vent, toute force aérodynamique est nulle : les modèles coïncident"
+traînée normale seule,"sans poids, 20 m/s de travers, C_D⊥ = 1,2",T_A,N,2000,2000,0.00002,oui,"§18.6 contrôle 3 : T constant, L = (2T/p)·asinh(pΣ/2T)"
+traînée normale seule,"sans poids, 20 m/s de travers, C_D⊥ = 1,2",T_B,N,2000,2000,0.00002,oui,"§18.6 contrôle 3 : T constant, L = (2T/p)·asinh(pΣ/2T)"
+traînée normale seule,"sans poids, 20 m/s de travers, C_D⊥ = 1,2",déport,m,2.20161,2.20161,2.20161e-8,oui,"§18.6 contrôle 3 : T constant, L = (2T/p)·asinh(pΣ/2T)"
+traînée normale seule,"sans poids, 20 m/s de travers, C_D⊥ = 1,2",flèche,m,0,0,9.98907e-7,oui,"§18.6 contrôle 3 : T constant, L = (2T/p)·asinh(pΣ/2T)"
+portance seule,"sans poids, 20 m/s de travers, C_L = +0,5, loi binormale",T_A,N,2000,2000,0.00002,oui,§18.6 contrôle 4 : arc de cercle R = T/p
+portance seule,"sans poids, 20 m/s de travers, C_L = +0,5, loi binormale",T_B,N,2000,2000,0.00002,oui,§18.6 contrôle 4 : arc de cercle R = T/p
+portance seule,"sans poids, 20 m/s de travers, C_L = +0,5, loi binormale",remontée,m,0.919014,0.919014,9.19014e-9,oui,§18.6 contrôle 4 : arc de cercle R = T/p
+portance seule,"sans poids, 20 m/s de travers, C_L = +0,5, loi binormale",déport,m,0,0,9.99975e-7,oui,§18.6 contrôle 4 : arc de cercle R = T/p
+traînée axiale seule,"sans poids, 20 m/s de dos, C_t = 0,1",T_A − T_B,N,29.4294,29.4294,2.94294e-7,oui,§18.6 contrôle 5 : T_A − T_B = ½·ρ·C_t·d·|U|·U·L
+traînée axiale seule,"sans poids, 20 m/s de dos, C_t = 0,1",déport,m,0,0,0.000001001,oui,§18.6 contrôle 5 : T_A − T_B = ½·ρ·C_t·d·|U|·U·L
+traînée axiale seule,"sans poids, 20 m/s de face, C_t = 0,1",T_A − T_B,N,-29.4294,-29.4294,2.94294e-7,oui,§18.6 contrôle 5 : T_A − T_B = ½·ρ·C_t·d·|U|·U·L
+traînée axiale seule,"sans poids, 20 m/s de face, C_t = 0,1",déport,m,0,0,0.000001001,oui,§18.6 contrôle 5 : T_A − T_B = ½·ρ·C_t·d·|U|·U·L
+charge uniforme,Z1 avec w = 3 N/m et p_y = 4 N/m,H,N,1423.94,1423.94,0.00569576,oui,"simulation-theory.md §15 Z1, chaînette inclinée de atan(4/3) autour de A–B"
+charge uniforme,Z1 avec w = 3 N/m et p_y = 4 N/m,T_max,N,1445.94,1445.94,0.00578376,oui,"simulation-theory.md §15 Z1, chaînette inclinée de atan(4/3) autour de A–B"
+charge uniforme,Z1 avec w = 3 N/m et p_y = 4 N/m,flèche,m,2.63992,2.63992,0.0000105597,oui,"simulation-theory.md §15 Z1, chaînette inclinée de atan(4/3) autour de A–B"
+charge uniforme,Z1 avec w = 3 N/m et p_y = 4 N/m,déport,m,3.5199,3.5199,0.0000140796,oui,"simulation-theory.md §15 Z1, chaînette inclinée de atan(4/3) autour de A–B"
+miroir,"acier-12|incline|passager|oblique-20, NLA-b+0.5-0.1",T_A,N,8005.86,8005.86,0.0001,oui,§18.6 contrôle 7 : vent traversier et signe de C_L inversés
+miroir,"acier-12|incline|passager|oblique-20, NLA-b+0.5-0.1",T_max,N,8005.86,8005.86,0.0001,oui,§18.6 contrôle 7 : vent traversier et signe de C_L inversés
+miroir,"acier-12|incline|passager|oblique-20, NLA-b+0.5-0.1",flèche,m,7.4352,7.4352,0.00001,oui,§18.6 contrôle 7 : vent traversier et signe de C_L inversés
+miroir,"acier-12|incline|passager|oblique-20, NLA-b+0.5-0.1",déport,m,-0.68432,-0.68432,0.00001,oui,§18.6 contrôle 7 : vent traversier et signe de C_L inversés

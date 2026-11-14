@@ -72,6 +72,17 @@ bun run test:ci          # vitest, minus the wall-clock tripwire
 jactionlint              # only if you touched .github/ — `uv tool install jactionlint`
 ```
 
+One more check is **not** in CI and is yours to run after any change under `src/lib/sim/` or
+`experiments/`:
+
+```bash
+bun experiments/spatial-aero-134/matrix.ts --check   # the archived tables and report still match the code
+```
+
+It exits `1` when a file differs: regenerate as
+[`docs/conventions/simulation.md`](docs/conventions/simulation.md#experiments-are-not-the-engine)
+says, or the report under `docs/references/spatial-wind/` goes stale with every other check green.
+
 `test:ci` skips the wall-clock p95 gate ([why](docs/conventions/testing.md#benches)), so run the full
 **`bun run test`** locally before merging anything under `src/lib/sim/`.
 

@@ -100,6 +100,7 @@ describe("the public surface", () => {
     const surface = {
       solveSpan: sim.solveSpan,
       sampleCable: sim.sampleCable,
+      sampleTension: sim.sampleTension,
       solveAtHorizontalPosition: sim.solveAtHorizontalPosition,
       sweep: sim.sweep,
       zGroundAt: sim.zGroundAt,
@@ -126,6 +127,15 @@ describe("the public surface", () => {
     // reach it directly. Same for `sweepGrid` and the Jacobian. »
     const withheld = ["levelSpanShortcut", "sweepGrid", "jacobianAt"];
     expect(withheld.filter((name) => Object.keys(sim).includes(name))).toEqual([]);
+  });
+
+  it("withholds the wind profile's bare shape: a reader takes the local speed (#120)", () => {
+    // `φ` alone scales no force and no mean: `windAt` is the physics' entry, `windProfileSpeed` a
+    // reading's, and §8.4's tests reach the shape through its module.
+    expect(Object.keys(sim)).toEqual(
+      expect.arrayContaining(["WIND_PROFILE", "windAt", "windProfileSpeed"]),
+    );
+    expect(Object.keys(sim)).not.toContain("windProfileShape");
   });
 
   it("re-exports the constants and catalogues the app reads, and no solver internals", () => {

@@ -38,6 +38,8 @@ rewrite.
 | Styling, Tailwind v4, shadcn | [docs/conventions/ui.md](docs/conventions/ui.md) |
 | TypeScript, imports, formatting | [docs/conventions/typescript.md](docs/conventions/typescript.md) |
 | Tests | [docs/conventions/testing.md](docs/conventions/testing.md) |
+| `experiments/`, and any change under `src/lib/sim/` (their archived reports depend on it) | [docs/conventions/simulation.md § Experiments are not the engine](docs/conventions/simulation.md#experiments-are-not-the-engine), then the experiment's `README.md` |
+| First load, the Vue 3D under a drag, `scripts/` | [docs/performance/](docs/performance/) (each report's protocol; its harness is in `scripts/`) |
 
 ## Agent skills
 

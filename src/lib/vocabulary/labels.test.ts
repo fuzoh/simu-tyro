@@ -298,8 +298,12 @@ describe("everything the app prints", () => {
     expect(names).not.toContain(join("lib", "vocabulary", "labels.test.ts"));
     // A JSX text that a « ; » runs through: what a scan that cut on punctuation would lose.
     const docsIndex = join(SRC, "routes", "docs.index.tsx");
-    expect(copyOf(docsIndex, readFileSync(docsIndex, "utf8"))).toContain(
-      "Les « § » des infobulles du simulateur renvoient à la première page. Les autres sont les rapports dont elle a été consolidée ; ils sont servis tels qu'ils figurent dans le dépôt.",
+    // Matched inside its text node, not as the whole node: the node also carries the « . » that
+    // closes the sentence the link before it opens, which is the link's markup and not this test's.
+    expect(copyOf(docsIndex, readFileSync(docsIndex, "utf8"))).toContainEqual(
+      expect.stringContaining(
+        "Les « § » des infobulles du simulateur renvoient à la référence technique ; les rapports d'origine sont servis tels qu'ils figurent dans le dépôt.",
+      ),
     );
   });
 

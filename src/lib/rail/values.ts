@@ -72,7 +72,10 @@ export type NumericFieldId = {
   [K in FieldId]: (typeof FIELDS)[K]["quantity"] extends null ? never : K;
 }[FieldId];
 
-/** The numeric fields a gate reads: all but `x_D` and the Positions, which sit in no gate. */
+/**
+ * The numeric fields a gate reads: all but `x_D`, the Positions and the target of the farthest point,
+ * which sit in no gate.
+ */
 export type GatedFieldId = {
   [K in NumericFieldId]: (typeof FIELDS)[K]["gate"] extends null ? never : K;
 }[NumericFieldId];
@@ -160,7 +163,7 @@ type NullableFieldId = OverrideFieldId | "MBL" | "muTextile" | "dTextile" | "k" 
 
 /**
  * What each lens reads. A Tightness Driver's reads the driver alone, so a refusal holding only the
- * `tightness` can name its target; `x_D`'s reads the whole draft; every other lens reads the
+ * `tightness` can name its target; a field in no gate reads the whole draft; every other lens reads the
  * Traverse-scope Scenario, so no lens the gates call can reach `x_D`.
  */
 type LensScope<K extends NumericFieldId> = K extends TightnessFieldId
@@ -308,6 +311,15 @@ export const FIELD_ACCESS: FieldAccess = {
     read: ({ wind }) => wind.directionDeg,
     write: (s, directionDeg) => ({ ...s, wind: { ...s.wind, directionDeg } }),
   },
+  // The Vent's profile (#120): each lens writes its own percent and leaves the rest of the Vent.
+  windWidth: {
+    read: ({ wind }) => wind.widthPct,
+    write: (s, widthPct) => ({ ...s, wind: { ...s.wind, widthPct } }),
+  },
+  windAttenuation: {
+    read: ({ wind }) => wind.attenuationPct,
+    write: (s, attenuationPct) => ({ ...s, wind: { ...s.wind, attenuationPct } }),
+  },
   CdA: {
     read: ({ dynamics }) => dynamics.CdA,
     write: (s, CdA) => ({ ...s, dynamics: { ...s.dynamics, CdA } }),
@@ -329,6 +341,10 @@ export const FIELD_ACCESS: FieldAccess = {
   rho: {
     read: ({ dynamics }) => dynamics.rho,
     write: (s, rho) => ({ ...s, dynamics: { ...s.dynamics, rho } }),
+  },
+  reachTarget: {
+    read: ({ dynamics }) => dynamics.reachTarget,
+    write: (s, reachTarget) => ({ ...s, dynamics: { ...s.dynamics, reachTarget } }),
   },
   latA: coordinateRead("A", "lat"),
   lonA: coordinateRead("A", "lon"),

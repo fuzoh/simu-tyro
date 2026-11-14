@@ -26,10 +26,15 @@ export const BANANE_STEPS = 32;
 /**
  * The wind's cross component, m/s: positive toward the left of the travel A → B.
  *
+ * @param wind the Vent's one speed and its direction. The Banane reads no profile (#120): the
+ *   Wind Gate withholds it while the Vent carries one that is not uniform.
  * @param bearing the bearing of A → B, degrees from north (`windBearing`), or `null` when the line
  *   has none: the Vent's direction is geographic, so without a bearing it has no side to bow to.
  */
-export function bananeAcross(wind: Wind, bearing: number | null): number {
+export function bananeAcross(
+  wind: Pick<Wind, "speedKmh" | "directionDeg">,
+  bearing: number | null,
+): number {
   if (bearing === null) return 0;
   return windComponents(kmhToMs(wind.speedKmh), wind.directionDeg, bearing).across;
 }

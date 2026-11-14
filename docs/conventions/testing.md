@@ -7,20 +7,45 @@ The `test` block lives in `vite.config.ts`.
   no `@vitest-environment-options`. `jsdom`, `@testing-library/react` and `@testing-library/dom` are
   **not** dependencies of this project and must not come back.
 - `test.include` is `src/**/*.test.ts` — `.ts` only, because a `.tsx` test file would be a component
-  test.
+  test — plus `experiments/**/*.test.ts`: an isolated numerical experiment (#134,
+  `experiments/spatial-aero-134/`) is code nothing under `src/` imports, and its tests sit beside
+  it under the same rules as the engine's — colocated, one per source file, expected values from
+  §15, a closed form or a hand calculation. An experiment's tables and report are written, and
+  compared with the archived ones, by its own command — never by the suite, where a test solves
+  the part of the matrix it asserts on. One asserts on a whole comparison: `controls.test.ts`
+  solves the main one once, in a `beforeAll`, because §18.6's controls 2 and 7 read its rows and
+  the matrix as delivered must hold no failed row. These tests pin the delivered matrix —
+  identifiers, counts, probes — so adjusting `cases.ts` means updating their expected values.
 - **Point-to-point app testing belongs to `agent-browser`**, not to Vitest — see
   [What CI does not cover](#what-ci-does-not-cover-agent-browsers-half) at the bottom of this file.
 - The two seams that once wanted a DOM are **parameters** instead: the dropped-keys reporter takes the
   **raw query string** as an argument, and `readSession` / `writeSession` take the **storage object**.
   Pure functions test fine in `node`, and they are the better seam.
-- **One test builds the app**: `src/components/map/load-vue-3d.test.ts` runs Vite's production
-  client build in memory (`build.write: false`) and reads its chunks — the Vue 3D's CesiumJS behind
-  a dynamic import, the size of what `/` downloads (#95). A chunk graph is the only place that
-  contract is observable, and it is still `node`, no DOM.
+- **Two tests build the app**: `src/components/map/load-vue-3d.test.ts` and
+  `src/components/map/load-top-map.test.ts` run Vite's production client build in memory
+  (`build.write: false`) and read its chunks — the Vue 3D's CesiumJS behind a dynamic import, the
+  size of what `/` downloads (#95); MapLibre behind the vue de dessus's door, out of what Statique,
+  Avancé and Terrain download before they render (#128). A chunk graph is the only place those
+  contracts are observable, and it is still `node`, no DOM. Both read it through one harness,
+  `src/components/map/client-build.ts` — the build and the static-import `closure` — so the two
+  cannot drift into measuring different sets, the move `bench-harness.ts` makes for the benches.
+  **`load-top-map.test.ts` also holds a contract that is not its file's**: no font inside a
+  stylesheet, which is `vite.config.ts`'s and `src/lib/app/inline-asset.ts`'s (#128). It rides on
+  that build on purpose — a stylesheet is observable only in a built client — so it spans modules,
+  like the next one.
 - **One test reads the whole app's copy**: `src/lib/vocabulary/labels.test.ts` walks every `.ts` and
   `.tsx` under `src/` for the words the interface never says, and checks the glossary names the
-  wordings it prints (#102). A scan of every string is observable nowhere else; it is the one
-  suite spanning several modules, and it is still `node`, no DOM.
+  wordings it prints (#102). A scan of every string is observable nowhere else; it spans every
+  module, and it is still `node`, no DOM.
+- **Two tests read the documentation against the code** (#125). `src/lib/docs/links.test.ts` unit
+  tests `links.ts`, then walks every page `pages.ts` serves — the guide, the reference, the
+  reports, read from disk — so that each link between pages lands on a heading that exists, the
+  guide's sommaire reaches every sub-chapter, and every slug and anchor served before the guide
+  still is. `src/lib/docs/guide-examples.test.ts` has no source file of its own: it runs the
+  First-Run Scenario through the engine's chain (`solveSpan`, `sweep`, `evaluateClearance`,
+  `evaluateVerdict`, `ride`) and checks that `docs/guide/*.md` prints each figure it quotes. A
+  link, or a figure in prose, is observable only across the page and the module that produce it;
+  both are still `node`, no DOM.
 
 ## What deserves a test
 
@@ -41,13 +66,20 @@ Decided in the wayfinder ticket _Engine API, execution model and module layout_.
 - **Colocated.** `solve.test.ts` sits beside `solve.ts` in `src/lib/sim/`. Keeps each
   assertion in eyeshot of the `docs/simulation-theory.md` § citation it verifies.
 - **One test file per source file**, same basename. **No `tests/` directory, and no suite file
-  spanning several modules** (bar the two exceptions above). This survives every app layer
-  unchanged — `first-run.test.ts` beside `first-run.ts`, `p1.test.ts` beside `p1.ts`.
+  spanning several modules** (bar the five exceptions above: the two build tests, the copy scan
+  and the two documentation tests). This survives every app layer unchanged — `first-run.test.ts`
+  beside `first-run.ts`, `p1.test.ts` beside `p1.ts`.
 - **Physics fixtures live in one place**: `src/lib/sim/__fixtures__/theory-15.ts`, exporting `F1`,
   `Z1`–`Z6` and `Z8` from `docs/simulation-theory.md` §15 as typed consts. Every fixture carries
   a `source` field naming its § (e.g. `"simulation-theory.md §15 Z4"`). The golden canonical
   links of the URL codec live in `src/lib/url/__fixtures__/canonical-links.ts`, tagged
   `[MEASURED]`.
+- **`theory-15.ts` is also read from outside `src/`**: it is the one module an experiment may
+  import past the engine's barrel, so that §15 is quoted and never retyped.
+  `experiments/spatial-aero-134/` imports it in four test files and in `controls.ts`, which its
+  command runs. The barrel check of `src/lib/sim/index.test.ts` walks `src/` only: moving or
+  renaming the module is a change to that experiment too
+  ([simulation.md](simulation.md#experiments-are-not-the-engine)).
 - **`Z7` (thermal) is deliberately absent** — its physics is out of scope for v1. Add it with the
   feature, not before, as `Z8` arrived with the passager's ride (#89).
 - Benches are `*.bench.ts`, colocated too — see [Benches](#benches).
@@ -65,6 +97,13 @@ Decided in the wayfinder ticket _Engine API, execution model and module layout_.
     assert at the loosest tier below.
 
   Treating the two alike invites someone to tighten the wrong one and to trust the wrong one.
+
+  A third class checks **documentation, not physics**: `src/lib/docs/guide-examples.test.ts` takes
+  its expected values from the engine's output on purpose — what it guards is that the guide's
+  prose still prints what the opening screen shows, not that the engine is right (the §15 and
+  `[MEASURED]` rows do that). The arithmetic it does on that output is the guide's own
+  presentation — `w / g` as a linear mass, `v · 3.6` in km/h, a share of the MBF — never a formula
+  of the engine. It is no model for a physics test.
 
   A datasheet figure takes `[DATASHEET]` (`simulation-theory.md` §0.2); arithmetic done on one
   keeps that tag and says so in `source` (`src/lib/rail/__fixtures__/courant-bandit.ts`).
@@ -171,5 +210,13 @@ the real app in a real browser instead
   reference chart column), and the drag frame time against a 16,7 ms vsync.
 - **The end-to-end walkthroughs** no unit test spans: a link arriving, a CSV import, a steel ⇄ textile
   family flip, a régime chosen, the narrow-screen keyboard.
+- **Two wall-clock protocols on the production build**, each a harness under `scripts/` that
+  drives Chromium and a report under `docs/performance/` that holds its protocol and its figures:
+  the first load ([`first-load.md`](../performance/first-load.md), `scripts/first-load.ts`, #128)
+  and the passager dragged on the coupe while the Vue 3D is open
+  ([`rider-drag.md`](../performance/rider-drag.md), `scripts/rider-drag.ts`, #130). Neither CI nor
+  `bun run test` runs them: after a change to what one measures — the routes' chunks and what a
+  Page loads first, or the Vue 3D's renderer and the scrub — re-run its harness and read the result
+  against the report.
 
 Anything expressible as a pure function stays in Vitest and must not be duplicated there.

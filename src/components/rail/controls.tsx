@@ -27,19 +27,22 @@
 
 import type { ChangeEvent, ReactNode } from "react";
 
-import { Info } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { Info, OctagonX, TriangleAlert } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+
+import type { TipClose, TipTone } from "@/lib/app/tip.ts";
 
 import { HelpText } from "@/components/docs/help-text.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field.tsx";
+import { Field, FieldLabel } from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select.tsx";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover.tsx";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
+import { opensOnFocus, tipClose, tipName, tipText } from "@/lib/app/tip.ts";
 import { formatValue } from "@/lib/format/quantity.ts";
 import { PICKER_COPY } from "@/lib/rail/fields.ts";
 import { cn } from "@/lib/utils.ts";
@@ -48,8 +51,17 @@ import { cn } from "@/lib/utils.ts";
  * A field group's heading — the live groups' and the Skeletons', so a Skeleton reserves the height
  * the first live frame lands in.
  */
-export function GroupHeading({ title }: { title: string }) {
-  return <h3 className="text-foreground/70 text-xs font-semibold">{title}</h3>;
+export function GroupHeading({ title, tip }: { title: string; tip?: string | null }) {
+  if (tip === undefined || tip === null) {
+    return <h3 className="text-foreground/70 text-xs font-semibold">{title}</h3>;
+  }
+  // A note about the whole group — or the whole column — behind an `ⓘ` on its heading (#122).
+  return (
+    <div className="flex items-center gap-1">
+      <h3 className="text-foreground/70 text-xs font-semibold">{title}</h3>
+      <Tip label={title} text={tip} />
+    </div>
+  );
 }
 
 /**
@@ -68,6 +80,7 @@ export function Row({
   htmlFor,
   hint,
   help,
+  notes = [],
   chip,
   control,
   message,
@@ -82,13 +95,25 @@ export function Row({
   hint?: string;
   /** What the value is and how it is computed — `@/lib/rail/help.ts`'s copy, as an {@link InfoTip}. */
   help?: string;
+  /**
+   * What the row used to print under itself (#122) — the field's meaning, an ambient note, why an
+   * option is disabled — joined to `help` in the one `ⓘ` beside the label.
+   */
+  notes?: readonly (string | null | undefined)[];
   chip?: ReactNode;
   control: ReactNode;
-  /** § 7's field message: neutral when `kind` is empty, ⛔ otherwise. */
+  /**
+   * § 7's field message. ⛔ is a `⛔` icon beside the label, the message behind it; the empty state
+   * — « Saisie en cours »'s field — stays in the open under the pair: it is the line that says the
+   * results on screen are not this text's.
+   */
   message?: { text: string; blocking: boolean };
-  /** § 3's non-blocking warning. It never withholds a number. */
+  /** § 3's non-blocking warning, behind a `⚠` beside the label. It never withholds a number. */
   warning?: string | null;
-  /** A transient note — `x_D`'s clamp is the one place a clamp speaks. */
+  /**
+   * Under the pair, in the open: the row's commands — Fix Actions, « Passer en mouflage » — and a
+   * transient note (`x_D`'s clamp is the one place a clamp speaks).
+   */
   note?: ReactNode;
   /** A second culprit of the same check: **error outline only**, no second copy of the message. */
   outlined?: boolean;
@@ -125,7 +150,12 @@ export function Row({
           >
             {label}
           </FieldLabel>
-          {help !== undefined && <InfoTip label={label} text={help} />}
+          <RowTips
+            error={message?.blocking === true ? message.text : null}
+            label={label}
+            notes={[help, ...notes]}
+            warning={warning}
+          />
         </span>
         <div
           className={cn("flex shrink-0 items-center gap-1", outlined && "ring-destructive ring-1")}
@@ -136,19 +166,11 @@ export function Row({
           )}
         </div>
       </Field>
-      {message !== undefined &&
-        // ⛔ is a `FieldError` — `role="alert"`, so a blocking state announces itself. The empty
-        // state is **not** an error and must not: « Saisie en cours » is ordinary typing, and
-        // announcing it would make every cleared field feel like a fault.
-        (message.blocking ? (
-          <FieldError errors={[{ message: message.text }]} />
-        ) : (
-          <p className="text-muted-foreground text-xs">{message.text}</p>
-        ))}
-      {warning !== undefined && warning !== null && (
-        <p className="text-warning text-xs">
-          ⚠ <HelpText text={warning} />
-        </p>
+      {/* ⛔ is the icon's: its alert region announces a blocking state. The empty state is **not**
+          an error and must not: « Saisie en cours » is ordinary typing, and announcing it would
+          make every cleared field feel like a fault. */}
+      {message !== undefined && !message.blocking && (
+        <p className="text-muted-foreground text-xs">{message.text}</p>
       )}
       {note}
     </div>
@@ -285,11 +307,6 @@ export function Picker<T extends string>({
   );
 }
 
-/** Why an option cannot be chosen — one per row, in the row's own full-width note slot. */
-export function DisabledReason({ reason }: { reason: string }) {
-  return <p className="text-muted-foreground text-xs">ℹ {reason}</p>;
-}
-
 /** A two-or-three-way choice rendered in full, because the options are the teaching. */
 export function Choice<T extends string>({
   name,
@@ -321,24 +338,21 @@ export function Choice<T extends string>({
       value={value}
     >
       {options.map((option) => (
-        <Label
-          className={cn("gap-1", option.disabled === true && "text-muted-foreground")}
-          key={option.value}
-        >
-          <RadioGroupItem disabled={option.disabled} value={option.value} />
-          <span>
-            {option.label}
-            {option.disabled === true && ` — ${PICKER_COPY.unavailable}`}
-          </span>
-        </Label>
+        <span className="flex items-center gap-1" key={option.value}>
+          <Label className={cn("gap-1", option.disabled === true && "text-muted-foreground")}>
+            <RadioGroupItem disabled={option.disabled} value={option.value} />
+            <span>
+              {option.label}
+              {option.disabled === true && ` — ${PICKER_COPY.unavailable}`}
+            </span>
+          </Label>
+          {/* Why it cannot be chosen, behind an `ⓘ` beside the option it explains (#122) —
+              outside the `Label`, so the radio's name stays its own words. */}
+          {option.disabled === true && option.reason !== undefined && option.reason !== "" && (
+            <Tip label={option.label} text={option.reason} />
+          )}
+        </span>
       ))}
-      {options
-        .filter((option) => option.disabled === true && option.reason)
-        .map((option) => (
-          <p className="text-muted-foreground pl-5 text-xs" key={`${option.value}-reason`}>
-            ℹ {option.reason}
-          </p>
-        ))}
     </RadioGroup>
   );
 }
@@ -431,38 +445,153 @@ export function Chip({
 }
 
 /**
- * The explanation beside a label — an `ⓘ` that opens `@/lib/rail/help.ts`'s copy (decision of
- * 2026-09-23): what the value is and how it is computed, in French, as long as it needs to be, with
- * every `§` a link into the documentation (`HelpText`).
+ * An infobulle (#122): an icon in the open, and behind it what the Page no longer prints — an
+ * explanation (`ⓘ`), an Avertissement (`⚠`) or a blocking field error (`⛔`). The icon's colour is
+ * its tone's, so a warning or an error is seen without opening anything; the words are one hover,
+ * one keyboard focus or one tap away.
  *
  * **A popover, not a tooltip** — the change of 2026-09-23 that came with the `/docs` pages. A
  * tooltip is non-interactive by contract: it closes as the pointer leaves the trigger, so a link
  * inside it can be seen but never reached. Base UI's popover opens on hover *and* on click
  * (`openOnHover`), stays open while the pointer is over it, and is a **button** in the tab order,
- * so keyboard and touch users reach the same text and the same links. The content is `text-xs` like
- * every other annotation; it is wider than the registry's `w-72` because a formula and its §
+ * so touch users reach the same text and the same links. **Keyboard focus opens it too** (#122):
+ * Base UI's popover has no focus trigger, so a `:focus-visible` focus — the keyboard's, never a
+ * click's, which would open it only for the click to toggle it shut — opens it here, without moving
+ * the focus, and Tab goes on into the bubble's links before leaving it. The focus Base UI hands back
+ * to the icon on Escape does not reopen it (`opensOnFocus`): one Escape closes the bubble. The content is `text-xs`
+ * like every other annotation; it is wider than the registry's `w-72` because a formula and its §
  * reference do not fit three lines.
+ *
+ * **A blocking error still announces itself.** The message used to be a `FieldError`
+ * (`role="alert"`); the icon carries a visually hidden copy of it in an alert region, so a screen
+ * reader hears the refusal the moment it lands, as before.
  */
-export function InfoTip({ label, text }: { label: string; text: string }) {
+export function Tip({
+  tone = "help",
+  label,
+  text,
+  children,
+}: {
+  tone?: TipTone;
+  /** What the bubble is about — the row's label — for the icon's accessible name. */
+  label: string;
+  /** The bubble's words, with every `§` a link into the documentation (`HelpText`). */
+  text?: string;
+  /** Richer content than one string — a list, a formula. */
+  children?: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  // Why the bubble last closed, until a focus or a blur on the icon answers it: Escape hands the
+  // focus back to the icon, and that focus must not reopen what Escape just shut.
+  const lastClose = useRef<TipClose | null>(null);
+  const Icon = TIP_ICON[tone];
   return (
-    <Popover>
+    <Popover
+      onOpenChange={(next, details) => {
+        lastClose.current = next ? null : tipClose(details.reason);
+        setOpen(next);
+      }}
+      open={open}
+    >
       <PopoverTrigger
-        aria-label={`Explication : ${label}`}
-        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex shrink-0 cursor-help items-center rounded-none focus-visible:ring-[3px] focus-visible:outline-none"
+        aria-label={tipName(tone, label)}
+        className={cn(
+          "focus-visible:ring-ring/50 inline-flex shrink-0 cursor-help items-center rounded-none focus-visible:ring-[3px] focus-visible:outline-none",
+          TIP_CLASS[tone],
+        )}
         closeDelay={150}
         delay={200}
+        onBlur={() => {
+          lastClose.current = null;
+        }}
+        onFocus={(event) => {
+          const opens = opensOnFocus(focusVisible(event.currentTarget), lastClose.current);
+          lastClose.current = null;
+          if (opens) setOpen(true);
+        }}
         openOnHover
         type="button"
       >
-        <Info aria-hidden="true" className="size-3" />
+        <Icon aria-hidden="true" className="size-3" />
       </PopoverTrigger>
+      {tone === "error" && text !== undefined && (
+        <span className="sr-only" role="alert">
+          {text}
+        </span>
+      )}
       <PopoverContent
         className="w-auto max-w-sm text-left leading-snug whitespace-pre-line"
+        // The focus stays on the icon: a bubble opened by Tab must not take the caret from a
+        // reader who is only passing through.
+        initialFocus={false}
         side="bottom"
       >
-        <HelpText text={text} />
+        {/* One box: the registry's popup is a flex column, which would set every segment of a
+            sentence — a `§` link, the words around it — on a line of its own. */}
+        <div>
+          {text !== undefined && <HelpText text={text} />}
+          {children}
+        </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+const TIP_ICON = { help: Info, warning: TriangleAlert, error: OctagonX } as const;
+
+const TIP_CLASS: Readonly<Record<TipTone, string>> = {
+  help: "text-muted-foreground hover:text-foreground",
+  warning: "text-warning",
+  error: "text-destructive",
+};
+
+/** A keyboard focus, as the browser itself judges it; a browser without the selector says no. */
+function focusVisible(element: Element): boolean {
+  try {
+    return element.matches(":focus-visible");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The explanation beside a label — an `ⓘ` that opens `@/lib/rail/help.ts`'s copy (decision of
+ * 2026-09-23): what the value is and how it is computed, in French, as long as it needs to be.
+ * {@link Tip} in its `help` tone.
+ */
+export function InfoTip({ label, text }: { label: string; text: string }) {
+  return <Tip label={label} text={text} />;
+}
+
+/**
+ * A row's infobulles, in the label's line: its explanation and notes as one `ⓘ`, then a `⚠` for its
+ * Avertissement and a `⛔` for its blocking error. Nothing is drawn for what is absent.
+ */
+export function RowTips({
+  label,
+  notes = [],
+  warning,
+  error,
+  children,
+}: {
+  label: string;
+  /** The help, the meaning, an ambient note, a disabled option's reason — one bubble, in order. */
+  notes?: readonly (string | null | undefined)[];
+  warning?: string | null;
+  error?: string | null;
+  /** Further icons after these — a region's several warnings. */
+  children?: ReactNode;
+}) {
+  const help = tipText(notes);
+  return (
+    <>
+      {help !== null && <Tip label={label} text={help} />}
+      {warning !== undefined && warning !== null && (
+        <Tip label={label} text={warning} tone="warning" />
+      )}
+      {error !== undefined && error !== null && <Tip label={label} text={error} tone="error" />}
+      {children}
+    </>
   );
 }
 
@@ -471,6 +600,7 @@ export function ReadOut({
   label,
   value,
   help,
+  notes = [],
   chip,
   warning,
   children,
@@ -478,12 +608,15 @@ export function ReadOut({
   label: string;
   /** `@/lib/rail/help.ts`'s copy for this row, as an {@link InfoTip}. */
   help?: string;
+  /** What the row used to print under itself (#122), joined to `help` in the one `ⓘ`. */
+  notes?: readonly (string | null | undefined)[];
   /** `null` renders nothing at all: « — » is spent on `Indéterminé` and may not be reused. */
   value: string | null;
   chip?: ReactNode;
   /**
-   * § 6's **Avertissement** tier: ⚠ **in line on the row it qualifies**, never a paragraph block
-   * and never a promotion to the banner. The ambient tier does not come through here — it is plain
+   * § 6's **Avertissement** tier: ⚠ **in line on the row it qualifies** — the icon beside the
+   * label since #122, its sentence behind it — never a paragraph block and never a promotion to
+   * the banner. The ambient tier does not come through here — it is plain
    * status text with no glyph, because it fires always and an alarm that always fires is mute.
    */
   warning?: string | null;
@@ -496,18 +629,13 @@ export function ReadOut({
           <span className="text-muted-foreground min-w-0 truncate text-xs" title={label}>
             {label}
           </span>
-          {help !== undefined && <InfoTip label={label} text={help} />}
+          <RowTips label={label} notes={[help, ...notes]} warning={warning} />
         </span>
         {chip}
         {/* A computed quantity: mono, and right-aligned because the label beside it is `flex-1`. */}
         {value !== null && <span className="text-right font-mono text-xs">{value}</span>}
         {children}
       </div>
-      {warning !== undefined && warning !== null && (
-        <p className="text-warning text-xs">
-          ⚠ <HelpText text={warning} />
-        </p>
-      )}
     </div>
   );
 }

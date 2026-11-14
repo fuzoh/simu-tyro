@@ -20,12 +20,49 @@ docs/references/`) rather than reading top-to-bottom.
 
 ## Served to the user
 
-`docs/simulation-theory.md`, `algo simulation tyrolienne.md` and the three reports above are
-rendered in the app at `/docs/<slug>` (`src/lib/docs/pages.ts`), and every `§n.m` in the Rail's
-help and provenance copy links to the matching heading of `simulation-theory.md`. **Renumbering a
-section of the theory file breaks those links** — `src/lib/docs/refs.test.ts` catches it. The
-three prose reports were given markdown headings on 2026-09-23 so they render; their wording is
-unchanged and `rg` still works.
+`docs/simulation-theory.md`, `algo simulation tyrolienne.md`, `research-two.md` and the four
+reports above are rendered in the app at `/docs/<slug>` (`src/lib/docs/pages.ts`), and every
+`§n.m` in the Rail's help and provenance copy links to the matching heading of
+`simulation-theory.md`. **Renumbering a section of the theory file breaks those links** —
+`src/lib/docs/refs.test.ts` catches it. The three prose reports were given markdown headings on
+2026-09-23 so they render; their wording is unchanged and `rg` still works.
+
+`docs/guide/` (#125) explains the reference step by step, in French, for a reader with school
+mathematics: one chapter per part of the engine, each sub-chapter citing the § it explains, and a
+worked example on the First-Run Scenario. **It adds nothing to the reference**: no formula,
+coefficient or rule appears there first. A change to the physics or a shipped default updates the
+reference, then the guide; `src/lib/docs/guide-examples.test.ts` recomputes the figures the guide
+quotes and fails when they drift.
+
+## Experiments are not the engine
+
+`experiments/` holds isolated numerical experiments — today `experiments/spatial-aero-134/`
+(#134, `docs/simulation-theory.md` §18): a prototype spatial statics that compares normal drag
+alone with an added lift and an added axial drag on the line. Its coefficients are **sensitivity
+probes**, its report is archived in `docs/references/spatial-wind/`, and **nothing under `src/`
+may import from it**: a value or a solver moves from an experiment into the engine only through
+the reference and a decision of the maintainer, never by reuse.
+
+The dependency runs one way, and it is real: the experiment reads the engine — through the barrel
+`@/lib/sim`: `deriveSteel`, `deriveTextile`, `solveSpan`, `resolveL0`, `windComponents`,
+`zGroundAt` and the constants; and, past it, §15's fixtures (below) — so its archived report and
+tables are a function of `src/lib/sim/`. Neither CI nor `bun run test` compares them with what
+the code now produces: the suite solves the main comparison once and checks its rows and its
+controls (`controls.test.ts`), which catches a broken prototype, not a figure that moved. **After
+a change under `src/lib/sim/`, run `bun experiments/spatial-aero-134/matrix.ts --check`**; if a
+file differs, regenerate and update the date and the engine commit in the dossier's index
+(`experiments/spatial-aero-134/README.md` § Rejouer).
+
+**One path past the barrel, and only that one.** `src/lib/sim/index.ts` is the one import path
+into the engine, and `index.test.ts` enforces it by walking `src/` — it does not walk
+`experiments/`. An experiment keeps to the barrel too, with a single exception:
+`@/lib/sim/__fixtures__/theory-15.ts`, §15's fixtures, which
+[testing.md](testing.md#fixture-rules) forbids retyping. `experiments/spatial-aero-134/` imports
+it in four test files and in `controls.ts` — a module the command runs, not a test: §18.6's
+no-wind return to §15 is computed from it, so `results/controls.csv` and the report's control
+table depend on that module. Moving or renaming it is a change to the experiment — the barrel
+check staying green says nothing of `experiments/`. No other deep path into `src/lib/sim/` is
+allowed from there.
 
 ## Rules
 
@@ -46,5 +83,22 @@ unchanged and `rg` still works.
   rhumb line the north-up map draws — and reaches every reader through the gates' `windBearing`
   (`src/lib/rail/gates.ts`), the one check behind « the Vent needs Positions ». Without a bearing
   nothing is projected: the ride and the Banane run without wind, the wind fields are disabled, and
-  a carried Vent is kept as given with a notice — never a Blocking Error. Moving an anchor changes
-  the components and never `wd`.
+  a carried Vent is kept as given with a notice — never a Blocking Error. A wind value the Wind
+  Gate refuses (`ws=-5`, `ww=95`) is one with or without a bearing, and its field stays typable
+  so that the breach can be repaired (`fieldUnavailable`). A withheld Vent is drawn as none, so
+  the rose's handle waits at the centre: it is offered there only where a drag lifts the breach —
+  `ws=-5` — and never over a refused profile, where the drag would replace the speed and the
+  direction the Scenario holds and lift nothing (`windControls`, `src/lib/map/wind-rose.ts`).
+  Moving an anchor changes the components and never `wd`.
+- **The Vent's profile is a prescribed scenario, read locally, and refused until it is read**
+  (#120, `docs/simulation-theory.md` §8.4). `windAt(field, x, L, bearing)`
+  (`src/lib/sim/wind-profile.ts`) is the one entry a spatial reader takes — at its own `x`, for
+  each evaluation: never a mean speed over the span, never one multiplier on a force, and nothing
+  clamped outside `[0, L]`. The Scenario's two percents become that field in
+  `src/lib/scenario/wind.ts` (`windFieldOf`), read at the whole percent they print as. The same
+  module holds `WIND_PROFILE_ACTIVE`, **off until every reader of the Vent takes `windAt`** (#127,
+  #118): meanwhile the profile's controls are not offered, and the Wind Gate refuses a profile
+  that is not uniform — a link or a Session can carry one — rather than compute it under one
+  speed. Turning the flag on while a reader still calls `windComponents` with the entered speed
+  is that silent substitution. The shape is §8.4's: no other curve, parameter or default without
+  changing the reference first.

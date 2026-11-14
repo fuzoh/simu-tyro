@@ -35,7 +35,7 @@ function DocPageRoute() {
         <code className="font-mono">{page.path}</code>
         {page.lang === "en" ? " · document en anglais" : ""}
       </p>
-      <DocMarkdown source={source} />
+      <DocMarkdown path={page.path} source={source} />
     </article>
   );
 }

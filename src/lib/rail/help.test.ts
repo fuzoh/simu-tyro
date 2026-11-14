@@ -58,4 +58,17 @@ describe("the Rail speaks the exact register", () => {
     expect(FIELDS.usage.label).toBe("Installation");
     expect(FIELD_HELP.usage).toMatch(/installation permanente/);
   });
+
+  // GLOSSARY.md, Tension interne — avoided: « tension totale », which names the régime's criterion.
+  test("the tension at a point is the tension interne, as the graph under it titles it (#119)", () => {
+    expect(DEDUCED_HELP.H).toContain("la tension interne en un point vaut T = H / cos θ");
+    expect(DEDUCED_HELP.H).not.toContain("tension totale");
+  });
+
+  // The row's one `ⓘ` is this help: no ride, garde or Verdict on Avancé reads the field.
+  test("the target of the farthest point says which Page reads it (#121)", () => {
+    expect(FIELD_HELP.reachTarget).toContain(
+      "La Page Dynamique en déduit une proposition — monter ou descendre B de tant, A restant fixe",
+    );
+  });
 });

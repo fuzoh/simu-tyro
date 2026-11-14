@@ -21,7 +21,7 @@ import { usePage } from "@/components/app/use-page.ts";
 import { useViewport } from "@/components/app/use-viewport.ts";
 import { ChartBlock } from "@/components/chart/chart-block.tsx";
 import { useChartWidth } from "@/components/chart/use-chart-width.ts";
-import { TopMap } from "@/components/map/top-map.tsx";
+import { TopMap } from "@/components/map/deferred-top-map.tsx";
 import { banner, pageReport } from "@/lib/app/banner.ts";
 import { shownOnStatique, STATIQUE_GATES } from "@/lib/statique/fields.ts";
 import { statiqueOutputs } from "@/lib/statique/outputs.ts";
@@ -50,7 +50,8 @@ function Live({ page }: { page: string }) {
     page,
     register: "terrain",
   });
-  const { cause, clearance, frame, refusal, results, saisie, solved, windCause } = surfaces;
+  const { cause, clearance, frame, refusal, results, saisie, solved, windCause, windCulprits } =
+    surfaces;
   const model = statiqueOutputs({ scenario: state.scenario, deduced, results, cause });
   // No ride is printed here: a Ride Gate breach does not take the slot from the Verdict.
   const occupant = useMemo(
@@ -88,7 +89,9 @@ function Live({ page }: { page: string }) {
       }
       sectionRef={ref}
       strip={<LinkStripNotice strip={strip} />}
-      topView={<TopMap frame={frame} solved={solved} windCause={windCause} />}
+      topView={
+        <TopMap frame={frame} solved={solved} windCause={windCause} windCulprits={windCulprits} />
+      }
     />
   );
 }

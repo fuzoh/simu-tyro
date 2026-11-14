@@ -1,7 +1,8 @@
 /**
  * **The one place in the app that reads a viewport** — « v1 build spec » § 5 (*The Chart Block
  * collapses to a Pinned Safety Header*, *Keyboard, four pieces*) and § 7 (*`__root.tsx` carries the
- * document and nothing visible*), ticket A12.2.
+ * document and nothing visible*), ticket A12.2. What else needs the width outside a component — Avancé's
+ * route `loader` (#128) — reads it here too, through {@link viewportWidth}.
  *
  * `useViewport` does two things, and they are the same measurement read twice:
  *
@@ -153,12 +154,21 @@ export function keyboardInsetOf({
   return Math.max(0, layoutHeight - visualHeight - offsetTop);
 }
 
+/**
+ * The window's inline size, px — the width {@link useViewport} reports, read once outside React.
+ * Its one other reader is Avancé's route `loader` (#128), which asks for the map's module only where
+ * the middle column will show it: a fetch decided, never a size, so the rule above still holds.
+ */
+export function viewportWidth(): number {
+  return window.innerWidth;
+}
+
 /** One measurement, taken twice: once for `--kb`, once for the fit rule. */
 function measure(): Viewport {
   const visual = window.visualViewport;
   const height = window.innerHeight;
   return {
-    width: window.innerWidth,
+    width: viewportWidth(),
     height,
     keyboardInset:
       visual === null || visual === undefined

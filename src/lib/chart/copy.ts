@@ -7,7 +7,8 @@
 import type { PeekMode } from "@/lib/layout/contract.ts";
 import type { LayerToggles } from "@/lib/session/session.ts";
 
-import { label } from "@/lib/vocabulary/labels.ts";
+import { READ_OUT_SCOPE } from "@/lib/rail/cells.ts";
+import { heading, label } from "@/lib/vocabulary/labels.ts";
 
 /**
  * § 8's own line for *l'exception géométrique*, centred in **both** empty plots — the one state
@@ -51,4 +52,28 @@ export const COUPE_HOVER = {
   fromFoot: "hauteurs depuis le pied de A",
   /** A position inside a Zone d'ancrage (#106): the garde is read there, and judged nowhere. */
   anchorZone: `${label("anchorZone", "terrain")} : garde non jugée`,
+} as const;
+
+/**
+ * Avancé's tension graph (#119). Its scope is the read-out row's — « à la position du passager » —
+ * stated on the heading, because the « T max » of the Résultats is the traverse's and the two must
+ * not be read for one another. With two Brins porteurs every value is one line's under the normal
+ * 50/50 share, and the graph says so on its axis, in a note and in its hover: **never the sum**.
+ */
+export const TENSION_COPY = {
+  title: `${heading("internalTension", "exact")} le long de la ligne`,
+  scope: READ_OUT_SCOPE,
+  /** The y axis's name, with the unit the force selector chose. */
+  yAxis: (unit: string, perLine: boolean) =>
+    `${label("internalTension", "exact")}${perLine ? " par ligne" : ""} (${unit})`,
+  xAxis: `${label("distance", "exact")} depuis A (m)`,
+  unloaded: label("unloadedLine", "exact"),
+  loaded: label("loadedLine", "exact"),
+  /** The legend's entry when the exact solve at the passager's position refuses. */
+  loadedUnavailable: `${label("loadedLine", "exact")} indisponible à cette position`,
+  passenger: label("passenger", "exact"),
+  sideA: `${label("loadedLine", "exact")}, côté A`,
+  sideB: `${label("loadedLine", "exact")}, côté B`,
+  perLineShort: "par ligne, partage 50/50",
+  perLineNote: `Deux ${label("carryingLines", "exact")} : tension d'une seule ligne, le passager étant partagé 50/50 entre les deux (P / 2 par ligne) — jamais la somme des deux lignes. Ce partage n'est pas confirmé par l'essai.`,
 } as const;

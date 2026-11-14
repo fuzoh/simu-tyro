@@ -250,6 +250,57 @@ export function vue3dScene({
   };
 }
 
+/**
+ * Does `after` differ from `before` by the loaded line alone — the passager moved along the same
+ * line, as a drag on the coupe moves it (#130)? Then the renderer moves that line and leaves every
+ * other one drawn; anything else — a new solve, a Vent, a Position, a passager placed or no longer
+ * placed — draws the scene anew.
+ *
+ * Compared by value, not by identity: the Page builds the scene anew on every move of the passager,
+ * its unchanged parts equal but not the same objects. Exact equality, as the same inputs give the
+ * same numbers.
+ */
+export function onlyLoadedMoved(before: Vue3dScene, after: Vue3dScene): boolean {
+  return (
+    before.loaded !== null &&
+    after.loaded !== null &&
+    samePoint(before.ends.A, after.ends.A) &&
+    samePoint(before.ends.B, after.ends.B) &&
+    (["A", "B"] as const).every((name) =>
+      (["foot", "anchor", "top"] as const).every((point) =>
+        samePoint(before.fils[name][point], after.fils[name][point]),
+      ),
+    ) &&
+    samePoints(before.ligneAB, after.ligneAB) &&
+    sameLines(
+      before.unloaded === null ? null : [before.unloaded],
+      after.unloaded === null ? null : [after.unloaded],
+    ) &&
+    sameLines(before.trajectory, after.trajectory) &&
+    before.membersPx.length === after.membersPx.length &&
+    before.membersPx.every((offset, i) => offset === after.membersPx[i])
+  );
+}
+
+function samePoint(
+  a: { readonly lat: number; readonly lon: number; readonly altitude?: number },
+  b: { readonly lat: number; readonly lon: number; readonly altitude?: number },
+): boolean {
+  return a.lat === b.lat && a.lon === b.lon && a.altitude === b.altitude;
+}
+
+function samePoints(a: readonly EarthPoint[], b: readonly EarthPoint[]): boolean {
+  return a.length === b.length && a.every((point, i) => samePoint(point, b[i]!));
+}
+
+function sameLines(
+  a: readonly (readonly EarthPoint[])[] | null,
+  b: readonly (readonly EarthPoint[])[] | null,
+): boolean {
+  if (a === null || b === null) return a === b;
+  return a.length === b.length && a.every((line, i) => samePoints(line, b[i]!));
+}
+
 /** What the Vue 3D draws while an anchor follows the pointer (#97). */
 export type Vue3dFollowing = {
   readonly fils: { readonly A: FilAPlomb; readonly B: FilAPlomb };

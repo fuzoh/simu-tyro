@@ -27,11 +27,23 @@
  *   re-enables the camera's gestures, once. Off the canvas, only the pointer that took the anchor
  *   ends its press.
  * - **The coupe's layers decide what is shown, never what is drawn** (#111): every line of the
- *   scene is an entity, drawn when the scene is new; the layers come beside the scene, not in it,
- *   so the View Strip's toggles and a drag only flip their `show`.
+ *   scene is drawn when the scene is new; the layers come beside the scene, not in it, so the View
+ *   Strip's toggles and a drag only flip their `show`.
+ * - **A passager dragged along the coupe moves the loaded line alone, in the frame it arrives**
+ *   (#130). A scene that differs from the last by that line only (`onlyLoadedMoved`) leaves every
+ *   other line drawn, and the loaded line is built on the main thread, never in a Worker whose
+ *   build a drag would start over on every frame (`LoadedLine`).
  * - **The camera moves as `@/lib/map/vue-3d-camera.ts` says**: the Vues prédéfinies are its
  *   poses, flown to in under a second; the Gimbal's and the keys' steps are its amounts. The canvas
  *   takes the focus on a press, so the keys reach the view only once it has been chosen.
+ * - **The Vue embarquée owns the camera while it lasts** (#126): before each frame the eye is put
+ *   where `@/lib/map/vue-3d-embarquee.ts` says the ride stands at the screen's time, looking where
+ *   the reader turned it. CesiumJS's camera gestures and its terrain collision are off — the eye
+ *   stands where the engine puts it, never lifted off the relief — a drag turns the head, no anchor
+ *   is taken, the Gimbal's steps do nothing, and the loaded line, the passager's at `x_D`, gives way
+ *   to the Trajectoire the pulley follows. Leaving puts the camera back where it stood and every
+ *   gesture with it — unless the Positions moved while riding and that pose no longer shows them:
+ *   then the camera stands back from the new line, as a typed Position or an imported CSV does.
  */
 
 import "cesium/Source/Widgets/CesiumWidget/CesiumWidget.css";
@@ -48,17 +60,24 @@ import {
   CesiumTerrainProvider,
   CesiumWidget,
   Color,
+  ColorGeometryInstanceAttribute,
   Ellipsoid,
   Entity,
+  GeometryInstance,
   HeadingPitchRange,
   HorizontalOrigin,
   ImageryLayer,
   LabelStyle,
+  Material,
   Math as CesiumMath,
   Matrix4,
   PerspectiveFrustum,
+  PolylineColorAppearance,
   PolylineDashMaterialProperty,
+  PolylineGeometry,
+  PolylineMaterialAppearance,
   PolylineOutlineMaterialProperty,
+  Primitive,
   Rectangle,
   sampleTerrainMostDetailed,
   SceneTransforms,
@@ -74,8 +93,16 @@ import type { MapDisplay } from "@/lib/map/display.ts";
 import type { Anchor, MapEvent } from "@/lib/map/gesture.ts";
 import type { WmtsLayer } from "@/lib/map/style.ts";
 import type { CameraPose, Lens, Vue3dCommand } from "@/lib/map/vue-3d-camera.ts";
+import type {
+  Embarked,
+  EmbarkedCommand,
+  EmbarkedReading,
+  Vue3dRide,
+} from "@/lib/map/vue-3d-embarquee.ts";
 import type { EarthPoint, Vue3dFollowing, Vue3dLayers, Vue3dScene } from "@/lib/map/vue-3d.ts";
+import type { TraceEnds } from "@/lib/terrain/trace.ts";
 
+import { probeMark, probeMeasure, probeSpan, probeTagOf, probing } from "@/lib/app/probe.ts";
 import {
   LINE_CASING,
   LINE_INK,
@@ -94,7 +121,20 @@ import {
   walkAmount,
   zoomAmount,
 } from "@/lib/map/vue-3d-camera.ts";
-import { CAMERA_REACH, DRAPED, TERRAIN_URL, vue3dFollowing } from "@/lib/map/vue-3d.ts";
+import {
+  embarkedPose,
+  embarkedReading,
+  embarkedStep,
+  lookDragged,
+  openEmbarked,
+} from "@/lib/map/vue-3d-embarquee.ts";
+import {
+  CAMERA_REACH,
+  DRAPED,
+  onlyLoadedMoved,
+  TERRAIN_URL,
+  vue3dFollowing,
+} from "@/lib/map/vue-3d.ts";
 import { sameEnds } from "@/lib/terrain/trace.ts";
 
 // Cesium's workers and assets are copied beside the app (`vite.config.ts`); this says where.
@@ -123,8 +163,15 @@ export type Vue3d = {
    * @param layers which of the scene's lines the View Strip shows.
    */
   show(scene: Vue3dScene, display: MapDisplay, idle: boolean, layers: Vue3dLayers): void;
-  /** Moves the camera as a Gimbal button or a key asks. */
+  /** Moves the camera as a Gimbal button or a key asks — nothing while the Vue embarquée lasts. */
   command(command: Vue3dCommand): void;
+  /**
+   * Hangs the camera under the pulley on `ride`, paused at the departure — or, with `null`, takes it
+   * out of the Vue embarquée, back where it stood before. A new ride starts over.
+   */
+  embark(ride: Vue3dRide | null): void;
+  /** Plays, pauses, starts over or turns the head in the Vue embarquée. */
+  ride(command: EmbarkedCommand): void;
   destroy(): void;
 };
 
@@ -135,6 +182,8 @@ export type Vue3d = {
  * @param onUnavailable called once if the Vue 3D falls over after it opened — a render error.
  * @param onHeading hears the camera's heading, whole degrees clockwise from north, when it changes.
  * @param label the canvas's accessible name: it takes the focus, and the keys with it.
+ * @param onEmbarked hears the Vue embarquée's read-out when its tenth of a second or its state
+ *   changes, and `null` when it ends.
  * @returns the open view; rejects when it cannot open — no relief, no WebGL.
  */
 export async function openVue3d(
@@ -143,11 +192,13 @@ export async function openVue3d(
     onGesture,
     onUnavailable,
     onHeading,
+    onEmbarked,
     label,
   }: {
     onGesture: (event: MapEvent) => void;
     onUnavailable: () => void;
     onHeading: (headingDeg: number) => void;
+    onEmbarked: (reading: EmbarkedReading | null) => void;
     label: string;
   },
 ): Promise<Vue3d> {
@@ -213,7 +264,15 @@ export async function openVue3d(
     idle: boolean;
     layers: Vue3dLayers;
   } | null = null;
+
   let drawn: Drawn | null = null;
+  // The rider-drag protocol (#130) times every frame and marks the first that draws a new scene
+  // whole — its loaded line built.
+  if (probing()) {
+    probeFrames(widget, () =>
+      shown !== null && drawn?.loaded.ready !== false ? shown.scene : null,
+    );
+  }
   // The anchor under a press; `moved` once it has left its Position, which is when the gesture
   // starts — a press and release on an anchor is no new line. `pointerId` is the pointer that took
   // it, `null` where the press came with none.
@@ -221,6 +280,41 @@ export async function openVue3d(
   // Where the dragged anchor stands, from its first move until the machine is idle again.
   let pose: { anchor: Anchor; foot: EarthPoint } | null = null;
   let following: Vue3dFollowing | null = null;
+  // The Vue embarquée: the ride it plays, its clock and look, the camera as it stood before and the
+  // Positions it stood over, whether a drag turns the head, and the last read-out told.
+  let embarked: {
+    readonly ride: Vue3dRide;
+    state: Embarked;
+    readonly before: {
+      destination: Cartesian3;
+      heading: number;
+      pitch: number;
+      roll: number;
+      ends: TraceEnds | null;
+    };
+    turning: boolean;
+    told: string;
+  } | null = null;
+  const controller = cesium.screenSpaceCameraController;
+
+  /** The read-out, told when its tenth of a second, its playing or its end changes. */
+  function tellEmbarked() {
+    if (embarked === null) return;
+    const reading = embarkedReading(embarked.ride, embarked.state, performance.now());
+    const now = `${Math.round(reading.t * 10)}|${reading.playing}|${reading.ended}`;
+    if (now === embarked.told) return;
+    embarked.told = now;
+    onEmbarked(reading);
+  }
+
+  // Before CesiumJS's own camera update, so the eye is where the ride stands on this very frame.
+  cesium.preUpdate.addEventListener(() => {
+    if (embarked === null) return;
+    cesium.camera.setView(
+      cesiumPose(embarkedPose(embarked.ride, embarked.state, performance.now())),
+    );
+    tellEmbarked();
+  });
 
   /**
    * Draws the dragged anchor where `pose` has it, or the scene's own anchors and lines — those the
@@ -231,10 +325,12 @@ export async function openVue3d(
       shown === null || pose === null ? null : vue3dFollowing(shown.scene, pose.anchor, pose.foot);
     if (drawn === null || shown === null) return;
     const still = following === null;
+    const riding = embarked !== null;
     const { layers } = shown;
-    for (const entity of drawn.loaded) entity.show = still;
+    // Riding, the loaded line — the passager's at x_D — gives way to the Trajectoire the eye follows.
+    drawn.loaded.show = still && !riding;
     for (const entity of drawn.unloaded) entity.show = still && layers.unloaded;
-    for (const entity of drawn.trajectory) entity.show = still && layers.trajectory;
+    for (const entity of drawn.trajectory) entity.show = still && (riding || layers.trajectory);
     drawn.chord.show = still && layers.ligneAB;
     drawn.ligneAB.show = !still;
   }
@@ -287,8 +383,27 @@ export async function openVue3d(
     if (!other) release();
   }
 
+  /**
+   * Ends the drag that turns the head, wherever it ended — the canvas's release or the window's
+   * ({@link ENDS_OF_A_PRESS}): a window that lost the focus mid-drag hears no release, and the head
+   * would go on turning under a pointer with no button held.
+   */
+  function stopTurning() {
+    for (const type of ENDS_OF_A_PRESS) window.removeEventListener(type, stopTurning);
+    if (embarked === null || !embarked.turning) return;
+    embarked.turning = false;
+    canvas.style.cursor = "grab";
+  }
+
   const pointer = new ScreenSpaceEventHandler(canvas);
   pointer.setInputAction(({ position }: ScreenSpaceEventHandler.PositionedEvent) => {
+    // Riding, a press turns the head and takes no anchor.
+    if (embarked !== null) {
+      embarked.turning = true;
+      for (const type of ENDS_OF_A_PRESS) window.addEventListener(type, stopTurning);
+      canvas.style.cursor = "grabbing";
+      return;
+    }
     if (shown?.idle !== true || grip !== null) return;
     const anchor = anchorAt(position);
     if (anchor === null) return;
@@ -298,7 +413,17 @@ export async function openVue3d(
     canvas.style.cursor = "grabbing";
   }, ScreenSpaceEventType.LEFT_DOWN);
 
-  pointer.setInputAction(({ endPosition }: ScreenSpaceEventHandler.MotionEvent) => {
+  pointer.setInputAction(({ startPosition, endPosition }: ScreenSpaceEventHandler.MotionEvent) => {
+    if (embarked !== null) {
+      if (!embarked.turning) return;
+      const look = lookDragged(
+        embarked.state.look,
+        endPosition.x - startPosition.x,
+        endPosition.y - startPosition.y,
+      );
+      embarked.state = { ...embarked.state, look };
+      return;
+    }
     if (grip === null) {
       cesium.canvas.style.cursor =
         shown?.idle === true && anchorAt(endPosition) !== null ? "grab" : "";
@@ -316,7 +441,13 @@ export async function openVue3d(
     }
   }, ScreenSpaceEventType.MOUSE_MOVE);
 
-  pointer.setInputAction(release, ScreenSpaceEventType.LEFT_UP);
+  pointer.setInputAction(() => {
+    if (embarked === null) {
+      release();
+      return;
+    }
+    stopTurning();
+  }, ScreenSpaceEventType.LEFT_UP);
 
   return {
     show(scene, display, idle, layers) {
@@ -335,24 +466,87 @@ export async function openVue3d(
         line = BoundingSphere.fromPoints(
           [scene.fils.A.anchor, scene.fils.B.anchor, ...(scene.loaded ?? [])].map(cartesian),
         );
-        drawn = draw(widget, scene, metresPerPixel, () => following);
+        // The passager moved along the same line: only the loaded line moves, in this very frame.
+        if (drawn !== null && before !== null && onlyLoadedMoved(before.scene, scene)) {
+          drawn.loaded.moveTo(scene.loaded);
+        } else {
+          drawn?.loaded.destroy();
+          drawn = draw(widget, scene, metresPerPixel, () => following);
+        }
       }
       if (idle && grip === null) pose = null;
       follow();
       // The camera stands back from the line when it opens, and when the Positions move to where
       // the reader cannot see them — a typed Position, an imported CSV. A line dragged in the view
-      // is already in it, so the camera stays where the reader put it.
-      if (before === null || (!sameEnds(before.scene.ends, scene.ends) && !inView(cesium, scene))) {
+      // is already in it, so the camera stays where the reader put it; riding, it is the ride's,
+      // and leaving the ride (`embark(null)`) applies the same rule to the pose it gives back.
+      if (
+        embarked === null &&
+        (before === null || (!sameEnds(before.scene.ends, scene.ends) && !inView(cesium, scene)))
+      ) {
         cesium.camera.setView(cesiumPose(lateralPose(cesium, scene, layers)));
       }
     },
     command(command) {
-      if (shown === null || widget.isDestroyed()) return;
+      if (shown === null || widget.isDestroyed() || embarked !== null) return;
       moveCamera(cesium, shown, line, command);
+    },
+    embark(ride) {
+      if (widget.isDestroyed() || embarked?.ride === ride) return;
+      const { camera } = cesium;
+      if (ride === null) {
+        stopTurning();
+        const { before } = embarked ?? {};
+        embarked = null;
+        controller.enableInputs = true;
+        controller.enableCollisionDetection = true;
+        canvas.style.cursor = "";
+        if (before !== undefined) {
+          const { destination, heading: h, pitch, roll } = before;
+          camera.setView({ destination, orientation: { heading: h, pitch, roll } });
+          // The reframe `show` skipped while riding: the Positions moved since the reader embarked
+          // — an imported CSV, a typed Position — and out of the pose given back, the camera stands
+          // back from the new line rather than over the old site.
+          if (
+            shown !== null &&
+            (before.ends === null || !sameEnds(before.ends, shown.scene.ends)) &&
+            !inView(cesium, shown.scene)
+          ) {
+            camera.setView(cesiumPose(lateralPose(cesium, shown.scene, shown.layers)));
+          }
+        }
+        follow();
+        onEmbarked(null);
+        return;
+      }
+      camera.cancelFlight();
+      const before = embarked?.before ?? {
+        destination: Cartesian3.clone(camera.positionWC),
+        heading: camera.heading,
+        pitch: camera.pitch,
+        roll: camera.roll,
+        ends: shown?.scene.ends ?? null,
+      };
+      embarked = { ride, state: openEmbarked(ride), before, turning: false, told: "" };
+      // `enableInputs` alone would come back at the end of a flight: collision is the other switch.
+      controller.enableInputs = false;
+      controller.enableCollisionDetection = false;
+      canvas.style.cursor = "grab";
+      follow();
+      tellEmbarked();
+    },
+    ride(command) {
+      if (embarked === null || widget.isDestroyed()) return;
+      const { ride, state } = embarked;
+      embarked.state = embarkedStep(state, command, performance.now(), ride.duration);
+      tellEmbarked();
     },
     destroy() {
       pointer.destroy();
-      for (const type of ENDS_OF_A_PRESS) window.removeEventListener(type, ended);
+      for (const type of ENDS_OF_A_PRESS) {
+        window.removeEventListener(type, ended);
+        window.removeEventListener(type, stopTurning);
+      }
       // Closed under a moving anchor, the view hears no release: the gesture ends where the anchor
       // was drawn, or the machine would wait for it — and keep the vue de dessus's markers — forever.
       if (grip?.moved === true && pose !== null) {
@@ -365,6 +559,31 @@ export async function openVue3d(
 }
 
 /**
+ * The rider-drag protocol's marks on the render loop (#130), installed only when a harness listens
+ * (`@/lib/app/probe.ts`): each frame's entity update — `DataSourceDisplay.update`, where an entity
+ * becomes geometry — and its render, and `vue3d:shown` on the first frame drawn with the scene
+ * `current` says is on hand complete — every entity's geometry on the GPU, which CesiumJS's clock
+ * says by letting itself animate again.
+ */
+function probeFrames(widget: CesiumWidget, current: () => Vue3dScene | null) {
+  const { scene: cesium, dataSourceDisplay: display } = widget;
+  const update = display.update.bind(display);
+  display.update = (time) => probeSpan("vue3d:entities", undefined, () => update(time));
+  let start = 0;
+  cesium.preUpdate.addEventListener(() => {
+    start = performance.now();
+  });
+  let marked: Vue3dScene | null = null;
+  cesium.postRender.addEventListener(() => {
+    probeMeasure("vue3d:render", start);
+    const scene = current();
+    if (scene === null || scene === marked || !widget.clock.canAnimate) return;
+    marked = scene;
+    probeMark("vue3d:shown", probeTagOf(scene));
+  });
+}
+
+/**
  * What ends a press, heard on the window: a release, wherever the pointer is, a cancelled pointer,
  * and the window losing the focus — which no pointer event follows.
  */
@@ -373,8 +592,11 @@ const ENDS_OF_A_PRESS = ["pointerup", "pointercancel", "blur"] as const;
 /** The entities of one scene: what a press may take, and the lines layers and drags show. */
 type Drawn = {
   readonly anchors: ReadonlyMap<Entity, Anchor>;
-  /** The engine's lines, the last release's: hidden while an anchor follows the pointer. */
-  readonly loaded: readonly Entity[];
+  /**
+   * The engine's loaded line, the last release's: hidden while an anchor follows the pointer, and
+   * moved alone when only the passager moved (#130).
+   */
+  readonly loaded: LoadedLine;
   /** The Ligne à vide, one per Brin porteur: its layer's, and the last release's. */
   readonly unloaded: readonly Entity[];
   /** The Trajectoire, one per run: its layer's, and the last release's. */
@@ -477,7 +699,6 @@ function draw(
     }),
   );
   const unloaded: Entity[] = [];
-  const loaded: Entity[] = [];
   for (const offsetPx of scene.membersPx) {
     if (scene.unloaded !== null) {
       unloaded.push(
@@ -492,26 +713,8 @@ function draw(
         }),
       );
     }
-    if (scene.loaded !== null) {
-      loaded.push(
-        entities.add({
-          polyline: {
-            positions: member(scene.loaded, offsetPx, metresPerPixel),
-            arcType: ArcType.NONE,
-            // 2 px of ink in a thin casing: two members 6 px apart keep air between them, as on the coupe.
-            width: 3,
-            material: new PolylineOutlineMaterialProperty({
-              color: INK,
-              outlineColor: CASING,
-              outlineWidth: 0.5,
-            }),
-            // A ridge between the camera and the line hides it from the relief, not from the reader.
-            depthFailMaterial: Color.fromAlpha(INK, 0.5),
-          },
-        }),
-      );
-    }
   }
+  const loaded = loadedLine(widget, scene.loaded, scene.membersPx, metresPerPixel);
   const ligneAB = entities.add({
     show: false,
     polyline: {
@@ -588,6 +791,131 @@ function drape(layer: WmtsLayer, alpha = 1): ImageryLayer {
 }
 
 /**
+ * The engine's loaded line, one member per Brin porteur, which a move of the passager redraws in
+ * the frame the move arrives (#130).
+ *
+ * Drawn as an entity of fixed vertices, it was static geometry, which CesiumJS builds in a Worker
+ * and shows a few frames later, the old line on screen until then — and a drag on the coupe, which
+ * moves it on every frame, started that build over every time: the Vue 3D kept the line where the
+ * drag began until the pointer stopped (`docs/performance/rider-drag.md`). So:
+ *
+ * - **One Brin porteur**: the line is a primitive built on the main thread (`asynchronous: false`)
+ *   — one polyline of a few hundred vertices — and drawn in the frame it is built, in the entity's
+ *   ink, casing and width, and fainter where a ridge hides it, as before.
+ * - **Two Brins porteurs**: each member is shifted by the camera's scale, so CesiumJS already
+ *   rebuilt it on every frame (`CallbackProperty`), on the main thread; it now reads the line's
+ *   current vertices instead of being added anew. As before, a ridge hides it whole: CesiumJS draws
+ *   no fainter ink behind the relief for a line rebuilt on every frame.
+ */
+type LoadedLine = {
+  /** Shown, or hidden — while an anchor follows the pointer, or riding. */
+  show: boolean;
+  /** Draws the line through `points`, from the next frame on. */
+  moveTo(points: readonly EarthPoint[] | null): void;
+  /** Is the line drawn through the last points it was given? */
+  readonly ready: boolean;
+  /** Takes the line out of the view. */
+  destroy(): void;
+};
+
+/** The ink behind a ridge: the loaded line's, at half. */
+const LOADED_HIDDEN = Color.fromAlpha(INK, 0.5);
+
+function loadedLine(
+  widget: CesiumWidget,
+  points: readonly EarthPoint[] | null,
+  membersPx: readonly number[],
+  metresPerPixel: { readonly current: number },
+): LoadedLine {
+  const { entities } = widget;
+  const { primitives } = widget.scene;
+  let at: Cartesian3[] = [];
+  let up: Cartesian3[] = [];
+  let shown = true;
+  let solid: Primitive | null = null;
+  const place = (next: readonly EarthPoint[] | null) => {
+    at = (next ?? []).map(cartesian);
+    up = verticals(at);
+    if (solid !== null) primitives.remove(solid);
+    solid = membersPx.includes(0) && at.length >= 2 ? primitives.add(solidLine(at, shown)) : null;
+  };
+  place(points);
+  const shifted = membersPx
+    .filter((offsetPx) => offsetPx !== 0)
+    .map((offsetPx) =>
+      entities.add({
+        polyline: {
+          positions: shiftedDown(
+            () => at,
+            () => up,
+            offsetPx,
+            metresPerPixel,
+          ),
+          arcType: ArcType.NONE,
+          // 2 px of ink in a thin casing: two members 6 px apart keep air between them, as on the coupe.
+          width: 3,
+          material: new PolylineOutlineMaterialProperty({
+            color: INK,
+            outlineColor: CASING,
+            outlineWidth: 0.5,
+          }),
+          depthFailMaterial: LOADED_HIDDEN,
+        },
+      }),
+    );
+  return {
+    get show() {
+      return shown;
+    },
+    set show(value) {
+      shown = value;
+      if (solid !== null) solid.show = value;
+      for (const entity of shifted) entity.show = value;
+    },
+    moveTo: place,
+    get ready() {
+      return solid === null || solid.ready;
+    },
+    destroy() {
+      if (solid !== null) primitives.remove(solid);
+      solid = null;
+      for (const entity of shifted) entities.remove(entity);
+    },
+  };
+}
+
+/**
+ * The loaded line of one Brin porteur, built now: CesiumJS's static polyline of a
+ * `PolylineOutlineMaterialProperty` with a colour behind the relief, as a primitive of its own.
+ */
+function solidLine(at: Cartesian3[], show: boolean): Primitive {
+  const material = Material.fromType("PolylineOutline", {
+    color: INK,
+    outlineColor: CASING,
+    outlineWidth: 0.5,
+  });
+  return new Primitive({
+    show,
+    asynchronous: false,
+    geometryInstances: new GeometryInstance({
+      geometry: new PolylineGeometry({
+        positions: at,
+        width: 3,
+        arcType: ArcType.NONE,
+        vertexFormat: PolylineMaterialAppearance.VERTEX_FORMAT,
+      }),
+      // A ridge between the camera and the line hides it from the relief, not from the reader.
+      attributes: { depthFailColor: ColorGeometryInstanceAttribute.fromColor(LOADED_HIDDEN) },
+    }),
+    appearance: new PolylineMaterialAppearance({
+      material,
+      translucent: material.isTranslucent(),
+    }),
+    depthFailAppearance: new PolylineColorAppearance({ translucent: true }),
+  });
+}
+
+/**
  * One member's vertices: the solved line itself, or — for two Brins porteurs — the line shifted by
  * the member's pixel offset, down positive as on the coupe, at the scale the camera shows it.
  */
@@ -598,12 +926,40 @@ function member(
 ): Cartesian3[] | CallbackProperty {
   const at = points.map(cartesian);
   if (offsetPx === 0) return at;
-  // « Down » is along each vertex's own vertical.
-  const up = at.map((point) => Ellipsoid.WGS84.geodeticSurfaceNormal(point, new Cartesian3()));
+  const up = verticals(at);
+  return shiftedDown(
+    () => at,
+    () => up,
+    offsetPx,
+    metresPerPixel,
+  );
+}
+
+/** « Down », for a shifted member, is along each vertex's own vertical: the vertices' normals. */
+function verticals(at: readonly Cartesian3[]): Cartesian3[] {
+  return at.map((point) => Ellipsoid.WGS84.geodeticSurfaceNormal(point, new Cartesian3()));
+}
+
+/**
+ * A member shifted `offsetPx` down, positive as on the coupe, at the scale the camera shows it —
+ * rebuilt on every frame from the vertices `at` and their {@link verticals} `up` read then, so the
+ * Ligne à vide's members and the loaded line's stay one convention and line up.
+ */
+function shiftedDown(
+  at: () => readonly Cartesian3[],
+  up: () => readonly Cartesian3[],
+  offsetPx: number,
+  metresPerPixel: { readonly current: number },
+): CallbackProperty {
   return new CallbackProperty(() => {
     const drop = offsetPx * metresPerPixel.current;
-    return at.map((point, i) => {
-      const shift = Cartesian3.multiplyByScalar(up[i] ?? Cartesian3.ZERO, drop, new Cartesian3());
+    const verticalsNow = up();
+    return at().map((point, i) => {
+      const shift = Cartesian3.multiplyByScalar(
+        verticalsNow[i] ?? Cartesian3.ZERO,
+        drop,
+        new Cartesian3(),
+      );
       return Cartesian3.subtract(point, shift, shift);
     });
   }, false);
