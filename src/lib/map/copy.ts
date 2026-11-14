@@ -186,9 +186,9 @@ export const EMBARQUEE_HELP =
   "La tête tourne librement, en lecture comme en pause. " +
   `Pendant la vue embarquée la ${label("loadedLine", "terrain")}, celle du passager à sa position saisie, est masquée et la ${label("trajectory", "terrain")} montrée.`;
 
-/** Why the Vue embarquée is off, on the hover of its button. */
+/** Why the Vue embarquée is off: on the hover of its button and behind the `ⓘ` beside it. */
 export const EMBARK_BLOCKED = {
-  "no-ride": "Vue embarquée : aucun mouvement calculé pour ce Scénario.",
+  "no-ride": "Vue embarquée : aucun mouvement calculé pour ce scénario.",
   "no-motion": "Vue embarquée : le mouvement calculé ne quitte pas le départ.",
   gesture: "Vue embarquée : en attente du nouveau calcul de la ligne.",
 } as const satisfies Record<EmbarkBlock, string>;

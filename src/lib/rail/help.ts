@@ -172,7 +172,7 @@ export const DEDUCED_HELP: Record<DeducedRowId, string> = {
   L0: "Longueur non tendue L₀ résolue par le solveur pour le pilote choisi (flèche, prétension, tension horizontale ou rapport V), en mètres. C'est la longueur de câble à mesurer hors charge avant de monter la ligne. Elle est préremplie dans le champ si vous passez au pilote « Longueur ».",
   pretension:
     "Prétension de la ligne à vide, par ligne : sa tension à l'ancrage de la Mise en tension, T = √(H² + V²) à cet ancrage (§2) — ce que lit un dynamomètre entre cet ancrage et le Maestro. Préremplie dans le champ si vous passez au pilote « Prétension ».",
-  H: "Tension horizontale H de la ligne à vide, résolue par le solveur pour le pilote choisi. Constante sur toute la ligne ; la tension totale en un point vaut T = H / cos θ, si bien que la prétension, lue à un ancrage, est plus grande. Préremplie dans le champ si vous passez au pilote « H ».",
+  H: "Tension horizontale H de la ligne à vide, résolue par le solveur pour le pilote choisi. Constante sur toute la ligne ; la tension interne en un point vaut T = H / cos θ, si bien que la prétension, lue à un ancrage, est plus grande. Préremplie dans le champ si vous passez au pilote « H ».",
   sag: "Flèche à vide : creux maximal de la ligne sans passager sous la ligne A–B, en mètres, et la position x où il se produit. Résolue depuis la chaînette élastique pour la L₀ courante (§4). Préremplie dans le champ si vous passez au pilote « Flèche ».",
   vRatio:
     "Rapport V = P / H de la ligne à vide : poids du passager m_p · g sur la tension horizontale H. Prérempli dans le champ si vous passez au pilote « Rapport V ».",

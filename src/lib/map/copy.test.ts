@@ -392,7 +392,7 @@ describe("the Vue embarquée's words (#126)", () => {
 
   test("says why it is off", () => {
     expect(EMBARK_BLOCKED["no-ride"]).toBe(
-      "Vue embarquée : aucun mouvement calculé pour ce Scénario.",
+      "Vue embarquée : aucun mouvement calculé pour ce scénario.",
     );
     expect(Object.keys(EMBARK_BLOCKED).sort()).toEqual(["gesture", "no-motion", "no-ride"]);
   });
