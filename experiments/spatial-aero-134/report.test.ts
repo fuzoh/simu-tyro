@@ -142,6 +142,30 @@ describe("buildReport — controls gate the conclusions (§18.6)", () => {
     expect(report).not.toContain("Aucun cas en échec");
   });
 
+  it("goes on past a failed row, and says it is left out rather than that everything passes", () => {
+    const fail = (rows: readonly Row[], indices: readonly number[]): Row[] =>
+      rows.map((row, i) =>
+        indices.includes(i) ? { ...row, status: "raffinement hors tolérance" as const } : row,
+      );
+    const one = buildReport({ fixed: fail(fixed, [3]), pose, controls: [passing] });
+    expect(one).toContain(
+      "**Tous les contrôles du prototype passent ; 1 ligne en échec, listée ci-dessus, est exclue des écarts.**",
+    );
+    expect(one).not.toContain("**Tous les contrôles passent.**");
+    // A row is not a control: the comparison is still printed, without that row.
+    expect(one).toContain("## 6. Comparaison principale — longueur non tendue identique");
+    expect(one).not.toContain("Diagnostic");
+    // Rows of both comparisons are counted together.
+    const three = buildReport({
+      fixed: fail(fixed, [3, 4]),
+      pose: fail(pose, [7]),
+      controls: [passing],
+    });
+    expect(three).toContain(
+      "**Tous les contrôles du prototype passent ; 3 lignes en échec, listées ci-dessus, sont exclues des écarts.**",
+    );
+  });
+
   it("calls the probes probes and adopts nothing", () => {
     const report = buildReport({ fixed, pose, controls: [passing] });
     expect(report).toContain("sonde de sensibilité");

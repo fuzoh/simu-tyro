@@ -14,7 +14,8 @@
  *   prints « — », which is not a failure.
  * - **Controls first, and they gate.** If one control fails, the report prints the diagnostic
  *   and stops before any comparison: no conclusion on the physics (§18.6).
- * - **A failed row is listed as a failure** and leaves no difference behind it.
+ * - **A failed row is listed as a failure** and leaves no difference behind it. It does not stop
+ *   the report: the comparison goes on without it, and says how many rows it leaves out.
  * - **No percentage of nothing.** A cell carries a relative difference only where `run.ts` gave
  *   one; a difference under the numerical floor is printed as such, not as a small number — in
  *   the CSV tables it is left empty and flagged.
@@ -1093,13 +1094,21 @@ ${controlsSection(experiment)}
 **Au moins un contrôle du prototype échoue.** Conformément à §18.6, ce rapport s'arrête ici : les tableaux de comparaison ne sont pas imprimés, parce qu'un écart entre deux modèles ne pourrait pas être distingué d'une erreur du prototype. Les lignes résolues restent dans \`results/\` pour le diagnostic ; elles ne sont pas des résultats.
 `;
   }
+  // The controls gate the comparison; a failed row does not — it is excluded, and said to be.
+  const failed = [...experiment.fixed, ...experiment.pose].filter(
+    ({ status }) => status !== "ok",
+  ).length;
+  const verdict =
+    failed === 0
+      ? "**Tous les contrôles passent.**"
+      : `**Tous les contrôles du prototype passent ; ${failed} ligne${failed > 1 ? "s" : ""} en échec, listée${failed > 1 ? "s" : ""} ci-dessus, ${failed > 1 ? "sont exclues" : "est exclue"} des écarts.**`;
   return `${head}
 
 ${inputsSection(experiment)}
 
 ${controlsSection(experiment)}
 
-**Tous les contrôles passent.** Les écarts des sections suivantes sont lus entre deux lignes qui ont chacune passé leurs vérifications, et seulement au-dessus du plancher numérique.
+${verdict} Les écarts des sections suivantes sont lus entre deux lignes qui ont chacune passé leurs vérifications, et seulement au-dessus du plancher numérique.
 
 ${loadsSection(experiment.fixed)}
 

@@ -22,8 +22,14 @@ bun experiments/spatial-aero-134/matrix.ts --out /tmp/essai --report /tmp/essai/
 
 Une dizaine de secondes. Code de sortie : `0` si tous les contrôles passent et toutes les lignes
 ont un équilibre vérifié ; `1` si `--check` trouve une différence ; `2` si un contrôle ou une
-ligne échoue — les fichiers sont écrits quand même, comme diagnostic, et le rapport s'arrête
-alors avant toute comparaison.
+ligne échoue — les fichiers sont écrits quand même, comme diagnostic. Ce que le rapport fait
+alors dépend de ce qui a échoué :
+
+- **un contrôle du prototype échoue** : le rapport s'arrête au diagnostic, avant toute
+  comparaison — un écart entre deux modèles ne se distinguerait pas d'une erreur du prototype ;
+- **une ligne échoue, les contrôles passent** : le rapport continue. La ligne est listée comme
+  échec numérique, ne donne aucun écart, et le rapport dit combien de lignes il exclut ; une
+  enveloppe qui l'exclut peut sous-estimer un maximum.
 
 La sortie ne dépend que des entrées : ni date, ni durée, ni machine n'y figurent. Après avoir
 changé une entrée, relancer la commande et relire le rapport en entier — sa prose décrit ce que
