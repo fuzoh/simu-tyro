@@ -1,14 +1,16 @@
 /**
  * What the experiment reads off a solved line (#134) — `docs/simulation-theory.md` §18.5 (the
- * outputs: reactions, tensions, flèche, déport, écart combiné, garde, distributed loads) and
- * §18.6 (the residuals every case is checked on: global force and moment balance, the jump at the
- * rider). The definitions are the maintainer's: flèche and écart combiné are Q9/Q10 of
- * `docs/references/spatial-wind/agent-readiness-decisions.md`, the extruded terrain is Q16.
+ * outputs: reactions, tensions, flèche, déport latéral, écart maximal à A–B, garde, distributed
+ * loads) and §18.6 (the residuals every case is checked on: global force and moment balance, the
+ * jump at the rider). The definitions are the maintainer's: flèche and écart maximal à A–B are
+ * Q9/Q10 of `docs/references/spatial-wind/agent-readiness-decisions.md`, the extruded terrain is
+ * Q16. « Déport latéral » is the brief's name for the lateral offset in metres — not the Banane,
+ * which the glossary keeps qualitative (§18.5, « Two names »).
  *
  * Rules this module exists to keep:
  *
- * - **The écart combiné is combined point by point, then maximised** — never the norm of a
- *   flèche and a déport taken at two different places.
+ * - **The écart maximal à A–B is combined point by point, then maximised** — never the norm of
+ *   a flèche and a déport latéral taken at two different places.
  * - **The garde is vertical, over the profile extruded sideways, less the whole gabarit.** It is
  *   not a clearance above the real ground off the A–B axis, and it claims none.
  * - **An extremum is read between the nodes, not at one.** Inside a smooth piece three
@@ -37,7 +39,7 @@ export type ShapeMeasures = {
   readonly rise: number;
   /** Déport latéral: the lateral offset of greatest magnitude, **signed** (`+` = left of A → B). */
   readonly sway: number;
-  /** Écart combiné: `max over the line of √(vertical offset² + lateral offset²)`. */
+  /** Écart maximal à A–B: `max over the line of √(vertical offset² + lateral offset²)`. */
   readonly combined: number;
   /** Garde verticale: `min over the line of z − z_ground(x) − h_gabarit`. */
   readonly clearance: number;

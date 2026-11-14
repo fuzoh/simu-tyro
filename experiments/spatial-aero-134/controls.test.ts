@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { ControlFamily } from "./controls.ts";
 import type { Row } from "./run.ts";
 
-import { CLOSED_FORM_BAR, judge, matrixHealth, runControls } from "./controls.ts";
+import { baseCases } from "./cases.ts";
+import { CLOSED_FORM_BAR, judge, matrixHealth, mirrorSubject, runControls } from "./controls.ts";
 import { runFixedLength, TOLERANCES } from "./run.ts";
 
 describe("judge", () => {
@@ -99,11 +100,55 @@ describe("runControls — §18.6, on the whole main comparison", () => {
     expect(Math.abs(sway.expected)).toBeGreaterThan(0.1);
     expect(sway.found).toBeCloseTo(sway.expected, 6);
   });
+
+  describe("a control the matrix gives no case to fails — it is never left out", () => {
+    const family = (rows: readonly Row[], name: ControlFamily) =>
+      runControls(rows).filter((control) => control.family === name);
+
+    it("takes the mirror on the row with the most to mirror, picked by what it is", () => {
+      // The largest lift with the largest axial drag; a rider, inclined anchors, a wind that is
+      // also axial, and of those the strongest crosswind: 20 m/s at 45°, on the first line.
+      const subject = mirrorSubject(fixed)!;
+      expect(subject.variant.aero).toMatchObject({ lift: 0.5, axial: 0.1 });
+      expect(subject.base.id).toBe("acier-12|incline|passager|oblique-20");
+      expect(of("miroir")[0].subject).toBe("acier-12|incline|passager|oblique-20, NLA-b+0.5-0.1");
+    });
+
+    it("fails the mirror's four quantities when no row has both a lift and a crosswind", () => {
+      const calm = fixed.filter((row) => row.base.wind.speed === 0);
+      expect(mirrorSubject(calm)).toBeNull();
+      const mirror = family(calm, "miroir");
+      expect(mirror.map(({ quantity }) => quantity)).toEqual(["T_A", "T_max", "flèche", "déport"]);
+      expect(mirror.map(({ pass }) => pass)).toEqual([false, false, false, false]);
+      expect(mirror.every(({ found }) => Number.isNaN(found))).toBe(true);
+    });
+
+    it("fails the mirror when its row has no equilibrium", () => {
+      const subject = mirrorSubject(fixed)!;
+      const broken = fixed.map((row) =>
+        row === subject ? { ...row, status: "non convergé" as const, outputs: null } : row,
+      );
+      const mirror = family(broken, "miroir");
+      expect(mirror).toHaveLength(4);
+      expect(mirror.some(({ pass }) => pass)).toBe(false);
+      expect(mirror[0].subject).toContain("non convergé");
+    });
+
+    it("fails the return to the plane engine when the matrix has no calm case", () => {
+      const windy = fixed.filter((row) => row.base.wind.speed > 0);
+      for (const name of ["moteur plan sans vent", "variantes sans vent"] as const) {
+        const rows = family(windy, name);
+        expect(rows.length).toBeGreaterThan(0);
+        expect(rows.some(({ pass }) => pass)).toBe(false);
+      }
+    });
+  });
 });
 
 describe("matrixHealth", () => {
   it("counts every status and keeps the worst residual of the rows that have one", () => {
-    const base = runFixedLength().slice(0, 1)[0];
+    // One base case under its reference: the rest of the matrix has nothing to say here.
+    const [base] = runFixedLength(baseCases().slice(0, 1));
     const failed: Row = {
       ...base,
       status: "non convergé",

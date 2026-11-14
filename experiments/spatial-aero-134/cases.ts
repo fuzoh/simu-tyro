@@ -8,7 +8,9 @@
  *
  * - **A finite, documented, adjustable matrix.** Two lines × two geometries × two load states ×
  *   the winds × the coefficient variants; nothing is sampled at random and nothing is hidden in
- *   the runner.
+ *   the runner. **Nothing downstream repeats a value of this file**: the runner, the controls and
+ *   the report read the axes off the cases and the variants, so an adjusted matrix is reported
+ *   as what it is.
  * - **No product property is invented.** The steel line derives from §13.1's formulas through
  *   the engine; the textile line is the Courant Bandit 11 mm of the dated sheet the app's preset
  *   already cites, its stiffness named as arithmetic on that sheet and not as a Courant figure.
@@ -24,11 +26,14 @@ import type { DerivedMaterial, Terrain, WindComponents } from "@/lib/sim";
 
 import { deriveSteel, deriveTextile, DYNAMICS, windComponents } from "@/lib/sim";
 
-import type { AeroCoefficients, LiftLaw } from "./aero.ts";
+import type { AeroCoefficients, LiftLaw, Vec3 } from "./aero.ts";
 
 /** Where a value of the matrix comes from — the brief's three classes, and the inputs' own. */
 export type Provenance =
-  /** Read off an instrument. */
+  /**
+   * Read off an instrument, on the installation computed. No input of the present matrix is: a
+   * figure measured on another installation enters as a « scénario », its measurement as source.
+   */
   | "mesurée"
   /** Published for another body or another flow: an order of magnitude, not this product's. */
   | "publiée non transférable"
@@ -36,12 +41,24 @@ export type Provenance =
   | "sonde de sensibilité"
   /** A dated manufacturer sheet. */
   | "fiche produit"
+  /** Arithmetic on a sheet's figure that the manufacturer does not state: not product data. */
+  | "dérivée de la fiche, non confirmée"
   /** Computed from the reference's formulas (`docs/simulation-theory.md` §13). */
   | "dérivée de la référence"
   /** A convention of the repository, with no normative source. */
   | "convention"
   /** An input of the illustrated installation: a scenario, not a recommendation. */
   | "scénario";
+
+/** A number as the French report prints it, as written: a decimal comma, a true minus sign. */
+export const french = (value: number): string => String(value).replace(".", ",").replace("-", "−");
+
+/** A French enumeration: « a », « a et b », « a, b et c ». */
+export const list = (items: readonly string[]): string =>
+  items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} et ${items.at(-1)}`;
+
+/** The members of a list, each once, in order of first appearance. */
+export const distinct = <T>(items: readonly T[]): T[] => [...new Set(items)];
 
 /** A value with its class and its source, as the report prints it. */
 export type Sourced = {
@@ -155,16 +172,16 @@ const TEXTILE_LINE: LineCase = {
     {
       name: "raideur axiale",
       value: "EA = k·MBL = 1,27 × 31 000 N = 39,37 kN",
-      provenance: "fiche produit",
+      provenance: "dérivée de la fiche, non confirmée",
       source:
         "arithmétique sur l'allongement de la fiche (2,5 % de 50 à 150 kg), pas une donnée Courant ; la page produit dit 3,5 % (§13.2)",
     },
     {
       name: "tension de pose",
       value: "1 400 N à l'ancrage A, à vide",
-      provenance: "mesurée",
+      provenance: "scénario",
       source:
-        "essai du 2026-11-01 sur cette corde, pose 1,52 → 1,40 kN (`docs/mesures dynamometre/README.md`) ; relevée sur 435 m, transposée ici à 150 m comme scénario",
+        "valeur empruntée à l'essai du 2026-11-01 sur cette corde, pose 1,52 → 1,40 kN (`docs/mesures dynamometre/README.md`) ; relevée sur 435 m et transposée ici à 150 m : pas une mesure de cette installation",
     },
     {
       name: "brins porteurs",
@@ -201,7 +218,9 @@ export const GEOMETRIES: readonly GeometryCase[] = [
  * Each anchor stands 20 m above its base. The first-run line takes 12 m, which the loaded textile
  * member does not clear; 20 m is a scenario chosen so that the gabarit stays above the ground in
  * every case of the matrix. A straight ground shifts every garde by the same amount, so the
- * differences between two models do not depend on that choice.
+ * differences between two models do not depend on that choice — and, being parallel to A–B, it
+ * makes every garde that height less the gabarit and the flèche: the report says where a garde
+ * only mirrors a flèche, and whether the gabarit does clear the ground.
  */
 export const GROUND = {
   /** Height of each anchor above its base, m. */
@@ -232,7 +251,7 @@ export const RIDER = {
 } as const;
 
 /** The force the rider puts on the computed member, N: `(0, 0, −m·g/n)`, with the engine's `g`. */
-export function riderForce(line: LineCase): readonly [number, number, number] {
+export function riderForce(line: LineCase): Vec3 {
   return [0, 0, (-RIDER.mass * DYNAMICS.g) / line.carryingMembers];
 }
 
@@ -261,32 +280,66 @@ export type WindCase = {
   readonly components: WindComponents;
 };
 
-const wind = (id: string, label: string, speed: number, from: number): WindCase => ({
-  id,
-  label,
-  speed,
-  from,
-  // The engine's own projection, on a line whose bearing is taken as north.
-  components: windComponents(speed, from, 0),
-});
+/** One direction a wind is prescribed from, whatever its speed. */
+export type WindDirection = {
+  readonly id: string;
+  /** How the report names it, e.g. « de travers »; the angle is printed beside it. */
+  readonly name: string;
+  /** Degrees clockwise from the head-on direction — {@link WindCase.from}. */
+  readonly from: number;
+};
+
+/** One wind of the matrix: a speed from a direction, named and labelled from the two. */
+export function windCase(speed: number, direction: WindDirection): WindCase {
+  return {
+    id: `${direction.id}-${speed}`,
+    label: `${speed} m/s ${direction.name} (${french(direction.from)}°)`,
+    speed,
+    from: direction.from,
+    // The engine's own projection, on a line whose bearing is taken as north.
+    components: windComponents(speed, direction.from, 0),
+  };
+}
+
+const CALM: WindCase = {
+  id: "calme",
+  label: "sans vent",
+  speed: 0,
+  from: 0,
+  components: windComponents(0, 0, 0),
+};
 
 /** The two speeds the archived notes already illustrate with; neither is a design wind. */
 export const WIND_SPEEDS = [10, 20] as const;
 
 /**
- * No wind, then four directions at each speed: across, oblique, and almost parallel from each
- * end — the axial drag pulls toward A in a head wind and toward B in a tail wind, and on an
- * inclined line the two are not mirror images.
+ * Four directions: across, oblique, and almost parallel from each end — the axial drag pulls
+ * toward A in a head wind and toward B in a tail wind, and on an inclined line the two are not
+ * mirror images.
+ */
+export const WIND_DIRECTIONS: readonly WindDirection[] = [
+  { id: "travers", name: "de travers", from: 90 },
+  { id: "oblique", name: "oblique de face", from: 45 },
+  { id: "quasi-face", name: "presque de face", from: 5 },
+  { id: "quasi-dos", name: "presque de dos", from: 175 },
+];
+
+/**
+ * No wind, then every direction at each speed. This list is what the matrix runs and what the
+ * report reads: a wind added here by hand is solved and tabulated like the others.
  */
 export const WINDS: readonly WindCase[] = [
-  wind("calme", "sans vent", 0, 0),
-  ...WIND_SPEEDS.flatMap((speed) => [
-    wind(`travers-${speed}`, `${speed} m/s de travers (90°)`, speed, 90),
-    wind(`oblique-${speed}`, `${speed} m/s oblique de face (45°)`, speed, 45),
-    wind(`quasi-face-${speed}`, `${speed} m/s presque de face (5°)`, speed, 5),
-    wind(`quasi-dos-${speed}`, `${speed} m/s presque de dos (175°)`, speed, 175),
-  ]),
+  CALM,
+  ...WIND_SPEEDS.flatMap((speed) => WIND_DIRECTIONS.map((direction) => windCase(speed, direction))),
 ];
+
+/** §18.4's coefficients, as the matrix is built from them. */
+export type Coefficients = {
+  readonly normal: number;
+  readonly liftMagnitudes: readonly number[];
+  readonly liftLaws: readonly LiftLaw[];
+  readonly axial: readonly number[];
+};
 
 /**
  * §18.4's coefficients. `C_D⊥` is one value for every model; the lift and the axial drag are
@@ -299,18 +352,13 @@ export const COEFFICIENTS = {
    * (Q35). **Publiée non transférable**: no 6×19 and no dry textile rope was measured.
    */
   normal: 1.2,
-  /** `|C_L|` probes — **sondes de sensibilité**, run with both signs. */
+  /** `|C_L|` probes — **sondes de sensibilité**, run with both signs. Zero is the reference. */
   liftMagnitudes: [0.05, 0.2, 0.5],
-  /** The two orientation hypotheses of §18.3. */
+  /** The two orientation hypotheses of §18.3. The first is the one crossed with the axial drag. */
   liftLaws: ["binormal", "yaw-odd"],
-  /** `C_t` probes, on the diameter — **sondes de sensibilité**. */
+  /** `C_t` probes, on the diameter — **sondes de sensibilité**. Zero is the reference. */
   axial: [0.02, 0.1],
-} as const satisfies {
-  normal: number;
-  liftMagnitudes: readonly number[];
-  liftLaws: readonly LiftLaw[];
-  axial: readonly number[];
-};
+} as const satisfies Coefficients;
 
 /** The four models the brief compares. */
 export type ModelId = "normale" | "normale+portance" | "normale+axiale" | "normale+portance+axiale";
@@ -322,57 +370,97 @@ export type Variant = {
   readonly aero: AeroCoefficients;
 };
 
-/** A number as the French report prints it: a decimal comma, a true minus sign. */
-const french = (value: number): string => String(value).replace(".", ",").replace("-", "−");
+/** The letter a lift law takes in a variant's identifier. */
+const LIFT_LAW_CODE: Readonly<Record<LiftLaw, string>> = { binormal: "b", "yaw-odd": "y" };
 
-const signed = (value: number): string => `${value > 0 ? "+" : "-"}${Math.abs(value)}`;
+/** A variant's identifier — the one place its format is written. Nothing else spells one out. */
+function variantId(model: ModelId, { lift, liftLaw, axial }: AeroCoefficients): string {
+  const probe = `${LIFT_LAW_CODE[liftLaw]}${lift > 0 ? "+" : "-"}${Math.abs(lift)}`;
+  switch (model) {
+    case "normale":
+      return "N";
+    case "normale+portance":
+      return `NL-${probe}`;
+    case "normale+axiale":
+      return `NA-${axial}`;
+    case "normale+portance+axiale":
+      return `NLA-${probe}-${axial}`;
+  }
+}
+
+/** Whether a variant is the reference every other is compared with: normal drag alone. */
+export const isReference = (variant: Variant): boolean => variant.model === "normale";
 
 /**
  * The coefficient matrix, reference first:
  *
  * 1. normal drag alone;
- * 2. normal + lift — both laws, three magnitudes, both signs;
- * 3. normal + axial drag — two magnitudes;
- * 4. normal + lift + axial — the binormal law crossed with the axial probes. The yaw-odd law is
- *    not crossed again: it is an orientation probe, and the matrix stays finite.
+ * 2. normal + lift — every law, every magnitude, both signs;
+ * 3. normal + axial drag — every magnitude;
+ * 4. normal + lift + axial — the first law crossed with the axial probes. A second law is not
+ *    crossed again: it is an orientation probe, and the matrix stays finite.
+ *
+ * @throws Error on probes the four models cannot be built from — an empty list, a probe that is
+ *   not a positive number (zero is the reference, the signs are the matrix's), or one given
+ *   twice. A broken matrix, not a result.
  */
-export const VARIANTS: readonly Variant[] = (() => {
-  const { normal, liftMagnitudes, liftLaws, axial } = COEFFICIENTS;
+export function variantsOf(coefficients: Coefficients): Variant[] {
+  const { normal, liftMagnitudes, liftLaws, axial } = coefficients;
+  for (const [name, probes] of [
+    ["liftMagnitudes", liftMagnitudes],
+    ["axial", axial],
+  ] as const) {
+    const sound = probes.length > 0 && probes.every((probe) => probe > 0 && Number.isFinite(probe));
+    if (!sound || distinct(probes).length !== probes.length) {
+      throw new Error(`COEFFICIENTS.${name}: at least one probe, each positive, none twice`);
+    }
+  }
+  if (liftLaws.length === 0 || distinct(liftLaws).length !== liftLaws.length) {
+    throw new Error("COEFFICIENTS.liftLaws: at least one law, none twice");
+  }
+
   const lifts = liftMagnitudes.flatMap((magnitude) => [magnitude, -magnitude]);
-  const law = (liftLaw: LiftLaw): string => (liftLaw === "binormal" ? "b" : "y");
-  const variants: Variant[] = [
-    { id: "N", model: "normale", aero: { normal, lift: 0, liftLaw: "binormal", axial: 0 } },
+  const variant = (model: ModelId, aero: AeroCoefficients): Variant => ({
+    id: variantId(model, aero),
+    model,
+    aero,
+  });
+  const [crossed] = liftLaws;
+  return [
+    variant("normale", { normal, lift: 0, liftLaw: crossed, axial: 0 }),
+    ...liftLaws.flatMap((liftLaw) =>
+      lifts.map((lift) => variant("normale+portance", { normal, lift, liftLaw, axial: 0 })),
+    ),
+    ...axial.map((Ct) =>
+      variant("normale+axiale", { normal, lift: 0, liftLaw: crossed, axial: Ct }),
+    ),
+    ...lifts.flatMap((lift) =>
+      axial.map((Ct) =>
+        variant("normale+portance+axiale", { normal, lift, liftLaw: crossed, axial: Ct }),
+      ),
+    ),
   ];
-  for (const liftLaw of liftLaws) {
-    for (const lift of lifts) {
-      variants.push({
-        id: `NL-${law(liftLaw)}${signed(lift)}`,
-        model: "normale+portance",
-        aero: { normal, lift, liftLaw, axial: 0 },
-      });
-    }
-  }
-  for (const Ct of axial) {
-    variants.push({
-      id: `NA-${Ct}`,
-      model: "normale+axiale",
-      aero: { normal, lift: 0, liftLaw: "binormal", axial: Ct },
-    });
-  }
-  for (const lift of lifts) {
-    for (const Ct of axial) {
-      variants.push({
-        id: `NLA-b${signed(lift)}-${Ct}`,
-        model: "normale+portance+axiale",
-        aero: { normal, lift, liftLaw: "binormal", axial: Ct },
-      });
-    }
-  }
-  return variants;
-})();
+}
+
+export const VARIANTS: readonly Variant[] = variantsOf(COEFFICIENTS);
 
 /** The reference every variant is compared with: normal drag alone. */
 export const REFERENCE_VARIANT = VARIANTS[0];
+
+/**
+ * The largest probe of each added force, taken alone: every lift law with both signs, then the
+ * axial drag. What a table that cannot hold every variant shows.
+ */
+export function largestProbes(variants: readonly Variant[]): Variant[] {
+  const lifted = variants.filter(({ model }) => model === "normale+portance");
+  const dragged = variants.filter(({ model }) => model === "normale+axiale");
+  const lift = Math.max(...lifted.map(({ aero }) => Math.abs(aero.lift)));
+  const axial = Math.max(...dragged.map(({ aero }) => aero.axial));
+  return [
+    ...lifted.filter(({ aero }) => Math.abs(aero.lift) === lift),
+    ...dragged.filter(({ aero }) => aero.axial === axial),
+  ];
+}
 
 /** The coefficients' own provenance lines, for the report. */
 export const COEFFICIENT_SOURCES: readonly Sourced[] = [
@@ -407,7 +495,7 @@ export const COEFFICIENT_SOURCES: readonly Sourced[] = [
 export const SCENARIO_SOURCES: readonly Sourced[] = [
   {
     name: "portée",
-    value: `${GEOMETRIES[0].L} m`,
+    value: `${list(distinct(GEOMETRIES.map(({ L }) => french(L))))} m`,
     provenance: "scénario",
     source: "ligne de premier lancement de l'application",
   },
@@ -422,7 +510,7 @@ export const SCENARIO_SOURCES: readonly Sourced[] = [
     value: `droit entre les pieds des ancrages, ${GROUND.anchorHeight} m sous chacun, extrudé latéralement`,
     provenance: "scénario",
     source:
-      "choisi pour que le gabarit reste au-dessus du sol dans tous les cas ; extrusion Q16, pas un relevé hors axe",
+      "hauteur de scénario, choisie pour dégager le gabarit : le rapport dit, à l'état des matrices, si elle y parvient ; extrusion Q16, pas un relevé hors axe",
   },
   {
     name: "gabarit",
@@ -438,7 +526,9 @@ export const SCENARIO_SOURCES: readonly Sourced[] = [
   },
   {
     name: "vent",
-    value: `uniforme et horizontal ; 0, ${WIND_SPEEDS.join(" et ")} m/s ; de 90°, 45°, 5° et 175°`,
+    value: `uniforme et horizontal ; ${list(distinct(WINDS.map(({ speed }) => french(speed))))} m/s ; de ${list(
+      distinct(WINDS.filter(({ speed }) => speed > 0).map(({ from }) => `${french(from)}°`)),
+    )}`,
     provenance: "scénario",
     source: "vitesses d'illustration des notes archivées, pas des vents de calcul",
   },
@@ -453,23 +543,21 @@ export type BaseCase = {
   readonly wind: WindCase;
 };
 
+/** One base case, named after its four axes — the one place its identifier is written. */
+export function baseCase(
+  line: LineCase,
+  geometry: GeometryCase,
+  load: LoadState,
+  wind: WindCase,
+): BaseCase {
+  return { id: [line.id, geometry.id, load.id, wind.id].join("|"), line, geometry, load, wind };
+}
+
 /** Every base case, in the order the tables print them. */
 export function baseCases(): BaseCase[] {
-  const cases: BaseCase[] = [];
-  for (const line of LINES) {
-    for (const geometry of GEOMETRIES) {
-      for (const load of LOAD_STATES) {
-        for (const wind of WINDS) {
-          cases.push({
-            id: [line.id, geometry.id, load.id, wind.id].join("|"),
-            line,
-            geometry,
-            load,
-            wind,
-          });
-        }
-      }
-    }
-  }
-  return cases;
+  return LINES.flatMap((line) =>
+    GEOMETRIES.flatMap((geometry) =>
+      LOAD_STATES.flatMap((load) => WINDS.map((wind) => baseCase(line, geometry, load, wind))),
+    ),
+  );
 }

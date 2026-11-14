@@ -4,14 +4,21 @@ import {
   baseCases,
   COEFFICIENT_SOURCES,
   COEFFICIENTS,
+  french,
   GEOMETRIES,
   GROUND,
   groundOf,
+  isReference,
+  largestProbes,
   LINES,
+  list,
   LOAD_STATES,
   REFERENCE_VARIANT,
   riderForce,
+  SCENARIO_SOURCES,
   VARIANTS,
+  variantsOf,
+  windCase,
   WINDS,
 } from "./cases.ts";
 
@@ -42,13 +49,43 @@ describe("LINES — every property is cited arithmetic, none is invented", () =>
     expect(rope.carryingMembers).toBe(2);
   });
 
-  it("names a provenance and a source for every input, and calls no textile figure measured but the pose", () => {
+  it("names a provenance and a source for every input", () => {
     const inputs = LINES.flatMap((candidate) => candidate.inputs);
     expect(inputs.every(({ source }) => source.length > 10)).toBe(true);
-    const measured = line("corde-bandit-11").inputs.filter(
-      ({ provenance }) => provenance === "mesurée",
-    );
-    expect(measured.map(({ name }) => name)).toEqual(["tension de pose"]);
+  });
+
+  it("files as product data only what the dated sheet states", () => {
+    const classOf = (name: string) =>
+      line("corde-bandit-11").inputs.find((input) => input.name === name)?.provenance;
+    expect(classOf("diamètre")).toBe("fiche produit");
+    expect(classOf("masse linéique")).toBe("fiche produit");
+    expect(classOf("charge de rupture")).toBe("fiche produit");
+    // k·MBL is arithmetic on the sheet's elongation, which Courant does not state as a stiffness.
+    expect(classOf("raideur axiale")).toBe("dérivée de la fiche, non confirmée");
+  });
+
+  it("calls no input measured: a pose read on another span is a scenario", () => {
+    const inputs = [...LINES.flatMap((candidate) => candidate.inputs), ...SCENARIO_SOURCES];
+    expect(inputs.filter(({ provenance }) => provenance === "mesurée")).toEqual([]);
+    const pose = line("corde-bandit-11").inputs.find(({ name }) => name === "tension de pose")!;
+    expect(pose.provenance).toBe("scénario");
+    expect(pose.source).toContain("435 m");
+  });
+});
+
+describe("how the report prints a value of the matrix", () => {
+  it("french: the number as written, with a decimal comma and a true minus", () => {
+    expect(french(0.05)).toBe("0,05");
+    expect(french(0.5)).toBe("0,5");
+    expect(french(-18)).toBe("−18");
+    expect(french(175)).toBe("175");
+  });
+
+  it("list: a French enumeration", () => {
+    expect(list([])).toBe("");
+    expect(list(["90°"])).toBe("90°");
+    expect(list(["90°", "45°"])).toBe("90° et 45°");
+    expect(list(["90°", "45°", "5°"])).toBe("90°, 45° et 5°");
   });
 });
 
@@ -85,6 +122,27 @@ describe("WINDS — none, across, oblique, almost parallel", () => {
     const { along, across } = byId("oblique-10");
     expect(along).toBeCloseTo(-10 / Math.SQRT2, 12);
     expect(across).toBeCloseTo(10 / Math.SQRT2, 12);
+  });
+
+  it("names a wind after its speed and its direction, the angle as it is set", () => {
+    const wind = windCase(15, { id: "quasi-face", name: "presque de face", from: 10 });
+    expect(wind.id).toBe("quasi-face-15");
+    expect(wind.label).toBe("15 m/s presque de face (10°)");
+    // sin 10° = 0,173648…, cos 10° = 0,984807…
+    expect(wind.components.across).toBeCloseTo(15 * 0.17364817766693033, 12);
+    expect(wind.components.along).toBeCloseTo(-15 * 0.984807753012208, 12);
+    expect(WINDS.map(({ label }) => label).slice(0, 5)).toEqual([
+      "sans vent",
+      "10 m/s de travers (90°)",
+      "10 m/s oblique de face (45°)",
+      "10 m/s presque de face (5°)",
+      "10 m/s presque de dos (175°)",
+    ]);
+  });
+
+  it("states the winds of the installation from the list it runs", () => {
+    const wind = SCENARIO_SOURCES.find(({ name }) => name === "vent")!;
+    expect(wind.value).toBe("uniforme et horizontal ; 0, 10 et 20 m/s ; de 90°, 45°, 5° et 175°");
   });
 
   it("the two almost parallel winds are 5° off the line, one from each end", () => {
@@ -130,6 +188,84 @@ describe("VARIANTS — a finite matrix of probes around one reference", () => {
     expect(new Set(VARIANTS.map(({ model }) => model))).toEqual(
       new Set(["normale", "normale+portance", "normale+axiale", "normale+portance+axiale"]),
     );
+  });
+
+  it("names each variant after its model and its coefficients", () => {
+    expect(VARIANTS.map(({ id }) => id)).toEqual([
+      "N",
+      ...["b", "y"].flatMap((law) =>
+        ["+0.05", "-0.05", "+0.2", "-0.2", "+0.5", "-0.5"].map((lift) => `NL-${law}${lift}`),
+      ),
+      "NA-0.02",
+      "NA-0.1",
+      ...["+0.05", "-0.05", "+0.2", "-0.2", "+0.5", "-0.5"].flatMap((lift) => [
+        `NLA-b${lift}-0.02`,
+        `NLA-b${lift}-0.1`,
+      ]),
+    ]);
+    expect(VARIANTS.filter(isReference)).toEqual([REFERENCE_VARIANT]);
+  });
+
+  it("builds another finite matrix from adjusted probes, the first law crossed with the axial drag", () => {
+    const adjusted = variantsOf({
+      normal: 1.1,
+      liftMagnitudes: [0.3, 0.1],
+      liftLaws: ["yaw-odd"],
+      axial: [0.05],
+    });
+    expect(adjusted.map(({ id }) => id)).toEqual([
+      "N",
+      "NL-y+0.3",
+      "NL-y-0.3",
+      "NL-y+0.1",
+      "NL-y-0.1",
+      "NA-0.05",
+      "NLA-y+0.3-0.05",
+      "NLA-y-0.3-0.05",
+      "NLA-y+0.1-0.05",
+      "NLA-y-0.1-0.05",
+    ]);
+    expect(adjusted.every(({ aero }) => aero.normal === 1.1)).toBe(true);
+    expect(adjusted.at(-1)!.aero).toEqual({
+      normal: 1.1,
+      lift: -0.1,
+      liftLaw: "yaw-odd",
+      axial: 0.05,
+    });
+  });
+
+  it("refuses probes the four models cannot be built from", () => {
+    const adjusted = (patch: Partial<Parameters<typeof variantsOf>[0]>) => () =>
+      variantsOf({ ...COEFFICIENTS, ...patch });
+    expect(adjusted({ axial: [] })).toThrow("COEFFICIENTS.axial");
+    expect(adjusted({ liftMagnitudes: [] })).toThrow("COEFFICIENTS.liftMagnitudes");
+    // Zero is the reference and the signs are the matrix's own: a probe is a positive size.
+    expect(adjusted({ liftMagnitudes: [0, 0.2] })).toThrow("COEFFICIENTS.liftMagnitudes");
+    expect(adjusted({ liftMagnitudes: [-0.2] })).toThrow("COEFFICIENTS.liftMagnitudes");
+    expect(adjusted({ axial: [0.1, 0.1] })).toThrow("COEFFICIENTS.axial");
+    expect(adjusted({ liftLaws: [] })).toThrow("COEFFICIENTS.liftLaws");
+  });
+
+  it("picks the largest probe of each added force by its size, wherever it stands in the list", () => {
+    expect(largestProbes(VARIANTS).map(({ id }) => id)).toEqual([
+      "NL-b+0.5",
+      "NL-b-0.5",
+      "NL-y+0.5",
+      "NL-y-0.5",
+      "NA-0.1",
+    ]);
+    const descending = variantsOf({
+      ...COEFFICIENTS,
+      liftMagnitudes: [0.4, 0.1],
+      axial: [0.08, 0.02],
+    });
+    expect(largestProbes(descending).map(({ id }) => id)).toEqual([
+      "NL-b+0.4",
+      "NL-b-0.4",
+      "NL-y+0.4",
+      "NL-y-0.4",
+      "NA-0.08",
+    ]);
   });
 
   it("calls every lift and axial coefficient a probe, and C_D⊥ not transferable", () => {

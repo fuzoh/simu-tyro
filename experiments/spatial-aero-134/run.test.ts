@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { solveSpan } from "@/lib/sim";
 import { TOLERANCE } from "@/lib/sim/__fixtures__/theory-15.ts";
 
+import type { PoseResult } from "./pose.ts";
 import type { Outputs, Row } from "./run.ts";
 
 import { baseCases, GEOMETRIES, LINES, REFERENCE_VARIANT, VARIANTS, WINDS } from "./cases.ts";
@@ -12,12 +13,75 @@ import {
   fixedLength,
   inputOf,
   reactionShift,
-  referenceOf,
   runFixedLength,
   runPoseTension,
   solveRow,
   TOLERANCES,
 } from "./run.ts";
+import { SPATIAL } from "./solve.ts";
+
+/**
+ * The failures a row can report are **injected on the collaborators, never hunted**: the matrix
+ * has no row that fails, and a line contrived to fail tests whatever made it fail
+ * (`docs/conventions/testing.md`, Injected states). Everything is off unless a test sets it.
+ */
+const injected = vi.hoisted(() => ({
+  /** `solveSpatial` finds no equilibrium at this number of steps. */
+  noEquilibriumAt: null as number | null,
+  /** Added to the force balance `residuals` reads. */
+  forceResidual: 0,
+  /** A lateral force added to the reaction at A, read on a line of this many nodes. */
+  turn: { nodes: 0, force: 0 },
+  /** What `resolvePoseLength` answers instead of searching. */
+  pose: null as PoseResult | null,
+}));
+
+vi.mock("./solve.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./solve.ts")>();
+  return {
+    ...actual,
+    solveSpatial: (...args: Parameters<typeof actual.solveSpatial>) =>
+      (args[1]?.steps ?? actual.SPATIAL.steps) === injected.noEquilibriumAt
+        ? {
+            ok: false as const,
+            failure: { kind: "no-convergence" as const, closure: 0.3, iterations: 17 },
+          }
+        : actual.solveSpatial(...args),
+  };
+});
+
+vi.mock("./measures.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./measures.ts")>();
+  return {
+    ...actual,
+    residuals: (...args: Parameters<typeof actual.residuals>) => {
+      const found = actual.residuals(...args);
+      return { ...found, force: found.force + injected.forceResidual };
+    },
+    forceMeasures: (...args: Parameters<typeof actual.forceMeasures>) => {
+      const found = actual.forceMeasures(...args);
+      if (args[0].S.length !== injected.turn.nodes) return found;
+      const [x, y, z] = found.reactionA;
+      return { ...found, reactionA: [x, y + injected.turn.force, z] as const };
+    },
+  };
+});
+
+vi.mock("./pose.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./pose.ts")>();
+  return {
+    ...actual,
+    resolvePoseLength: (...args: Parameters<typeof actual.resolvePoseLength>) =>
+      injected.pose ?? actual.resolvePoseLength(...args),
+  };
+});
+
+afterEach(() => {
+  injected.noEquilibriumAt = null;
+  injected.forceResidual = 0;
+  injected.turn = { nodes: 0, force: 0 };
+  injected.pose = null;
+});
 
 const [steel, rope] = LINES;
 const [level, inclined] = GEOMETRIES;
@@ -117,6 +181,58 @@ describe("solveRow — one equilibrium at two step counts, with its checks", () 
   });
 });
 
+describe("solveRow — a row that fails a check stays, as a failure (§18.6)", () => {
+  const input = () =>
+    inputOf(
+      steel,
+      inclined,
+      wind("oblique-20"),
+      variant("NL-b+0.5"),
+      fixedLength(steel, inclined),
+      false,
+    );
+
+  it("reports the closure and the iterations of a line with no equilibrium", () => {
+    injected.noEquilibriumAt = SPATIAL.steps;
+    expect(solveRow(input(), inclined)).toEqual({
+      status: "non convergé",
+      detail: "fermeture 3.00e-1 m après 17 itérations",
+      outputs: null,
+      residuals: null,
+      refinement: null,
+      iterations: 17,
+    });
+  });
+
+  it("has nothing to refine a line with no equilibrium at twice the steps", () => {
+    injected.noEquilibriumAt = 2 * SPATIAL.steps;
+    const solved = solveRow(input(), inclined);
+    expect(solved.status).toBe("raffinement non résolu");
+    expect(solved.detail).toBe("pas d'équilibre à 480 pas");
+    expect(solved.outputs).toBeNull();
+    expect(solved.refinement).toBeNull();
+  });
+
+  it("fails a line whose force balance is over its bar, and keeps its figures for the diagnostic", () => {
+    injected.forceResidual = 5 * TOLERANCES.force;
+    const solved = solveRow(input(), inclined);
+    expect(solved.status).toBe("bilan hors tolérance");
+    expect(solved.detail).toContain("bilan des forces 5.00e-6 N");
+    expect(solved.outputs).not.toBeNull();
+    expect(solved.residuals!.force).toBeGreaterThan(TOLERANCES.force);
+  });
+
+  it("fails a line whose reaction turns between the two step counts, its tensions unmoved", () => {
+    // 1 mN sideways on a reaction of some 3 kN changes |F| by about 10⁻¹⁰ N: only the vector shows.
+    injected.turn = { nodes: SPATIAL.steps + 1, force: 1e-3 };
+    const solved = solveRow(input(), inclined);
+    expect(solved.status).toBe("raffinement hors tolérance");
+    expect(solved.refinement!.force).toBeCloseTo(1e-3, 6);
+    expect(solved.refinement!.length).toBeLessThan(TOLERANCES.refinement.length);
+    expect(solved.detail).toContain("1.00e-3 N");
+  });
+});
+
 describe("balanceBreach", () => {
   const clean = { closure: 0, force: 0, moment: 0, jump: 0, continuity: 0 };
 
@@ -202,7 +318,43 @@ describe("the two comparisons, on a part of the matrix", () => {
     expect(new Set(fixed.map(({ L0 }) => L0)).size).toBe(1);
     expect(fixed[0].L0).toBe(fixedLength(rope, inclined));
     expect(fixed[0].variant).toBe(REFERENCE_VARIANT);
-    expect(referenceOf(fixed[5], fixed)).toBe(fixed[0]);
+  });
+
+  it("runs the variants it is given, the matrix's own by default", () => {
+    const two = [REFERENCE_VARIANT, variant("NA-0.1")];
+    const base = only("corde-bandit-11|incline|vide|travers-10");
+    expect(runFixedLength(base, two).map((solved) => solved.variant.id)).toEqual(["N", "NA-0.1"]);
+    const posed = runPoseTension({
+      lines: [rope],
+      geometries: [inclined],
+      winds: [wind("travers-10")],
+      variants: two,
+    });
+    expect(posed.map((solved) => `${solved.base.load.id} ${solved.variant.id}`)).toEqual([
+      "vide N",
+      "passager N",
+      "vide NA-0.1",
+      "passager NA-0.1",
+    ]);
+  });
+
+  it("a pose that cannot be resolved leaves both load states as failures, with no length", () => {
+    injected.pose = { ok: false, failure: { kind: "unreachable", L0: 151.25, tension: 900 } };
+    const unposed = runPoseTension({
+      lines: [rope],
+      geometries: [inclined],
+      winds: [wind("travers-10")],
+      variants: [REFERENCE_VARIANT, variant("NA-0.1")],
+    });
+    expect(unposed).toHaveLength(4);
+    for (const failed of unposed) {
+      expect(failed.status).toBe("pose non résolue");
+      expect(failed.detail).toBe("unreachable à L0 = 151.2500 m");
+      expect(failed.L0).toBeNaN();
+      expect(failed.outputs).toBeNull();
+    }
+    // A failed row has no difference, and gives none to the rows compared with it.
+    expect(differenceOf(unposed[2], unposed[0], "Tmax")).toBeNull();
   });
 
   it("the separate comparison reports each model's L₀, and its unloaded line reads the tension de pose", () => {

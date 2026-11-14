@@ -34,7 +34,7 @@ f_a = ½·ρ·C_t ·d·|u_t|·u_t·t                  traînée axiale
 
 ## 3. Entrées et provenance
 
-Toutes les entrées sont dans `experiments/spatial-aero-134/cases.ts` ; en changer une et relancer la commande rejoue tout. Les classes de provenance sont celles du brief — mesurée, publiée non transférable, sonde de sensibilité — plus celles des entrées qui ne sont pas des coefficients.
+Toutes les entrées sont dans `experiments/spatial-aero-134/cases.ts` ; en changer une et relancer la commande rejoue tout. Les classes de provenance sont celles du brief — mesurée, publiée non transférable, sonde de sensibilité — plus celles des entrées qui ne sont pas des coefficients. **Aucune entrée de cette matrice n'est classée « mesurée »** : une valeur empruntée à un essai fait sur une autre installation est un scénario, et une valeur calculée à partir d'une fiche n'est pas une donnée de la fiche.
 
 ### Câble acier 12 mm, 6×19 âme métallique, 1770
 
@@ -57,8 +57,8 @@ Identifiant `corde-bandit-11`. Ce que le solveur consomme : `w = 0,7161 N/m`, `E
 | diamètre | 11 mm | fiche produit | fiche technique Courant du 12/09/2022 (préréglage `src/lib/rail/presets.ts`, #78) |
 | masse linéique | 73 g/m | fiche produit | fiche technique Courant du 12/09/2022, confirmée en 2020, 2022 et 2024 |
 | charge de rupture | 3 100 daN | fiche produit | fiches datées ; la page produit affiche 3 000 daN |
-| raideur axiale | EA = k·MBL = 1,27 × 31 000 N = 39,37 kN | fiche produit | arithmétique sur l'allongement de la fiche (2,5 % de 50 à 150 kg), pas une donnée Courant ; la page produit dit 3,5 % (§13.2) |
-| tension de pose | 1 400 N à l'ancrage A, à vide | mesurée | essai du 2026-11-01 sur cette corde, pose 1,52 → 1,40 kN (`docs/mesures dynamometre/README.md`) ; relevée sur 435 m, transposée ici à 150 m comme scénario |
+| raideur axiale | EA = k·MBL = 1,27 × 31 000 N = 39,37 kN | dérivée de la fiche, non confirmée | arithmétique sur l'allongement de la fiche (2,5 % de 50 à 150 kg), pas une donnée Courant ; la page produit dit 3,5 % (§13.2) |
+| tension de pose | 1 400 N à l'ancrage A, à vide | scénario | valeur empruntée à l'essai du 2026-11-01 sur cette corde, pose 1,52 → 1,40 kN (`docs/mesures dynamometre/README.md`) ; relevée sur 435 m et transposée ici à 150 m : pas une mesure de cette installation |
 | brins porteurs | 2 ; le brin calculé porte la moitié du poids du passager | convention | §8.1, partage 50/50 `[CONVENTION]`, non validé ; montage à deux cordes de l'essai du 2026-11-01 |
 
 ### Installation
@@ -67,7 +67,7 @@ Identifiant `corde-bandit-11`. Ce que le solveur consomme : `w = 0,7161 N/m`, `E
 | --- | --- | --- | --- |
 | portée | 150 m | scénario | ligne de premier lancement de l'application |
 | dénivelé | 0 m ; −18 m | scénario | ancrages de niveau, puis dénivelé de la ligne de premier lancement |
-| sol | droit entre les pieds des ancrages, 20 m sous chacun, extrudé latéralement | scénario | choisi pour que le gabarit reste au-dessus du sol dans tous les cas ; extrusion Q16, pas un relevé hors axe |
+| sol | droit entre les pieds des ancrages, 20 m sous chacun, extrudé latéralement | scénario | hauteur de scénario, choisie pour dégager le gabarit : le rapport dit, à l'état des matrices, si elle y parvient ; extrusion Q16, pas un relevé hors axe |
 | gabarit | 2,1 m | convention | §6.3, gabarit vertical entier de l'application, retranché en entier |
 | passager | 120 kg, immobile, tenu au chariot au milieu de la longueur non tendue | scénario | masse de premier lancement, non confirmée (§8.1) ; poids seul, aucune prise au vent |
 | vent | uniforme et horizontal ; 0, 10 et 20 m/s ; de 90°, 45°, 5° et 175° | scénario | vitesses d'illustration des notes archivées, pas des vents de calcul |
@@ -92,14 +92,14 @@ Identifiant `corde-bandit-11`. Ce que le solveur consomme : `w = 0,7161 N/m`, `E
 | États de charge | `vide` (à vide), `passager` (passager statique de 120 kg au milieu) |
 | Vents | `calme`, `travers-10`, `oblique-10`, `quasi-face-10`, `quasi-dos-10`, `travers-20`, `oblique-20`, `quasi-face-20`, `quasi-dos-20` |
 
-Soit 72 cas de base, chacun sous 27 variantes de coefficients : 1944 lignes par comparaison.
+Soit 72 cas de base, chacun sous 27 variantes de coefficients : 1944 lignes dans la comparaison principale, 1944 dans la comparaison séparée.
 
 | Modèle | Variantes | Identifiants |
 | --- | --- | --- |
 | 1. traînée normale seule — la référence | 1 | `N` |
-| 2. normale + portance | 12 | `NL-b±x` (loi binormale), `NL-y±x` (loi impaire en lacet), `x` = \|C_L\| |
-| 3. normale + traînée axiale | 2 | `NA-x`, `x` = C_t |
-| 4. normale + portance + axiale | 12 | `NLA-b±x-y`, loi binormale croisée avec les sondes axiales |
+| 2. normale + portance, les deux signes de chaque sonde | 12 | loi binormale : `NL-b+0.05`, `NL-b-0.05`, `NL-b+0.2`, `NL-b-0.2`, `NL-b+0.5`, `NL-b-0.5` ; loi impaire en lacet : `NL-y+0.05`, `NL-y-0.05`, `NL-y+0.2`, `NL-y-0.2`, `NL-y+0.5`, `NL-y-0.5` |
+| 3. normale + traînée axiale | 2 | `NA-0.02`, `NA-0.1` |
+| 4. normale + portance + axiale, chaque sonde de portance croisée avec chaque sonde axiale | 12 | loi binormale : `NLA-b+0.05-0.02`, `NLA-b+0.05-0.1`, `NLA-b-0.05-0.02`, `NLA-b-0.05-0.1`, `NLA-b+0.2-0.02`, `NLA-b+0.2-0.1`, `NLA-b-0.2-0.02`, `NLA-b-0.2-0.1`, `NLA-b+0.5-0.02`, `NLA-b+0.5-0.1`, `NLA-b-0.5-0.02`, `NLA-b-0.5-0.1` |
 
 La loi impaire en lacet n'est pas recroisée avec la traînée axiale : c'est une sonde d'orientation, et la matrice reste finie.
 
@@ -114,7 +114,7 @@ Les tolérances sont celles de `docs/simulation-theory.md` §18.6, **fixées à 
 | bilan global des moments en A | 1,0×10⁻⁶ N·m par mètre de corde | la tolérance de force fois son bras de levier |
 | saut de force au passager | 1,0×10⁻⁶ N | comme le bilan des forces |
 | continuité au passager | 1,0×10⁻⁹ m | le nœud est partagé |
-| raffinement, de 240 à 480 pas | 1,0×10⁻⁵ m ; 1,0×10⁻⁴ N | RK4 est d'ordre 4 : l'écart vaut 15/16 de l'erreur du maillage grossier |
+| raffinement, de 240 à 480 pas | 1,0×10⁻⁵ m ; 1,0×10⁻⁴ N | RK4 est d'ordre 4 : l'écart vaut 15/16 de l'erreur du maillage grossier ; pris sur chaque longueur et chaque force rapportée, les deux réactions comme vecteurs |
 | retour aux références sans vent | 4,0×10⁻⁶ relatif | palier « scalaires résolus » de `docs/conventions/testing.md` |
 | formes closes sans poids | 1,0×10⁻⁸ relatif | elles sont exactes |
 | plancher de lecture d'un écart | 1,0×10⁻⁴ m ; 1,0×10⁻³ N | dix fois la tolérance de raffinement |
@@ -122,7 +122,7 @@ Les tolérances sont celles de `docs/simulation-theory.md` §18.6, **fixées à 
 
 ### Contrôles du prototype
 
-Chaque valeur attendue vient d'ailleurs que du prototype : fixtures publiées de §15, moteur plan, forme close, symétrie. Le détail, grandeur par grandeur, est dans `results/controls.csv`.
+Chaque valeur attendue vient d'ailleurs que du prototype : fixtures publiées de §15, moteur plan, forme close, symétrie. Un contrôle auquel la matrice ne donne aucun cas, ou dont la ligne n'a pas d'équilibre, est en échec — jamais omis. Le détail, grandeur par grandeur, est dans `results/controls.csv`.
 
 | Contrôle | Valeur attendue tirée de | Grandeurs | Passées | Plus grande part de la tolérance consommée | Passe |
 | --- | --- | --- | --- | --- | --- |
@@ -166,7 +166,7 @@ Aucun cas en échec : toutes les lignes des deux comparaisons ont un équilibre 
 
 ## 5. Charges distribuées
 
-Moyenne du module de chaque force sur la longueur tendue, en N/m, et entre parenthèses en part du poids propre de la ligne. Cas montré : ancrages inclinés, à vide, à `L₀` fixe ; les maxima aux nœuds et les autres cas sont dans `results/fixed-l0.csv`. Chaque force est proportionnelle à son coefficient : une sonde cinq fois plus petite donne une charge cinq fois plus petite.
+Moyenne du module de chaque force sur la longueur tendue, en N/m, et entre parenthèses en part du poids propre de la ligne. Cas montré : ancrages inclinés, 150 m, B 18 m plus bas, à vide, à `L₀` fixe ; les maxima aux nœuds et les autres cas sont dans `results/fixed-l0.csv`. Chaque force est proportionnelle à son coefficient : une sonde cinq fois plus petite donne une charge cinq fois plus petite.
 
 ### Câble acier 12 mm, 6×19 âme métallique, 1770
 
@@ -202,7 +202,7 @@ La traînée normale est nulle quand le vent est parallèle à la ligne, et c'es
 
 ## 6. Comparaison principale — longueur non tendue identique
 
-**Même installation, mêmes ancrages, mêmes autres entrées : seule la force ajoutée change d'une colonne à l'autre.** Pour chaque ligne et chaque géométrie, `L₀` est résolue une fois, par le moteur, sans vent, depuis la tension de pose à l'ancrage A ; elle est ensuite la même pour tous les vents, les deux états de charge et toutes les variantes. Aucune longueur n'est recalculée.
+**Même installation, mêmes ancrages, mêmes autres entrées : seule la force ajoutée change d'une colonne à l'autre.** Pour chaque ligne et chaque géométrie, `L₀` est résolue une fois, par le moteur, sans vent, depuis la tension de pose à l'ancrage A ; elle est ensuite la même pour tous les vents, tous les états de charge et toutes les variantes. Aucune longueur n'est recalculée.
 
 | Ligne | Géométrie | Tension de pose sans vent (N) | L₀ (m) |
 | --- | --- | --- | --- |
@@ -213,7 +213,7 @@ La traînée normale est nulle quand le vent est parallèle à la ligne, et c'es
 
 ### Résultats de référence — traînée normale seule
 
-| Ligne | Géométrie | Charge | Vent | L₀ (m) | T_A (N) | T_max (N) | Flèche (m) | Déport (m) | Écart combiné (m) | Garde (m) |
+| Ligne | Géométrie | Charge | Vent | L₀ (m) | T_A (N) | T_max (N) | Flèche (m) | Déport latéral (m) | Écart maximal à A–B (m) | Garde (m) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | acier-12 | niveau | vide | calme | 150,5398 | 2634,0 | 2634,0 | 5,802 | 0,000 | 5,802 | 12,098 |
 | acier-12 | niveau | vide | travers-10 | 150,5398 | 2667,2 | 2667,2 | 5,728 | 0,943 | 5,805 | 12,172 |
@@ -288,155 +288,155 @@ La traînée normale est nulle quand le vent est parallèle à la ligne, et c'es
 | corde-bandit-11 | incline | passager | quasi-face-20 | 145,9467 | 1998,7 | 1998,7 | 12,745 | 0,085 | 12,746 | 5,155 |
 | corde-bandit-11 | incline | passager | quasi-dos-20 | 145,9467 | 1978,9 | 1978,9 | 12,512 | 0,085 | 12,512 | 5,388 |
 
-Le déport est signé : positif vers la gauche du sens A → B, donc sous un vent venant de la droite. La garde est verticale, sur le profil extrudé latéralement, gabarit entier retranché : ce n'est pas une garde au sol réel hors de l'axe.
+Le déport latéral est signé : positif vers la gauche du sens A → B, donc sous un vent venant de la droite. L'écart maximal à A–B combine, à chaque abscisse, le décalage vertical et le décalage latéral, puis prend le maximum. La garde est verticale, sur le profil extrudé latéralement, gabarit entier retranché : ce n'est pas une garde au sol réel hors de l'axe.
 
 ### Écarts par taille de sonde
 
-Chaque cellule est l'écart au modèle de référence — traînée normale seule, même cas, même convention — **de plus grande valeur absolue** parmi les cas regroupés, avec son signe ; le pourcentage est celui de ce même cas, et n'est donné que si la référence est assez loin de zéro. « < plancher » : aucun écart du groupe ne dépasse le plancher numérique. Le déport de référence est nul ou presque par vent presque parallèle : son écart est alors donné en mètres seuls. Les écarts de réaction sont la norme de la différence des vecteurs : une réaction qui tourne sans grandir s'y voit. « Remontée max. » n'est pas un écart : c'est la plus grande hauteur atteinte **au-dessus** de la droite A–B dans le groupe — la flèche, elle, ne descend pas sous zéro, et une ligne soulevée au-dessus de A–B a une flèche nulle. Regroupés ici : les deux géométries, les quatre directions de vent et les deux signes de portance.
+Chaque cellule est l'écart au modèle de référence — traînée normale seule, même cas, même convention — **de plus grande valeur absolue** parmi les cas regroupés, avec son signe ; le pourcentage est celui de ce même cas, et n'est donné que si la référence est assez loin de zéro. « < plancher » : aucun écart du groupe ne dépasse le plancher numérique ; « — » : le groupe ne contient aucune ligne. Le déport latéral de référence est nul ou presque par vent presque parallèle : son écart est alors donné en mètres seuls. Les écarts de réaction sont la norme de la différence des vecteurs : une réaction qui tourne sans grandir s'y voit. « Remontée max. » n'est pas un écart : c'est la plus grande hauteur atteinte **au-dessus** de la droite A–B dans le groupe — la flèche, elle, ne descend pas sous zéro, et une ligne soulevée au-dessus de A–B a une flèche nulle. Dans toutes les lignes résolues ici, la garde vaut 17,9 m moins la flèche — le sol prescrit est parallèle à A–B : `Δgarde = −Δflèche`, et la colonne de la garde répète celle de la flèche au signe près. Son pourcentage n'est pas imprimé : il serait la part d'une garde que fixe la hauteur d'ancrage du scénario, et changerait avec elle ; il reste dans les fichiers CSV. Regroupés ici : toutes les géométries, toutes les directions de vent et les deux signes de portance.
 
 #### Câble acier 12 mm, 6×19 âme métallique, 1770
 
-| Sonde | Vent | Charge | ΔT_max (N) | Δflèche (m) | Δdéport (m) | Δécart combiné (m) | Δgarde (m) | ‖ΔR_A‖ (N) | ‖ΔR_B‖ (N) | Remontée max. (m) |
+| Sonde | Vent | Charge | ΔT_max (N) | Δflèche (m) | Δdéport latéral (m) | Δécart maximal à A–B (m) | Δgarde (m) | ‖ΔR_A‖ (N) | ‖ΔR_B‖ (N) | Remontée max. (m) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| portance binormale, C_L = ±0,05 | 10 m/s | vide | −16,9 (−0,6 %) | −0,003 (< 0,1 %) | +0,006 (+0,6 %) | −0,002 (< 0,1 %) | +0,003 (< 0,1 %) | 16,9 (0,6 %) | 16,9 (0,6 %) | — |
-| portance binormale, C_L = ±0,05 | 10 m/s | passager | −13,5 (−0,2 %) | −0,001 (< 0,1 %) | +0,001 (+0,6 %) | −0,001 (< 0,1 %) | +0,001 (< 0,1 %) | 13,5 (0,2 %) | 13,5 (0,2 %) | — |
-| portance binormale, C_L = ±0,05 | 20 m/s | vide | +56,6 (+1,8 %) | −0,048 (−1,0 %) | +0,061 (+1,8 %) | +0,006 (+0,1 %) | +0,048 (+0,4 %) | 56,9 (1,8 %) | 56,9 (1,8 %) | — |
-| portance binormale, C_L = ±0,05 | 20 m/s | passager | +52,9 (+0,6 %) | −0,005 (−0,1 %) | +0,008 (+0,6 %) | −0,003 (< 0,1 %) | +0,005 (< 0,1 %) | 53,2 (0,6 %) | 53,2 (0,6 %) | — |
-| portance binormale, C_L = ±0,20 | 10 m/s | vide | −67,6 (−2,5 %) | −0,011 (−0,2 %) | +0,026 (+2,6 %) | −0,007 (−0,1 %) | +0,011 (+0,1 %) | 67,6 (2,5 %) | 67,6 (2,5 %) | — |
-| portance binormale, C_L = ±0,20 | 10 m/s | passager | −54,0 (−0,7 %) | −0,003 (< 0,1 %) | +0,004 (+2,3 %) | −0,003 (< 0,1 %) | +0,003 (< 0,1 %) | 54,2 (0,7 %) | 54,2 (0,7 %) | — |
-| portance binormale, C_L = ±0,20 | 20 m/s | vide | +228,4 (+7,3 %) | −0,209 (−4,1 %) | +0,256 (+7,7 %) | +0,025 (+0,4 %) | +0,209 (+1,6 %) | 229,6 (7,4 %) | 229,6 (7,4 %) | — |
-| portance binormale, C_L = ±0,20 | 20 m/s | passager | +211,8 (+2,5 %) | −0,019 (−0,3 %) | +0,033 (+2,6 %) | −0,013 (−0,2 %) | +0,019 (+0,2 %) | 212,7 (2,6 %) | 212,7 (2,6 %) | — |
-| portance binormale, C_L = ±0,50 | 10 m/s | vide | −169,1 (−6,3 %) | −0,029 (−0,5 %) | +0,067 (+6,9 %) | −0,018 (−0,3 %) | +0,029 (+0,2 %) | 169,2 (6,3 %) | 169,2 (6,3 %) | — |
-| portance binormale, C_L = ±0,50 | 10 m/s | passager | −135,0 (−1,6 %) | −0,007 (−0,1 %) | +0,009 (+5,9 %) | −0,007 (−0,1 %) | +0,007 (+0,1 %) | 135,5 (1,6 %) | 135,5 (1,6 %) | — |
-| portance binormale, C_L = ±0,50 | 20 m/s | vide | +578,4 (+18,6 %) | −0,619 (−12,3 %) | +0,698 (+21,0 %) | +0,063 (+1,0 %) | +0,619 (+4,8 %) | 581,0 (18,6 %) | 581,0 (18,6 %) | — |
-| portance binormale, C_L = ±0,50 | 20 m/s | passager | +529,5 (+6,3 %) | −0,049 (−0,7 %) | +0,086 (+6,9 %) | −0,034 (−0,5 %) | +0,049 (+0,5 %) | 531,7 (6,4 %) | 531,7 (6,4 %) | — |
-| portance impaire en lacet, C_L = ±0,05 | 10 m/s | vide | −8,5 (−0,3 %) | −0,001 (< 0,1 %) | +0,005 | −0,001 (< 0,1 %) | +0,001 (< 0,1 %) | 8,5 (0,3 %) | 8,5 (0,3 %) | — |
-| portance impaire en lacet, C_L = ±0,05 | 10 m/s | passager | −6,7 (−0,1 %) | −3,6×10⁻⁴ (< 0,1 %) | +0,002 | −3,5×10⁻⁴ (< 0,1 %) | 3,6×10⁻⁴ (< 0,1 %) | 6,8 (0,1 %) | 6,8 (0,1 %) | — |
-| portance impaire en lacet, C_L = ±0,05 | 20 m/s | vide | +32,3 (+1,2 %) | −0,013 (−0,2 %) | +0,029 (+1,6 %) | −0,003 (−0,1 %) | +0,013 (+0,1 %) | 32,4 (1,2 %) | 32,4 (1,2 %) | — |
-| portance impaire en lacet, C_L = ±0,05 | 20 m/s | passager | −26,8 (−0,3 %) | −0,002 (< 0,1 %) | +0,007 | −0,001 (< 0,1 %) | +0,002 (< 0,1 %) | 26,9 (0,3 %) | 26,9 (0,3 %) | — |
-| portance impaire en lacet, C_L = ±0,20 | 10 m/s | vide | −34,1 (−1,3 %) | −0,005 (−0,1 %) | −0,020 | −0,004 (−0,1 %) | +0,005 (< 0,1 %) | 34,1 (1,3 %) | 34,1 (1,3 %) | — |
-| portance impaire en lacet, C_L = ±0,20 | 10 m/s | passager | −26,9 (−0,3 %) | −0,001 (< 0,1 %) | −0,007 | −0,001 (< 0,1 %) | +0,001 (< 0,1 %) | 27,0 (0,3 %) | 27,0 (0,3 %) | — |
-| portance impaire en lacet, C_L = ±0,20 | 20 m/s | vide | +129,4 (+4,7 %) | −0,054 (−0,9 %) | +0,120 (+6,5 %) | −0,014 (−0,2 %) | +0,054 (+0,4 %) | 129,6 (4,7 %) | 129,5 (4,7 %) | — |
-| portance impaire en lacet, C_L = ±0,20 | 20 m/s | passager | −107,1 (−1,3 %) | −0,007 (−0,1 %) | −0,027 | −0,006 (−0,1 %) | +0,007 (+0,1 %) | 107,6 (1,3 %) | 107,5 (1,3 %) | — |
-| portance impaire en lacet, C_L = ±0,50 | 10 m/s | vide | −85,2 (−3,2 %) | −0,012 (−0,2 %) | −0,050 | −0,009 (−0,2 %) | +0,012 (+0,1 %) | 85,2 (3,2 %) | 85,2 (3,2 %) | — |
-| portance impaire en lacet, C_L = ±0,50 | 10 m/s | passager | −67,3 (−0,8 %) | −0,004 (< 0,1 %) | −0,017 | −0,004 (< 0,1 %) | +0,004 (< 0,1 %) | 67,5 (0,8 %) | 67,5 (0,8 %) | — |
-| portance impaire en lacet, C_L = ±0,50 | 20 m/s | vide | +323,5 (+11,7 %) | −0,148 (−2,6 %) | +0,319 (+17,4 %) | −0,035 (−0,6 %) | +0,148 (+1,2 %) | 324,1 (11,7 %) | 323,8 (11,7 %) | — |
-| portance impaire en lacet, C_L = ±0,50 | 20 m/s | passager | −267,8 (−3,2 %) | −0,019 (−0,3 %) | −0,067 | −0,015 (−0,2 %) | +0,019 (+0,2 %) | 268,9 (3,3 %) | 268,8 (3,3 %) | — |
+| portance binormale, C_L = ±0,05 | 10 m/s | vide | −16,9 (−0,6 %) | −0,003 (< 0,1 %) | +0,006 (+0,6 %) | −0,002 (< 0,1 %) | +0,003 | 16,9 (0,6 %) | 16,9 (0,6 %) | — |
+| portance binormale, C_L = ±0,05 | 10 m/s | passager | −13,5 (−0,2 %) | −0,001 (< 0,1 %) | +0,001 (+0,6 %) | −0,001 (< 0,1 %) | +0,001 | 13,5 (0,2 %) | 13,5 (0,2 %) | — |
+| portance binormale, C_L = ±0,05 | 20 m/s | vide | +56,6 (+1,8 %) | −0,048 (−1,0 %) | +0,061 (+1,8 %) | +0,006 (+0,1 %) | +0,048 | 56,9 (1,8 %) | 56,9 (1,8 %) | — |
+| portance binormale, C_L = ±0,05 | 20 m/s | passager | +52,9 (+0,6 %) | −0,005 (−0,1 %) | +0,008 (+0,6 %) | −0,003 (< 0,1 %) | +0,005 | 53,2 (0,6 %) | 53,2 (0,6 %) | — |
+| portance binormale, C_L = ±0,2 | 10 m/s | vide | −67,6 (−2,5 %) | −0,011 (−0,2 %) | +0,026 (+2,6 %) | −0,007 (−0,1 %) | +0,011 | 67,6 (2,5 %) | 67,6 (2,5 %) | — |
+| portance binormale, C_L = ±0,2 | 10 m/s | passager | −54,0 (−0,7 %) | −0,003 (< 0,1 %) | +0,004 (+2,3 %) | −0,003 (< 0,1 %) | +0,003 | 54,2 (0,7 %) | 54,2 (0,7 %) | — |
+| portance binormale, C_L = ±0,2 | 20 m/s | vide | +228,4 (+7,3 %) | −0,209 (−4,1 %) | +0,256 (+7,7 %) | +0,025 (+0,4 %) | +0,209 | 229,6 (7,4 %) | 229,6 (7,4 %) | — |
+| portance binormale, C_L = ±0,2 | 20 m/s | passager | +211,8 (+2,5 %) | −0,019 (−0,3 %) | +0,033 (+2,6 %) | −0,013 (−0,2 %) | +0,019 | 212,7 (2,6 %) | 212,7 (2,6 %) | — |
+| portance binormale, C_L = ±0,5 | 10 m/s | vide | −169,1 (−6,3 %) | −0,029 (−0,5 %) | +0,067 (+6,9 %) | −0,018 (−0,3 %) | +0,029 | 169,2 (6,3 %) | 169,2 (6,3 %) | — |
+| portance binormale, C_L = ±0,5 | 10 m/s | passager | −135,0 (−1,6 %) | −0,007 (−0,1 %) | +0,009 (+5,9 %) | −0,007 (−0,1 %) | +0,007 | 135,5 (1,6 %) | 135,5 (1,6 %) | — |
+| portance binormale, C_L = ±0,5 | 20 m/s | vide | +578,4 (+18,6 %) | −0,619 (−12,3 %) | +0,698 (+21,0 %) | +0,063 (+1,0 %) | +0,619 | 581,0 (18,6 %) | 581,0 (18,6 %) | — |
+| portance binormale, C_L = ±0,5 | 20 m/s | passager | +529,5 (+6,3 %) | −0,049 (−0,7 %) | +0,086 (+6,9 %) | −0,034 (−0,5 %) | +0,049 | 531,7 (6,4 %) | 531,7 (6,4 %) | — |
+| portance impaire en lacet, C_L = ±0,05 | 10 m/s | vide | −8,5 (−0,3 %) | −0,001 (< 0,1 %) | +0,005 | −0,001 (< 0,1 %) | +0,001 | 8,5 (0,3 %) | 8,5 (0,3 %) | — |
+| portance impaire en lacet, C_L = ±0,05 | 10 m/s | passager | −6,7 (−0,1 %) | −3,6×10⁻⁴ (< 0,1 %) | +0,002 | −3,5×10⁻⁴ (< 0,1 %) | 3,6×10⁻⁴ | 6,8 (0,1 %) | 6,8 (0,1 %) | — |
+| portance impaire en lacet, C_L = ±0,05 | 20 m/s | vide | +32,3 (+1,2 %) | −0,013 (−0,2 %) | +0,029 (+1,6 %) | −0,003 (−0,1 %) | +0,013 | 32,4 (1,2 %) | 32,4 (1,2 %) | — |
+| portance impaire en lacet, C_L = ±0,05 | 20 m/s | passager | −26,8 (−0,3 %) | −0,002 (< 0,1 %) | +0,007 | −0,001 (< 0,1 %) | +0,002 | 26,9 (0,3 %) | 26,9 (0,3 %) | — |
+| portance impaire en lacet, C_L = ±0,2 | 10 m/s | vide | −34,1 (−1,3 %) | −0,005 (−0,1 %) | −0,020 | −0,004 (−0,1 %) | +0,005 | 34,1 (1,3 %) | 34,1 (1,3 %) | — |
+| portance impaire en lacet, C_L = ±0,2 | 10 m/s | passager | −26,9 (−0,3 %) | −0,001 (< 0,1 %) | −0,007 | −0,001 (< 0,1 %) | +0,001 | 27,0 (0,3 %) | 27,0 (0,3 %) | — |
+| portance impaire en lacet, C_L = ±0,2 | 20 m/s | vide | +129,4 (+4,7 %) | −0,054 (−0,9 %) | +0,120 (+6,5 %) | −0,014 (−0,2 %) | +0,054 | 129,6 (4,7 %) | 129,5 (4,7 %) | — |
+| portance impaire en lacet, C_L = ±0,2 | 20 m/s | passager | −107,1 (−1,3 %) | −0,007 (−0,1 %) | −0,027 | −0,006 (−0,1 %) | +0,007 | 107,6 (1,3 %) | 107,5 (1,3 %) | — |
+| portance impaire en lacet, C_L = ±0,5 | 10 m/s | vide | −85,2 (−3,2 %) | −0,012 (−0,2 %) | −0,050 | −0,009 (−0,2 %) | +0,012 | 85,2 (3,2 %) | 85,2 (3,2 %) | — |
+| portance impaire en lacet, C_L = ±0,5 | 10 m/s | passager | −67,3 (−0,8 %) | −0,004 (< 0,1 %) | −0,017 | −0,004 (< 0,1 %) | +0,004 | 67,5 (0,8 %) | 67,5 (0,8 %) | — |
+| portance impaire en lacet, C_L = ±0,5 | 20 m/s | vide | +323,5 (+11,7 %) | −0,148 (−2,6 %) | +0,319 (+17,4 %) | −0,035 (−0,6 %) | +0,148 | 324,1 (11,7 %) | 323,8 (11,7 %) | — |
+| portance impaire en lacet, C_L = ±0,5 | 20 m/s | passager | −267,8 (−3,2 %) | −0,019 (−0,3 %) | −0,067 | −0,015 (−0,2 %) | +0,019 | 268,9 (3,3 %) | 268,8 (3,3 %) | — |
 | traînée axiale, C_t = 0,02 | 10 m/s | vide | +1,1 (< 0,1 %) | < plancher | < plancher | < plancher | < plancher | 1,1 (< 0,1 %) | 1,1 (< 0,1 %) | — |
 | traînée axiale, C_t = 0,02 | 10 m/s | passager | +1,1 (< 0,1 %) | < plancher | < plancher | < plancher | < plancher | 1,1 (< 0,1 %) | 1,1 (< 0,1 %) | — |
 | traînée axiale, C_t = 0,02 | 20 m/s | vide | +4,4 (+0,2 %) | < plancher | < plancher | < plancher | < plancher | 4,4 (0,2 %) | 4,4 (0,2 %) | — |
 | traînée axiale, C_t = 0,02 | 20 m/s | passager | +4,4 (+0,1 %) | < plancher | < plancher | < plancher | < plancher | 4,4 (0,1 %) | 4,4 (0,1 %) | — |
-| traînée axiale, C_t = 0,10 | 10 m/s | vide | +5,5 (+0,2 %) | < plancher | < plancher | < plancher | < plancher | 5,5 (0,2 %) | 5,5 (0,2 %) | — |
-| traînée axiale, C_t = 0,10 | 10 m/s | passager | +5,4 (+0,1 %) | < plancher | < plancher | < plancher | < plancher | 5,4 (0,1 %) | 5,5 (0,1 %) | — |
-| traînée axiale, C_t = 0,10 | 20 m/s | vide | +21,9 (+0,8 %) | −2,3×10⁻⁴ (< 0,1 %) | < plancher | −2,3×10⁻⁴ (< 0,1 %) | 2,3×10⁻⁴ (< 0,1 %) | 21,9 (0,8 %) | 21,9 (0,8 %) | — |
-| traînée axiale, C_t = 0,10 | 20 m/s | passager | +21,8 (+0,3 %) | < plancher | < plancher | < plancher | < plancher | 21,8 (0,3 %) | 22,1 (0,3 %) | — |
-| portance binormale ±0,50 et axiale 0,10 | 10 m/s | vide | −169,1 (−6,3 %) | −0,029 (−0,5 %) | +0,067 (+6,9 %) | −0,018 (−0,3 %) | +0,029 (+0,2 %) | 169,2 (6,3 %) | 169,2 (6,3 %) | — |
-| portance binormale ±0,50 et axiale 0,10 | 10 m/s | passager | −135,0 (−1,6 %) | −0,007 (−0,1 %) | +0,009 (+5,9 %) | −0,007 (−0,1 %) | +0,007 (+0,1 %) | 135,5 (1,6 %) | 135,5 (1,6 %) | — |
-| portance binormale ±0,50 et axiale 0,10 | 20 m/s | vide | +578,4 (+18,6 %) | −0,619 (−12,3 %) | +0,698 (+21,0 %) | +0,063 (+1,0 %) | +0,619 (+4,8 %) | 581,0 (18,6 %) | 581,0 (18,6 %) | — |
-| portance binormale ±0,50 et axiale 0,10 | 20 m/s | passager | +529,5 (+6,3 %) | −0,049 (−0,7 %) | +0,086 (+6,9 %) | −0,034 (−0,5 %) | +0,049 (+0,5 %) | 531,7 (6,4 %) | 531,7 (6,4 %) | — |
+| traînée axiale, C_t = 0,1 | 10 m/s | vide | +5,5 (+0,2 %) | < plancher | < plancher | < plancher | < plancher | 5,5 (0,2 %) | 5,5 (0,2 %) | — |
+| traînée axiale, C_t = 0,1 | 10 m/s | passager | +5,4 (+0,1 %) | < plancher | < plancher | < plancher | < plancher | 5,4 (0,1 %) | 5,5 (0,1 %) | — |
+| traînée axiale, C_t = 0,1 | 20 m/s | vide | +21,9 (+0,8 %) | −2,3×10⁻⁴ (< 0,1 %) | < plancher | −2,3×10⁻⁴ (< 0,1 %) | 2,3×10⁻⁴ | 21,9 (0,8 %) | 21,9 (0,8 %) | — |
+| traînée axiale, C_t = 0,1 | 20 m/s | passager | +21,8 (+0,3 %) | < plancher | < plancher | < plancher | < plancher | 21,8 (0,3 %) | 22,1 (0,3 %) | — |
+| portance binormale ±0,5 et axiale 0,1 | 10 m/s | vide | −169,1 (−6,3 %) | −0,029 (−0,5 %) | +0,067 (+6,9 %) | −0,018 (−0,3 %) | +0,029 | 169,2 (6,3 %) | 169,2 (6,3 %) | — |
+| portance binormale ±0,5 et axiale 0,1 | 10 m/s | passager | −135,0 (−1,6 %) | −0,007 (−0,1 %) | +0,009 (+5,9 %) | −0,007 (−0,1 %) | +0,007 | 135,5 (1,6 %) | 135,5 (1,6 %) | — |
+| portance binormale ±0,5 et axiale 0,1 | 20 m/s | vide | +578,4 (+18,6 %) | −0,619 (−12,3 %) | +0,698 (+21,0 %) | +0,063 (+1,0 %) | +0,619 | 581,0 (18,6 %) | 581,0 (18,6 %) | — |
+| portance binormale ±0,5 et axiale 0,1 | 20 m/s | passager | +529,5 (+6,3 %) | −0,049 (−0,7 %) | +0,086 (+6,9 %) | −0,034 (−0,5 %) | +0,049 | 531,7 (6,4 %) | 531,7 (6,4 %) | — |
 
 #### Corde Courant Bandit 11 mm, polyamide EN 1891 type A
 
-| Sonde | Vent | Charge | ΔT_max (N) | Δflèche (m) | Δdéport (m) | Δécart combiné (m) | Δgarde (m) | ‖ΔR_A‖ (N) | ‖ΔR_B‖ (N) | Remontée max. (m) |
+| Sonde | Vent | Charge | ΔT_max (N) | Δflèche (m) | Δdéport latéral (m) | Δécart maximal à A–B (m) | Δgarde (m) | ‖ΔR_A‖ (N) | ‖ΔR_B‖ (N) | Remontée max. (m) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| portance binormale, C_L = ±0,05 | 10 m/s | vide | +0,9 (+0,1 %) | −0,068 (−4,8 %) | −0,004 (−0,5 %) | +0,044 (+2,0 %) | +0,068 (+0,4 %) | 2,7 (0,2 %) | 2,7 (0,2 %) | — |
-| portance binormale, C_L = ±0,05 | 10 m/s | passager | +2,9 (+0,1 %) | −0,032 (−0,3 %) | +0,004 (+0,6 %) | −0,032 (−0,3 %) | +0,032 (+0,6 %) | 3,6 (0,2 %) | 3,6 (0,2 %) | — |
-| portance binormale, C_L = ±0,05 | 20 m/s | vide | +2,8 (+0,2 %) | −0,247 (−19,5 %) | −0,019 (−0,6 %) | +0,050 (+1,5 %) | +0,247 (+1,5 %) | 10,4 (0,7 %) | 10,3 (0,7 %) | — |
-| portance binormale, C_L = ±0,05 | 20 m/s | passager | +10,8 (+0,5 %) | −0,134 (−1,1 %) | +0,023 (+0,5 %) | −0,117 (−0,9 %) | +0,134 (+2,4 %) | 13,8 (0,7 %) | 13,7 (0,7 %) | — |
-| portance binormale, C_L = ±0,20 | 10 m/s | vide | +4,0 (+0,3 %) | −0,273 (−19,4 %) | −0,018 (−2,1 %) | +0,182 (+8,4 %) | +0,273 (+1,7 %) | 10,8 (0,8 %) | 10,8 (0,8 %) | — |
-| portance binormale, C_L = ±0,20 | 10 m/s | passager | +11,8 (+0,6 %) | −0,130 (−1,0 %) | +0,014 (+2,3 %) | −0,129 (−1,0 %) | +0,130 (+2,5 %) | 14,4 (0,7 %) | 14,3 (0,8 %) | — |
-| portance binormale, C_L = ±0,20 | 20 m/s | vide | +13,8 (+0,9 %) | −0,993 (−78,4 %) | −0,079 (−2,5 %) | +0,232 (+3,8 %) | +0,993 (+6,0 %) | 42,1 (2,7 %) | 42,0 (2,7 %) | — |
-| portance binormale, C_L = ±0,20 | 20 m/s | passager | +43,7 (+2,1 %) | −0,548 (−4,5 %) | +0,091 (+1,9 %) | −0,475 (−3,6 %) | +0,548 (+9,6 %) | 55,3 (2,7 %) | 54,9 (2,8 %) | — |
-| portance binormale, C_L = ±0,50 | 10 m/s | vide | +11,1 (+0,8 %) | −0,685 (−48,8 %) | −0,044 (−5,3 %) | +0,480 (+22,2 %) | +0,685 (+4,2 %) | 27,3 (1,9 %) | 27,3 (1,9 %) | — |
-| portance binormale, C_L = ±0,50 | 10 m/s | passager | +29,6 (+1,5 %) | −0,329 (−2,6 %) | +0,036 (+5,8 %) | −0,326 (−2,6 %) | +0,329 (+6,2 %) | 36,1 (1,8 %) | 35,8 (1,9 %) | — |
-| portance binormale, C_L = ±0,50 | 20 m/s | vide | +47,1 (+3,0 %) | +2,383 (+188,2 %) | −0,203 (−6,3 %) | +0,766 (+12,6 %) | −2,383 (−14,3 %) | 108,9 (7,0 %) | 108,6 (7,0 %) | 1,219 |
-| portance binormale, C_L = ±0,50 | 20 m/s | passager | +110,9 (+5,4 %) | −1,424 (−11,7 %) | +0,229 (+4,8 %) | −1,224 (−9,4 %) | +1,424 (+25,0 %) | 138,7 (6,7 %) | 137,7 (7,0 %) | — |
-| portance impaire en lacet, C_L = ±0,05 | 10 m/s | vide | +0,5 (< 0,1 %) | −0,034 (−2,2 %) | +0,008 | +0,029 (+1,8 %) | +0,034 (+0,2 %) | 1,3 (0,1 %) | 1,3 (0,1 %) | — |
-| portance impaire en lacet, C_L = ±0,05 | 10 m/s | passager | +1,4 (+0,1 %) | −0,016 (−0,1 %) | +0,007 | −0,016 (−0,1 %) | +0,016 (+0,3 %) | 1,8 (0,1 %) | 1,8 (0,1 %) | — |
-| portance impaire en lacet, C_L = ±0,05 | 20 m/s | vide | +1,7 (+0,1 %) | −0,131 (−7,5 %) | −0,033 | +0,050 (+1,5 %) | +0,131 (+0,8 %) | 5,4 (0,4 %) | 5,2 (0,4 %) | — |
-| portance impaire en lacet, C_L = ±0,05 | 20 m/s | passager | +5,7 (+0,3 %) | −0,064 (−0,5 %) | +0,027 | −0,061 (−0,5 %) | +0,064 (+1,2 %) | 7,0 (0,4 %) | 6,9 (0,4 %) | — |
-| portance impaire en lacet, C_L = ±0,20 | 10 m/s | vide | +1,9 (+0,1 %) | −0,136 (−9,0 %) | −0,033 | +0,116 (+7,2 %) | +0,136 (+0,8 %) | 5,4 (0,4 %) | 5,3 (0,4 %) | — |
-| portance impaire en lacet, C_L = ±0,20 | 10 m/s | passager | +5,8 (+0,3 %) | −0,063 (−0,5 %) | −0,028 | −0,063 (−0,5 %) | +0,063 (+1,2 %) | 7,1 (0,4 %) | 7,1 (0,4 %) | — |
-| portance impaire en lacet, C_L = ±0,20 | 20 m/s | vide | +7,8 (+0,5 %) | −0,527 (−30,1 %) | −0,130 | +0,221 (+6,5 %) | +0,527 (+3,3 %) | 21,9 (1,5 %) | 20,9 (1,4 %) | — |
-| portance impaire en lacet, C_L = ±0,20 | 20 m/s | passager | +22,7 (+1,2 %) | −0,258 (−2,0 %) | −0,113 | −0,245 (−1,9 %) | +0,258 (+5,0 %) | 28,1 (1,4 %) | 27,8 (1,4 %) | — |
-| portance impaire en lacet, C_L = ±0,50 | 10 m/s | vide | +5,1 (+0,4 %) | −0,341 (−22,5 %) | −0,081 | +0,293 (+18,2 %) | +0,341 (+2,1 %) | 13,6 (1,0 %) | 13,4 (1,0 %) | — |
-| portance impaire en lacet, C_L = ±0,50 | 10 m/s | passager | +14,5 (+0,7 %) | −0,159 (−1,3 %) | −0,068 | −0,158 (−1,2 %) | +0,159 (+3,0 %) | 17,8 (0,9 %) | 17,6 (0,9 %) | — |
-| portance impaire en lacet, C_L = ±0,50 | 20 m/s | vide | +23,6 (+1,6 %) | −1,325 (−75,7 %) | −0,325 | +0,637 (+18,6 %) | +1,325 (+8,2 %) | 56,1 (3,9 %) | 53,5 (3,7 %) | — |
-| portance impaire en lacet, C_L = ±0,50 | 20 m/s | passager | +57,2 (+2,9 %) | −0,658 (−5,2 %) | −0,275 | −0,624 (−5,0 %) | +0,658 (+12,7 %) | 70,3 (3,6 %) | 69,4 (3,5 %) | — |
+| portance binormale, C_L = ±0,05 | 10 m/s | vide | +0,9 (+0,1 %) | −0,068 (−4,8 %) | −0,004 (−0,5 %) | +0,044 (+2,0 %) | +0,068 | 2,7 (0,2 %) | 2,7 (0,2 %) | — |
+| portance binormale, C_L = ±0,05 | 10 m/s | passager | +2,9 (+0,1 %) | −0,032 (−0,3 %) | +0,004 (+0,6 %) | −0,032 (−0,3 %) | +0,032 | 3,6 (0,2 %) | 3,6 (0,2 %) | — |
+| portance binormale, C_L = ±0,05 | 20 m/s | vide | +2,8 (+0,2 %) | −0,247 (−19,5 %) | −0,019 (−0,6 %) | +0,050 (+1,5 %) | +0,247 | 10,4 (0,7 %) | 10,3 (0,7 %) | — |
+| portance binormale, C_L = ±0,05 | 20 m/s | passager | +10,8 (+0,5 %) | −0,134 (−1,1 %) | +0,023 (+0,5 %) | −0,117 (−0,9 %) | +0,134 | 13,8 (0,7 %) | 13,7 (0,7 %) | — |
+| portance binormale, C_L = ±0,2 | 10 m/s | vide | +4,0 (+0,3 %) | −0,273 (−19,4 %) | −0,018 (−2,1 %) | +0,182 (+8,4 %) | +0,273 | 10,8 (0,8 %) | 10,8 (0,8 %) | — |
+| portance binormale, C_L = ±0,2 | 10 m/s | passager | +11,8 (+0,6 %) | −0,130 (−1,0 %) | +0,014 (+2,3 %) | −0,129 (−1,0 %) | +0,130 | 14,4 (0,7 %) | 14,3 (0,8 %) | — |
+| portance binormale, C_L = ±0,2 | 20 m/s | vide | +13,8 (+0,9 %) | −0,993 (−78,4 %) | −0,079 (−2,5 %) | +0,232 (+3,8 %) | +0,993 | 42,1 (2,7 %) | 42,0 (2,7 %) | — |
+| portance binormale, C_L = ±0,2 | 20 m/s | passager | +43,7 (+2,1 %) | −0,548 (−4,5 %) | +0,091 (+1,9 %) | −0,475 (−3,6 %) | +0,548 | 55,3 (2,7 %) | 54,9 (2,8 %) | — |
+| portance binormale, C_L = ±0,5 | 10 m/s | vide | +11,1 (+0,8 %) | −0,685 (−48,8 %) | −0,044 (−5,3 %) | +0,480 (+22,2 %) | +0,685 | 27,3 (1,9 %) | 27,3 (1,9 %) | — |
+| portance binormale, C_L = ±0,5 | 10 m/s | passager | +29,6 (+1,5 %) | −0,329 (−2,6 %) | +0,036 (+5,8 %) | −0,326 (−2,6 %) | +0,329 | 36,1 (1,8 %) | 35,8 (1,9 %) | — |
+| portance binormale, C_L = ±0,5 | 20 m/s | vide | +47,1 (+3,0 %) | +2,383 (+188,2 %) | −0,203 (−6,3 %) | +0,766 (+12,6 %) | −2,383 | 108,9 (7,0 %) | 108,6 (7,0 %) | 1,219 |
+| portance binormale, C_L = ±0,5 | 20 m/s | passager | +110,9 (+5,4 %) | −1,424 (−11,7 %) | +0,229 (+4,8 %) | −1,224 (−9,4 %) | +1,424 | 138,7 (6,7 %) | 137,7 (7,0 %) | — |
+| portance impaire en lacet, C_L = ±0,05 | 10 m/s | vide | +0,5 (< 0,1 %) | −0,034 (−2,2 %) | +0,008 | +0,029 (+1,8 %) | +0,034 | 1,3 (0,1 %) | 1,3 (0,1 %) | — |
+| portance impaire en lacet, C_L = ±0,05 | 10 m/s | passager | +1,4 (+0,1 %) | −0,016 (−0,1 %) | +0,007 | −0,016 (−0,1 %) | +0,016 | 1,8 (0,1 %) | 1,8 (0,1 %) | — |
+| portance impaire en lacet, C_L = ±0,05 | 20 m/s | vide | +1,7 (+0,1 %) | −0,131 (−7,5 %) | −0,033 | +0,050 (+1,5 %) | +0,131 | 5,4 (0,4 %) | 5,2 (0,4 %) | — |
+| portance impaire en lacet, C_L = ±0,05 | 20 m/s | passager | +5,7 (+0,3 %) | −0,064 (−0,5 %) | +0,027 | −0,061 (−0,5 %) | +0,064 | 7,0 (0,4 %) | 6,9 (0,4 %) | — |
+| portance impaire en lacet, C_L = ±0,2 | 10 m/s | vide | +1,9 (+0,1 %) | −0,136 (−9,0 %) | −0,033 | +0,116 (+7,2 %) | +0,136 | 5,4 (0,4 %) | 5,3 (0,4 %) | — |
+| portance impaire en lacet, C_L = ±0,2 | 10 m/s | passager | +5,8 (+0,3 %) | −0,063 (−0,5 %) | −0,028 | −0,063 (−0,5 %) | +0,063 | 7,1 (0,4 %) | 7,1 (0,4 %) | — |
+| portance impaire en lacet, C_L = ±0,2 | 20 m/s | vide | +7,8 (+0,5 %) | −0,527 (−30,1 %) | −0,130 | +0,221 (+6,5 %) | +0,527 | 21,9 (1,5 %) | 20,9 (1,4 %) | — |
+| portance impaire en lacet, C_L = ±0,2 | 20 m/s | passager | +22,7 (+1,2 %) | −0,258 (−2,0 %) | −0,113 | −0,245 (−1,9 %) | +0,258 | 28,1 (1,4 %) | 27,8 (1,4 %) | — |
+| portance impaire en lacet, C_L = ±0,5 | 10 m/s | vide | +5,1 (+0,4 %) | −0,341 (−22,5 %) | −0,081 | +0,293 (+18,2 %) | +0,341 | 13,6 (1,0 %) | 13,4 (1,0 %) | — |
+| portance impaire en lacet, C_L = ±0,5 | 10 m/s | passager | +14,5 (+0,7 %) | −0,159 (−1,3 %) | −0,068 | −0,158 (−1,2 %) | +0,159 | 17,8 (0,9 %) | 17,6 (0,9 %) | — |
+| portance impaire en lacet, C_L = ±0,5 | 20 m/s | vide | +23,6 (+1,6 %) | −1,325 (−75,7 %) | −0,325 | +0,637 (+18,6 %) | +1,325 | 56,1 (3,9 %) | 53,5 (3,7 %) | — |
+| portance impaire en lacet, C_L = ±0,5 | 20 m/s | passager | +57,2 (+2,9 %) | −0,658 (−5,2 %) | −0,275 | −0,624 (−5,0 %) | +0,658 | 70,3 (3,6 %) | 69,4 (3,5 %) | — |
 | traînée axiale, C_t = 0,02 | 10 m/s | vide | +1,0 (+0,1 %) | < plancher | < plancher | < plancher | < plancher | 1,0 (0,1 %) | 1,0 (0,1 %) | — |
 | traînée axiale, C_t = 0,02 | 10 m/s | passager | +1,0 (+0,1 %) | < plancher | < plancher | < plancher | < plancher | 1,0 (0,1 %) | 1,0 (0,1 %) | — |
 | traînée axiale, C_t = 0,02 | 20 m/s | vide | +4,0 (+0,3 %) | < plancher | 1,5×10⁻⁴ (< 0,1 %) | 1,6×10⁻⁴ (< 0,1 %) | < plancher | 4,0 (0,3 %) | 4,0 (0,3 %) | — |
-| traînée axiale, C_t = 0,02 | 20 m/s | passager | +4,0 (+0,2 %) | 3,8×10⁻⁴ (< 0,1 %) | < plancher | 3,8×10⁻⁴ (< 0,1 %) | −3,8×10⁻⁴ (< 0,1 %) | 4,0 (0,2 %) | 4,0 (0,2 %) | — |
-| traînée axiale, C_t = 0,10 | 10 m/s | vide | +5,0 (+0,4 %) | < plancher | < plancher | < plancher | < plancher | 5,0 (0,4 %) | 5,0 (0,4 %) | — |
-| traînée axiale, C_t = 0,10 | 10 m/s | passager | +4,9 (+0,3 %) | 3,7×10⁻⁴ (< 0,1 %) | < plancher | 3,7×10⁻⁴ (< 0,1 %) | −3,7×10⁻⁴ (< 0,1 %) | 4,9 (0,3 %) | 5,0 (0,3 %) | — |
-| traînée axiale, C_t = 0,10 | 20 m/s | vide | +20,1 (+1,4 %) | 3,1×10⁻⁴ (< 0,1 %) | +0,001 (< 0,1 %) | +0,001 (< 0,1 %) | −3,1×10⁻⁴ (< 0,1 %) | 20,1 (1,4 %) | 20,1 (1,4 %) | — |
-| traînée axiale, C_t = 0,10 | 20 m/s | passager | +19,8 (+1,0 %) | +0,002 (< 0,1 %) | 2,3×10⁻⁴ (< 0,1 %) | +0,002 (< 0,1 %) | −0,002 (< 0,1 %) | 19,8 (1,0 %) | 20,2 (1,1 %) | — |
-| portance binormale ±0,50 et axiale 0,10 | 10 m/s | vide | +11,1 (+0,8 %) | −0,685 (−48,8 %) | −0,044 (−5,3 %) | +0,480 (+22,2 %) | +0,685 (+4,2 %) | 27,3 (1,9 %) | 27,3 (1,9 %) | — |
-| portance binormale ±0,50 et axiale 0,10 | 10 m/s | passager | +29,6 (+1,5 %) | −0,329 (−2,6 %) | +0,036 (+5,8 %) | −0,326 (−2,6 %) | +0,329 (+6,2 %) | 36,1 (1,8 %) | 35,8 (1,9 %) | — |
-| portance binormale ±0,50 et axiale 0,10 | 20 m/s | vide | +47,3 (+3,0 %) | +2,383 (+188,2 %) | −0,202 (−6,3 %) | +0,766 (+12,6 %) | −2,383 (−14,3 %) | 108,9 (7,0 %) | 108,7 (7,0 %) | 1,219 |
-| portance binormale ±0,50 et axiale 0,10 | 20 m/s | passager | +111,0 (+5,4 %) | −1,424 (−11,7 %) | +0,229 (+4,8 %) | −1,224 (−9,4 %) | +1,424 (+25,0 %) | 138,7 (6,7 %) | 137,8 (7,0 %) | — |
+| traînée axiale, C_t = 0,02 | 20 m/s | passager | +4,0 (+0,2 %) | 3,8×10⁻⁴ (< 0,1 %) | < plancher | 3,8×10⁻⁴ (< 0,1 %) | −3,8×10⁻⁴ | 4,0 (0,2 %) | 4,0 (0,2 %) | — |
+| traînée axiale, C_t = 0,1 | 10 m/s | vide | +5,0 (+0,4 %) | < plancher | < plancher | < plancher | < plancher | 5,0 (0,4 %) | 5,0 (0,4 %) | — |
+| traînée axiale, C_t = 0,1 | 10 m/s | passager | +4,9 (+0,3 %) | 3,7×10⁻⁴ (< 0,1 %) | < plancher | 3,7×10⁻⁴ (< 0,1 %) | −3,7×10⁻⁴ | 4,9 (0,3 %) | 5,0 (0,3 %) | — |
+| traînée axiale, C_t = 0,1 | 20 m/s | vide | +20,1 (+1,4 %) | 3,1×10⁻⁴ (< 0,1 %) | +0,001 (< 0,1 %) | +0,001 (< 0,1 %) | −3,1×10⁻⁴ | 20,1 (1,4 %) | 20,1 (1,4 %) | — |
+| traînée axiale, C_t = 0,1 | 20 m/s | passager | +19,8 (+1,0 %) | +0,002 (< 0,1 %) | 2,3×10⁻⁴ (< 0,1 %) | +0,002 (< 0,1 %) | −0,002 | 19,8 (1,0 %) | 20,2 (1,1 %) | — |
+| portance binormale ±0,5 et axiale 0,1 | 10 m/s | vide | +11,1 (+0,8 %) | −0,685 (−48,8 %) | −0,044 (−5,3 %) | +0,480 (+22,2 %) | +0,685 | 27,3 (1,9 %) | 27,3 (1,9 %) | — |
+| portance binormale ±0,5 et axiale 0,1 | 10 m/s | passager | +29,6 (+1,5 %) | −0,329 (−2,6 %) | +0,036 (+5,8 %) | −0,326 (−2,6 %) | +0,329 | 36,1 (1,8 %) | 35,8 (1,9 %) | — |
+| portance binormale ±0,5 et axiale 0,1 | 20 m/s | vide | +47,3 (+3,0 %) | +2,383 (+188,2 %) | −0,202 (−6,3 %) | +0,766 (+12,6 %) | −2,383 | 108,9 (7,0 %) | 108,7 (7,0 %) | 1,219 |
+| portance binormale ±0,5 et axiale 0,1 | 20 m/s | passager | +111,0 (+5,4 %) | −1,424 (−11,7 %) | +0,229 (+4,8 %) | −1,224 (−9,4 %) | +1,424 | 138,7 (6,7 %) | 137,8 (7,0 %) | — |
 
-### Écarts par direction du vent, aux plus grandes sondes
+### Écarts vent par vent, aux plus grandes sondes
 
-Regroupés ici : les deux géométries, les deux états de charge et les deux signes de portance.
+Regroupés ici : toutes les géométries, tous les états de charge et les deux signes de portance.
 
 #### Câble acier 12 mm, 6×19 âme métallique, 1770
 
-| Vent | Sonde | ΔT_max (N) | Δflèche (m) | Δdéport (m) | Δgarde (m) |
+| Vent | Sonde | ΔT_max (N) | Δflèche (m) | Δdéport latéral (m) | Δgarde (m) |
 | --- | --- | --- | --- | --- | --- |
-| 10 m/s de travers (90°) | portance binormale, C_L = ±0,50 | −169,1 (−6,3 %) | −0,029 (−0,5 %) | +0,067 (+6,9 %) | +0,029 (+0,2 %) |
-| 10 m/s de travers (90°) | portance impaire en lacet, C_L = ±0,50 | 1,1×10⁻² (< 0,1 %) | < plancher | < plancher | < plancher |
-| 10 m/s de travers (90°) | traînée axiale, C_t = 0,10 | 1,1×10⁻³ (< 0,1 %) | < plancher | < plancher | < plancher |
-| 10 m/s oblique (45°) | portance binormale, C_L = ±0,50 | −85,6 (−3,2 %) | −0,012 (−0,2 %) | +0,042 (+8,5 %) | +0,012 (+0,1 %) |
-| 10 m/s oblique (45°) | portance impaire en lacet, C_L = ±0,50 | −85,2 (−3,2 %) | −0,012 (−0,2 %) | +0,041 (+8,3 %) | +0,012 (+0,1 %) |
-| 10 m/s oblique (45°) | traînée axiale, C_t = 0,10 | +2,8 (+0,1 %) | < plancher | < plancher | < plancher |
-| 10 m/s presque de face (5°) | portance binormale, C_L = ±0,50 | +2,3 (+0,1 %) | −2,3×10⁻⁴ (< 0,1 %) | +0,009 | 2,3×10⁻⁴ (< 0,1 %) |
-| 10 m/s presque de face (5°) | portance impaire en lacet, C_L = ±0,50 | +14,9 (+0,6 %) | −0,002 (< 0,1 %) | +0,050 | +0,002 (< 0,1 %) |
-| 10 m/s presque de face (5°) | traînée axiale, C_t = 0,10 | +5,5 (+0,2 %) | < plancher | < plancher | < plancher |
-| 10 m/s presque de dos (175°) | portance binormale, C_L = ±0,50 | +2,3 (+0,1 %) | −1,9×10⁻⁴ (< 0,1 %) | +0,009 | 1,9×10⁻⁴ (< 0,1 %) |
-| 10 m/s presque de dos (175°) | portance impaire en lacet, C_L = ±0,50 | +14,9 (+0,6 %) | −0,002 (< 0,1 %) | −0,050 | +0,002 (< 0,1 %) |
-| 10 m/s presque de dos (175°) | traînée axiale, C_t = 0,10 | +5,5 (+0,2 %) | < plancher | < plancher | < plancher |
-| 20 m/s de travers (90°) | portance binormale, C_L = ±0,50 | +578,4 (+18,6 %) | −0,619 (−12,3 %) | +0,698 (+21,0 %) | +0,619 (+4,8 %) |
-| 20 m/s de travers (90°) | portance impaire en lacet, C_L = ±0,50 | +0,1 (< 0,1 %) | 1,3×10⁻⁴ (< 0,1 %) | −1,5×10⁻⁴ (< 0,1 %) | −1,3×10⁻⁴ (< 0,1 %) |
-| 20 m/s de travers (90°) | traînée axiale, C_t = 0,10 | 4,9×10⁻² (< 0,1 %) | < plancher | < plancher | < plancher |
-| 20 m/s oblique (45°) | portance binormale, C_L = ±0,50 | +324,9 (+11,7 %) | −0,151 (−2,6 %) | +0,328 (+17,9 %) | +0,151 (+1,2 %) |
-| 20 m/s oblique (45°) | portance impaire en lacet, C_L = ±0,50 | +323,5 (+11,7 %) | −0,148 (−2,6 %) | +0,319 (+17,4 %) | +0,148 (+1,2 %) |
-| 20 m/s oblique (45°) | traînée axiale, C_t = 0,10 | +11,5 (+0,4 %) | < plancher | < plancher | < plancher |
-| 20 m/s presque de face (5°) | portance binormale, C_L = ±0,50 | +9,0 (+0,3 %) | −0,001 (< 0,1 %) | +0,037 | +0,001 (< 0,1 %) |
-| 20 m/s presque de face (5°) | portance impaire en lacet, C_L = ±0,50 | +59,7 (+2,3 %) | −0,011 (−0,2 %) | +0,202 | +0,011 (+0,1 %) |
-| 20 m/s presque de face (5°) | traînée axiale, C_t = 0,10 | +21,9 (+0,8 %) | < plancher | < plancher | < plancher |
-| 20 m/s presque de dos (175°) | portance binormale, C_L = ±0,50 | +9,3 (+0,4 %) | −0,001 (< 0,1 %) | +0,037 | +0,001 (< 0,1 %) |
-| 20 m/s presque de dos (175°) | portance impaire en lacet, C_L = ±0,50 | +60,8 (+2,3 %) | −0,008 (−0,1 %) | −0,207 | +0,008 (+0,1 %) |
-| 20 m/s presque de dos (175°) | traînée axiale, C_t = 0,10 | +21,9 (+0,8 %) | −2,3×10⁻⁴ (< 0,1 %) | < plancher | 2,3×10⁻⁴ (< 0,1 %) |
+| 10 m/s de travers (90°) | portance binormale, C_L = ±0,5 | −169,1 (−6,3 %) | −0,029 (−0,5 %) | +0,067 (+6,9 %) | +0,029 |
+| 10 m/s de travers (90°) | portance impaire en lacet, C_L = ±0,5 | 1,1×10⁻² (< 0,1 %) | < plancher | < plancher | < plancher |
+| 10 m/s de travers (90°) | traînée axiale, C_t = 0,1 | 1,1×10⁻³ (< 0,1 %) | < plancher | < plancher | < plancher |
+| 10 m/s oblique de face (45°) | portance binormale, C_L = ±0,5 | −85,6 (−3,2 %) | −0,012 (−0,2 %) | +0,042 (+8,5 %) | +0,012 |
+| 10 m/s oblique de face (45°) | portance impaire en lacet, C_L = ±0,5 | −85,2 (−3,2 %) | −0,012 (−0,2 %) | +0,041 (+8,3 %) | +0,012 |
+| 10 m/s oblique de face (45°) | traînée axiale, C_t = 0,1 | +2,8 (+0,1 %) | < plancher | < plancher | < plancher |
+| 10 m/s presque de face (5°) | portance binormale, C_L = ±0,5 | +2,3 (+0,1 %) | −2,3×10⁻⁴ (< 0,1 %) | +0,009 | 2,3×10⁻⁴ |
+| 10 m/s presque de face (5°) | portance impaire en lacet, C_L = ±0,5 | +14,9 (+0,6 %) | −0,002 (< 0,1 %) | +0,050 | +0,002 |
+| 10 m/s presque de face (5°) | traînée axiale, C_t = 0,1 | +5,5 (+0,2 %) | < plancher | < plancher | < plancher |
+| 10 m/s presque de dos (175°) | portance binormale, C_L = ±0,5 | +2,3 (+0,1 %) | −1,9×10⁻⁴ (< 0,1 %) | +0,009 | 1,9×10⁻⁴ |
+| 10 m/s presque de dos (175°) | portance impaire en lacet, C_L = ±0,5 | +14,9 (+0,6 %) | −0,002 (< 0,1 %) | −0,050 | +0,002 |
+| 10 m/s presque de dos (175°) | traînée axiale, C_t = 0,1 | +5,5 (+0,2 %) | < plancher | < plancher | < plancher |
+| 20 m/s de travers (90°) | portance binormale, C_L = ±0,5 | +578,4 (+18,6 %) | −0,619 (−12,3 %) | +0,698 (+21,0 %) | +0,619 |
+| 20 m/s de travers (90°) | portance impaire en lacet, C_L = ±0,5 | +0,1 (< 0,1 %) | 1,3×10⁻⁴ (< 0,1 %) | −1,5×10⁻⁴ (< 0,1 %) | −1,3×10⁻⁴ |
+| 20 m/s de travers (90°) | traînée axiale, C_t = 0,1 | 4,9×10⁻² (< 0,1 %) | < plancher | < plancher | < plancher |
+| 20 m/s oblique de face (45°) | portance binormale, C_L = ±0,5 | +324,9 (+11,7 %) | −0,151 (−2,6 %) | +0,328 (+17,9 %) | +0,151 |
+| 20 m/s oblique de face (45°) | portance impaire en lacet, C_L = ±0,5 | +323,5 (+11,7 %) | −0,148 (−2,6 %) | +0,319 (+17,4 %) | +0,148 |
+| 20 m/s oblique de face (45°) | traînée axiale, C_t = 0,1 | +11,5 (+0,4 %) | < plancher | < plancher | < plancher |
+| 20 m/s presque de face (5°) | portance binormale, C_L = ±0,5 | +9,0 (+0,3 %) | −0,001 (< 0,1 %) | +0,037 | +0,001 |
+| 20 m/s presque de face (5°) | portance impaire en lacet, C_L = ±0,5 | +59,7 (+2,3 %) | −0,011 (−0,2 %) | +0,202 | +0,011 |
+| 20 m/s presque de face (5°) | traînée axiale, C_t = 0,1 | +21,9 (+0,8 %) | < plancher | < plancher | < plancher |
+| 20 m/s presque de dos (175°) | portance binormale, C_L = ±0,5 | +9,3 (+0,4 %) | −0,001 (< 0,1 %) | +0,037 | +0,001 |
+| 20 m/s presque de dos (175°) | portance impaire en lacet, C_L = ±0,5 | +60,8 (+2,3 %) | −0,008 (−0,1 %) | −0,207 | +0,008 |
+| 20 m/s presque de dos (175°) | traînée axiale, C_t = 0,1 | +21,9 (+0,8 %) | −2,3×10⁻⁴ (< 0,1 %) | < plancher | 2,3×10⁻⁴ |
 
 #### Corde Courant Bandit 11 mm, polyamide EN 1891 type A
 
-| Vent | Sonde | ΔT_max (N) | Δflèche (m) | Δdéport (m) | Δgarde (m) |
+| Vent | Sonde | ΔT_max (N) | Δflèche (m) | Δdéport latéral (m) | Δgarde (m) |
 | --- | --- | --- | --- | --- | --- |
-| 10 m/s de travers (90°) | portance binormale, C_L = ±0,50 | +29,6 (+1,5 %) | −0,685 (−48,8 %) | +0,017 (+1,4 %) | +0,685 (+4,2 %) |
-| 10 m/s de travers (90°) | portance impaire en lacet, C_L = ±0,50 | 2,0×10⁻² (< 0,1 %) | < plancher | < plancher | < plancher |
-| 10 m/s de travers (90°) | traînée axiale, C_t = 0,10 | 2,4×10⁻³ (< 0,1 %) | < plancher | < plancher | < plancher |
-| 10 m/s oblique (45°) | portance binormale, C_L = ±0,50 | +15,0 (+0,8 %) | −0,346 (−22,9 %) | −0,044 (−5,3 %) | +0,346 (+2,1 %) |
-| 10 m/s oblique (45°) | portance impaire en lacet, C_L = ±0,50 | +14,5 (+0,7 %) | −0,341 (−22,5 %) | −0,043 (−5,2 %) | +0,341 (+2,1 %) |
-| 10 m/s oblique (45°) | traînée axiale, C_t = 0,10 | +2,6 (+0,2 %) | 2,5×10⁻⁴ (< 0,1 %) | < plancher | −2,5×10⁻⁴ (< 0,1 %) |
-| 10 m/s presque de face (5°) | portance binormale, C_L = ±0,50 | +0,5 (< 0,1 %) | −0,009 (−0,6 %) | +0,022 | +0,009 (+0,1 %) |
-| 10 m/s presque de face (5°) | portance impaire en lacet, C_L = ±0,50 | +2,5 (+0,1 %) | −0,059 (−4,1 %) | +0,081 | +0,059 (+0,4 %) |
-| 10 m/s presque de face (5°) | traînée axiale, C_t = 0,10 | +5,0 (+0,4 %) | 3,7×10⁻⁴ (< 0,1 %) | < plancher | −3,7×10⁻⁴ (< 0,1 %) |
-| 10 m/s presque de dos (175°) | portance binormale, C_L = ±0,50 | +0,5 (< 0,1 %) | −0,009 (−0,6 %) | +0,022 | +0,009 (+0,1 %) |
-| 10 m/s presque de dos (175°) | portance impaire en lacet, C_L = ±0,50 | +2,6 (+0,1 %) | −0,059 (−4,3 %) | −0,081 | +0,059 (+0,4 %) |
-| 10 m/s presque de dos (175°) | traînée axiale, C_t = 0,10 | +5,0 (+0,4 %) | −3,2×10⁻⁴ (< 0,1 %) | < plancher | 3,2×10⁻⁴ (< 0,1 %) |
-| 20 m/s de travers (90°) | portance binormale, C_L = ±0,50 | +110,9 (+5,4 %) | +2,383 (+188,2 %) | +0,229 (+4,8 %) | −2,383 (−14,3 %) |
-| 20 m/s de travers (90°) | portance impaire en lacet, C_L = ±0,50 | +0,3 (< 0,1 %) | +0,003 (+0,3 %) | −1,4×10⁻⁴ (< 0,1 %) | −0,003 (< 0,1 %) |
-| 20 m/s de travers (90°) | traînée axiale, C_t = 0,10 | +0,1 (< 0,1 %) | 1,0×10⁻⁴ (< 0,1 %) | < plancher | −1,0×10⁻⁴ (< 0,1 %) |
-| 20 m/s oblique (45°) | portance binormale, C_L = ±0,50 | +58,9 (+3,0 %) | −1,341 (−76,6 %) | −0,203 (−6,3 %) | +1,341 (+8,3 %) |
-| 20 m/s oblique (45°) | portance impaire en lacet, C_L = ±0,50 | +57,2 (+2,9 %) | −1,325 (−75,7 %) | −0,198 (−6,2 %) | +1,325 (+8,2 %) |
-| 20 m/s oblique (45°) | traînée axiale, C_t = 0,10 | +10,7 (+0,7 %) | +0,002 (< 0,1 %) | +0,001 (< 0,1 %) | −0,002 (< 0,1 %) |
-| 20 m/s presque de face (5°) | portance binormale, C_L = ±0,50 | +1,9 (+0,1 %) | −0,035 (−2,3 %) | +0,087 | +0,035 (+0,2 %) |
-| 20 m/s presque de face (5°) | portance impaire en lacet, C_L = ±0,50 | +10,4 (+0,5 %) | −0,237 (−15,4 %) | +0,325 | +0,237 (+1,4 %) |
-| 20 m/s presque de face (5°) | traînée axiale, C_t = 0,10 | +20,1 (+1,4 %) | +0,002 (< 0,1 %) | 1,7×10⁻⁴ | −0,002 (< 0,1 %) |
-| 20 m/s presque de dos (175°) | portance binormale, C_L = ±0,50 | +2,0 (+0,1 %) | −0,035 (−2,7 %) | +0,087 | +0,035 (+0,2 %) |
-| 20 m/s presque de dos (175°) | portance impaire en lacet, C_L = ±0,50 | +10,6 (+0,5 %) | −0,237 (−18,3 %) | −0,325 | +0,237 (+1,4 %) |
-| 20 m/s presque de dos (175°) | traînée axiale, C_t = 0,10 | +20,1 (+1,4 %) | −0,001 (< 0,1 %) | −1,6×10⁻⁴ | +0,001 (< 0,1 %) |
+| 10 m/s de travers (90°) | portance binormale, C_L = ±0,5 | +29,6 (+1,5 %) | −0,685 (−48,8 %) | +0,017 (+1,4 %) | +0,685 |
+| 10 m/s de travers (90°) | portance impaire en lacet, C_L = ±0,5 | 2,0×10⁻² (< 0,1 %) | < plancher | < plancher | < plancher |
+| 10 m/s de travers (90°) | traînée axiale, C_t = 0,1 | 2,4×10⁻³ (< 0,1 %) | < plancher | < plancher | < plancher |
+| 10 m/s oblique de face (45°) | portance binormale, C_L = ±0,5 | +15,0 (+0,8 %) | −0,346 (−22,9 %) | −0,044 (−5,3 %) | +0,346 |
+| 10 m/s oblique de face (45°) | portance impaire en lacet, C_L = ±0,5 | +14,5 (+0,7 %) | −0,341 (−22,5 %) | −0,043 (−5,2 %) | +0,341 |
+| 10 m/s oblique de face (45°) | traînée axiale, C_t = 0,1 | +2,6 (+0,2 %) | 2,5×10⁻⁴ (< 0,1 %) | < plancher | −2,5×10⁻⁴ |
+| 10 m/s presque de face (5°) | portance binormale, C_L = ±0,5 | +0,5 (< 0,1 %) | −0,009 (−0,6 %) | +0,022 | +0,009 |
+| 10 m/s presque de face (5°) | portance impaire en lacet, C_L = ±0,5 | +2,5 (+0,1 %) | −0,059 (−4,1 %) | +0,081 | +0,059 |
+| 10 m/s presque de face (5°) | traînée axiale, C_t = 0,1 | +5,0 (+0,4 %) | 3,7×10⁻⁴ (< 0,1 %) | < plancher | −3,7×10⁻⁴ |
+| 10 m/s presque de dos (175°) | portance binormale, C_L = ±0,5 | +0,5 (< 0,1 %) | −0,009 (−0,6 %) | +0,022 | +0,009 |
+| 10 m/s presque de dos (175°) | portance impaire en lacet, C_L = ±0,5 | +2,6 (+0,1 %) | −0,059 (−4,3 %) | −0,081 | +0,059 |
+| 10 m/s presque de dos (175°) | traînée axiale, C_t = 0,1 | +5,0 (+0,4 %) | −3,2×10⁻⁴ (< 0,1 %) | < plancher | 3,2×10⁻⁴ |
+| 20 m/s de travers (90°) | portance binormale, C_L = ±0,5 | +110,9 (+5,4 %) | +2,383 (+188,2 %) | +0,229 (+4,8 %) | −2,383 |
+| 20 m/s de travers (90°) | portance impaire en lacet, C_L = ±0,5 | +0,3 (< 0,1 %) | +0,003 (+0,3 %) | −1,4×10⁻⁴ (< 0,1 %) | −0,003 |
+| 20 m/s de travers (90°) | traînée axiale, C_t = 0,1 | +0,1 (< 0,1 %) | 1,0×10⁻⁴ (< 0,1 %) | < plancher | −1,0×10⁻⁴ |
+| 20 m/s oblique de face (45°) | portance binormale, C_L = ±0,5 | +58,9 (+3,0 %) | −1,341 (−76,6 %) | −0,203 (−6,3 %) | +1,341 |
+| 20 m/s oblique de face (45°) | portance impaire en lacet, C_L = ±0,5 | +57,2 (+2,9 %) | −1,325 (−75,7 %) | −0,198 (−6,2 %) | +1,325 |
+| 20 m/s oblique de face (45°) | traînée axiale, C_t = 0,1 | +10,7 (+0,7 %) | +0,002 (< 0,1 %) | +0,001 (< 0,1 %) | −0,002 |
+| 20 m/s presque de face (5°) | portance binormale, C_L = ±0,5 | +1,9 (+0,1 %) | −0,035 (−2,3 %) | +0,087 | +0,035 |
+| 20 m/s presque de face (5°) | portance impaire en lacet, C_L = ±0,5 | +10,4 (+0,5 %) | −0,237 (−15,4 %) | +0,325 | +0,237 |
+| 20 m/s presque de face (5°) | traînée axiale, C_t = 0,1 | +20,1 (+1,4 %) | +0,002 (< 0,1 %) | 1,7×10⁻⁴ | −0,002 |
+| 20 m/s presque de dos (175°) | portance binormale, C_L = ±0,5 | +2,0 (+0,1 %) | −0,035 (−2,7 %) | +0,087 | +0,035 |
+| 20 m/s presque de dos (175°) | portance impaire en lacet, C_L = ±0,5 | +10,6 (+0,5 %) | −0,237 (−18,3 %) | −0,325 | +0,237 |
+| 20 m/s presque de dos (175°) | traînée axiale, C_t = 0,1 | +20,1 (+1,4 %) | −0,001 (< 0,1 %) | −1,6×10⁻⁴ | +0,001 |
 
 Le détail, ligne par ligne, avec chaque composante des réactions, est dans `results/fixed-l0.csv` ; les coordonnées d'une sélection de lignes dans `results/shapes.csv`.
 
@@ -448,7 +448,7 @@ La longueur est cherchée sur la branche tendue, à partir de la longueur sans v
 
 ### Longueur de chaque modèle
 
-`L₀` sans vent, `L₀` du modèle de référence sous le vent, puis écart de `L₀` à cette référence pour les plus grandes sondes, en millimètres. Les 27 variantes sont dans `results/pose-tension.csv`.
+`L₀` sans vent, `L₀` du modèle de référence sous le vent, puis écart de `L₀` à cette référence pour la plus grande sonde de chaque force ajoutée, seule, en millimètres. Les 27 variantes sont dans `results/pose-tension.csv`.
 
 | Ligne | Géométrie | Vent | L₀ sans vent (m) | L₀ référence (m) | ΔL₀ `NL-b+0.5` (mm) | ΔL₀ `NL-b-0.5` (mm) | ΔL₀ `NL-y+0.5` (mm) | ΔL₀ `NL-y-0.5` (mm) | ΔL₀ `NA-0.1` (mm) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -487,89 +487,89 @@ La longueur est cherchée sur la branche tendue, à partir de la longueur sans v
 
 ### Écarts par taille de sonde, à tension de pose identique
 
-Chaque cellule est l'écart au modèle de référence — traînée normale seule, même cas, même convention — **de plus grande valeur absolue** parmi les cas regroupés, avec son signe ; le pourcentage est celui de ce même cas, et n'est donné que si la référence est assez loin de zéro. « < plancher » : aucun écart du groupe ne dépasse le plancher numérique. Le déport de référence est nul ou presque par vent presque parallèle : son écart est alors donné en mètres seuls. Les écarts de réaction sont la norme de la différence des vecteurs : une réaction qui tourne sans grandir s'y voit. « Remontée max. » n'est pas un écart : c'est la plus grande hauteur atteinte **au-dessus** de la droite A–B dans le groupe — la flèche, elle, ne descend pas sous zéro, et une ligne soulevée au-dessus de A–B a une flèche nulle. Regroupés ici : les deux géométries, les quatre directions de vent et les deux signes de portance. À vide, `T_A` est la tension de pose elle-même, identique par construction ; `T_max` et les réactions peuvent différer.
+Chaque cellule est l'écart au modèle de référence — traînée normale seule, même cas, même convention — **de plus grande valeur absolue** parmi les cas regroupés, avec son signe ; le pourcentage est celui de ce même cas, et n'est donné que si la référence est assez loin de zéro. « < plancher » : aucun écart du groupe ne dépasse le plancher numérique ; « — » : le groupe ne contient aucune ligne. Le déport latéral de référence est nul ou presque par vent presque parallèle : son écart est alors donné en mètres seuls. Les écarts de réaction sont la norme de la différence des vecteurs : une réaction qui tourne sans grandir s'y voit. « Remontée max. » n'est pas un écart : c'est la plus grande hauteur atteinte **au-dessus** de la droite A–B dans le groupe — la flèche, elle, ne descend pas sous zéro, et une ligne soulevée au-dessus de A–B a une flèche nulle. Dans toutes les lignes résolues ici, la garde vaut 17,9 m moins la flèche — le sol prescrit est parallèle à A–B : `Δgarde = −Δflèche`, et la colonne de la garde répète celle de la flèche au signe près. Son pourcentage n'est pas imprimé : il serait la part d'une garde que fixe la hauteur d'ancrage du scénario, et changerait avec elle ; il reste dans les fichiers CSV. Regroupés ici : toutes les géométries, toutes les directions de vent et les deux signes de portance. À vide, `T_A` est la tension de pose elle-même, identique par construction ; `T_max` et les réactions peuvent différer.
 
 #### Câble acier 12 mm, 6×19 âme métallique, 1770
 
-| Sonde | Vent | Charge | ΔT_max (N) | Δflèche (m) | Δdéport (m) | Δécart combiné (m) | Δgarde (m) | ‖ΔR_A‖ (N) | ‖ΔR_B‖ (N) | Remontée max. (m) |
+| Sonde | Vent | Charge | ΔT_max (N) | Δflèche (m) | Δdéport latéral (m) | Δécart maximal à A–B (m) | Δgarde (m) | ‖ΔR_A‖ (N) | ‖ΔR_B‖ (N) | Remontée max. (m) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| portance binormale, C_L = ±0,05 | 10 m/s | vide | < plancher | +0,042 (+0,7 %) | +0,002 (+0,5 %) | +0,042 (+0,7 %) | −0,042 (−0,4 %) | 2,9 (0,1 %) | 2,8 (0,1 %) | — |
-| portance binormale, C_L = ±0,05 | 10 m/s | passager | +27,5 (+0,3 %) | +0,040 (+0,5 %) | +0,001 (+0,4 %) | +0,040 (+0,5 %) | −0,040 (−0,4 %) | 28,3 (0,3 %) | 28,2 (0,4 %) | — |
-| portance binormale, C_L = ±0,05 | 20 m/s | vide | < plancher | +0,169 (+2,8 %) | +0,009 (+0,5 %) | +0,143 (+2,0 %) | −0,169 (−1,4 %) | 11,4 (0,4 %) | 11,2 (0,4 %) | — |
-| portance binormale, C_L = ±0,05 | 20 m/s | passager | +68,2 (+0,9 %) | +0,145 (+1,7 %) | +0,014 (+1,0 %) | +0,145 (+1,7 %) | −0,145 (−1,5 %) | 71,3 (1,0 %) | 71,3 (1,0 %) | — |
-| portance binormale, C_L = ±0,20 | 10 m/s | vide | < plancher | +0,169 (+2,8 %) | +0,010 (+2,0 %) | +0,167 (+2,8 %) | −0,169 (−1,4 %) | 11,4 (0,4 %) | 11,3 (0,4 %) | — |
-| portance binormale, C_L = ±0,20 | 10 m/s | passager | +111,3 (+1,4 %) | +0,161 (+2,1 %) | +0,005 (+1,4 %) | +0,161 (+2,1 %) | −0,161 (−1,6 %) | 114,1 (1,4 %) | 114,0 (1,5 %) | — |
-| portance binormale, C_L = ±0,20 | 20 m/s | vide | < plancher | +0,679 (+11,3 %) | +0,037 (+1,8 %) | +0,582 (+8,1 %) | −0,679 (−5,7 %) | 45,5 (1,7 %) | 44,9 (1,8 %) | — |
-| portance binormale, C_L = ±0,20 | 20 m/s | passager | +276,3 (+3,8 %) | +0,591 (+6,9 %) | +0,059 (+4,1 %) | +0,592 (+6,9 %) | −0,591 (−6,3 %) | 288,2 (4,0 %) | 288,2 (4,0 %) | — |
-| portance binormale, C_L = ±0,50 | 10 m/s | vide | < plancher | +0,424 (+7,1 %) | +0,024 (+4,9 %) | +0,419 (+6,9 %) | −0,424 (−3,6 %) | 28,5 (1,1 %) | 28,2 (1,1 %) | — |
-| portance binormale, C_L = ±0,50 | 10 m/s | passager | +283,4 (+3,5 %) | +0,406 (+5,4 %) | +0,011 (+3,6 %) | +0,406 (+5,4 %) | −0,406 (−3,9 %) | 290,3 (3,6 %) | 290,3 (3,7 %) | — |
-| portance binormale, C_L = ±0,50 | 20 m/s | vide | < plancher | +1,706 (+28,4 %) | +0,092 (+4,6 %) | +1,489 (+20,7 %) | −1,706 (−14,4 %) | 114,0 (4,3 %) | 112,7 (4,4 %) | — |
-| portance binormale, C_L = ±0,50 | 20 m/s | passager | +697,0 (+9,6 %) | +1,526 (+17,9 %) | +0,149 (+10,3 %) | +1,530 (+17,7 %) | −1,526 (−16,3 %) | 725,2 (10,0 %) | 725,2 (10,0 %) | — |
-| portance impaire en lacet, C_L = ±0,05 | 10 m/s | vide | < plancher | +0,021 (+0,3 %) | +0,005 | +0,021 (+0,3 %) | −0,021 (−0,2 %) | 1,4 (0,1 %) | 1,4 (0,1 %) | — |
-| portance impaire en lacet, C_L = ±0,05 | 10 m/s | passager | +14,0 (+0,2 %) | +0,020 (+0,3 %) | +0,002 | +0,020 (+0,3 %) | −0,020 (−0,2 %) | 14,4 (0,2 %) | 14,4 (0,2 %) | — |
-| portance impaire en lacet, C_L = ±0,05 | 20 m/s | vide | < plancher | +0,084 (+1,3 %) | +0,020 | +0,077 (+1,2 %) | −0,084 (−0,7 %) | 5,8 (0,2 %) | 5,5 (0,2 %) | — |
-| portance impaire en lacet, C_L = ±0,05 | 20 m/s | passager | +49,7 (+0,6 %) | +0,076 (+1,0 %) | +0,007 | +0,076 (+1,0 %) | −0,076 (−0,8 %) | 51,1 (0,6 %) | 51,1 (0,6 %) | — |
-| portance impaire en lacet, C_L = ±0,20 | 10 m/s | vide | < plancher | +0,084 (+1,4 %) | −0,020 | +0,083 (+1,4 %) | −0,084 (−0,7 %) | 5,7 (0,2 %) | 5,6 (0,2 %) | — |
-| portance impaire en lacet, C_L = ±0,20 | 10 m/s | passager | +56,4 (+0,7 %) | +0,080 (+1,1 %) | −0,007 | +0,080 (+1,1 %) | −0,080 (−0,8 %) | 57,8 (0,7 %) | 57,7 (0,7 %) | — |
-| portance impaire en lacet, C_L = ±0,20 | 20 m/s | vide | < plancher | +0,336 (+5,4 %) | −0,081 | +0,311 (+4,7 %) | −0,336 (−2,9 %) | 23,1 (0,9 %) | 22,1 (0,9 %) | — |
-| portance impaire en lacet, C_L = ±0,20 | 20 m/s | passager | +202,0 (+2,5 %) | +0,308 (+3,9 %) | −0,027 | +0,308 (+3,8 %) | −0,308 (−3,1 %) | 207,6 (2,6 %) | 207,4 (2,6 %) | — |
-| portance impaire en lacet, C_L = ±0,50 | 10 m/s | vide | < plancher | +0,210 (+3,5 %) | −0,050 | +0,207 (+3,4 %) | −0,210 (−1,8 %) | 14,3 (0,5 %) | 14,0 (0,6 %) | — |
-| portance impaire en lacet, C_L = ±0,50 | 10 m/s | passager | +142,4 (+1,7 %) | +0,200 (+2,6 %) | −0,017 | +0,200 (+2,6 %) | −0,200 (−1,9 %) | 145,7 (1,8 %) | 145,7 (1,8 %) | — |
-| portance impaire en lacet, C_L = ±0,50 | 20 m/s | vide | < plancher | +0,843 (+13,5 %) | +0,200 | +0,784 (+12,0 %) | −0,843 (−7,2 %) | 57,7 (2,2 %) | 55,2 (2,2 %) | — |
-| portance impaire en lacet, C_L = ±0,50 | 20 m/s | passager | +520,1 (+6,6 %) | +0,784 (+9,8 %) | −0,067 | +0,782 (+9,7 %) | −0,784 (−7,9 %) | 533,7 (6,7 %) | 533,1 (6,7 %) | — |
-| traînée axiale, C_t = 0,02 | 10 m/s | vide | +2,2 (+0,1 %) | −0,003 (< 0,1 %) | −1,1×10⁻⁴ (< 0,1 %) | −0,003 (< 0,1 %) | +0,003 (< 0,1 %) | 0,1 (< 0,1 %) | 2,2 (0,1 %) | — |
-| traînée axiale, C_t = 0,02 | 10 m/s | passager | +3,7 (< 0,1 %) | −0,003 (< 0,1 %) | < plancher | −0,003 (< 0,1 %) | +0,003 (< 0,1 %) | 1,6 (< 0,1 %) | 3,8 (< 0,1 %) | — |
-| traînée axiale, C_t = 0,02 | 20 m/s | vide | +8,7 (+0,3 %) | −0,010 (−0,2 %) | −0,002 (−0,1 %) | −0,010 (−0,2 %) | +0,010 (+0,1 %) | 0,5 (< 0,1 %) | 8,8 (0,3 %) | — |
-| traînée axiale, C_t = 0,02 | 20 m/s | passager | +15,0 (+0,2 %) | −0,010 (−0,1 %) | −4,7×10⁻⁴ (−0,1 %) | −0,010 (−0,1 %) | +0,010 (+0,1 %) | 6,5 (0,1 %) | 15,2 (0,2 %) | — |
-| traînée axiale, C_t = 0,10 | 10 m/s | vide | +10,9 (+0,4 %) | −0,013 (−0,2 %) | −0,001 (−0,1 %) | −0,013 (−0,2 %) | +0,013 (+0,1 %) | 0,6 (< 0,1 %) | 11,0 (0,4 %) | — |
-| traînée axiale, C_t = 0,10 | 10 m/s | passager | +18,7 (+0,2 %) | −0,013 (−0,2 %) | −1,4×10⁻⁴ (−0,1 %) | −0,013 (−0,2 %) | +0,013 (+0,1 %) | 8,2 (0,1 %) | 18,9 (0,2 %) | — |
-| traînée axiale, C_t = 0,10 | 20 m/s | vide | +43,6 (+1,7 %) | −0,052 (−0,8 %) | −0,008 (−0,4 %) | −0,052 (−0,8 %) | +0,052 (+0,4 %) | 2,4 (0,1 %) | 43,8 (1,7 %) | — |
-| traînée axiale, C_t = 0,10 | 20 m/s | passager | +74,6 (+0,9 %) | −0,051 (−0,7 %) | −0,002 (−0,3 %) | −0,051 (−0,7 %) | +0,051 (+0,5 %) | 33,0 (0,4 %) | 76,0 (1,0 %) | — |
-| portance binormale ±0,50 et axiale 0,10 | 10 m/s | vide | +10,9 (+0,4 %) | +0,424 (+7,1 %) | −0,025 (−5,0 %) | +0,419 (+6,9 %) | −0,424 (−3,6 %) | 28,5 (1,1 %) | 28,2 (1,1 %) | — |
-| portance binormale ±0,50 et axiale 0,10 | 10 m/s | passager | +283,4 (+3,5 %) | +0,406 (+5,4 %) | +0,011 (+3,6 %) | +0,406 (+5,4 %) | −0,406 (−3,9 %) | 290,3 (3,6 %) | 290,3 (3,7 %) | — |
-| portance binormale ±0,50 et axiale 0,10 | 20 m/s | vide | +43,6 (+1,7 %) | +1,707 (+28,4 %) | −0,099 (−5,0 %) | +1,490 (+20,7 %) | −1,707 (−14,4 %) | 114,0 (4,3 %) | 112,7 (4,4 %) | — |
-| portance binormale ±0,50 et axiale 0,10 | 20 m/s | passager | +696,9 (+9,6 %) | +1,526 (+17,9 %) | +0,149 (+10,3 %) | +1,531 (+17,7 %) | −1,526 (−16,3 %) | 725,0 (10,0 %) | 725,0 (10,0 %) | — |
+| portance binormale, C_L = ±0,05 | 10 m/s | vide | < plancher | +0,042 (+0,7 %) | +0,002 (+0,5 %) | +0,042 (+0,7 %) | −0,042 | 2,9 (0,1 %) | 2,8 (0,1 %) | — |
+| portance binormale, C_L = ±0,05 | 10 m/s | passager | +27,5 (+0,3 %) | +0,040 (+0,5 %) | +0,001 (+0,4 %) | +0,040 (+0,5 %) | −0,040 | 28,3 (0,3 %) | 28,2 (0,4 %) | — |
+| portance binormale, C_L = ±0,05 | 20 m/s | vide | < plancher | +0,169 (+2,8 %) | +0,009 (+0,5 %) | +0,143 (+2,0 %) | −0,169 | 11,4 (0,4 %) | 11,2 (0,4 %) | — |
+| portance binormale, C_L = ±0,05 | 20 m/s | passager | +68,2 (+0,9 %) | +0,145 (+1,7 %) | +0,014 (+1,0 %) | +0,145 (+1,7 %) | −0,145 | 71,3 (1,0 %) | 71,3 (1,0 %) | — |
+| portance binormale, C_L = ±0,2 | 10 m/s | vide | < plancher | +0,169 (+2,8 %) | +0,010 (+2,0 %) | +0,167 (+2,8 %) | −0,169 | 11,4 (0,4 %) | 11,3 (0,4 %) | — |
+| portance binormale, C_L = ±0,2 | 10 m/s | passager | +111,3 (+1,4 %) | +0,161 (+2,1 %) | +0,005 (+1,4 %) | +0,161 (+2,1 %) | −0,161 | 114,1 (1,4 %) | 114,0 (1,5 %) | — |
+| portance binormale, C_L = ±0,2 | 20 m/s | vide | < plancher | +0,679 (+11,3 %) | +0,037 (+1,8 %) | +0,582 (+8,1 %) | −0,679 | 45,5 (1,7 %) | 44,9 (1,8 %) | — |
+| portance binormale, C_L = ±0,2 | 20 m/s | passager | +276,3 (+3,8 %) | +0,591 (+6,9 %) | +0,059 (+4,1 %) | +0,592 (+6,9 %) | −0,591 | 288,2 (4,0 %) | 288,2 (4,0 %) | — |
+| portance binormale, C_L = ±0,5 | 10 m/s | vide | < plancher | +0,424 (+7,1 %) | +0,024 (+4,9 %) | +0,419 (+6,9 %) | −0,424 | 28,5 (1,1 %) | 28,2 (1,1 %) | — |
+| portance binormale, C_L = ±0,5 | 10 m/s | passager | +283,4 (+3,5 %) | +0,406 (+5,4 %) | +0,011 (+3,6 %) | +0,406 (+5,4 %) | −0,406 | 290,3 (3,6 %) | 290,3 (3,7 %) | — |
+| portance binormale, C_L = ±0,5 | 20 m/s | vide | < plancher | +1,706 (+28,4 %) | +0,092 (+4,6 %) | +1,489 (+20,7 %) | −1,706 | 114,0 (4,3 %) | 112,7 (4,4 %) | — |
+| portance binormale, C_L = ±0,5 | 20 m/s | passager | +697,0 (+9,6 %) | +1,526 (+17,9 %) | +0,149 (+10,3 %) | +1,530 (+17,7 %) | −1,526 | 725,2 (10,0 %) | 725,2 (10,0 %) | — |
+| portance impaire en lacet, C_L = ±0,05 | 10 m/s | vide | < plancher | +0,021 (+0,3 %) | +0,005 | +0,021 (+0,3 %) | −0,021 | 1,4 (0,1 %) | 1,4 (0,1 %) | — |
+| portance impaire en lacet, C_L = ±0,05 | 10 m/s | passager | +14,0 (+0,2 %) | +0,020 (+0,3 %) | +0,002 | +0,020 (+0,3 %) | −0,020 | 14,4 (0,2 %) | 14,4 (0,2 %) | — |
+| portance impaire en lacet, C_L = ±0,05 | 20 m/s | vide | < plancher | +0,084 (+1,3 %) | +0,020 | +0,077 (+1,2 %) | −0,084 | 5,8 (0,2 %) | 5,5 (0,2 %) | — |
+| portance impaire en lacet, C_L = ±0,05 | 20 m/s | passager | +49,7 (+0,6 %) | +0,076 (+1,0 %) | +0,007 | +0,076 (+1,0 %) | −0,076 | 51,1 (0,6 %) | 51,1 (0,6 %) | — |
+| portance impaire en lacet, C_L = ±0,2 | 10 m/s | vide | < plancher | +0,084 (+1,4 %) | −0,020 | +0,083 (+1,4 %) | −0,084 | 5,7 (0,2 %) | 5,6 (0,2 %) | — |
+| portance impaire en lacet, C_L = ±0,2 | 10 m/s | passager | +56,4 (+0,7 %) | +0,080 (+1,1 %) | −0,007 | +0,080 (+1,1 %) | −0,080 | 57,8 (0,7 %) | 57,7 (0,7 %) | — |
+| portance impaire en lacet, C_L = ±0,2 | 20 m/s | vide | < plancher | +0,336 (+5,4 %) | −0,081 | +0,311 (+4,7 %) | −0,336 | 23,1 (0,9 %) | 22,1 (0,9 %) | — |
+| portance impaire en lacet, C_L = ±0,2 | 20 m/s | passager | +202,0 (+2,5 %) | +0,308 (+3,9 %) | −0,027 | +0,308 (+3,8 %) | −0,308 | 207,6 (2,6 %) | 207,4 (2,6 %) | — |
+| portance impaire en lacet, C_L = ±0,5 | 10 m/s | vide | < plancher | +0,210 (+3,5 %) | −0,050 | +0,207 (+3,4 %) | −0,210 | 14,3 (0,5 %) | 14,0 (0,6 %) | — |
+| portance impaire en lacet, C_L = ±0,5 | 10 m/s | passager | +142,4 (+1,7 %) | +0,200 (+2,6 %) | −0,017 | +0,200 (+2,6 %) | −0,200 | 145,7 (1,8 %) | 145,7 (1,8 %) | — |
+| portance impaire en lacet, C_L = ±0,5 | 20 m/s | vide | < plancher | +0,843 (+13,5 %) | +0,200 | +0,784 (+12,0 %) | −0,843 | 57,7 (2,2 %) | 55,2 (2,2 %) | — |
+| portance impaire en lacet, C_L = ±0,5 | 20 m/s | passager | +520,1 (+6,6 %) | +0,784 (+9,8 %) | −0,067 | +0,782 (+9,7 %) | −0,784 | 533,7 (6,7 %) | 533,1 (6,7 %) | — |
+| traînée axiale, C_t = 0,02 | 10 m/s | vide | +2,2 (+0,1 %) | −0,003 (< 0,1 %) | −1,1×10⁻⁴ (< 0,1 %) | −0,003 (< 0,1 %) | +0,003 | 0,1 (< 0,1 %) | 2,2 (0,1 %) | — |
+| traînée axiale, C_t = 0,02 | 10 m/s | passager | +3,7 (< 0,1 %) | −0,003 (< 0,1 %) | < plancher | −0,003 (< 0,1 %) | +0,003 | 1,6 (< 0,1 %) | 3,8 (< 0,1 %) | — |
+| traînée axiale, C_t = 0,02 | 20 m/s | vide | +8,7 (+0,3 %) | −0,010 (−0,2 %) | −0,002 (−0,1 %) | −0,010 (−0,2 %) | +0,010 | 0,5 (< 0,1 %) | 8,8 (0,3 %) | — |
+| traînée axiale, C_t = 0,02 | 20 m/s | passager | +15,0 (+0,2 %) | −0,010 (−0,1 %) | −4,7×10⁻⁴ (−0,1 %) | −0,010 (−0,1 %) | +0,010 | 6,5 (0,1 %) | 15,2 (0,2 %) | — |
+| traînée axiale, C_t = 0,1 | 10 m/s | vide | +10,9 (+0,4 %) | −0,013 (−0,2 %) | −0,001 (−0,1 %) | −0,013 (−0,2 %) | +0,013 | 0,6 (< 0,1 %) | 11,0 (0,4 %) | — |
+| traînée axiale, C_t = 0,1 | 10 m/s | passager | +18,7 (+0,2 %) | −0,013 (−0,2 %) | −1,4×10⁻⁴ (−0,1 %) | −0,013 (−0,2 %) | +0,013 | 8,2 (0,1 %) | 18,9 (0,2 %) | — |
+| traînée axiale, C_t = 0,1 | 20 m/s | vide | +43,6 (+1,7 %) | −0,052 (−0,8 %) | −0,008 (−0,4 %) | −0,052 (−0,8 %) | +0,052 | 2,4 (0,1 %) | 43,8 (1,7 %) | — |
+| traînée axiale, C_t = 0,1 | 20 m/s | passager | +74,6 (+0,9 %) | −0,051 (−0,7 %) | −0,002 (−0,3 %) | −0,051 (−0,7 %) | +0,051 | 33,0 (0,4 %) | 76,0 (1,0 %) | — |
+| portance binormale ±0,5 et axiale 0,1 | 10 m/s | vide | +10,9 (+0,4 %) | +0,424 (+7,1 %) | −0,025 (−5,0 %) | +0,419 (+6,9 %) | −0,424 | 28,5 (1,1 %) | 28,2 (1,1 %) | — |
+| portance binormale ±0,5 et axiale 0,1 | 10 m/s | passager | +283,4 (+3,5 %) | +0,406 (+5,4 %) | +0,011 (+3,6 %) | +0,406 (+5,4 %) | −0,406 | 290,3 (3,6 %) | 290,3 (3,7 %) | — |
+| portance binormale ±0,5 et axiale 0,1 | 20 m/s | vide | +43,6 (+1,7 %) | +1,707 (+28,4 %) | −0,099 (−5,0 %) | +1,490 (+20,7 %) | −1,707 | 114,0 (4,3 %) | 112,7 (4,4 %) | — |
+| portance binormale ±0,5 et axiale 0,1 | 20 m/s | passager | +696,9 (+9,6 %) | +1,526 (+17,9 %) | +0,149 (+10,3 %) | +1,531 (+17,7 %) | −1,526 | 725,0 (10,0 %) | 725,0 (10,0 %) | — |
 
 #### Corde Courant Bandit 11 mm, polyamide EN 1891 type A
 
-| Sonde | Vent | Charge | ΔT_max (N) | Δflèche (m) | Δdéport (m) | Δécart combiné (m) | Δgarde (m) | ‖ΔR_A‖ (N) | ‖ΔR_B‖ (N) | Remontée max. (m) |
+| Sonde | Vent | Charge | ΔT_max (N) | Δflèche (m) | Δdéport latéral (m) | Δécart maximal à A–B (m) | Δgarde (m) | ‖ΔR_A‖ (N) | ‖ΔR_B‖ (N) | Remontée max. (m) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| portance binormale, C_L = ±0,05 | 10 m/s | vide | < plancher | +0,070 (+4,9 %) | +0,004 (+0,5 %) | +0,046 (+2,1 %) | −0,070 (−0,4 %) | 2,5 (0,2 %) | 2,5 (0,2 %) | — |
-| portance binormale, C_L = ±0,05 | 10 m/s | passager | −2,4 (−0,1 %) | +0,036 (+0,3 %) | +0,003 (+0,6 %) | +0,036 (+0,3 %) | −0,036 (−0,7 %) | 3,2 (0,2 %) | 3,2 (0,2 %) | — |
-| portance binormale, C_L = ±0,05 | 20 m/s | vide | < plancher | +0,278 (+19,6 %) | +0,016 (+0,5 %) | +0,066 (+1,0 %) | −0,278 (−1,7 %) | 10,1 (0,7 %) | 10,0 (0,7 %) | — |
-| portance binormale, C_L = ±0,05 | 20 m/s | passager | −9,3 (−0,5 %) | +0,151 (+1,2 %) | +0,021 (+0,4 %) | +0,134 (+1,0 %) | −0,151 (−3,1 %) | 12,8 (0,7 %) | 12,6 (0,7 %) | — |
-| portance binormale, C_L = ±0,20 | 10 m/s | vide | < plancher | +0,278 (+19,6 %) | +0,016 (+2,0 %) | +0,191 (+8,8 %) | −0,278 (−1,7 %) | 10,2 (0,7 %) | 10,2 (0,7 %) | — |
-| portance binormale, C_L = ±0,20 | 10 m/s | passager | −9,6 (−0,5 %) | +0,146 (+1,2 %) | +0,014 (+2,2 %) | +0,145 (+1,1 %) | −0,146 (−2,8 %) | 13,0 (0,7 %) | 12,9 (0,7 %) | — |
-| portance binormale, C_L = ±0,20 | 20 m/s | vide | < plancher | +1,115 (+78,3 %) | +0,065 (+1,9 %) | +0,326 (+4,8 %) | −1,115 (−6,8 %) | 40,2 (2,9 %) | 40,1 (2,9 %) | — |
-| portance binormale, C_L = ±0,20 | 20 m/s | passager | −39,2 (−2,0 %) | +0,612 (+4,7 %) | +0,093 (+1,9 %) | +0,547 (+3,9 %) | −0,612 (−12,6 %) | 52,4 (2,7 %) | 52,0 (2,8 %) | — |
-| portance binormale, C_L = ±0,50 | 10 m/s | vide | < plancher | +0,696 (+49,1 %) | +0,041 (+4,9 %) | +0,506 (+23,2 %) | −0,696 (−4,2 %) | 25,5 (1,8 %) | 25,4 (1,8 %) | — |
-| portance binormale, C_L = ±0,50 | 10 m/s | passager | −24,7 (−1,2 %) | +0,369 (+2,9 %) | +0,035 (+5,7 %) | +0,366 (+2,9 %) | −0,369 (−7,0 %) | 32,9 (1,7 %) | 32,6 (1,7 %) | — |
-| portance binormale, C_L = ±0,50 | 20 m/s | vide | +0,9 (+0,1 %) | +2,796 (+196,3 %) | +0,163 (+4,9 %) | +1,100 (+16,2 %) | −2,796 (−17,0 %) | 100,8 (7,2 %) | 100,5 (7,2 %) | 1,355 |
-| portance binormale, C_L = ±0,50 | 20 m/s | passager | −108,3 (−5,6 %) | +1,572 (+12,1 %) | +0,274 (+5,4 %) | +1,427 (+10,2 %) | −1,572 (−32,3 %) | 138,7 (7,2 %) | 137,6 (7,4 %) | — |
-| portance impaire en lacet, C_L = ±0,05 | 10 m/s | vide | < plancher | +0,035 (+2,3 %) | +0,008 | +0,029 (+1,8 %) | −0,035 (−0,2 %) | 1,3 (0,1 %) | 1,3 (0,1 %) | — |
-| portance impaire en lacet, C_L = ±0,05 | 10 m/s | passager | −1,2 (−0,1 %) | +0,018 (+0,1 %) | +0,007 | +0,018 (+0,1 %) | −0,018 (−0,3 %) | 1,6 (0,1 %) | 1,6 (0,1 %) | — |
-| portance impaire en lacet, C_L = ±0,05 | 20 m/s | vide | < plancher | +0,138 (+7,6 %) | +0,032 | +0,056 (+1,6 %) | −0,138 (−0,9 %) | 5,2 (0,4 %) | 4,9 (0,4 %) | — |
-| portance impaire en lacet, C_L = ±0,05 | 20 m/s | passager | −4,6 (−0,2 %) | +0,072 (+0,6 %) | +0,027 | +0,069 (+0,5 %) | −0,072 (−1,5 %) | 6,3 (0,3 %) | 6,2 (0,3 %) | — |
-| portance impaire en lacet, C_L = ±0,20 | 10 m/s | vide | < plancher | +0,138 (+9,1 %) | −0,032 | +0,119 (+7,4 %) | −0,138 (−0,8 %) | 5,1 (0,4 %) | 5,0 (0,4 %) | — |
-| portance impaire en lacet, C_L = ±0,20 | 10 m/s | passager | −4,6 (−0,2 %) | +0,072 (+0,6 %) | −0,028 | +0,071 (+0,6 %) | −0,072 (−1,4 %) | 6,4 (0,3 %) | 6,3 (0,3 %) | — |
-| portance impaire en lacet, C_L = ±0,20 | 20 m/s | vide | < plancher | +0,553 (+30,4 %) | +0,130 | +0,249 (+7,0 %) | −0,553 (−3,4 %) | 20,9 (1,5 %) | 19,7 (1,4 %) | — |
-| portance impaire en lacet, C_L = ±0,20 | 20 m/s | passager | −19,0 (−1,0 %) | +0,290 (+2,2 %) | −0,113 | +0,277 (+2,2 %) | −0,290 (−5,9 %) | 25,7 (1,3 %) | 25,3 (1,3 %) | — |
-| portance impaire en lacet, C_L = ±0,50 | 10 m/s | vide | < plancher | +0,346 (+22,8 %) | +0,081 | +0,301 (+18,7 %) | −0,346 (−2,1 %) | 12,8 (0,9 %) | 12,6 (0,9 %) | — |
-| portance impaire en lacet, C_L = ±0,50 | 10 m/s | passager | −11,8 (−0,6 %) | +0,180 (+1,4 %) | −0,068 | +0,178 (+1,4 %) | −0,180 (−3,4 %) | 16,0 (0,8 %) | 15,8 (0,8 %) | — |
-| portance impaire en lacet, C_L = ±0,50 | 20 m/s | vide | < plancher | +1,384 (+76,0 %) | +0,326 | +0,728 (+20,6 %) | −1,384 (−8,6 %) | 52,2 (3,7 %) | 49,3 (3,6 %) | — |
-| portance impaire en lacet, C_L = ±0,50 | 20 m/s | passager | −50,4 (−2,6 %) | +0,736 (+5,7 %) | −0,275 | +0,704 (+5,5 %) | −0,736 (−14,9 %) | 66,2 (3,4 %) | 65,2 (3,4 %) | — |
-| traînée axiale, C_t = 0,02 | 10 m/s | vide | +2,0 (+0,1 %) | −0,001 (−0,1 %) | −2,9×10⁻⁴ (< 0,1 %) | −0,001 (−0,1 %) | +0,001 (< 0,1 %) | 2,6×10⁻² (< 0,1 %) | 2,0 (0,1 %) | — |
-| traînée axiale, C_t = 0,02 | 10 m/s | passager | +1,6 (+0,1 %) | +0,004 (< 0,1 %) | −1,1×10⁻⁴ (< 0,1 %) | +0,004 (< 0,1 %) | −0,004 (−0,1 %) | 0,4 (< 0,1 %) | 1,7 (0,1 %) | — |
-| traînée axiale, C_t = 0,02 | 20 m/s | vide | +8,0 (+0,6 %) | −0,004 (−0,3 %) | −0,004 (−0,1 %) | −0,005 (−0,1 %) | +0,004 (< 0,1 %) | 0,1 (< 0,1 %) | 8,0 (0,6 %) | — |
-| traînée axiale, C_t = 0,02 | 20 m/s | passager | +6,5 (+0,3 %) | +0,017 (+0,1 %) | −0,002 (−0,1 %) | +0,017 (+0,1 %) | −0,017 (−0,3 %) | 1,4 (0,1 %) | 6,6 (0,3 %) | — |
-| traînée axiale, C_t = 0,10 | 10 m/s | vide | +10,0 (+0,7 %) | −0,005 (−0,4 %) | −0,001 (−0,2 %) | −0,005 (−0,4 %) | +0,005 (< 0,1 %) | 0,1 (< 0,1 %) | 10,0 (0,7 %) | — |
-| traînée axiale, C_t = 0,10 | 10 m/s | passager | +8,2 (+0,4 %) | +0,021 (+0,2 %) | −0,001 (−0,1 %) | +0,021 (+0,2 %) | −0,021 (−0,4 %) | 1,8 (0,1 %) | 8,3 (0,4 %) | — |
-| traînée axiale, C_t = 0,10 | 20 m/s | vide | +40,1 (+2,9 %) | −0,022 (−1,4 %) | −0,022 (−0,6 %) | −0,025 (−0,7 %) | +0,022 (+0,1 %) | 0,7 (< 0,1 %) | 40,1 (2,9 %) | — |
-| traînée axiale, C_t = 0,10 | 20 m/s | passager | +32,8 (+1,7 %) | +0,086 (+0,7 %) | −0,008 (−0,3 %) | +0,086 (+0,7 %) | −0,086 (−1,6 %) | 7,2 (0,4 %) | 33,1 (1,7 %) | — |
-| portance binormale ±0,50 et axiale 0,10 | 10 m/s | vide | +10,0 (+0,7 %) | +0,696 (+49,1 %) | −0,042 (−5,1 %) | +0,506 (+23,2 %) | −0,696 (−4,2 %) | 25,5 (1,8 %) | 25,4 (1,8 %) | — |
-| portance binormale ±0,50 et axiale 0,10 | 10 m/s | passager | −24,7 (−1,2 %) | +0,369 (+2,9 %) | +0,035 (+5,6 %) | +0,366 (+2,9 %) | −0,369 (−7,0 %) | 32,9 (1,7 %) | 32,6 (1,7 %) | — |
-| portance binormale ±0,50 et axiale 0,10 | 20 m/s | vide | +40,1 (+2,9 %) | +2,796 (+196,3 %) | −0,179 (−5,4 %) | +1,102 (+16,2 %) | −2,796 (−17,0 %) | 100,8 (7,2 %) | 100,5 (7,2 %) | 1,355 |
-| portance binormale ±0,50 et axiale 0,10 | 20 m/s | passager | −108,3 (−5,6 %) | +1,573 (+12,1 %) | +0,274 (+5,4 %) | +1,428 (+10,2 %) | −1,573 (−32,3 %) | 138,7 (7,2 %) | 137,6 (7,4 %) | — |
+| portance binormale, C_L = ±0,05 | 10 m/s | vide | < plancher | +0,070 (+4,9 %) | +0,004 (+0,5 %) | +0,046 (+2,1 %) | −0,070 | 2,5 (0,2 %) | 2,5 (0,2 %) | — |
+| portance binormale, C_L = ±0,05 | 10 m/s | passager | −2,4 (−0,1 %) | +0,036 (+0,3 %) | +0,003 (+0,6 %) | +0,036 (+0,3 %) | −0,036 | 3,2 (0,2 %) | 3,2 (0,2 %) | — |
+| portance binormale, C_L = ±0,05 | 20 m/s | vide | < plancher | +0,278 (+19,6 %) | +0,016 (+0,5 %) | +0,066 (+1,0 %) | −0,278 | 10,1 (0,7 %) | 10,0 (0,7 %) | — |
+| portance binormale, C_L = ±0,05 | 20 m/s | passager | −9,3 (−0,5 %) | +0,151 (+1,2 %) | +0,021 (+0,4 %) | +0,134 (+1,0 %) | −0,151 | 12,8 (0,7 %) | 12,6 (0,7 %) | — |
+| portance binormale, C_L = ±0,2 | 10 m/s | vide | < plancher | +0,278 (+19,6 %) | +0,016 (+2,0 %) | +0,191 (+8,8 %) | −0,278 | 10,2 (0,7 %) | 10,2 (0,7 %) | — |
+| portance binormale, C_L = ±0,2 | 10 m/s | passager | −9,6 (−0,5 %) | +0,146 (+1,2 %) | +0,014 (+2,2 %) | +0,145 (+1,1 %) | −0,146 | 13,0 (0,7 %) | 12,9 (0,7 %) | — |
+| portance binormale, C_L = ±0,2 | 20 m/s | vide | < plancher | +1,115 (+78,3 %) | +0,065 (+1,9 %) | +0,326 (+4,8 %) | −1,115 | 40,2 (2,9 %) | 40,1 (2,9 %) | — |
+| portance binormale, C_L = ±0,2 | 20 m/s | passager | −39,2 (−2,0 %) | +0,612 (+4,7 %) | +0,093 (+1,9 %) | +0,547 (+3,9 %) | −0,612 | 52,4 (2,7 %) | 52,0 (2,8 %) | — |
+| portance binormale, C_L = ±0,5 | 10 m/s | vide | < plancher | +0,696 (+49,1 %) | +0,041 (+4,9 %) | +0,506 (+23,2 %) | −0,696 | 25,5 (1,8 %) | 25,4 (1,8 %) | — |
+| portance binormale, C_L = ±0,5 | 10 m/s | passager | −24,7 (−1,2 %) | +0,369 (+2,9 %) | +0,035 (+5,7 %) | +0,366 (+2,9 %) | −0,369 | 32,9 (1,7 %) | 32,6 (1,7 %) | — |
+| portance binormale, C_L = ±0,5 | 20 m/s | vide | +0,9 (+0,1 %) | +2,796 (+196,3 %) | +0,163 (+4,9 %) | +1,100 (+16,2 %) | −2,796 | 100,8 (7,2 %) | 100,5 (7,2 %) | 1,355 |
+| portance binormale, C_L = ±0,5 | 20 m/s | passager | −108,3 (−5,6 %) | +1,572 (+12,1 %) | +0,274 (+5,4 %) | +1,427 (+10,2 %) | −1,572 | 138,7 (7,2 %) | 137,6 (7,4 %) | — |
+| portance impaire en lacet, C_L = ±0,05 | 10 m/s | vide | < plancher | +0,035 (+2,3 %) | +0,008 | +0,029 (+1,8 %) | −0,035 | 1,3 (0,1 %) | 1,3 (0,1 %) | — |
+| portance impaire en lacet, C_L = ±0,05 | 10 m/s | passager | −1,2 (−0,1 %) | +0,018 (+0,1 %) | +0,007 | +0,018 (+0,1 %) | −0,018 | 1,6 (0,1 %) | 1,6 (0,1 %) | — |
+| portance impaire en lacet, C_L = ±0,05 | 20 m/s | vide | < plancher | +0,138 (+7,6 %) | +0,032 | +0,056 (+1,6 %) | −0,138 | 5,2 (0,4 %) | 4,9 (0,4 %) | — |
+| portance impaire en lacet, C_L = ±0,05 | 20 m/s | passager | −4,6 (−0,2 %) | +0,072 (+0,6 %) | +0,027 | +0,069 (+0,5 %) | −0,072 | 6,3 (0,3 %) | 6,2 (0,3 %) | — |
+| portance impaire en lacet, C_L = ±0,2 | 10 m/s | vide | < plancher | +0,138 (+9,1 %) | −0,032 | +0,119 (+7,4 %) | −0,138 | 5,1 (0,4 %) | 5,0 (0,4 %) | — |
+| portance impaire en lacet, C_L = ±0,2 | 10 m/s | passager | −4,6 (−0,2 %) | +0,072 (+0,6 %) | −0,028 | +0,071 (+0,6 %) | −0,072 | 6,4 (0,3 %) | 6,3 (0,3 %) | — |
+| portance impaire en lacet, C_L = ±0,2 | 20 m/s | vide | < plancher | +0,553 (+30,4 %) | +0,130 | +0,249 (+7,0 %) | −0,553 | 20,9 (1,5 %) | 19,7 (1,4 %) | — |
+| portance impaire en lacet, C_L = ±0,2 | 20 m/s | passager | −19,0 (−1,0 %) | +0,290 (+2,2 %) | −0,113 | +0,277 (+2,2 %) | −0,290 | 25,7 (1,3 %) | 25,3 (1,3 %) | — |
+| portance impaire en lacet, C_L = ±0,5 | 10 m/s | vide | < plancher | +0,346 (+22,8 %) | +0,081 | +0,301 (+18,7 %) | −0,346 | 12,8 (0,9 %) | 12,6 (0,9 %) | — |
+| portance impaire en lacet, C_L = ±0,5 | 10 m/s | passager | −11,8 (−0,6 %) | +0,180 (+1,4 %) | −0,068 | +0,178 (+1,4 %) | −0,180 | 16,0 (0,8 %) | 15,8 (0,8 %) | — |
+| portance impaire en lacet, C_L = ±0,5 | 20 m/s | vide | < plancher | +1,384 (+76,0 %) | +0,326 | +0,728 (+20,6 %) | −1,384 | 52,2 (3,7 %) | 49,3 (3,6 %) | — |
+| portance impaire en lacet, C_L = ±0,5 | 20 m/s | passager | −50,4 (−2,6 %) | +0,736 (+5,7 %) | −0,275 | +0,704 (+5,5 %) | −0,736 | 66,2 (3,4 %) | 65,2 (3,4 %) | — |
+| traînée axiale, C_t = 0,02 | 10 m/s | vide | +2,0 (+0,1 %) | −0,001 (−0,1 %) | −2,9×10⁻⁴ (< 0,1 %) | −0,001 (−0,1 %) | +0,001 | 2,6×10⁻² (< 0,1 %) | 2,0 (0,1 %) | — |
+| traînée axiale, C_t = 0,02 | 10 m/s | passager | +1,6 (+0,1 %) | +0,004 (< 0,1 %) | −1,1×10⁻⁴ (< 0,1 %) | +0,004 (< 0,1 %) | −0,004 | 0,4 (< 0,1 %) | 1,7 (0,1 %) | — |
+| traînée axiale, C_t = 0,02 | 20 m/s | vide | +8,0 (+0,6 %) | −0,004 (−0,3 %) | −0,004 (−0,1 %) | −0,005 (−0,1 %) | +0,004 | 0,1 (< 0,1 %) | 8,0 (0,6 %) | — |
+| traînée axiale, C_t = 0,02 | 20 m/s | passager | +6,5 (+0,3 %) | +0,017 (+0,1 %) | −0,002 (−0,1 %) | +0,017 (+0,1 %) | −0,017 | 1,4 (0,1 %) | 6,6 (0,3 %) | — |
+| traînée axiale, C_t = 0,1 | 10 m/s | vide | +10,0 (+0,7 %) | −0,005 (−0,4 %) | −0,001 (−0,2 %) | −0,005 (−0,4 %) | +0,005 | 0,1 (< 0,1 %) | 10,0 (0,7 %) | — |
+| traînée axiale, C_t = 0,1 | 10 m/s | passager | +8,2 (+0,4 %) | +0,021 (+0,2 %) | −0,001 (−0,1 %) | +0,021 (+0,2 %) | −0,021 | 1,8 (0,1 %) | 8,3 (0,4 %) | — |
+| traînée axiale, C_t = 0,1 | 20 m/s | vide | +40,1 (+2,9 %) | −0,022 (−1,4 %) | −0,022 (−0,6 %) | −0,025 (−0,7 %) | +0,022 | 0,7 (< 0,1 %) | 40,1 (2,9 %) | — |
+| traînée axiale, C_t = 0,1 | 20 m/s | passager | +32,8 (+1,7 %) | +0,086 (+0,7 %) | −0,008 (−0,3 %) | +0,086 (+0,7 %) | −0,086 | 7,2 (0,4 %) | 33,1 (1,7 %) | — |
+| portance binormale ±0,5 et axiale 0,1 | 10 m/s | vide | +10,0 (+0,7 %) | +0,696 (+49,1 %) | −0,042 (−5,1 %) | +0,506 (+23,2 %) | −0,696 | 25,5 (1,8 %) | 25,4 (1,8 %) | — |
+| portance binormale ±0,5 et axiale 0,1 | 10 m/s | passager | −24,7 (−1,2 %) | +0,369 (+2,9 %) | +0,035 (+5,6 %) | +0,366 (+2,9 %) | −0,369 | 32,9 (1,7 %) | 32,6 (1,7 %) | — |
+| portance binormale ±0,5 et axiale 0,1 | 20 m/s | vide | +40,1 (+2,9 %) | +2,796 (+196,3 %) | −0,179 (−5,4 %) | +1,102 (+16,2 %) | −2,796 | 100,8 (7,2 %) | 100,5 (7,2 %) | 1,355 |
+| portance binormale ±0,5 et axiale 0,1 | 20 m/s | passager | −108,3 (−5,6 %) | +1,573 (+12,1 %) | +0,274 (+5,4 %) | +1,428 (+10,2 %) | −1,573 | 138,7 (7,2 %) | 137,6 (7,4 %) | — |
 
 ## 8. Lecture
 
@@ -577,19 +577,19 @@ Chaque cellule est l'écart au modèle de référence — traînée normale seul
 
 Écart de plus grande valeur absolue sur toute la matrice à `L₀` fixe, avec le cas et la variante où il se produit.
 
-| Ligne | Force ajoutée | ΔT_max (N) | Δflèche (m) | Δdéport (m) | Δgarde (m) | Remontée max. (m) |
+| Ligne | Force ajoutée | ΔT_max (N) | Δflèche (m) | Δdéport latéral (m) | Δgarde (m) | Remontée max. (m) |
 | --- | --- | --- | --- | --- | --- | --- |
-| acier-12 | portance, toutes sondes | +578,4 (+18,6 %) — niveau, vide, travers-20, NL-b-0.5 | −0,619 (−12,3 %) — incline, vide, travers-20, NL-b+0.5 | +0,698 (+21,0 %) — incline, vide, travers-20, NL-b+0.5 | +0,619 (+4,8 %) — incline, vide, travers-20, NL-b+0.5 | — |
-| acier-12 | traînée axiale, toutes sondes | +21,9 (+0,8 %) — niveau, vide, quasi-face-20, NA-0.1 | −2,3×10⁻⁴ (< 0,1 %) — incline, vide, quasi-dos-20, NA-0.1 | < plancher — incline, vide, oblique-20, NA-0.1 | 2,3×10⁻⁴ (< 0,1 %) — incline, vide, quasi-dos-20, NA-0.1 | — |
-| acier-12 | plus petites sondes (C_L = ±0,05, C_t = 0,02) | +56,6 (+1,8 %) — niveau, vide, travers-20, NL-b-0.05 | −0,048 (−1,0 %) — incline, vide, travers-20, NL-b+0.05 | +0,061 (+1,8 %) — incline, vide, travers-20, NL-b+0.05 | +0,048 (+0,4 %) — incline, vide, travers-20, NL-b+0.05 | — |
-| corde-bandit-11 | portance, toutes sondes | +110,9 (+5,4 %) — incline, passager, travers-20, NL-b-0.5 | +2,383 (+188,2 %) — incline, vide, travers-20, NL-b-0.5 | −0,325 — incline, vide, quasi-dos-20, NL-y+0.5 | −2,383 (−14,3 %) — incline, vide, travers-20, NL-b-0.5 | 1,219 |
-| corde-bandit-11 | traînée axiale, toutes sondes | +20,1 (+1,4 %) — niveau, vide, quasi-dos-20, NA-0.1 | +0,002 (< 0,1 %) — incline, passager, oblique-20, NA-0.1 | +0,001 (< 0,1 %) — niveau, vide, oblique-20, NA-0.1 | −0,002 (< 0,1 %) — incline, passager, oblique-20, NA-0.1 | — |
-| corde-bandit-11 | plus petites sondes (C_L = ±0,05, C_t = 0,02) | +10,8 (+0,5 %) — incline, passager, travers-20, NL-b-0.05 | −0,247 (−19,5 %) — incline, vide, travers-20, NL-b+0.05 | −0,033 — incline, vide, quasi-dos-20, NL-y+0.05 | +0,247 (+1,5 %) — incline, vide, travers-20, NL-b+0.05 | — |
+| acier-12 | portance, toutes sondes | +578,4 (+18,6 %) — niveau, vide, travers-20, NL-b-0.5 | −0,619 (−12,3 %) — incline, vide, travers-20, NL-b+0.5 | +0,698 (+21,0 %) — incline, vide, travers-20, NL-b+0.5 | +0,619 — incline, vide, travers-20, NL-b+0.5 | — |
+| acier-12 | traînée axiale, toutes sondes | +21,9 (+0,8 %) — niveau, vide, quasi-face-20, NA-0.1 | −2,3×10⁻⁴ (< 0,1 %) — incline, vide, quasi-dos-20, NA-0.1 | < plancher — incline, vide, oblique-20, NA-0.1 | 2,3×10⁻⁴ — incline, vide, quasi-dos-20, NA-0.1 | — |
+| acier-12 | plus petites sondes (C_L = ±0,05, C_t = 0,02) | +56,6 (+1,8 %) — niveau, vide, travers-20, NL-b-0.05 | −0,048 (−1,0 %) — incline, vide, travers-20, NL-b+0.05 | +0,061 (+1,8 %) — incline, vide, travers-20, NL-b+0.05 | +0,048 — incline, vide, travers-20, NL-b+0.05 | — |
+| corde-bandit-11 | portance, toutes sondes | +110,9 (+5,4 %) — incline, passager, travers-20, NL-b-0.5 | +2,383 (+188,2 %) — incline, vide, travers-20, NL-b-0.5 | −0,325 — incline, vide, quasi-dos-20, NL-y+0.5 | −2,383 — incline, vide, travers-20, NL-b-0.5 | 1,219 |
+| corde-bandit-11 | traînée axiale, toutes sondes | +20,1 (+1,4 %) — niveau, vide, quasi-dos-20, NA-0.1 | +0,002 (< 0,1 %) — incline, passager, oblique-20, NA-0.1 | +0,001 (< 0,1 %) — niveau, vide, oblique-20, NA-0.1 | −0,002 — incline, passager, oblique-20, NA-0.1 | — |
+| corde-bandit-11 | plus petites sondes (C_L = ±0,05, C_t = 0,02) | +10,8 (+0,5 %) — incline, passager, travers-20, NL-b-0.05 | −0,247 (−19,5 %) — incline, vide, travers-20, NL-b+0.05 | −0,033 — incline, vide, quasi-dos-20, NL-y+0.05 | +0,247 — incline, vide, travers-20, NL-b+0.05 | — |
 
-- **Câble acier 12 mm, 6×19 âme métallique, 1770.** Portance, plus grande sonde (`C_L = ±0,50`) : `T_max` +578,4 N (+18,6 %), flèche −0,619 m (−12,3 %), garde +0,619 m (+4,8 %). Plus petite sonde (`±0,05`) : `T_max` +56,6 N (+1,8 %), flèche −0,048 m (−1,0 %), garde +0,048 m (+0,4 %). Traînée axiale (`C_t` jusqu'à 0,10) : `T_max` +21,9 N (+0,8 %) ; aucune longueur ne bouge de plus de 2,3×10⁻⁴ m.
-- **Corde Courant Bandit 11 mm, polyamide EN 1891 type A.** Portance, plus grande sonde (`C_L = ±0,50`) : `T_max` +110,9 N (+5,4 %), flèche +2,383 m (+188,2 %), garde −2,383 m (−14,3 %). Plus petite sonde (`±0,05`) : `T_max` +10,8 N (+0,5 %), flèche −0,247 m (−19,5 %), garde +0,247 m (+1,5 %). Traînée axiale (`C_t` jusqu'à 0,10) : `T_max` +20,1 N (+1,4 %) ; aucune longueur ne bouge de plus de 0,002 m.
+- **Câble acier 12 mm, 6×19 âme métallique, 1770.** Portance, plus grande sonde (`C_L = ±0,5`) : `T_max` +578,4 N (+18,6 %), flèche −0,619 m (−12,3 %), garde +0,619 m. Plus petite sonde (`±0,05`) : `T_max` +56,6 N (+1,8 %), flèche −0,048 m (−1,0 %), garde +0,048 m. Traînée axiale (`C_t` jusqu'à 0,1) : `T_max` +21,9 N (+0,8 %) ; aucune longueur ne bouge de plus de 2,3×10⁻⁴ m.
+- **Corde Courant Bandit 11 mm, polyamide EN 1891 type A.** Portance, plus grande sonde (`C_L = ±0,5`) : `T_max` +110,9 N (+5,4 %), flèche +2,383 m (+188,2 %), garde −2,383 m. Plus petite sonde (`±0,05`) : `T_max` +10,8 N (+0,5 %), flèche −0,247 m (−19,5 %), garde +0,247 m. Traînée axiale (`C_t` jusqu'à 0,1) : `T_max` +20,1 N (+1,4 %) ; aucune longueur ne bouge de plus de 0,002 m.
 
-Les tableaux par direction de la section 6 montrent où chaque loi agit, et c'est une propriété des formules : la loi binormale est maximale par vent de travers, la loi impaire en lacet par vent oblique, et près d'un vent parallèle elle dépasse la loi binormale. Inverser le signe de `C_L` inverse le sens de l'écart, pas exactement sa taille.
+Les tableaux vent par vent de la section 6 montrent où chaque loi agit, et c'est une propriété des formules : la loi binormale est maximale par vent de travers, la loi impaire en lacet par vent oblique, et près d'un vent parallèle elle dépasse la loi binormale. Inverser le signe de `C_L` inverse le sens de l'écart, pas exactement sa taille.
 
 Ce sont des réponses à des **sondes**, dans des **scénarios hypothétiques** : elles disent quels effets *peuvent* déplacer sensiblement un résultat si un coefficient avait la taille de la sonde. Elles ne sont pas une erreur garantie, ni une erreur probable, sur un produit réel. L'expérience ne fixe aucun seuil d'importance : un écart qui se compte en pourcents de la tension ou en décimètres de flèche ou de garde se lit sur les chiffres.
 
@@ -606,5 +606,5 @@ Ce sont des réponses à des **sondes**, dans des **scénarios hypothétiques** 
 - Le passager n'a que son poids : aucune prise au vent, aucun ellipsoïde, aucune inertie de descente.
 - Statique seulement : ni vibration, ni détachement tourbillonnaire, ni galop, ni rafale (#124).
 - Une garde verticale sur un profil extrudé, pas une garde au sol réel hors de l'axe.
-- Deux installations illustrées de 150 m : les écarts ne s'extrapolent pas à une autre portée, une autre tension de pose ou un autre vent sans rejouer la matrice.
+- Les seules installations illustrées de la section 3 : les écarts ne s'extrapolent pas à une autre portée, une autre tension de pose ou un autre vent sans rejouer la matrice.
 - Le moteur de production, la traînée de descente (Q12), le Verdict et les facteurs de sécurité ne sont pas modifiés.

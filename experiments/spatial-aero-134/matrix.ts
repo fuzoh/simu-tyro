@@ -27,9 +27,9 @@ import { fileURLToPath } from "node:url";
 
 import type { Row } from "./run.ts";
 
-import { COEFFICIENTS, REFERENCE_VARIANT, WIND_SPEEDS } from "./cases.ts";
+import { largestProbes, REFERENCE_VARIANT, VARIANTS, WINDS } from "./cases.ts";
 import { runControls } from "./controls.ts";
-import { buildReport, controlsCsv, inputsCsv, rowsCsv } from "./report.ts";
+import { buildReport, controlsCsv, csvNumber, inputsCsv, rowsCsv } from "./report.ts";
 import { inputOf, runFixedLength, runPoseTension } from "./run.ts";
 import { SPATIAL, solveSpatial } from "./solve.ts";
 
@@ -38,24 +38,13 @@ const ROOT = resolve(HERE, "../..");
 
 /** Which lines `shapes.csv` holds, and how densely. */
 export const SHAPES = {
-  /** The stronger of the two winds. */
-  speed: Math.max(...WIND_SPEEDS),
-  /** The reference and the largest probe of each added force, both signs and both laws. */
-  variants: [
-    REFERENCE_VARIANT.id,
-    ...COEFFICIENTS.liftLaws.flatMap((law) =>
-      ["+", "-"].map(
-        (sign) =>
-          `NL-${law === "binormal" ? "b" : "y"}${sign}${Math.max(...COEFFICIENTS.liftMagnitudes)}`,
-      ),
-    ),
-    `NA-${Math.max(...COEFFICIENTS.axial)}`,
-  ],
+  /** The strongest wind of the matrix. */
+  speed: Math.max(...WINDS.map(({ speed }) => speed)),
+  /** The reference and the largest probe of each added force, both signs and every law. */
+  variants: [REFERENCE_VARIANT, ...largestProbes(VARIANTS)].map(({ id }) => id),
   /** One node out of this many, the ends of each piece always kept. */
   every: 40,
 } as const;
-
-const number = (value: number): string => String(Number(value.toPrecision(6)));
 
 /** The coordinates and the tension along the selected lines of the main comparison. */
 export function shapesCsv(fixed: readonly Row[]): string {
@@ -75,12 +64,48 @@ export function shapesCsv(fixed: readonly Row[]): string {
         if ((i - from) % SHAPES.every !== 0 && i !== to) continue;
         const T = Math.hypot(Fx[i], Fy[i], Fz[i]);
         lines.push(
-          [row.base.id, row.variant.id, ...[S[i], x[i], y[i], z[i], T].map(number)].join(","),
+          [
+            row.base.id,
+            row.variant.id,
+            ...[S[i], x[i], y[i], z[i], T].map((value) => csvNumber(value)),
+          ].join(","),
         );
       }
     }
   }
   return `${lines.join("\n")}\n`;
+}
+
+/** What the command did with one file. */
+export type Settled = {
+  readonly path: string;
+  /** `écrit` when written; under `--check`, whether the file present is what the run produces. */
+  readonly state: "écrit" | "identique" | "DIFFÉRENT";
+};
+
+/**
+ * Write the files of a run, or — under `--check` — compare each with the one present and write
+ * nothing. A file that is absent differs.
+ */
+export function settle(files: ReadonlyMap<string, string>, check: boolean): Settled[] {
+  return [...files].map(([path, content]): Settled => {
+    if (check) {
+      const same = existsSync(path) && readFileSync(path, "utf8") === content;
+      return { path, state: same ? "identique" : "DIFFÉRENT" };
+    }
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, content);
+    return { path, state: "écrit" };
+  });
+}
+
+/**
+ * The command's exit code: `1` when `--check` found a file that differs, else `2` when a control
+ * or a row failed — the experiment may not be read — else `0`.
+ */
+export function exitCodeOf(settled: readonly Settled[], failures: number): 0 | 1 | 2 {
+  if (settled.some(({ state }) => state === "DIFFÉRENT")) return 1;
+  return failures > 0 ? 2 : 0;
 }
 
 function option(name: string, fallback: string): string {
@@ -94,7 +119,6 @@ function main(): void {
     "report",
     join(ROOT, "docs/references/spatial-wind/lift-axial-drag-experiment.md"),
   );
-  const check = process.argv.includes("--check");
 
   const started = performance.now();
   const fixed = runFixedLength();
@@ -117,21 +141,9 @@ function main(): void {
   );
   console.log(`contrôles en échec : ${failedControls} ; lignes en échec : ${failedRows}`);
 
-  let stale = 0;
-  for (const [path, content] of files) {
-    if (check) {
-      const same = existsSync(path) && readFileSync(path, "utf8") === content;
-      if (!same) stale++;
-      console.log(`${same ? "identique" : "DIFFÉRENT"}  ${path}`);
-    } else {
-      mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(path, content);
-      console.log(`écrit  ${path}`);
-    }
-  }
-
-  if (stale > 0) process.exitCode = 1;
-  else if (failedControls > 0 || failedRows > 0) process.exitCode = 2;
+  const settled = settle(files, process.argv.includes("--check"));
+  for (const { path, state } of settled) console.log(`${state}  ${path}`);
+  process.exitCode = exitCodeOf(settled, failedControls + failedRows);
 }
 
 if (import.meta.main) main();

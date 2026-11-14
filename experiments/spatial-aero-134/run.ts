@@ -28,13 +28,13 @@ import type { SpatialInput, SpatialSolution } from "./solve.ts";
 
 import {
   AIR_DENSITY,
+  baseCase,
   baseCases,
   GEOMETRIES,
   GROUND,
   groundOf,
   LINES,
   LOAD_STATES,
-  REFERENCE_VARIANT,
   RIDER,
   riderForce,
   VARIANTS,
@@ -121,7 +121,10 @@ export type Row = {
   /** At twice `SPATIAL.steps`. `null` unless the row has an equilibrium at both step counts. */
   readonly outputs: Outputs | null;
   readonly residuals: Residuals | null;
-  /** The greatest gap between the two step counts, over the lengths and over the forces. */
+  /**
+   * The greatest gap between the two step counts, over the lengths and over the forces — the
+   * two reactions included, each as the norm of its vector gap.
+   */
   readonly refinement: { readonly length: number; readonly force: number } | null;
   readonly iterations: number;
 };
@@ -210,7 +213,8 @@ export function solveRow(input: SpatialInput, geometry: GeometryCase, seed?: Vec
       failure.kind === "no-convergence"
         ? `fermeture ${failure.closure.toExponential(2)} m après ${failure.iterations} itérations`
         : `entrée refusée : ${failure.field} = ${failure.value}`;
-    return { ...FAILED, status: "non convergé", detail, iterations: 0 };
+    const iterations = failure.kind === "no-convergence" ? failure.iterations : 0;
+    return { ...FAILED, status: "non convergé", detail, iterations };
   }
   const { solution } = coarse;
   const fine = solveSpatial(input, {
@@ -231,7 +235,14 @@ export function solveRow(input: SpatialInput, geometry: GeometryCase, seed?: Vec
   const before = outputsOf(solution, geometry);
   const gap = (keys: readonly DifferenceKey[]): number =>
     Math.max(...keys.map((key) => Math.abs(outputs[key] - before[key])));
-  const refinement = { length: gap(LENGTH_KEYS), force: gap(FORCE_KEYS) };
+  // §18.6 holds every force reported to the bar: a reaction that has not settled in direction
+  // moves no tension, so the two reactions are compared as vectors.
+  const turn = (anchor: "reactionA" | "reactionB"): number =>
+    Math.hypot(...outputs[anchor].map((component, k) => component - before[anchor][k]));
+  const refinement = {
+    length: gap(LENGTH_KEYS),
+    force: Math.max(gap(FORCE_KEYS), turn("reactionA"), turn("reactionB")),
+  };
   const found = residuals(fine.solution);
   const reported = { ...spent, outputs, residuals: found, refinement };
 
@@ -275,8 +286,13 @@ const seedOf = (row: Solved | undefined): Vec3 | undefined =>
  * geometry. Rows come in the order of the cases, the reference variant first in each.
  *
  * @param cases the base cases to run — the whole matrix unless a test asks for a part of it.
+ * @param variants the coefficient variants, reference first — the matrix's own unless a test
+ *   builds another set.
  */
-export function runFixedLength(cases: readonly BaseCase[] = baseCases()): Row[] {
+export function runFixedLength(
+  cases: readonly BaseCase[] = baseCases(),
+  variants: readonly Variant[] = VARIANTS,
+): Row[] {
   const lengths = new Map<string, number>();
   const rows: Row[] = [];
   for (const base of cases) {
@@ -284,7 +300,7 @@ export function runFixedLength(cases: readonly BaseCase[] = baseCases()): Row[] 
     const L0 = lengths.get(key) ?? fixedLength(base.line, base.geometry);
     lengths.set(key, L0);
     let reference: Solved | undefined;
-    for (const variant of VARIANTS) {
+    for (const variant of variants) {
       const input = inputOf(base.line, base.geometry, base.wind, variant, L0, base.load.rider);
       const solved = solveRow(input, base.geometry, seedOf(reference));
       reference ??= solved;
@@ -301,14 +317,15 @@ export function runFixedLength(cases: readonly BaseCase[] = baseCases()): Row[] 
  * the one the rows are reported at; the rows then go through the same checks as the main
  * comparison's, at both counts.
  *
- * @param part the lines, geometries and winds to run — the whole matrix unless a test asks for
- *   a part of it.
+ * @param part the lines, geometries, winds and variants to run — the whole matrix unless a test
+ *   asks for a part of it.
  */
 export function runPoseTension(
   part: {
     readonly lines?: readonly LineCase[];
     readonly geometries?: readonly GeometryCase[];
     readonly winds?: readonly WindCase[];
+    readonly variants?: readonly Variant[];
   } = {},
 ): Row[] {
   const rows: Row[] = [];
@@ -316,19 +333,13 @@ export function runPoseTension(
     for (const geometry of part.geometries ?? GEOMETRIES) {
       const start = fixedLength(line, geometry);
       for (const wind of part.winds ?? WINDS) {
-        for (const variant of VARIANTS) {
+        for (const variant of part.variants ?? VARIANTS) {
           const unposed = inputOf(line, geometry, wind, variant, start, false);
           const pose = resolvePoseLength(unposed, line.poseTension, start, {
             steps: 2 * SPATIAL.steps,
           });
           for (const load of LOAD_STATES) {
-            const base: BaseCase = {
-              id: [line.id, geometry.id, load.id, wind.id].join("|"),
-              line,
-              geometry,
-              load,
-              wind,
-            };
+            const base = baseCase(line, geometry, load, wind);
             if (!pose.ok) {
               const { failure } = pose;
               rows.push({
@@ -353,16 +364,6 @@ export function runPoseTension(
     }
   }
   return rows;
-}
-
-/** The reference row of a row: same convention, same base case, normal drag alone. */
-export function referenceOf(row: Row, rows: readonly Row[]): Row | undefined {
-  return rows.find(
-    (candidate) =>
-      candidate.convention === row.convention &&
-      candidate.base.id === row.base.id &&
-      candidate.variant.id === REFERENCE_VARIANT.id,
-  );
 }
 
 /**

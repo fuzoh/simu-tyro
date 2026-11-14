@@ -11,7 +11,9 @@
  * - **§15 is quoted from the engine's fixture module**, never retyped and never taken from
  *   `docs/references/` (`docs/conventions/testing.md` — Fixture rules).
  * - **A control whose line does not solve is a failed control**, with `NaN` where the value
- *   would be — not a skipped one.
+ *   would be — not a skipped one. So is a control the matrix gives no case to: one that reads
+ *   the rows picks its case by what the case is, never by an identifier, and fails when no row
+ *   answers.
  * - **The matrix's own health is counted, not sampled**: every row's status, and the greatest
  *   residual and refinement gap over the rows that have them.
  */
@@ -20,11 +22,11 @@ import { solveSpan } from "@/lib/sim";
 import { Z1, Z2, Z3, Z4, Z5 } from "@/lib/sim/__fixtures__/theory-15.ts";
 
 import type { AeroCoefficients, Vec3 } from "./aero.ts";
-import type { Row, RowStatus } from "./run.ts";
+import type { DifferenceKey, Row, RowStatus } from "./run.ts";
 import type { SpatialInput, SpatialSolution } from "./solve.ts";
 
 import { NO_AERO } from "./aero.ts";
-import { AIR_DENSITY, REFERENCE_VARIANT, riderForce, RIDER } from "./cases.ts";
+import { AIR_DENSITY, isReference, riderForce, RIDER } from "./cases.ts";
 import { forceMeasures, shapeMeasures } from "./measures.ts";
 import { FORCE_KEYS, inputOf, LENGTH_KEYS, TOLERANCES } from "./run.ts";
 import { SPATIAL, solveSpatial } from "./solve.ts";
@@ -32,7 +34,10 @@ import { SPATIAL, solveSpatial } from "./solve.ts";
 /** §18.6's bar on the closed forms, relative: they are exact and the integration leaves less. */
 export const CLOSED_FORM_BAR = 1e-8;
 
-/** The seven families of §18.6, in its order. */
+/**
+ * The seven controls of §18.6, in its order. Control 2 is two families: the calm cases against
+ * the plane engine, and their variants against the reference.
+ */
 export type ControlFamily =
   | "§15 sans vent"
   | "moteur plan sans vent"
@@ -225,8 +230,22 @@ function theoryFixtures(): ControlRow[] {
  */
 function calmCases(fixed: readonly Row[]): ControlRow[] {
   const rows: ControlRow[] = [];
+  const nan = Number.NaN;
   const calm = fixed.filter((row) => row.base.wind.speed === 0);
-  for (const row of calm.filter((candidate) => candidate.variant.id === REFERENCE_VARIANT.id)) {
+  const references = calm.filter((row) => isReference(row.variant));
+  if (references.length === 0) {
+    // No calm case to return to: the control cannot be made, which is not a pass.
+    const subject = "aucun cas sans vent dans la matrice";
+    return [
+      ...rowsOf("moteur plan sans vent", subject, "`solveSpan`, moteur plan (§4–§6)", [
+        ["T_A", "N", nan, nan, 0],
+      ]),
+      ...rowsOf("variantes sans vent", subject, "sans vent, les modèles coïncident", [
+        ["plus grand écart de force", "N", 0, nan, TOLERANCES.floor.force],
+      ]),
+    ];
+  }
+  for (const row of references) {
     const { line, geometry, load } = row.base;
     const plane = solveSpan({
       L: geometry.L,
@@ -237,7 +256,6 @@ function calmCases(fixed: readonly Row[]): ControlRow[] {
       loads: load.rider ? [{ P: -riderForce(line)[2], s: RIDER.fraction * row.L0 }] : [],
     });
     const found = row.outputs;
-    const nan = Number.NaN;
     const expected = plane.ok ? plane.state : { H: nan, TA: nan, TB: nan, Tmax: nan };
     const check = (quantity: string, value: number, got: number): Check => [
       quantity,
@@ -259,14 +277,15 @@ function calmCases(fixed: readonly Row[]): ControlRow[] {
     const others = calm.filter(
       (candidate) => candidate.base.id === row.base.id && candidate.variant.id !== row.variant.id,
     );
-    const gap = (keys: readonly (keyof NonNullable<Row["outputs"]>)[]): number =>
-      found === null || others.some((other) => other.outputs === null)
-        ? nan
-        : Math.max(
-            ...others.flatMap((other) =>
-              keys.map((key) => Math.abs((other.outputs![key] as number) - (found[key] as number))),
-            ),
-          );
+    const gap = (keys: readonly DifferenceKey[]): number => {
+      if (found === null) return nan;
+      let greatest = 0;
+      for (const { outputs } of others) {
+        if (outputs === null) return nan;
+        for (const key of keys) greatest = Math.max(greatest, Math.abs(outputs[key] - found[key]));
+      }
+      return greatest;
+    };
     rows.push(
       ...rowsOf(
         "variantes sans vent",
@@ -413,28 +432,69 @@ function uniformLoad(): ControlRow[] {
   );
 }
 
+/** The first of the candidates whose key is the greatest, keys compared entry by entry. */
+function foremost<T>(candidates: readonly T[], key: (candidate: T) => readonly number[]): T | null {
+  let best: T | null = null;
+  let bestKey: readonly number[] = [];
+  for (const candidate of candidates) {
+    const candidateKey = key(candidate);
+    const at = candidateKey.findIndex((value, k) => value !== bestKey[k]);
+    if (best === null || (at !== -1 && candidateKey[at] > bestKey[at])) {
+      best = candidate;
+      bestKey = candidateKey;
+    }
+  }
+  return best;
+}
+
+/**
+ * The row §18.6's mirror is taken on, picked by what it is and not by a name: under the variant
+ * with the largest lift coefficient and, at that lift, the largest axial one; on the case with a
+ * crosswind component that has the most to mirror — a rider, inclined anchors, a wind that is
+ * also axial, then the strongest crosswind. `null` when the matrix holds no row with both a lift
+ * and a crosswind: nothing there has a mirror image to differ from.
+ */
+export function mirrorSubject(fixed: readonly Row[]): Row | null {
+  const mirrored = fixed.filter(
+    ({ base, variant }) => variant.aero.lift !== 0 && base.wind.components.across !== 0,
+  );
+  const lifted = foremost(mirrored, ({ variant }) => [variant.aero.lift, variant.aero.axial]);
+  if (lifted === null) return null;
+  return foremost(
+    mirrored.filter(({ variant }) => variant.id === lifted.variant.id),
+    ({ base }) => [
+      Number(base.load.rider),
+      Number(base.geometry.h !== 0),
+      Number(base.wind.components.along !== 0),
+      Math.abs(base.wind.components.across),
+    ],
+  );
+}
+
 /** §18.6 control 7: one case of the matrix against its mirror image in the plane `y = 0`. */
 function mirror(fixed: readonly Row[]): ControlRow[] {
-  const row = fixed.find(
-    (candidate) =>
-      candidate.base.id === "acier-12|incline|passager|oblique-20" &&
-      candidate.variant.id === "NLA-b+0.5-0.1",
-  );
-  if (row === undefined || row.outputs === null) return [];
-  const { line, geometry, wind, load } = row.base;
-  const input = inputOf(line, geometry, wind, row.variant, row.L0, load.rider);
-  const mirrored = reading(
-    solve({
-      ...input,
-      wind: { along: input.wind.along, across: -input.wind.across },
-      aero: { ...input.aero, lift: -input.aero.lift },
-    }),
-  );
+  const row = mirrorSubject(fixed);
+  const nan = Number.NaN;
   const { refinement } = TOLERANCES;
-  const { outputs } = row;
+  // No subject, or one without an equilibrium: the four quantities fail, none is left out.
+  const outputs = row?.outputs ?? { TA: nan, Tmax: nan, sag: nan, sway: nan };
+  let mirrored = reading(null);
+  if (row?.outputs) {
+    const { line, geometry, wind, load } = row.base;
+    const input = inputOf(line, geometry, wind, row.variant, row.L0, load.rider);
+    mirrored = reading(
+      solve({
+        ...input,
+        wind: { along: input.wind.along, across: -input.wind.across },
+        aero: { ...input.aero, lift: -input.aero.lift },
+      }),
+    );
+  }
   return rowsOf(
     "miroir",
-    `${row.base.id}, ${row.variant.id}`,
+    row === null
+      ? "aucun cas de la matrice n'a à la fois une portance et un vent traversier"
+      : `${row.base.id}, ${row.variant.id}${row.outputs === null ? ` (${row.status})` : ""}`,
     "§18.6 contrôle 7 : vent traversier et signe de C_L inversés",
     [
       ["T_A", "N", outputs.TA, mirrored.TA, refinement.force],
