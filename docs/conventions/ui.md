@@ -212,9 +212,13 @@ turns the camera and never scrolls the page. The north needle is `Navigation2` t
 number.
 
 **The Vue embarquée replaces the Gimbal while it plays** (#126). « Vue embarquée » is the Gimbal's
-last button (key 3), under the two Vues prédéfinies, `size="sm"` and `.touch-44` like them; off,
-with its reason on the wrapper's hover as `MapControls` does for « 3D », while no motion is
-proposed (`EMBARK_BLOCKED`). Inside, the same corner holds one row of `icon-sm` buttons — lecture or
+last button (key 3), under the two Vues prédéfinies, `size="sm"` and `.touch-44` like them; off
+while no motion is proposed (`EMBARK_BLOCKED`), with its reason on the wrapper's hover as
+`MapControls` does for « 3D » **and behind an `ⓘ` beside the button**: « 3D »'s reason is also a
+line of the caption, this one is printed nowhere else, and a disabled button takes neither the
+keyboard's focus nor a tap (#122's rule, below). The `ⓘ` hangs outside the Gimbal's column
+(`absolute left-full`), so the column keeps its width when a reason comes or goes — while an anchor
+is dragged, for one. Inside, the same corner holds one row of `icon-sm` buttons — lecture or
 pause, recommencer, the head turned left, the eyes raised, lowered, the head turned right, the
 keyboard glyph — and « Quitter la vue embarquée » under it, on the Gimbal's hit-box rule
 (`after:-z-1` inside `isolate`). The focus lands on « Lecture » on entering and back on the canvas on

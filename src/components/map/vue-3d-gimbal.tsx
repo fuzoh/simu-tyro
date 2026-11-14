@@ -19,10 +19,12 @@
  *   button, and only the 4 px gaps and the margin around the group take the enlarged target. The
  *   pad's grid box would sit over its gaps' hit boxes, so it lets presses through.
  * - **The Vue embarquée has controls of its own** (#126): « Vue embarquée » (key 3) enters it, off
- *   with its reason on hover while no motion is proposed. Inside it the Gimbal gives way to
- *   {@link EmbarkedControls} — lecture or pause, recommencer, the head turned and the eyes raised or
- *   lowered, « Quitter la vue embarquée » — on the same corner and the same hit-box rule, and the
- *   read-out of the ride sits over the view's bottom-left corner, an estimation with its `ⓘ`.
+ *   while no motion is proposed, with its reason on hover and behind an `ⓘ` beside it — a disabled
+ *   button takes no focus and no tap, and the reason is printed nowhere else. Inside it the Gimbal
+ *   gives way to {@link EmbarkedControls} — lecture or pause, recommencer, the head turned and the
+ *   eyes raised or lowered, « Quitter la vue embarquée » — on the same corner and the same hit-box
+ *   rule, and the read-out of the ride sits over the view's bottom-left corner, an estimation with
+ *   its `ⓘ`.
  */
 
 import type { ReactNode } from "react";
@@ -163,21 +165,30 @@ export function Gimbal({
         name={GIMBAL_COPY.vueLaterale}
         onCommand={onCommand}
       />
-      {/* A disabled button takes no hover, so the reason is the wrapper's. */}
+      {/* A disabled button takes no hover and no focus. The mouse reads the reason on the button's
+          wrapper; the keyboard and a finger read it behind the `ⓘ` beside it (#122), which hangs
+          outside the column so the Gimbal keeps its width when a reason comes or goes. */}
       {embark !== null && (
-        <span className="flex" title={embark.blocked ?? undefined}>
-          <Button
-            className={UNDER_FACES}
-            disabled={embark.blocked !== null}
-            onClick={onEmbark}
-            size="sm"
-            title={
-              embark.blocked === null ? gimbalHint(EMBARQUEE_COPY.enter, EMBARK_KEY) : undefined
-            }
-            variant="outline"
-          >
-            {EMBARQUEE_COPY.enter}
-          </Button>
+        <span className="relative flex">
+          <span className="flex" title={embark.blocked ?? undefined}>
+            <Button
+              className={UNDER_FACES}
+              disabled={embark.blocked !== null}
+              onClick={onEmbark}
+              size="sm"
+              title={
+                embark.blocked === null ? gimbalHint(EMBARQUEE_COPY.enter, EMBARK_KEY) : undefined
+              }
+              variant="outline"
+            >
+              {EMBARQUEE_COPY.enter}
+            </Button>
+          </span>
+          {embark.blocked !== null && (
+            <span className="bg-background absolute top-0 left-full ml-1 grid size-7 place-items-center">
+              <InfoTip label={EMBARQUEE_COPY.enter} text={embark.blocked} />
+            </span>
+          )}
         </span>
       )}
     </div>
