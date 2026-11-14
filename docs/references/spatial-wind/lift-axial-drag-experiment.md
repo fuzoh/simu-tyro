@@ -448,27 +448,27 @@ La longueur est cherchée sur la branche tendue, à partir de la longueur sans v
 
 ### Longueur de chaque modèle
 
-`L₀` sans vent, `L₀` du modèle de référence sous le vent, puis écart de `L₀` à cette référence pour la plus grande sonde de chaque force ajoutée, seule, en millimètres. Les 27 variantes sont dans `results/pose-tension.csv`.
+`L₀` sans vent, `L₀` du modèle de référence sous le vent, puis écart de `L₀` à cette référence pour la plus grande sonde de chaque force ajoutée, seule, en millimètres. « < plancher » : l'écart de longueur est sous le plancher numérique de 1,0×10⁻⁴ m ; « échec » : la ligne à vide du modèle, ou celle de la référence, n'a pas passé ses vérifications et ne donne aucun écart. Les 27 variantes sont dans `results/pose-tension.csv`.
 
 | Ligne | Géométrie | Vent | L₀ sans vent (m) | L₀ référence (m) | ΔL₀ `NL-b+0.5` (mm) | ΔL₀ `NL-b-0.5` (mm) | ΔL₀ `NL-y+0.5` (mm) | ΔL₀ `NL-y-0.5` (mm) | ΔL₀ `NA-0.1` (mm) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| acier-12 | niveau | travers-10 | 150,5398 | 150,5560 | −80,4 | +86,4 | 0,0 | 0,0 | 0,0 |
+| acier-12 | niveau | travers-10 | 150,5398 | 150,5560 | −80,4 | +86,4 | < plancher | < plancher | < plancher |
 | acier-12 | niveau | oblique-10 | 150,5398 | 150,5439 | −41,0 | +42,6 | +42,3 | −40,8 | −1,3 |
 | acier-12 | niveau | quasi-face-10 | 150,5398 | 150,5398 | −0,8 | +0,8 | +7,3 | −7,2 | −2,6 |
 | acier-12 | niveau | quasi-dos-10 | 150,5398 | 150,5398 | −0,8 | +0,8 | −7,2 | +7,3 | +2,7 |
-| acier-12 | niveau | travers-20 | 150,5398 | 150,8000 | −288,2 | +386,3 | 0,0 | 0,0 | 0,0 |
+| acier-12 | niveau | travers-20 | 150,5398 | 150,8000 | −288,2 | +386,3 | < plancher | < plancher | < plancher |
 | acier-12 | niveau | oblique-20 | 150,5398 | 150,6056 | −155,3 | +180,3 | +179,1 | −154,9 | −5,6 |
 | acier-12 | niveau | quasi-face-20 | 150,5398 | 150,5398 | −3,2 | +3,2 | +29,5 | −28,3 | −10,4 |
 | acier-12 | niveau | quasi-dos-20 | 150,5398 | 150,5398 | −3,2 | +3,2 | −28,3 | +29,5 | +10,8 |
-| acier-12 | incline | travers-10 | 151,6442 | 151,6615 | −84,7 | +91,2 | 0,0 | 0,0 | 0,0 |
+| acier-12 | incline | travers-10 | 151,6442 | 151,6615 | −84,7 | +91,2 | < plancher | < plancher | < plancher |
 | acier-12 | incline | oblique-10 | 151,6442 | 151,6614 | −43,5 | +45,3 | +44,4 | −42,8 | −1,4 |
 | acier-12 | incline | quasi-face-10 | 151,6442 | 151,6488 | −1,2 | +1,2 | +7,7 | −7,5 | −2,8 |
 | acier-12 | incline | quasi-dos-10 | 151,6442 | 151,6397 | −1,2 | +1,2 | −7,5 | +7,6 | +2,8 |
-| acier-12 | incline | travers-20 | 151,6442 | 151,9206 | −303,7 | +408,2 | +0,1 | −0,1 | +0,1 |
+| acier-12 | incline | travers-20 | 151,6442 | 151,9206 | −303,7 | +408,2 | +0,1 | < plancher | < plancher |
 | acier-12 | incline | oblique-20 | 151,6442 | 151,7670 | −165,0 | +192,4 | +188,4 | −162,6 | −6,3 |
 | acier-12 | incline | quasi-face-20 | 151,6442 | 151,6628 | −4,7 | +4,8 | +31,7 | −29,2 | −11,3 |
 | acier-12 | incline | quasi-dos-20 | 151,6442 | 151,6262 | −4,7 | +4,7 | −28,8 | +31,3 | +11,0 |
-| corde-bandit-11 | niveau | travers-10 | 144,8846 | 144,9300 | −25,6 | +41,5 | 0,0 | 0,0 | 0,0 |
+| corde-bandit-11 | niveau | travers-10 | 144,8846 | 144,9300 | −25,6 | +41,5 | < plancher | < plancher | < plancher |
 | corde-bandit-11 | niveau | oblique-10 | 144,8846 | 144,8960 | −14,8 | +18,7 | +18,7 | −14,8 | −9,0 |
 | corde-bandit-11 | niveau | quasi-face-10 | 144,8846 | 144,8846 | −0,3 | +0,3 | +3,0 | −2,8 | −18,1 |
 | corde-bandit-11 | niveau | quasi-dos-10 | 144,8846 | 144,8846 | −0,3 | +0,3 | −2,8 | +3,0 | +18,1 |
@@ -476,7 +476,7 @@ La longueur est cherchée sur la branche tendue, à partir de la longueur sans v
 | corde-bandit-11 | niveau | oblique-20 | 144,8846 | 145,0665 | −35,7 | +99,7 | +99,7 | −35,8 | −36,7 |
 | corde-bandit-11 | niveau | quasi-face-20 | 144,8846 | 144,8847 | −1,0 | +1,0 | +12,6 | −10,6 | −72,2 |
 | corde-bandit-11 | niveau | quasi-dos-20 | 144,8846 | 144,8847 | −1,0 | +1,0 | −10,6 | +12,6 | +72,4 |
-| corde-bandit-11 | incline | travers-10 | 145,9467 | 145,9934 | −26,2 | +42,5 | 0,0 | 0,0 | 0,0 |
+| corde-bandit-11 | incline | travers-10 | 145,9467 | 145,9934 | −26,2 | +42,5 | < plancher | < plancher | < plancher |
 | corde-bandit-11 | incline | oblique-10 | 145,9467 | 145,9636 | −15,2 | +19,4 | +19,1 | −15,0 | −9,0 |
 | corde-bandit-11 | incline | quasi-face-10 | 145,9467 | 145,9481 | −0,4 | +0,4 | +3,1 | −2,8 | −18,0 |
 | corde-bandit-11 | incline | quasi-dos-10 | 145,9467 | 145,9452 | −0,4 | +0,4 | −2,8 | +3,1 | +18,0 |

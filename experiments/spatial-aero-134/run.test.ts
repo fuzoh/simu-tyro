@@ -12,6 +12,7 @@ import {
   differenceOf,
   fixedLength,
   inputOf,
+  lengthShift,
   reactionShift,
   runFixedLength,
   runPoseTension,
@@ -301,6 +302,36 @@ describe("reactionShift", () => {
       relative: 0.06,
       resolved: true,
     });
+  });
+});
+
+describe("lengthShift — the length a model needs beyond the reference's", () => {
+  const posed = (L0: number, status: Row["status"] = "ok", id = "NA-0.1"): Row => ({
+    ...row({}, status, id),
+    L0,
+  });
+  const reference = posed(150, "ok", "N");
+
+  it("is the difference of the two lengths, in metres and without a percentage", () => {
+    expect(lengthShift(posed(150.25), reference)).toEqual({
+      absolute: 0.25,
+      relative: null,
+      resolved: true,
+    });
+    expect(lengthShift(posed(149.5), reference)!.absolute).toBe(-0.5);
+  });
+
+  it("does not read a difference under the 0,1 mm floor", () => {
+    expect(lengthShift(posed(150.00005), reference)!.resolved).toBe(false);
+    expect(lengthShift(posed(149.99995), reference)!.resolved).toBe(false);
+    expect(lengthShift(posed(150.0002), reference)!.resolved).toBe(true);
+  });
+
+  it("gives nothing for a row or a reference that failed its checks, whatever its length", () => {
+    expect(lengthShift(posed(150.25, "raffinement hors tolérance"), reference)).toBeNull();
+    expect(lengthShift(posed(150.25), posed(150, "bilan hors tolérance", "N"))).toBeNull();
+    expect(lengthShift(posed(Number.NaN, "pose non résolue"), reference)).toBeNull();
+    expect(lengthShift(posed(150.25), undefined)).toBeNull();
   });
 });
 

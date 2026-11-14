@@ -390,6 +390,18 @@ export function differenceOf(
 }
 
 /**
+ * How far the `L₀` of a row is from its reference's, m — in the separate comparison, the length
+ * a model needs beyond the reference's for the same tension de pose (§18.7). Read on the unloaded
+ * row, whose equilibrium is the one the length was solved on. `null` under the same rule as
+ * {@link differenceOf}, resolved above the same floor; no percentage — a share of the whole line.
+ */
+export function lengthShift(row: Row, reference: Row | undefined): Difference | null {
+  if (reference === undefined || row.status !== "ok" || reference.status !== "ok") return null;
+  const absolute = row.L0 - reference.L0;
+  return { absolute, relative: null, resolved: Math.abs(absolute) >= TOLERANCES.floor.length };
+}
+
+/**
  * How far a row's reaction at one anchor is from its reference's, as the **norm of the vector
  * difference** — a reaction that turns without growing still shows. `relative` is to the norm of
  * the reference's reaction. `null` under the same rule as {@link differenceOf}.

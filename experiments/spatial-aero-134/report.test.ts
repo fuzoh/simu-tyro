@@ -260,6 +260,52 @@ describe("buildReport — an adjusted matrix is reported as it was run", () => {
   });
 });
 
+describe("buildReport — the length of each model is a difference like any other (§18.6)", () => {
+  // The unloaded row of one model, or of the reference, with something injected on it.
+  const withUnloaded = (id: string, patch: Partial<Row>): Row[] =>
+    pose.map((row) =>
+      row.base.load.id === "vide" && row.variant.id === id ? { ...row, ...patch } : row,
+    );
+  const reference = pose.find((row) => row.base.load.id === "vide" && row.variant.id === "N")!;
+  /** The five ΔL₀ cells of the one wind run: NL-b+0.5, NL-b-0.5, NL-y+0.5, NL-y-0.5, NA-0.1. */
+  const shifts = (rows: readonly Row[]): string[] => {
+    const lengths = section(
+      buildReport({ fixed, pose: rows, controls: [passing] }),
+      "### Longueur de chaque modèle",
+    );
+    const [line] = lengths.split("\n").filter((text) => text.startsWith("| acier-12 |"));
+    return line
+      .split("|")
+      .map((cell) => cell.trim())
+      .slice(6, 11);
+  };
+
+  it("prints a length difference above the floor in millimetres, with its sign", () => {
+    expect(shifts(withUnloaded("NA-0.1", { L0: reference.L0 + 2e-4 }))[4]).toBe("+0,2");
+    expect(shifts(withUnloaded("NA-0.1", { L0: reference.L0 - 0.0123 }))[4]).toBe("−12,3");
+  });
+
+  it("writes no number for a length difference under the 0,1 mm floor", () => {
+    expect(shifts(withUnloaded("NA-0.1", { L0: reference.L0 + 5e-5 }))[4]).toBe("< plancher");
+    expect(shifts(withUnloaded("NA-0.1", { L0: reference.L0 - 5e-5 }))[4]).toBe("< plancher");
+  });
+
+  it("gives no difference to a model whose unloaded line failed its checks, its length known", () => {
+    const failed = shifts(
+      withUnloaded("NL-b+0.5", { status: "raffinement hors tolérance", detail: "écart 2e-5 m" }),
+    );
+    expect(failed[0]).toBe("échec");
+    // The other models keep theirs: a downward lift needs a longer line for the same pose.
+    expect(failed[1]).toMatch(/^\+\d+,\d$/);
+  });
+
+  it("gives no difference to any model when the reference failed its checks", () => {
+    expect(shifts(withUnloaded("N", { status: "bilan hors tolérance" }))).toEqual(
+      Array.from({ length: 5 }, () => "échec"),
+    );
+  });
+});
+
 describe("buildReport — a group without a row is not a failure", () => {
   // Two base cases that share neither their speed nor their load state.
   const cases = baseCases().filter(

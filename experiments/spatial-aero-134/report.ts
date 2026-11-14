@@ -49,7 +49,7 @@ import {
   SCENARIO_SOURCES,
 } from "./cases.ts";
 import { CLOSED_FORM_BAR, matrixHealth } from "./controls.ts";
-import { differenceOf, reactionShift, TOLERANCES } from "./run.ts";
+import { differenceOf, lengthShift, reactionShift, TOLERANCES } from "./run.ts";
 import { closureTolerance, SPATIAL } from "./solve.ts";
 
 /** Everything one run of the matrix produced. */
@@ -877,11 +877,13 @@ function poseSection(pose: readonly Row[], fixed: readonly Row[]): string {
             (row) => row.base.line.id === line.id && row.base.geometry.id === geometry.id,
           );
           const from = at(line, geometry, wind, reference);
+          // A difference like any other, shown in millimetres: none behind a failed row, none
+          // read under the floor.
           const shift = (variant: Variant): string => {
             const row = at(line, geometry, wind, variant);
             if (row === undefined || from === undefined) return "—";
-            if (!Number.isFinite(row.L0) || !Number.isFinite(from.L0)) return "échec";
-            return signed(1000 * (row.L0 - from.L0), 1);
+            const found = lengthShift(row, from);
+            return differenceCell(found && { ...found, absolute: 1000 * found.absolute }, 1);
           };
           return [
             line.id,
@@ -902,7 +904,7 @@ La longueur est cherchée sur la branche tendue, à partir de la longueur sans v
 
 ### Longueur de chaque modèle
 
-\`L₀\` sans vent, \`L₀\` du modèle de référence sous le vent, puis écart de \`L₀\` à cette référence pour ${shown.length === 0 ? "aucune variante : la matrice n'a pas de sonde seule" : "la plus grande sonde de chaque force ajoutée, seule"}, en millimètres. Les ${axes.variants.length} variantes sont dans \`results/pose-tension.csv\`.
+\`L₀\` sans vent, \`L₀\` du modèle de référence sous le vent, puis écart de \`L₀\` à cette référence pour ${shown.length === 0 ? "aucune variante : la matrice n'a pas de sonde seule" : "la plus grande sonde de chaque force ajoutée, seule"}, en millimètres. « < plancher » : l'écart de longueur est sous le plancher numérique de ${scientific(TOLERANCES.floor.length)} m ; « échec » : la ligne à vide du modèle, ou celle de la référence, n'a pas passé ses vérifications et ne donne aucun écart. Les ${axes.variants.length} variantes sont dans \`results/pose-tension.csv\`.
 
 ${table(
   [

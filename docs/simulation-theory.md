@@ -1355,7 +1355,9 @@ cannot be bracketed is a reported failure, and a root found is local — nothing
 **Reference and differences.** In both tables every model is compared with normal drag alone on
 the same case under the same convention: `Δ = value − reference`, and `Δ/|reference|` only under
 §18.6's rule. A flèche, a déport or a garde can be nil or change sign: the absolute difference is
-the result, the percentage a convenience.
+the result, the percentage a convenience. The length a model needs in the separate comparison is
+compared the same way: `ΔL₀` is taken between two unloaded lines that both passed, read only
+above the length floor, and given without a percentage.
 
 **What the experiment cannot conclude.** That a probe moves a result says the equilibrium is
 sensitive to that coefficient at that size; that it does not says so for that size only. Neither
