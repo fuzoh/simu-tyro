@@ -144,8 +144,13 @@ variantes de `shapes.csv`, et les autres citent des cas et des variantes par leu
 Ajuster `cases.ts` demande d'y mettre à jour ces valeurs attendues. Une matrice ajustée *pour un
 test* se construit avec `variantsOf`, `windCase` et `baseCase`, sans toucher à `cases.ts`.
 
+`report.test.ts` lit aussi des lignes **écrites à la main**, qu'aucun solveur n'a produites : des
+écarts ronds et aucun chiffre en double, pour vérifier quelle valeur va sous quel en-tête du
+rapport et des tableaux — ce que `--check`, qui compare la sortie du code à une sortie du même
+code, ne peut pas dire.
+
 Les échecs d'une ligne — pas d'équilibre, bilan ou raffinement hors tolérance, pose non résolue —
 sont injectés sur les collaborateurs (`vi.mock`, dans `run.test.ts`) ou posés sur une ligne
-résolue (`report.test.ts`, `controls.test.ts`), jamais cherchés : la matrice livrée n'en contient
-aucun. Une entrée refusée est le seul échec d'une ligne atteint par une entrée réelle. Le tir et
+résolue ou écrite à la main (`report.test.ts`, `controls.test.ts`), jamais cherchés : la matrice
+livrée n'en contient aucun. Une entrée refusée est le seul échec d'une ligne atteint par une entrée réelle. Le tir et
 la recherche de pose testent leurs propres échecs dans `solve.test.ts` et `pose.test.ts`.
