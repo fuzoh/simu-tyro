@@ -153,7 +153,7 @@ function rideOutput(id: RideId, title: string, reach: RideReach, L: number): Rea
 }
 
 function proposalOutput(
-  { current, L, target, windless }: ReachReading,
+  { current, L, windless }: ReachReading,
   proposal: ReachProposal,
   wording: ReachWording,
 ): ReachProposalOutput {
@@ -180,7 +180,6 @@ function proposalOutput(
   const warnings = [
     REACH_COPY.noPromise,
     REACH_COPY.movedB,
-    ...(target > REACH.steadyMax ? [REACH_COPY.highTarget] : []),
     ...(!windless && proposal.calm.reachesB ? [REACH_COPY.calmReachesB] : []),
     ...(proposal.quasiStatic ? [WARNING_COPY["quasi-static"]] : []),
   ];
@@ -252,7 +251,7 @@ function refusalSentence(
   const anchor = label("anchor", "terrain");
   switch (refusal.kind) {
     case "target":
-      return `la cible de ${formatQuantity("reachTarget", target)} sort du domaine ${formatValue("reachTarget", REACH.targetBand.min)} – ${formatQuantity("reachTarget", REACH.targetBand.max)} de la ${label("span", "terrain")}. Une cible à B ou au-delà demanderait l'arrivée que la proposition évite ; elle se règle sur la ${label("page", "terrain")} Avancé.`;
+      return `la cible de ${formatQuantity("reachTarget", target)} sort du domaine ${formatValue("reachTarget", REACH.targetBand.min)} – ${formatQuantity("reachTarget", REACH.targetBand.max)} de la ${label("span", "terrain")}. Une cible plus près de B, ou au-delà, risquerait l'arrivée que la proposition évite ; elle se règle sur la ${label("page", "terrain")} Avancé.`;
     case "unjudged":
       return `la ${label("groundClearance", "terrain")} n'est pas jugée sur cette ${label("line", "terrain")}, et un contact avec le terrain ne peut donc pas être écarté.`;
     case "unreachable":

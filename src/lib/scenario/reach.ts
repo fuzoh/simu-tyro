@@ -29,8 +29,8 @@
  *   higher B — the side where the passager stops shorter — and every figure it carries is recomputed
  *   at that rounded height, so what is printed is what the Scenario would give once edited.
  * - **The target is read at the whole percent it prints as** ({@link reachTargetOf}). A link may
- *   carry `cib=98.4`, kept as given (ADR-0001); what is judged against the domain and searched is
- *   the 98 % the field on Avancé and the sentences on Dynamique show, never a value nobody reads.
+ *   carry `cib=93.4`, kept as given (ADR-0001); what is judged against the domain and searched is
+ *   the 93 % the field on Avancé and the sentences on Dynamique show, never a value nobody reads.
  * - **A refusal is a value with its reason**, never a fallback height: the target outside its
  *   domain, a target no height of B reaches, a line that stops solving on the way, a predicted
  *   contact outside the Zones d'ancrage, a garde that is not judged.
@@ -61,26 +61,20 @@ export const REACH = {
   /**
    * The target's domain, % of the span, both ends included.
    *
-   * - **98, not 99.** A target at B or past it asks for the arrival the proposal exists to avoid,
-   *   and 99 % is short of B on paper only: on each of the seven lines checked, 50 m to 2000 m, a
-   *   10 km/h tail wind carries the passager of a 99 % proposal to B, and so does the low end of
-   *   the `C_dA` field's own band (0,30 m², `DYNAMICS.CdABand`) on all but the 50 m one.
-   *   **98 % is the last whole percent kept, not a safe one**: from 300 m of span on, either
-   *   variation reaches B from a target of 94 – 97 % already. Only up to 93 % did both leave the
+   * - **93, the highest target measured short of B.** A target at B or past it asks for the
+   *   arrival the proposal exists to avoid, and a target close to B is short of it on paper only:
+   *   two variations of the candidate were measured on seven lines, 50 m to 2000 m — a 10 km/h
+   *   tail wind nobody entered, and the low end of the `C_dA` field's own band (0,30 m²,
+   *   `DYNAMICS.CdABand`). From 300 m of span on, either carries the passager of a 94 – 97 %
+   *   proposal to B; at 99 % the tail wind does on every line. Only up to 93 % did both leave the
    *   passager short of B on every line — the shipped 90 % at 96,2 % of the span at most.
-   *   `docs/simulation-theory.md` §12.2 tables it.
+   *   `docs/simulation-theory.md` §12.2 tables it. The bound is what was measured, not a
+   *   guarantee: no target promises a stop before B.
    * - **50** is mid-span. Under it the passager turns back before half the line — the opposite of
    *   what the proposal is for — and a mistyped « 9 » for « 90 » would be answered with a B raised
    *   by tens of metres rather than questioned.
    */
-  targetBand: { min: 50, max: 98 },
-  /**
-   * The highest target, % of the span, whose proposal stayed short of B under both variations
-   * measured — a 10 km/h tail wind nobody entered, `C_dA` at the low end of its field's band — on
-   * each of the seven lines of `docs/simulation-theory.md` §12.2 `[MEASURED]`. Above it the domain
-   * still answers, and the proposal says that it stands within the model's own sensitivity of B.
-   */
-  steadyMax: 93,
+  targetBand: { min: 50, max: 93 },
   /**
    * The grain of a proposed height, m — the Anchor Height's own (`QUANTITIES.anchorHeight`). The
    * search walks it: {@link STEPS_PER_METRE} is read off it.
@@ -146,9 +140,9 @@ export function withinTarget(reach: RideReach, targetX: number): boolean {
 
 /**
  * The target as it is read, % of the span: **the whole percent it prints as**. The field on Avancé
- * commits whole percents, but a link or a Session may hold `98.4` (kept as given, ADR-0001), which
- * every Page shows as « 98 % » — so 98 % is what the domain judges and the search is held to.
- * Judged raw, that target would be refused as « 98 % », outside a domain that ends at 98 %.
+ * commits whole percents, but a link or a Session may hold `93.4` (kept as given, ADR-0001), which
+ * every Page shows as « 93 % » — so 93 % is what the domain judges and the search is held to.
+ * Judged raw, that target would be refused as « 93 % », outside a domain that ends at 93 %.
  */
 export function reachTargetOf(target: number): number {
   return roundToDisplay("reachTarget", target);

@@ -521,8 +521,7 @@ an answer lands; under them it moves nothing.
   are two rides, the second headed « sans vent — comparaison ». Assumptions are muted `text-xs`
   lines, the warnings `text-warning` behind a ⚠, like a tile's Avertissement. The assumption that
   names the Tightness Driver kept also prints what it does to the line — longueur à vide and, when
-  it is not the driver, tension de pose, each « before → after » — and a target above 93 % adds
-  the warning « Cible haute … » (§12.2's measured bound).
+  it is not the driver, tension de pose, each « before → after ».
 - **A refusal is a sentence in the foreground colour**, in the place of the tiles, never beside a
   height.
 - **Searched after the frame that prints the rides** (`useDeferredValue`): the search re-runs the

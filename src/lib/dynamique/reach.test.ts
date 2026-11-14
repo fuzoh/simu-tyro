@@ -4,7 +4,6 @@ import type { ReachProposal, ReachReading, ReachRefusal, RideReach } from "@/lib
 import type { Scenario, ScenarioDraft } from "@/lib/scenario/types.ts";
 
 import { FIELD_ACCESS } from "@/lib/rail/values.ts";
-import { REACH } from "@/lib/scenario/reach.ts";
 import { traverseInputs, traverseScenario } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { completeFromDefaults, scenarioToSearch, searchToScenario } from "@/lib/url/scenario.ts";
@@ -361,21 +360,6 @@ describe("every proposal says what it is and what it stands on", () => {
     );
   });
 
-  test("a target above the measured steady bound says how little it takes to reach B", () => {
-    const high =
-      "Cible haute : au-delà de 93 % de la portée, un vent arrière de 10 km/h non saisi ou une traînée plus faible ont suffi, sur certaines des lignes essayées, à amener le passager jusqu'à B.";
-    expect(REACH.steadyMax).toBe(93);
-    for (const target of [94, 96, 98]) {
-      const { warnings } = proposalOf(worded(proposed(), { target }));
-      expect(warnings, `${target} %`).toHaveLength(3);
-      expect(warnings[2]).toBe(high);
-    }
-    // Up to the bound — the shipped 90 % included — a proposal carries its two own warnings.
-    for (const target of [50, 90, 93]) {
-      expect(proposalOf(worded(proposed(), { target })).warnings, `${target} %`).toHaveLength(2);
-    }
-  });
-
   test("a ride too swift for a frozen line says so under the proposal too", () => {
     const { warnings } = proposalOf(worded(proposed({ quasiStatic: true })));
     expect(warnings).toHaveLength(3);
@@ -391,7 +375,7 @@ describe("a refusal explains itself and gives no height", () => {
     [
       "a target out of its domain",
       refused({ kind: "target" }),
-      "Aucune proposition : la cible de 90 % sort du domaine 50 – 98 % de la portée. Une cible à B ou au-delà demanderait l'arrivée que la proposition évite ; elle se règle sur la Page Avancé.",
+      "Aucune proposition : la cible de 90 % sort du domaine 50 – 93 % de la portée. Une cible plus près de B, ou au-delà, risquerait l'arrivée que la proposition évite ; elle se règle sur la Page Avancé.",
     ],
     [
       "a garde that is not judged",
@@ -476,7 +460,7 @@ describe("a refusal explains itself and gives no height", () => {
 
   test("a refused target is quoted as the search read it", () => {
     const out = worded(refused({ kind: "target" }), { target: 120, targetX: 180 });
-    expect(out.refusal).toContain("la cible de 120 % sort du domaine 50 – 98 % de la portée");
+    expect(out.refusal).toContain("la cible de 120 % sort du domaine 50 – 93 % de la portée");
     expect(out.target).toContain("à 120 % de la portée");
   });
 
@@ -665,19 +649,19 @@ describe("`reachProposal` — the shipped line, searched and worded", () => {
       return searchToScenario(completeFromDefaults(arrived).search);
     };
     // Kept as given in the Scenario (ADR-0001) …
-    expect(linked("98.4").dynamics.reachTarget).toBe(98.4);
-    // … and read as the 98 % it prints as: inside the domain, searched at 98 % of the span.
-    const inside = answer(linked("98.4"));
+    expect(linked("93.4").dynamics.reachTarget).toBe(93.4);
+    // … and read as the 93 % it prints as: inside the domain, searched at 93 % of the span.
+    const inside = answer(linked("93.4"));
     expect(inside.refusal).toBeNull();
-    expect(inside.target).toContain("à 98 % de la portée, soit à x 147,0 m");
-    expect(proposalOf(inside).headline).toEqual(proposalOf(answer(linked("98"))).headline);
+    expect(inside.target).toContain("à 93 % de la portée, soit à x 139,5 m");
+    expect(proposalOf(inside).headline).toEqual(proposalOf(answer(linked("93"))).headline);
     const low = answer(linked("49.6"));
     expect(low.refusal).toBeNull();
     expect(low.target).toContain("à 50 % de la portée, soit à x 75,0 m");
     // Half a percent past the domain prints as the percent that is out of it, and is refused as it.
-    const outside = answer(linked("98.5"));
+    const outside = answer(linked("93.5"));
     expect(outside.proposal).toBeNull();
-    expect(outside.refusal).toContain("la cible de 99 % sort du domaine 50 – 98 % de la portée");
+    expect(outside.refusal).toContain("la cible de 94 % sort du domaine 50 – 93 % de la portée");
     expect(answer(linked("49.4")).refusal).toContain("la cible de 49 % sort du domaine");
     // Inside the domain too, the label and the search agree: 90,4 % is the shipped 90 %.
     const shipped = answer(SHIPPED);
@@ -689,6 +673,6 @@ describe("`reachProposal` — the shipped line, searched and worded", () => {
   test("a target out of its domain is refused on Dynamique, with the domain", () => {
     const out = answer({ ...SHIPPED, dynamics: { ...SHIPPED.dynamics, reachTarget: 100 } });
     expect(out.proposal).toBeNull();
-    expect(out.refusal).toContain("la cible de 100 % sort du domaine 50 – 98 % de la portée");
+    expect(out.refusal).toContain("la cible de 100 % sort du domaine 50 – 93 % de la portée");
   });
 });

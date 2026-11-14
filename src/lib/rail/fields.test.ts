@@ -256,32 +256,32 @@ describe("the target of the farthest point (#121) — set here, read by Dynamiqu
   });
 
   test("a target out of its domain is kept and warned, never refused (ADR-0001)", () => {
-    // B itself, past B, and under mid-span: each is a value the field holds.
-    for (const out of ["99", "100", "120", "49", "0", "-5"]) {
+    // Too near B, B itself, past B, and under mid-span: each is a value the field holds.
+    for (const out of ["94", "99", "100", "120", "49", "0", "-5"]) {
       expect(checkField("reachTarget", out)).toBeNull();
     }
     expect(warningFor("reachTarget", 90)).toBeNull();
     expect(warningFor("reachTarget", 50)).toBeNull();
-    expect(warningFor("reachTarget", 98)).toBeNull();
-    for (const out of [49, 99, 100, 120]) {
+    expect(warningFor("reachTarget", 93)).toBeNull();
+    for (const out of [49, 94, 98, 99, 100, 120]) {
       expect(warningFor("reachTarget", out), `${out}`).toBe(
-        "cible hors du domaine (50 – 98 % de la portée) : aucune hauteur de B n'est proposée [CONVENTION]",
+        "cible hors du domaine (50 – 93 % de la portée) : aucune hauteur de B n'est proposée [CONVENTION]",
       );
     }
   });
 
   test("a link's target between whole percents: the field's warning and the proposal's domain agree", () => {
-    // The Scenario keeps `cib=98.4` as given; the row warns on the text it shows — « 98 » — and
+    // The Scenario keeps `cib=93.4` as given; the row warns on the text it shows — « 93 » — and
     // Dynamique judges the same whole percent (`isReachTarget`), so one never contradicts the other.
-    for (const held of [98.4, 97.5, 49.5, 49.6, 90.4, 98.5, 98.6, 49.4, 120.2]) {
+    for (const held of [93.4, 92.5, 49.5, 49.6, 90.4, 93.5, 93.6, 98.4, 49.4, 120.2]) {
       const shown = displayField("reachTarget", held);
       const warned = warningFor("reachTarget", Number(shown)) !== null;
       expect(warned, `${held} → « ${shown} »`).toBe(!isReachTarget(held));
     }
-    expect(displayField("reachTarget", 98.4)).toBe("98");
-    expect(warningFor("reachTarget", Number(displayField("reachTarget", 98.4)))).toBeNull();
-    expect(displayField("reachTarget", 98.5)).toBe("99");
-    expect(warningFor("reachTarget", Number(displayField("reachTarget", 98.5)))).not.toBeNull();
+    expect(displayField("reachTarget", 93.4)).toBe("93");
+    expect(warningFor("reachTarget", Number(displayField("reachTarget", 93.4)))).toBeNull();
+    expect(displayField("reachTarget", 93.5)).toBe("94");
+    expect(warningFor("reachTarget", Number(displayField("reachTarget", 93.5)))).not.toBeNull();
   });
 
   test("its label is the registry's, the same on every Page", () => {

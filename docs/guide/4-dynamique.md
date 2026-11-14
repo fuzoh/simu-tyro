@@ -175,9 +175,9 @@ qui garde le point le plus loin sur la cible ou en deçà**. Elle est ensuite re
 au sol et avec le mouvement sans vent, pour comparaison. Les bornes : B ne descend pas sous son
 pied ($z_B + \Delta \ge 0$) et la pente de la ligne A–B ne dépasse pas 45° ($h + \Delta \le L$).
 
-**La cible.** De 50 à 98 % de la portée, en pour cent entiers, 90 % par défaut : une convention.
-B lui-même est exclu, puisque c'est l'arrivée que l'on cherche à éviter. Au-dessus de 93 %, la
-proposition est donnée avec un avertissement : sur les lignes mesurées, une traînée plus faible
+**La cible.** De 50 à 93 % de la portée, en pour cent entiers, 90 % par défaut : une convention.
+B lui-même est exclu, puisque c'est l'arrivée que l'on cherche à éviter. Au-dessus de 93 %,
+aucune hauteur n'est proposée : sur les lignes mesurées, une traînée plus faible
 ($C_dA$ = 0,30) ou un léger vent dans le dos (10 km/h) suffisaient à faire atteindre B.
 
 **Les refus.** Pas de hauteur proposée, avec la raison, quand la cible sort de son domaine, quand

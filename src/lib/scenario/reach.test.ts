@@ -214,7 +214,7 @@ describe("`rideReach` — three quantities that are not one another", () => {
   });
 });
 
-describe("the target's domain — 50 to 98 % of the span, B and beyond excluded", () => {
+describe("the target's domain — 50 to 93 % of the span, B and beyond excluded", () => {
   test("the shipped target is 90 %, inside the domain", () => {
     expect(REACH.target).toBe(90);
     expect(SHIPPED.dynamics.reachTarget).toBe(90);
@@ -223,8 +223,8 @@ describe("the target's domain — 50 to 98 % of the span, B and beyond excluded"
 
   test("both ends are included, and nothing at B or past it is a target", () => {
     expect(isReachTarget(50)).toBe(true);
-    expect(isReachTarget(98)).toBe(true);
-    for (const out of [49, 98.5, 99, 100, 120, 0, -90, Number.NaN]) {
+    expect(isReachTarget(93)).toBe(true);
+    for (const out of [49, 93.5, 94, 98, 99, 100, 120, 0, -90, Number.NaN]) {
       expect(isReachTarget(out), `${out} %`).toBe(false);
     }
   });
@@ -232,31 +232,31 @@ describe("the target's domain — 50 to 98 % of the span, B and beyond excluded"
   test("a target between whole percents is read at the percent it prints as", () => {
     // A link or a Session may hold one (ADR-0001); the field on Avancé commits whole percents.
     for (const [held, read] of [
-      [98.4, 98],
-      [97.5, 98],
+      [93.4, 93],
+      [92.5, 93],
       [49.5, 50],
       [49.6, 50],
       [90.4, 90],
-      [98.5, 99],
+      [93.5, 94],
       [49.4, 49],
     ] as const) {
       expect(reachTargetOf(held), `${held} %`).toBe(read);
       expect(formatQuantity("reachTarget", held), `${held} %`).toBe(`${read} %`);
-      // What is judged is what is printed: never « 98 % sort du domaine 50 – 98 % ».
-      expect(isReachTarget(held), `${held} %`).toBe(read >= 50 && read <= 98);
+      // What is judged is what is printed: never « 93 % sort du domaine 50 – 93 % ».
+      expect(isReachTarget(held), `${held} %`).toBe(read >= 50 && read <= 93);
     }
   });
 
   test("the search is held to the target as read, and says which", () => {
-    const whole = propose(targeting(SHIPPED, 98));
-    const between = propose(targeting(SHIPPED, 98.4));
-    expect(between.target).toBe(98);
+    const whole = propose(targeting(SHIPPED, 93));
+    const between = propose(targeting(SHIPPED, 93.4));
+    expect(between.target).toBe(93);
     expect(between.targetX).toBe(whole.targetX);
     expect(proposalOf(between)).toEqual(proposalOf(whole));
-    // Half a percent past the domain reads 99 %, and is refused as 99 %.
-    const past = propose(targeting(SHIPPED, 98.5));
+    // Half a percent past the domain reads 94 %, and is refused as 94 %.
+    const past = propose(targeting(SHIPPED, 93.5));
     expect(refusalOf(past)).toEqual({ kind: "target" });
-    expect(past.target).toBe(99);
+    expect(past.target).toBe(94);
     // Just under the domain's foot it reads 50 %, and is searched there.
     const foot = propose(targeting(SHIPPED, 49.6));
     expect(foot.target).toBe(50);
@@ -396,7 +396,7 @@ describe("`proposeAnchorB` — the inverse, checked against the forward chain", 
     expect(propose(targeting(SHIPPED, 120)).estimate).toBe(true);
   });
 
-  test.each([50, 60, 75, 98])("target %d: met the same way", (t) => {
+  test.each([50, 60, 75, 93])("target %d: met the same way", (t) => {
     const { reading } = expectTightest(targeting(SHIPPED, t));
     expect(reading.targetX).toBeCloseTo((t / 100) * 150, 9);
   });
@@ -405,7 +405,7 @@ describe("`proposeAnchorB` — the inverse, checked against the forward chain", 
     const at = (t: number) => proposalOf(propose(targeting(SHIPPED, t))).deltaB;
     expect(at(50)).toBeGreaterThan(at(75));
     expect(at(75)).toBeGreaterThan(at(90));
-    expect(at(90)).toBeGreaterThan(at(98));
+    expect(at(90)).toBeGreaterThan(at(93));
   });
 
   test.each([
@@ -550,7 +550,7 @@ describe("the Vent entered is in the search, and the ride without it is beside",
 describe("a refusal is a reason, never a height", () => {
   test("B's anchor on the ground and the passager still short: out of reach, lowest", () => {
     // 500 m of level line: the passager turns back at 79 % of the span, and B stands 12 m up.
-    const long = targeting(line(500, 0), 95);
+    const long = targeting(line(500, 0), 93);
     const reading = propose(long);
     expect(refusalOf(reading)).toEqual({ kind: "unreachable", bound: "lowest", deltaB: -12 });
     // The forward chain agrees: with B on the ground the farthest point is still short.
@@ -605,8 +605,8 @@ describe("a refusal is a reason, never a height", () => {
   });
 
   test("a candidate whose passager would touch the terrain outside the Zones d'ancrage", () => {
-    // A level line 10 m up clears the ground; lowering B for 98 % brings the passager onto it.
-    const low = targeting(line(150, 0, 10, 10), 98);
+    // A level line 10 m up clears the ground; lowering B for 93 % brings the passager onto it.
+    const low = targeting(line(150, 0, 10, 10), 93);
     const refusal = refusalOf(propose(low));
     if (refusal.kind !== "contact") throw new Error(`expected a contact: ${refusal.kind}`);
     expect(refusal.contact).toBe("rider");
@@ -617,8 +617,8 @@ describe("a refusal is a reason, never a height", () => {
   });
 
   test("a candidate whose line itself would touch the terrain", () => {
-    // Half a metre lower at both ends, the same lowering lays the line itself on the ground.
-    const low = targeting(line(150, 0, 9.5, 9.5), 98);
+    // B 5 m above A asks for a deeper lowering: it lays the line itself on the ground.
+    const low = targeting(line(150, 5, 10, 10), 93);
     const refusal = refusalOf(propose(low));
     if (refusal.kind !== "contact") throw new Error(`expected a contact: ${refusal.kind}`);
     expect(refusal.contact).toBe("cable");
