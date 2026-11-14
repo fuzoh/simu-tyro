@@ -33,8 +33,14 @@ Les chiffres et les fichiers attribués à #134 dans les notes antérieures du d
 (`production-aerodynamics-followup.md` §4.5, `inversion-followup.md`,
 `triage-decisions-consolidated.md`, `descent-views-contract-followup.md`) décrivent un arbre de
 travail de recherche qui n'a pas été livré avec elles : **ils ne se rejouent pas et sont
-remplacés par ce rapport**, dont la matrice, les lignes et les conventions diffèrent. Deux écarts
-à connaître : la traînée axiale y suit l'air, à l'inverse du signe écrit dans
+remplacés par ce rapport**, dont la matrice, les lignes et les conventions diffèrent. Il en va de
+même du premier commentaire de l'issue #134, « Experiment delivered » (2026-11-10) : il décrit un
+essai antérieur — des tests sous `src/lib/sim/spatial-aero-134.test.ts`, 2048 lignes à L₀ fixe,
+une ligne en échec à tension de pose et ses propres chiffres — et non ce qui est livré ici, dont
+les tests sont `experiments/spatial-aero-134/*.test.ts` et dont chaque comparaison a 1944 lignes,
+aucune en échec. Il est caduc ; à dire dans l'issue quand ce travail est publié.
+
+Deux écarts à connaître : la traînée axiale y suit l'air, à l'inverse du signe écrit dans
 `line-lift-axial-drag-significance.md` §3 et `production-aerodynamics-followup.md` §4.1 (§18.3
 l'explique, à confirmer par le mainteneur) ; et une seconde loi d'orientation de la portance,
 impaire en lacet, y est jouée à côté de la loi binormale.
