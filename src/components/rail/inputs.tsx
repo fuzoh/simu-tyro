@@ -71,7 +71,6 @@ import {
   airDensityShown,
   DYNAMICS_HEADING,
   QUASI_STATIC_LABEL,
-  REACH_TARGET_NOTE,
   quasiStaticRow,
   STEEL_TROLLEY_NOTE,
   trolleyMuChip,
@@ -721,8 +720,9 @@ export function RailInputs({
             />
           )}
           {/* Where the farthest point is wanted (#121): no ride reads it. Dynamique answers it
-                with a height for B, and this row is the one place it is set. */}
-          <NumericRow hint="%" id="reachTarget" notes={[REACH_TARGET_NOTE]} />
+                with a height for B, and this row is the one place it is set. Its `ⓘ` is
+                `FIELD_HELP.reachTarget` alone, which already says what reads it. */}
+          <NumericRow hint="%" id="reachTarget" />
         </Group>
 
         {/* The Positions (#90): typed in WGS84, read in LV95. The statics never read them; the

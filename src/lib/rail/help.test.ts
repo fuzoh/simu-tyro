@@ -58,4 +58,11 @@ describe("the Rail speaks the exact register", () => {
     expect(FIELDS.usage.label).toBe("Installation");
     expect(FIELD_HELP.usage).toMatch(/installation permanente/);
   });
+
+  // The row's one `ⓘ` is this help: no ride, garde or Verdict on Avancé reads the field.
+  test("the target of the farthest point says which Page reads it (#121)", () => {
+    expect(FIELD_HELP.reachTarget).toContain(
+      "La Page Dynamique en déduit une proposition — monter ou descendre B de tant, A restant fixe",
+    );
+  });
 });

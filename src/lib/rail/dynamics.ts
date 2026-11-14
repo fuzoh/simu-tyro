@@ -59,9 +59,6 @@ export function airDensityShown(rho: DynamicsReading["rho"]): {
   };
 }
 
-/** Under the target of the farthest point: what reads it, since nothing on this Page does. */
-export const REACH_TARGET_NOTE = `Part de la ${label("span", "exact")} que le ${label("farthestPoint", "exact")} du ${label("passenger", "exact")} doit atteindre : la ${label("page", "exact")} Dynamique en déduit de combien monter ou descendre B.`;
-
 /** §12.1's check, as the row that reads it. */
 export const QUASI_STATIC_LABEL = "Rapport v/c maximal";
 

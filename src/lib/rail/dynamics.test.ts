@@ -10,7 +10,6 @@ import {
   DYNAMICS_HEADING,
   QUASI_STATIC_LABEL,
   quasiStaticRow,
-  REACH_TARGET_NOTE,
   STEEL_TROLLEY_NOTE,
   trolleyMuChip,
 } from "./dynamics.ts";
@@ -80,24 +79,10 @@ describe("the câble's μ, an Unconfirmed Default", () => {
   });
 });
 
-describe("the target of the farthest point (#121)", () => {
-  test("its note says what reads it, since nothing on Avancé does", () => {
-    expect(REACH_TARGET_NOTE).toBe(
-      "Part de la portée que le point le plus loin du passager doit atteindre : la Page Dynamique en déduit de combien monter ou descendre B.",
-    );
-  });
-});
-
 describe("the group's words", () => {
   test("say no word the interface never says", () => {
     const row = quasiStaticRow({ quasiStatic: { ratio: 0.3, atX: 10, exceeded: true } });
-    const words = [
-      DYNAMICS_HEADING,
-      STEEL_TROLLEY_NOTE,
-      QUASI_STATIC_LABEL,
-      REACH_TARGET_NOTE,
-      row?.warning ?? "",
-    ];
+    const words = [DYNAMICS_HEADING, STEEL_TROLLEY_NOTE, QUASI_STATIC_LABEL, row?.warning ?? ""];
     for (const source of ["typed", "profile", "sea-level"] as const) {
       words.push(airDensityShown({ value: 1.2, source }).note);
     }
