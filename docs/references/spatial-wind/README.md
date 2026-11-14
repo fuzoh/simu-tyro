@@ -26,7 +26,8 @@ Ce rapport-là n'est pas une revue de la note : il se rejoue. Son code, ses test
 sont dans `experiments/spatial-aero-134/`. Il ne porte ni date ni commit, pour que
 `matrix.ts --check` le compare exactement à ce que le code produit ; la date et l'état du moteur
 de la dernière régénération sont ceux de la ligne ci-dessus, à mettre à jour avec lui. Rien ne
-rejoue la matrice automatiquement : après un changement sous `src/lib/sim/`, lancer `--check`.
+le compare automatiquement à ce que le code produit — la suite de tests résout la comparaison
+principale sans relire ce fichier : après un changement sous `src/lib/sim/`, lancer `--check`.
 
 Les chiffres et les fichiers attribués à #134 dans les notes antérieures du dossier
 (`production-aerodynamics-followup.md` §4.5, `inversion-followup.md`,

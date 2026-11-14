@@ -10,8 +10,12 @@ The `test` block lives in `vite.config.ts`.
   test — plus `experiments/**/*.test.ts`: an isolated numerical experiment (#134,
   `experiments/spatial-aero-134/`) is code nothing under `src/` imports, and its tests sit beside
   it under the same rules as the engine's — colocated, one per source file, expected values from
-  §15, a closed form or a hand calculation. An experiment's matrix is replayed by its own
-  command, not by the suite: a test runs the part of it that it asserts on.
+  §15, a closed form or a hand calculation. An experiment's tables and report are written, and
+  compared with the archived ones, by its own command — never by the suite, where a test solves
+  the part of the matrix it asserts on. One asserts on a whole comparison: `controls.test.ts`
+  solves the main one once, in a `beforeAll`, because §18.6's controls 2 and 7 read its rows and
+  the matrix as delivered must hold no failed row. These tests pin the delivered matrix —
+  identifiers, counts, probes — so adjusting `cases.ts` means updating their expected values.
 - **Point-to-point app testing belongs to `agent-browser`**, not to Vitest — see
   [What CI does not cover](#what-ci-does-not-cover-agent-browsers-half) at the bottom of this file.
 - The two seams that once wanted a DOM are **parameters** instead: the dropped-keys reporter takes the

@@ -45,7 +45,9 @@ the reference and a decision of the maintainer, never by reuse.
 
 The dependency runs one way, and it is real: the experiment reads the engine (`deriveSteel`,
 `deriveTextile`, `solveSpan`, `resolveL0`, the constants), so its archived report and tables are
-a function of `src/lib/sim/`. Neither CI nor `bun run test` replays the matrix. **After a change
+a function of `src/lib/sim/`. Neither CI nor `bun run test` compares them with what the code now
+produces: the suite solves the main comparison once and checks its rows and its controls
+(`controls.test.ts`), which catches a broken prototype, not a figure that moved. **After a change
 under `src/lib/sim/`, run `bun experiments/spatial-aero-134/matrix.ts --check`**; if a file
 differs, regenerate and update the date and the engine commit in the dossier's index
 (`experiments/spatial-aero-134/README.md` § Rejouer).

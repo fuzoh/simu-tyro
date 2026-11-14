@@ -36,10 +36,12 @@ changé une entrée, relancer la commande et relire le rapport en entier — sa 
 l'expérience est, ses chiffres viennent tous des lignes résolues.
 
 **Les entrées comprennent le moteur.** Le prototype lit `src/lib/sim/` — matériaux dérivés,
-`solveSpan`, `resolveL0`, constantes — et ni la CI ni `bun run test` ne rejouent la matrice.
-Après un changement sous `src/lib/sim/`, lancer `--check` : s'il trouve une différence, le rapport
-et les tableaux archivés ne sont plus ce que le code produit. Les régénérer, puis mettre à jour
-la date et le commit du moteur dans la ligne de l'index du dossier
+`solveSpan`, `resolveL0`, constantes — et ni la CI ni `bun run test` ne comparent ce qu'il produit
+aux fichiers archivés : la suite résout la comparaison principale une fois et vérifie ses lignes
+et ses contrôles ([§ Tests](#tests)), ce qui signale un prototype cassé, pas un chiffre qui a
+bougé. Après un changement sous `src/lib/sim/`, lancer `--check` : s'il trouve une différence, le
+rapport et les tableaux archivés ne sont plus ce que le code produit. Les régénérer, puis mettre
+à jour la date et le commit du moteur dans la ligne de l'index du dossier
 (`docs/references/spatial-wind/README.md`) : le rapport lui-même n'en porte pas, pour que
 `--check` reste une comparaison exacte.
 
@@ -50,9 +52,9 @@ gabarit, passager, vents (`WIND_SPEEDS`, `WIND_DIRECTIONS`), coefficients (`COEF
 variantes. La première variante est la référence — traînée normale seule — à laquelle toutes les
 autres sont comparées.
 
-Rien d'autre n'est à modifier. Les deux comparaisons, les contrôles, le rapport et les tableaux
-lisent la matrice sur les lignes résolues — jamais sur une liste, un identifiant ou un compte
-répété ailleurs :
+Rien d'autre n'est à modifier dans le code. Les deux comparaisons, les contrôles, le rapport et
+les tableaux lisent la matrice sur les lignes résolues — jamais sur une liste, un identifiant ou
+un compte répété ailleurs :
 
 - les entrées de la section 3 du rapport et de `inputs.csv` — lignes, portée, dénivelé, vents,
   coefficients — sont celles des lignes résolues ;
@@ -68,6 +70,10 @@ répété ailleurs :
   matrice.
 
 La source imprimée à côté d'une valeur est du texte : en changeant la valeur, changer sa source.
+
+**Les tests, eux, fixent la matrice livrée** — identifiants, comptes, sondes, cas retenu pour le
+miroir. Après un ajustement de `cases.ts`, `bun run test` est rouge tant que leurs valeurs
+attendues n'ont pas suivi ([§ Tests](#tests)).
 
 ## Fichiers
 
@@ -121,8 +127,21 @@ rapport ne l'imprime pas.
 `experiments/**/*.test.ts`). Les valeurs attendues viennent de §15, de formes closes ou de calculs
 à la main — jamais de la sortie du prototype.
 
-La suite ne rejoue pas la matrice : chaque test résout la part dont il a besoin, et une matrice
-ajustée s'y construit avec `variantsOf`, `windCase` et `baseCase`, sans toucher à `cases.ts`. Les
-échecs d'une ligne — pas d'équilibre, bilan ou raffinement hors tolérance, pose non résolue — sont
-injectés sur les collaborateurs (`vi.mock`), jamais cherchés : la matrice livrée n'en contient
-aucun.
+La suite n'écrit et ne compare aucun tableau : c'est le rôle de la commande et de `--check`.
+Chaque test résout la part de la matrice sur laquelle il affirme quelque chose. Un fichier
+affirme sur une comparaison entière : `controls.test.ts` résout la comparaison principale une
+fois — une à deux secondes — parce que les contrôles 2 et 7 de §18.6 lisent ses lignes et que la
+matrice livrée ne doit contenir aucune ligne en échec. La comparaison séparée n'est résolue que
+par parts.
+
+Les tests fixent la matrice livrée : `cases.test.ts` ses entrées, ses identifiants et ses
+comptes, `controls.test.ts` le nombre de ses lignes et le cas du miroir, `matrix.test.ts` les
+variantes de `shapes.csv`, et les autres citent des cas et des variantes par leur identifiant.
+Ajuster `cases.ts` demande d'y mettre à jour ces valeurs attendues. Une matrice ajustée *pour un
+test* se construit avec `variantsOf`, `windCase` et `baseCase`, sans toucher à `cases.ts`.
+
+Les échecs d'une ligne — pas d'équilibre, bilan ou raffinement hors tolérance, pose non résolue —
+sont injectés sur les collaborateurs (`vi.mock`, dans `run.test.ts`) ou posés sur une ligne
+résolue (`report.test.ts`, `controls.test.ts`), jamais cherchés : la matrice livrée n'en contient
+aucun. Une entrée refusée est le seul échec d'une ligne atteint par une entrée réelle. Le tir et
+la recherche de pose testent leurs propres échecs dans `solve.test.ts` et `pose.test.ts`.
