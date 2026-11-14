@@ -359,6 +359,24 @@ describe("differenceOf — absolute first, a percentage only of something", () =
     expect(found!.resolved).toBe(true);
   });
 
+  it("draws the line of a percentage at 0,1 m for a length and at 10 N for a force (§18.6)", () => {
+    const other = (outputs: Partial<Outputs>) => row(outputs, "ok", "NA-0.1");
+    // 2 N more on a reference of 5 N is not « +40 % »: the bar of a force is 10 N, not the
+    // 0,1 of a length.
+    expect(differenceOf(other({ HA: 7 }), row({ HA: 5 }), "HA")).toEqual({
+      absolute: 2,
+      relative: null,
+      resolved: true,
+    });
+    expect(differenceOf(other({ HA: 12 }), row({ HA: 10 }), "HA")!.relative).toBeCloseTo(0.2, 12);
+    // A flèche of 5 cm is under the bar of a length; one of 10 cm is on it.
+    expect(differenceOf(other({ sag: 0.06 }), row({ sag: 0.05 }), "sag")!.relative).toBeNull();
+    expect(differenceOf(other({ sag: 0.12 }), row({ sag: 0.1 }), "sag")!.relative).toBeCloseTo(
+      0.2,
+      12,
+    );
+  });
+
   it("does not read a difference under the numerical floor", () => {
     expect(differenceOf(row({ sag: 5.00005 }, "ok", "NA-0.1"), reference, "sag")!.resolved).toBe(
       false,
@@ -396,6 +414,47 @@ describe("reactionShift", () => {
       relative: 0.06,
       resolved: true,
     });
+  });
+
+  it("gives no percentage of a reaction under 10 N, and one from 10 N up", () => {
+    // A reaction of 5 N — 3 along, 4 down — pushed 2 N sideways: 2 N, not « 40 % ».
+    const small = row({ reactionA: [3, 0, -4] });
+    expect(
+      reactionShift(row({ reactionA: [3, 2, -4] }, "ok", "NA-0.1"), small, "reactionA"),
+    ).toEqual({ absolute: 2, relative: null, resolved: true });
+    // Twice that reaction is 10 N, on the bar: 2 N of it is 20 %.
+    const enough = row({ reactionA: [6, 0, -8] });
+    expect(
+      reactionShift(row({ reactionA: [6, 2, -8] }, "ok", "NA-0.1"), enough, "reactionA")!.relative,
+    ).toBeCloseTo(0.2, 12);
+  });
+
+  it("does not read a shift under the 1 mN floor", () => {
+    const reference = row({ reactionB: [-3000, 0, -4000] });
+    const shifted = (by: number) => row({ reactionB: [-3000, by, -4000] }, "ok", "NA-0.1");
+    expect(reactionShift(shifted(5e-4), reference, "reactionB")!.resolved).toBe(false);
+    expect(reactionShift(shifted(2e-3), reference, "reactionB")!.resolved).toBe(true);
+  });
+
+  it("reads each anchor's own reaction", () => {
+    const reference = row({ reactionA: [3000, 0, -4000], reactionB: [-3000, 0, -4000] });
+    const moved = row(
+      { reactionA: [3000, 0, -4000], reactionB: [-3000, 50, -4000] },
+      "ok",
+      "NA-0.1",
+    );
+    expect(reactionShift(moved, reference, "reactionA")!.absolute).toBe(0);
+    expect(reactionShift(moved, reference, "reactionB")!.absolute).toBe(50);
+  });
+
+  it("gives nothing for a row or a reference that failed its checks", () => {
+    const reference = row({ reactionA: [3000, 0, -4000] });
+    const turned = row({ reactionA: [3000, 300, -4000] }, "bilan hors tolérance", "NA-0.1");
+    expect(reactionShift(turned, reference, "reactionA")).toBeNull();
+    expect(
+      reactionShift({ ...turned, status: "ok" }, row(null, "non convergé"), "reactionA"),
+    ).toBeNull();
+    expect(reactionShift({ ...turned, status: "ok" }, undefined, "reactionA")).toBeNull();
   });
 });
 
