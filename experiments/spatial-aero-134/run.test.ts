@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { solveSpan } from "@/lib/sim";
 import { TOLERANCE } from "@/lib/sim/__fixtures__/theory-15.ts";
 
+import type { ForceMeasures, ShapeMeasures } from "./measures.ts";
 import type { PoseFailure, PoseResult } from "./pose.ts";
 import type { Outputs, Row } from "./run.ts";
 
@@ -19,7 +20,9 @@ import {
   balanceBreach,
   differenceOf,
   fixedLength,
+  FORCE_KEYS,
   inputOf,
+  LENGTH_KEYS,
   lengthShift,
   reactionShift,
   runFixedLength,
@@ -39,8 +42,11 @@ const injected = vi.hoisted(() => ({
   noEquilibriumAt: null as number | null,
   /** Added to the force balance `residuals` reads. */
   forceResidual: 0,
-  /** A lateral force added to the reaction at A, read on a line of this many nodes. */
-  turn: { nodes: 0, force: 0 },
+  /**
+   * Something added to one output read on a line of this many nodes — so on one of the two step
+   * counts only: a length, a tension, or a lateral force on the reaction at an anchor.
+   */
+  gap: { nodes: 0, on: "sag" as keyof ShapeMeasures | keyof ForceMeasures, by: 0 },
   /** What `resolvePoseLength` answers instead of searching. */
   pose: null as PoseResult | null,
 }));
@@ -67,11 +73,21 @@ vi.mock("./measures.ts", async (importOriginal) => {
       const found = actual.residuals(...args);
       return { ...found, force: found.force + injected.forceResidual };
     },
+    shapeMeasures: (...args: Parameters<typeof actual.shapeMeasures>) => {
+      const found = actual.shapeMeasures(...args);
+      const { nodes, on, by } = injected.gap;
+      if (args[0].S.length !== nodes || !(on in found)) return found;
+      return { ...found, [on]: found[on as keyof ShapeMeasures] + by };
+    },
     forceMeasures: (...args: Parameters<typeof actual.forceMeasures>) => {
       const found = actual.forceMeasures(...args);
-      if (args[0].S.length !== injected.turn.nodes) return found;
-      const [x, y, z] = found.reactionA;
-      return { ...found, reactionA: [x, y + injected.turn.force, z] as const };
+      const { nodes, on, by } = injected.gap;
+      if (args[0].S.length !== nodes || !(on in found)) return found;
+      if (on === "reactionA" || on === "reactionB") {
+        const [x, y, z] = found[on];
+        return { ...found, [on]: [x, y + by, z] as const };
+      }
+      return { ...found, [on]: found[on as "TA" | "TB" | "Tmax" | "HA"] + by };
     },
   };
 });
@@ -88,7 +104,7 @@ vi.mock("./pose.ts", async (importOriginal) => {
 afterEach(() => {
   injected.noEquilibriumAt = null;
   injected.forceResidual = 0;
-  injected.turn = { nodes: 0, force: 0 };
+  injected.gap = { nodes: 0, on: "sag", by: 0 };
   injected.pose = null;
 });
 
@@ -259,14 +275,56 @@ describe("solveRow — a row that fails a check stays, as a failure (§18.6)", (
     expect(solved.residuals!.force).toBeGreaterThan(TOLERANCES.force);
   });
 
-  it("fails a line whose reaction turns between the two step counts, its tensions unmoved", () => {
-    // 1 mN sideways on a reaction of some 3 kN changes |F| by about 10⁻¹⁰ N: only the vector shows.
-    injected.turn = { nodes: SPATIAL.steps + 1, force: 1e-3 };
+  // §18.6 holds the gap between the two step counts to its bar on every length and on every
+  // force reported. Each is moved alone on the coarser line, the others left as solved.
+  const coarse = SPATIAL.steps + 1;
+
+  it.each(["reactionA", "reactionB"] as const)(
+    "fails a line whose %s turns between the two step counts, its tensions unmoved",
+    (anchor) => {
+      // 1 mN sideways on a reaction of some 3 kN changes |F| by about 10⁻¹⁰ N: only the vector
+      // shows.
+      injected.gap = { nodes: coarse, on: anchor, by: 1e-3 };
+      const solved = solveRow(input(), inclined);
+      expect(solved.status).toBe("raffinement hors tolérance");
+      expect(solved.refinement!.force).toBeCloseTo(1e-3, 6);
+      expect(solved.refinement!.length).toBeLessThan(TOLERANCES.refinement.length);
+      expect(solved.detail).toContain("1.00e-3 N");
+    },
+  );
+
+  it.each(FORCE_KEYS)("fails a line whose %s moves by 1 mN between the two step counts", (key) => {
+    injected.gap = { nodes: coarse, on: key, by: 1e-3 };
     const solved = solveRow(input(), inclined);
     expect(solved.status).toBe("raffinement hors tolérance");
     expect(solved.refinement!.force).toBeCloseTo(1e-3, 6);
     expect(solved.refinement!.length).toBeLessThan(TOLERANCES.refinement.length);
-    expect(solved.detail).toContain("1.00e-3 N");
+  });
+
+  it.each(LENGTH_KEYS)(
+    "fails a line whose %s moves by 0,02 mm between the two step counts, its forces unmoved",
+    (key) => {
+      // Twice the 0,01 mm bar, on one length alone.
+      injected.gap = { nodes: coarse, on: key, by: 2e-5 };
+      const solved = solveRow(input(), inclined);
+      expect(solved.status).toBe("raffinement hors tolérance");
+      expect(solved.refinement!.length).toBeCloseTo(2e-5, 7);
+      expect(solved.refinement!.force).toBeLessThan(TOLERANCES.refinement.force);
+      expect(solved.detail).toMatch(/^écart 2\.0\de-5 m, /);
+      // The figures stay, for the diagnostic.
+      expect(solved.outputs).not.toBeNull();
+    },
+  );
+
+  it("passes a line whose gap is half a bar: 0,005 mm on a length, 0,05 mN on a force", () => {
+    injected.gap = { nodes: coarse, on: "clearance", by: 5e-6 };
+    const length = solveRow(input(), inclined);
+    expect(length.status).toBe("ok");
+    expect(length.refinement!.length).toBeCloseTo(5e-6, 7);
+    injected.gap = { nodes: coarse, on: "reactionB", by: 5e-5 };
+    const force = solveRow(input(), inclined);
+    expect(force.status).toBe("ok");
+    expect(force.refinement!.force).toBeCloseTo(5e-5, 6);
   });
 });
 
