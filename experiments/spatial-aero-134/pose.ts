@@ -95,7 +95,7 @@ export function resolvePoseLength(
   if ("kind" in first) return { ok: false, failure: first };
   if (met(first)) return done(first);
 
-  // Too tight ⇒ lengthen; too slack ⇒ shorten. `tight` and `slack` end up bracketing the root.
+  // Too tight ⇒ lengthen; too slack ⇒ shorten. `inner` and `outer` end up bracketing the root.
   const direction = first.gap > 0 ? 1 : -1;
   let step = POSE.firstStep * Math.hypot(line.L, line.h);
   let inner = first;

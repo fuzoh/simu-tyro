@@ -37,7 +37,7 @@ describe("runControls — §18.6, on the whole main comparison", () => {
     expect(health.worst.refinementLength).toBeLessThan(TOLERANCES.refinement.length);
     expect(health.worst.refinementForce).toBeLessThan(TOLERANCES.refinement.force);
     // The gabarit stays above the prescribed ground: no garde of the tables is a contact.
-    expect(health.smallestClearance).toBeGreaterThan(0);
+    expect(fixed.every(({ outputs }) => outputs !== null && outputs.clearance > 0)).toBe(true);
   });
 
   it("every control passes", () => {

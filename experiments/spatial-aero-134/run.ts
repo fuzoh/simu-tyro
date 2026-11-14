@@ -166,7 +166,7 @@ export function inputOf(
 }
 
 /** Everything a solved line reports, read with the geometry's ground and the gabarit. */
-export function outputsOf(solution: SpatialSolution, geometry: GeometryCase): Outputs {
+function outputsOf(solution: SpatialSolution, geometry: GeometryCase): Outputs {
   const forces = forceMeasures(solution);
   const shape = shapeMeasures(solution, groundOf(geometry), GROUND.gabarit);
   const loads = loadMeasures(solution);

@@ -72,7 +72,6 @@ export type Sourced = {
 export type LineCase = {
   readonly id: string;
   readonly label: string;
-  readonly family: "steel" | "textile";
   /** `w` N/m, `EA` N, `strength` N — the engine's derived material. */
   readonly material: DerivedMaterial;
   /** The declared aerodynamic diameter, m. */
@@ -95,7 +94,6 @@ export type LineCase = {
 const STEEL_LINE: LineCase = {
   id: "acier-12",
   label: "Câble acier 12 mm, 6×19 âme métallique, 1770",
-  family: "steel",
   material: deriveSteel({ family: "steel", d: 12, R0: 1770, construction: "iwrc" }),
   d: 0.012,
   poseTension: 2634,
@@ -138,7 +136,6 @@ const STEEL_LINE: LineCase = {
 const TEXTILE_LINE: LineCase = {
   id: "corde-bandit-11",
   label: "Corde Courant Bandit 11 mm, polyamide EN 1891 type A",
-  family: "textile",
   material: deriveTextile({
     family: "textile",
     ropeClass: "pa-en1891a",

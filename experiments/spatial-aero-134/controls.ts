@@ -536,8 +536,6 @@ export type MatrixHealth = {
     readonly refinementLength: number;
     readonly refinementForce: number;
   };
-  /** The smallest garde of any row, m: the gabarit stays above the prescribed ground if positive. */
-  readonly smallestClearance: number;
 };
 
 export function matrixHealth(rows: readonly Row[]): MatrixHealth {
@@ -558,7 +556,6 @@ export function matrixHealth(rows: readonly Row[]): MatrixHealth {
     refinementLength: 0,
     refinementForce: 0,
   };
-  let smallestClearance = Infinity;
   for (const row of rows) {
     statuses[row.status]++;
     if (row.residuals !== null) {
@@ -573,8 +570,6 @@ export function matrixHealth(rows: readonly Row[]): MatrixHealth {
       worst.refinementLength = Math.max(worst.refinementLength, row.refinement.length);
       worst.refinementForce = Math.max(worst.refinementForce, row.refinement.force);
     }
-    if (row.outputs !== null)
-      smallestClearance = Math.min(smallestClearance, row.outputs.clearance);
   }
-  return { rows: rows.length, statuses, worst, smallestClearance };
+  return { rows: rows.length, statuses, worst };
 }
