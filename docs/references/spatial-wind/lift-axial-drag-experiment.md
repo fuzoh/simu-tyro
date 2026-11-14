@@ -111,7 +111,7 @@ Les tolérances sont celles de `docs/simulation-theory.md` §18.6, **fixées à 
 | --- | --- | --- |
 | fermeture aux ancrages | 1,0×10⁻⁶ m | §5.3, celle du moteur |
 | bilan global des forces | 1,0×10⁻⁶ N | charges ré-intégrées par Simpson, seconde quadrature de ce que RK4 a intégré ; trois ordres sous le plancher des forces |
-| bilan global des moments en A | 1,0×10⁻⁶ N·m par mètre de corde | la tolérance de force fois son bras de levier |
+| bilan global des moments en A | 1,0×10⁻⁶ N·m par mètre de ligne A–B | la tolérance de force fois son bras de levier |
 | saut de force au passager | 1,0×10⁻⁶ N | comme le bilan des forces |
 | continuité au passager | 1,0×10⁻⁹ m | le nœud est partagé |
 | raffinement, de 240 à 480 pas | 1,0×10⁻⁵ m ; 1,0×10⁻⁴ N | RK4 est d'ordre 4 : l'écart vaut 15/16 de l'erreur du maillage grossier ; pris sur chaque longueur et chaque force rapportée, les deux réactions comme vecteurs |
@@ -143,7 +143,7 @@ Chaque valeur attendue vient d'ailleurs que du prototype : fixtures publiées de
 | L₀ fixe — en échec | 0 | 0 | oui |
 | L₀ fixe — pire fermeture aux ancrages | 1,0×10⁻¹⁰ m | 1,0×10⁻⁶ m | oui |
 | L₀ fixe — pire bilan des forces | 1,6×10⁻⁹ N | 1,0×10⁻⁶ N | oui |
-| L₀ fixe — pire bilan des moments, par mètre de corde | 8,6×10⁻¹¹ N·m/m | 1,0×10⁻⁶ N·m/m | oui |
+| L₀ fixe — pire bilan des moments, par mètre de ligne A–B | 8,6×10⁻¹¹ N·m/m | 1,0×10⁻⁶ N·m/m | oui |
 | L₀ fixe — pire saut au passager | 0 N | 1,0×10⁻⁶ N | oui |
 | L₀ fixe — pire continuité au passager | 0 m | 1,0×10⁻⁹ m | oui |
 | L₀ fixe — pire raffinement, longueurs | 4,2×10⁻⁸ m | 1,0×10⁻⁵ m | oui |
@@ -152,7 +152,7 @@ Chaque valeur attendue vient d'ailleurs que du prototype : fixtures publiées de
 | Tension de pose — en échec | 0 | 0 | oui |
 | Tension de pose — pire fermeture aux ancrages | 8,9×10⁻¹¹ m | 1,0×10⁻⁶ m | oui |
 | Tension de pose — pire bilan des forces | 1,9×10⁻⁹ N | 1,0×10⁻⁶ N | oui |
-| Tension de pose — pire bilan des moments, par mètre de corde | 3,1×10⁻¹⁰ N·m/m | 1,0×10⁻⁶ N·m/m | oui |
+| Tension de pose — pire bilan des moments, par mètre de ligne A–B | 3,1×10⁻¹⁰ N·m/m | 1,0×10⁻⁶ N·m/m | oui |
 | Tension de pose — pire saut au passager | 0 N | 1,0×10⁻⁶ N | oui |
 | Tension de pose — pire continuité au passager | 0 m | 1,0×10⁻⁹ m | oui |
 | Tension de pose — pire raffinement, longueurs | 4,5×10⁻⁸ m | 1,0×10⁻⁵ m | oui |
@@ -292,7 +292,7 @@ Le déport latéral est signé : positif vers la gauche du sens A → B, donc so
 
 ### Écarts par taille de sonde
 
-Chaque cellule est l'écart au modèle de référence — traînée normale seule, même cas, même convention — **de plus grande valeur absolue** parmi les cas regroupés, avec son signe ; le pourcentage est celui de ce même cas, et n'est donné que si la référence est assez loin de zéro. « < plancher » : aucun écart du groupe ne dépasse le plancher numérique ; « — » : le groupe ne contient aucune ligne. Le déport latéral de référence est nul ou presque par vent presque parallèle : son écart est alors donné en mètres seuls. Les écarts de réaction sont la norme de la différence des vecteurs : une réaction qui tourne sans grandir s'y voit. « Remontée max. » n'est pas un écart : c'est la plus grande hauteur atteinte **au-dessus** de la droite A–B dans le groupe — la flèche, elle, ne descend pas sous zéro, et une ligne soulevée au-dessus de A–B a une flèche nulle. Dans toutes les lignes résolues ici, la garde vaut 17,9 m moins la flèche — le sol prescrit est parallèle à A–B : `Δgarde = −Δflèche`, et la colonne de la garde répète celle de la flèche au signe près. Son pourcentage n'est pas imprimé : il serait la part d'une garde que fixe la hauteur d'ancrage du scénario, et changerait avec elle ; il reste dans les fichiers CSV. Regroupés ici : toutes les géométries, toutes les directions de vent et les deux signes de portance.
+Chaque cellule est l'écart au modèle de référence — traînée normale seule, même cas, même convention — **de plus grande valeur absolue** parmi les cas regroupés, avec son signe ; le pourcentage est celui de ce même cas, et n'est donné que si la référence est assez loin de zéro. « < plancher » : aucun écart du groupe ne dépasse le plancher numérique ; « — » : le groupe ne contient aucune ligne. Le déport latéral de référence est nul ou presque par vent presque parallèle : son écart est alors donné en mètres seuls. Les écarts de réaction sont la norme de la différence des vecteurs : une réaction qui tourne sans grandir s'y voit. « Remontée max. » n'est pas un écart : c'est la plus grande hauteur atteinte **au-dessus** de la ligne A–B dans le groupe — la flèche, elle, ne descend pas sous zéro, et une ligne soulevée au-dessus de A–B a une flèche nulle. Dans toutes les lignes résolues ici, la garde vaut 17,9 m moins la flèche — le sol prescrit est parallèle à A–B : `Δgarde = −Δflèche`, et la colonne de la garde répète celle de la flèche au signe près. Son pourcentage n'est pas imprimé : il serait la part d'une garde que fixe la hauteur d'ancrage du scénario, et changerait avec elle ; il reste dans les fichiers CSV. Regroupés ici : toutes les géométries, toutes les directions de vent et les deux signes de portance.
 
 #### Câble acier 12 mm, 6×19 âme métallique, 1770
 
@@ -487,7 +487,7 @@ La longueur est cherchée sur la branche tendue, à partir de la longueur sans v
 
 ### Écarts par taille de sonde, à tension de pose identique
 
-Chaque cellule est l'écart au modèle de référence — traînée normale seule, même cas, même convention — **de plus grande valeur absolue** parmi les cas regroupés, avec son signe ; le pourcentage est celui de ce même cas, et n'est donné que si la référence est assez loin de zéro. « < plancher » : aucun écart du groupe ne dépasse le plancher numérique ; « — » : le groupe ne contient aucune ligne. Le déport latéral de référence est nul ou presque par vent presque parallèle : son écart est alors donné en mètres seuls. Les écarts de réaction sont la norme de la différence des vecteurs : une réaction qui tourne sans grandir s'y voit. « Remontée max. » n'est pas un écart : c'est la plus grande hauteur atteinte **au-dessus** de la droite A–B dans le groupe — la flèche, elle, ne descend pas sous zéro, et une ligne soulevée au-dessus de A–B a une flèche nulle. Dans toutes les lignes résolues ici, la garde vaut 17,9 m moins la flèche — le sol prescrit est parallèle à A–B : `Δgarde = −Δflèche`, et la colonne de la garde répète celle de la flèche au signe près. Son pourcentage n'est pas imprimé : il serait la part d'une garde que fixe la hauteur d'ancrage du scénario, et changerait avec elle ; il reste dans les fichiers CSV. Regroupés ici : toutes les géométries, toutes les directions de vent et les deux signes de portance. À vide, `T_A` est la tension de pose elle-même, identique par construction ; `T_max` et les réactions peuvent différer.
+Chaque cellule est l'écart au modèle de référence — traînée normale seule, même cas, même convention — **de plus grande valeur absolue** parmi les cas regroupés, avec son signe ; le pourcentage est celui de ce même cas, et n'est donné que si la référence est assez loin de zéro. « < plancher » : aucun écart du groupe ne dépasse le plancher numérique ; « — » : le groupe ne contient aucune ligne. Le déport latéral de référence est nul ou presque par vent presque parallèle : son écart est alors donné en mètres seuls. Les écarts de réaction sont la norme de la différence des vecteurs : une réaction qui tourne sans grandir s'y voit. « Remontée max. » n'est pas un écart : c'est la plus grande hauteur atteinte **au-dessus** de la ligne A–B dans le groupe — la flèche, elle, ne descend pas sous zéro, et une ligne soulevée au-dessus de A–B a une flèche nulle. Dans toutes les lignes résolues ici, la garde vaut 17,9 m moins la flèche — le sol prescrit est parallèle à A–B : `Δgarde = −Δflèche`, et la colonne de la garde répète celle de la flèche au signe près. Son pourcentage n'est pas imprimé : il serait la part d'une garde que fixe la hauteur d'ancrage du scénario, et changerait avec elle ; il reste dans les fichiers CSV. Regroupés ici : toutes les géométries, toutes les directions de vent et les deux signes de portance. À vide, `T_A` est la tension de pose elle-même, identique par construction ; `T_max` et les réactions peuvent différer.
 
 #### Câble acier 12 mm, 6×19 âme métallique, 1770
 

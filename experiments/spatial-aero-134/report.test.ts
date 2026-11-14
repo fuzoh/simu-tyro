@@ -174,6 +174,16 @@ describe("buildReport — controls gate the conclusions (§18.6)", () => {
     expect(report).toContain("Décision de production encore ouverte");
   });
 
+  it("names the straight span between the anchors as the glossary does: ligne A–B", () => {
+    const report = buildReport({ fixed, pose, controls: [passing] });
+    expect(report).toContain("N·m par mètre de ligne A–B");
+    expect(report).toContain("au-dessus** de la ligne A–B");
+    // GLOSSARY.md, Span — avoided: « corde » for the chord (a corde is a line of the matrix) and
+    // « droite A–B ».
+    expect(report).not.toContain("mètre de corde");
+    expect(report).not.toContain("droite A–B");
+  });
+
   describe("under another clock", () => {
     afterEach(() => {
       vi.useRealTimers();

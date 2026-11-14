@@ -397,7 +397,7 @@ function healthRows(label: string, health: MatrixHealth, closureBar: number): st
         ["fermeture aux ancrages", worst.closure, closureBar, "m"],
         ["bilan des forces", worst.force, TOLERANCES.force, "N"],
         [
-          "bilan des moments, par mètre de corde",
+          "bilan des moments, par mètre de ligne A–B",
           worst.momentPerMetre,
           TOLERANCES.momentPerMetre,
           "N·m/m",
@@ -493,7 +493,7 @@ ${table(
     ],
     [
       "bilan global des moments en A",
-      `${scientific(TOLERANCES.momentPerMetre)} N·m par mètre de corde`,
+      `${scientific(TOLERANCES.momentPerMetre)} N·m par mètre de ligne A–B`,
       "la tolérance de force fois son bras de levier",
     ],
     ["saut de force au passager", `${scientific(TOLERANCES.force)} N`, "comme le bilan des forces"],
@@ -805,7 +805,7 @@ function readingOf(rows: readonly Row[]): string {
     offset === null
       ? ""
       : ` Dans toutes les lignes résolues ici, la garde vaut ${french(Number(offset.toFixed(3)))} m moins la flèche — le sol prescrit est parallèle à A–B : \`Δgarde = −Δflèche\`, et la colonne de la garde répète celle de la flèche au signe près. Son pourcentage n'est pas imprimé : il serait la part d'une garde que fixe la hauteur d'ancrage du scénario, et changerait avec elle ; il reste dans les fichiers CSV.`;
-  return `Chaque cellule est l'écart au modèle de référence — traînée normale seule, même cas, même convention — **de plus grande valeur absolue** parmi les cas regroupés, avec son signe ; le pourcentage est celui de ce même cas, et n'est donné que si la référence est assez loin de zéro. « < plancher » : aucun écart du groupe ne dépasse le plancher numérique ; « — » : le groupe ne contient aucune ligne. Le déport latéral de référence est nul ou presque par vent presque parallèle : son écart est alors donné en mètres seuls. Les écarts de réaction sont la norme de la différence des vecteurs : une réaction qui tourne sans grandir s'y voit. « Remontée max. » n'est pas un écart : c'est la plus grande hauteur atteinte **au-dessus** de la droite A–B dans le groupe — la flèche, elle, ne descend pas sous zéro, et une ligne soulevée au-dessus de A–B a une flèche nulle.${garde}`;
+  return `Chaque cellule est l'écart au modèle de référence — traînée normale seule, même cas, même convention — **de plus grande valeur absolue** parmi les cas regroupés, avec son signe ; le pourcentage est celui de ce même cas, et n'est donné que si la référence est assez loin de zéro. « < plancher » : aucun écart du groupe ne dépasse le plancher numérique ; « — » : le groupe ne contient aucune ligne. Le déport latéral de référence est nul ou presque par vent presque parallèle : son écart est alors donné en mètres seuls. Les écarts de réaction sont la norme de la différence des vecteurs : une réaction qui tourne sans grandir s'y voit. « Remontée max. » n'est pas un écart : c'est la plus grande hauteur atteinte **au-dessus** de la ligne A–B dans le groupe — la flèche, elle, ne descend pas sous zéro, et une ligne soulevée au-dessus de A–B a une flèche nulle.${garde}`;
 }
 
 /** § Comparaison principale. */
