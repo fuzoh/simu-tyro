@@ -35,10 +35,13 @@ export const POSE = {
   tolerance: 1e-10,
 } as const;
 
+/** Why no length was found. `L0` is where the search stopped, m; `tension` what A read there, N. */
 export type PoseFailure =
+  /** The unloaded line has no equilibrium at a length the search tried. */
   | { readonly kind: "equilibrium"; readonly L0: number; readonly failure: SpatialFailure }
   /** The tension stopped moving toward the target before reaching it. */
   | { readonly kind: "unreachable"; readonly L0: number; readonly tension: number }
+  /** The bracket did not close on the target within `POSE.maxIterations`. */
   | { readonly kind: "no-convergence"; readonly L0: number; readonly tension: number };
 
 export type PoseResult =

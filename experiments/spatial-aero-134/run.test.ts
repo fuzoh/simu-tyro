@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { solveSpan } from "@/lib/sim";
 import { TOLERANCE } from "@/lib/sim/__fixtures__/theory-15.ts";
 
-import type { PoseResult } from "./pose.ts";
+import type { PoseFailure, PoseResult } from "./pose.ts";
 import type { Outputs, Row } from "./run.ts";
 
 import { baseCases, GEOMETRIES, LINES, REFERENCE_VARIANT, VARIANTS, WINDS } from "./cases.ts";
@@ -380,12 +380,45 @@ describe("the two comparisons, on a part of the matrix", () => {
     expect(unposed).toHaveLength(4);
     for (const failed of unposed) {
       expect(failed.status).toBe("pose non résolue");
-      expect(failed.detail).toBe("unreachable à L0 = 151.2500 m");
+      expect(failed.detail).toBe(
+        "tension hors d'atteinte sur la branche tendue : 900.0 N à L0 = 151.2500 m",
+      );
       expect(failed.L0).toBeNaN();
       expect(failed.outputs).toBeNull();
     }
     // A failed row has no difference, and gives none to the rows compared with it.
     expect(differenceOf(unposed[2], unposed[0], "Tmax")).toBeNull();
+  });
+
+  it("says where the search for a pose stopped and what it found there, whatever stopped it", () => {
+    const detailOf = (failure: PoseFailure): string => {
+      injected.pose = { ok: false, failure };
+      const [unposed] = runPoseTension({
+        lines: [rope],
+        geometries: [inclined],
+        winds: [wind("travers-10")],
+        variants: [REFERENCE_VARIANT],
+      });
+      return unposed.detail;
+    };
+    expect(detailOf({ kind: "no-convergence", L0: 146.0312, tension: 1398.4 })).toBe(
+      "recherche de la longueur non convergée : 1398.4 N à L0 = 146.0312 m",
+    );
+    // The line that did not solve on the way reports its own closure, or the input it refused.
+    expect(
+      detailOf({
+        kind: "equilibrium",
+        L0: 152.5,
+        failure: { kind: "no-convergence", closure: 71.3, iterations: 60 },
+      }),
+    ).toBe("pas d'équilibre à L0 = 152.5000 m : fermeture 7.13e+1 m après 60 itérations");
+    expect(
+      detailOf({
+        kind: "equilibrium",
+        L0: 140,
+        failure: { kind: "invalid-input", field: "L0", value: 140 },
+      }),
+    ).toBe("pas d'équilibre à L0 = 140.0000 m : entrée refusée : L0 = 140");
   });
 
   it("the separate comparison reports each model's L₀, and its unloaded line reads the tension de pose", () => {

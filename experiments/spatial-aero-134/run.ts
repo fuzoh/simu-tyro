@@ -24,7 +24,8 @@ import { resolveL0 } from "@/lib/sim";
 import type { Vec3 } from "./aero.ts";
 import type { BaseCase, GeometryCase, LineCase, Variant, WindCase } from "./cases.ts";
 import type { Residuals } from "./measures.ts";
-import type { SpatialInput, SpatialSolution } from "./solve.ts";
+import type { PoseFailure } from "./pose.ts";
+import type { SpatialFailure, SpatialInput, SpatialSolution } from "./solve.ts";
 
 import {
   AIR_DENSITY,
@@ -194,6 +195,29 @@ export function balanceBreach(found: Residuals, chord: number): string | null {
   return null;
 }
 
+/** Why a shot gave no equilibrium, in words: the closure it reached, or the input it refused. */
+function equilibriumBreach(failure: SpatialFailure): string {
+  return failure.kind === "no-convergence"
+    ? `fermeture ${failure.closure.toExponential(2)} m après ${failure.iterations} itérations`
+    : `entrée refusée : ${failure.field} = ${failure.value}`;
+}
+
+/**
+ * Why a tension de pose was not inverted, in words: where the search stopped and what it found
+ * there — the tension read at A, or what the line that did not solve reached (§18.5, §18.7).
+ */
+function poseBreach(failure: PoseFailure): string {
+  const at = `L0 = ${failure.L0.toFixed(4)} m`;
+  switch (failure.kind) {
+    case "equilibrium":
+      return `pas d'équilibre à ${at} : ${equilibriumBreach(failure.failure)}`;
+    case "unreachable":
+      return `tension hors d'atteinte sur la branche tendue : ${failure.tension.toFixed(1)} N à ${at}`;
+    case "no-convergence":
+      return `recherche de la longueur non convergée : ${failure.tension.toFixed(1)} N à ${at}`;
+  }
+}
+
 type Solved = Pick<
   Row,
   "status" | "detail" | "outputs" | "residuals" | "refinement" | "iterations"
@@ -209,12 +233,8 @@ export function solveRow(input: SpatialInput, geometry: GeometryCase, seed?: Vec
   const coarse = solveSpatial(input, { steps: SPATIAL.steps, seed });
   if (!coarse.ok) {
     const { failure } = coarse;
-    const detail =
-      failure.kind === "no-convergence"
-        ? `fermeture ${failure.closure.toExponential(2)} m après ${failure.iterations} itérations`
-        : `entrée refusée : ${failure.field} = ${failure.value}`;
     const iterations = failure.kind === "no-convergence" ? failure.iterations : 0;
-    return { ...FAILED, status: "non convergé", detail, iterations };
+    return { ...FAILED, status: "non convergé", detail: equilibriumBreach(failure), iterations };
   }
   const { solution } = coarse;
   const fine = solveSpatial(input, {
@@ -341,7 +361,6 @@ export function runPoseTension(
           for (const load of LOAD_STATES) {
             const base = baseCase(line, geometry, load, wind);
             if (!pose.ok) {
-              const { failure } = pose;
               rows.push({
                 convention: "tension de pose",
                 base,
@@ -349,7 +368,7 @@ export function runPoseTension(
                 L0: Number.NaN,
                 ...FAILED,
                 status: "pose non résolue",
-                detail: `${failure.kind} à L0 = ${failure.L0.toFixed(4)} m`,
+                detail: poseBreach(pose.failure),
                 iterations: 0,
               });
               continue;
