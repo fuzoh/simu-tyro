@@ -1256,7 +1256,7 @@ physical impossibility.
 | `T_A`, `T_B`, `T_max`  | `\|F(0)\|`, `\|F(L₀)\|`, greatest `\|F\|` over the nodes, both sides of the rider included                                       |
 | flèche                 | greatest vertical drop below the straight line A–B, `max(h·x/L − z)`, never negative (Q9); a rise above A–B is reported beside it |
 | déport latéral         | the lateral offset `y` of greatest magnitude, **signed**                                                                         |
-| écart combiné à A–B    | `max over the line of √((h·x/L − z)² + y²)` — combined **at each abscissa, then maximised** (Q10); not a shortest distance to A–B |
+| écart maximal à A–B    | `max over the line of √((h·x/L − z)² + y²)` — combined **at each abscissa, then maximised** (Q10); not a shortest distance to A–B |
 | garde verticale        | `min over the line of z − z_ground(x) − h_gabarit`, on the ground profile **extruded sideways** (Q16) and the whole gabarit of §6.3 |
 | distributed loads      | mean over the stretched length and greatest nodal value of `\|f_n\|`, `\|f_L\|`, `\|f_a\|`, N/m, also as a share of `w`             |
 
@@ -1264,6 +1264,22 @@ An extremum is read between the nodes: inside a smooth piece, the vertex of the 
 three consecutive nodes wherever it lies between them; at the rider's node, which is a corner,
 the node itself. The garde is a vertical clearance over an extruded profile: it is no clearance from the
 real ground off the A–B axis.
+
+**Two names.** « Écart maximal à A–B » is the glossary's term and Q10's; #134's brief wrote it
+« écart combiné maximal à A–B ». « Déport latéral » is the brief's name for the lateral offset
+this experiment computes in metres. It is **not the Banane**: the glossary keeps the Banane
+qualitative — never a distance — and lists « déport » among the words to avoid for it. Which
+word a computed lateral offset takes in the interface is an open decision of the maintainer
+(`docs/references/spatial-wind/descent-views-contract-followup.md` §7,
+`agent-readiness-views.md` §10); the experiment's tables are not the interface and settle
+nothing.
+
+**On a ground parallel to A–B the garde adds nothing to the flèche.** The matrix's prescribed
+ground is a straight line a fixed height under each anchor, so
+`garde = (anchor height − h_gabarit) − flèche` on every line and the difference of garde between
+two models is the difference of flèche with the opposite sign. The report says so where it holds
+and then prints the garde's difference in metres alone: a percentage of that garde would be a
+share of a height the scenario chose.
 
 ### 18.6 Controls and tolerances
 
@@ -1277,12 +1293,13 @@ models is read.** A case over a bar is a failure that stays in the tables, never
 | global moment balance about A                                 | `10⁻⁶ N·m` per metre of chord               | the force bar times its lever arm                                               |
 | rider's jump `‖F(S_P⁺) − F(S_P⁻) + P_ext‖`                    | `10⁻⁶ N`                                    | as the force balance                                                            |
 | continuity `‖r(S_P⁺) − r(S_P⁻)‖`                              | `10⁻⁹ m`                                    | the node is shared: anything else is a defect                                   |
-| refinement: gap between `N` and `2N` steps, on every length and on every force reported | `10⁻⁵ m`, `10⁻⁴ N`     | RK4 is of order 4: the gap is 15/16 of the coarse error, so the finer line, the one reported, is well inside it |
+| refinement: gap between `N` and `2N` steps, on every length and on every force reported — each reaction as the norm of its vector gap | `10⁻⁵ m`, `10⁻⁴ N`     | RK4 is of order 4: the gap is 15/16 of the coarse error, so the finer line, the one reported, is well inside it |
 
 A difference between two models is **read only between two cases that both passed**, and is
 called **resolved** only above a floor of `10⁻⁴ m` and `10⁻³ N` — ten times the refinement bars.
 Resolved means distinguishable from the numerical error; it does not mean significant for an
-installation. A relative difference is given only where the reference is at least `0.1 m` or
+installation. A difference under the floor is written nowhere as a number: the report prints
+« < plancher », the tables leave the cell empty and flag it. A relative difference is given only where the reference is at least `0.1 m` or
 `10 N`: below, the percentage would be a ratio to nearly nothing and the absolute value stands
 alone.
 
@@ -1310,7 +1327,11 @@ alone.
    `y = 0`: same tensions, same flèche, opposite déport, within the refinement bars.
 
 Controls 3–5 are asserted at `10⁻⁸` relative: the closed forms are exact and the integration
-leaves less. **If a control fails, the report gives the diagnostic and draws no conclusion on the
+leaves less. Controls 2 and 7 read the matrix's own rows; the mirror is taken on the row with the
+most to mirror — the largest lift with the largest axial drag, on a loaded, inclined case under
+the strongest wind that is both across and along the line. **A control that cannot be made — its
+line has no equilibrium, or the matrix holds no case for it — is a failed control, never an
+omitted one. If a control fails, the report gives the diagnostic and draws no conclusion on the
 physics.**
 
 ### 18.7 The two installation conventions

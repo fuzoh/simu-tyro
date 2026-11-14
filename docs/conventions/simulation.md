@@ -43,6 +43,13 @@ probes**, its report is archived in `docs/references/spatial-wind/`, and **nothi
 may import from it**: a value or a solver moves from an experiment into the engine only through
 the reference and a decision of the maintainer, never by reuse.
 
+The dependency runs one way, and it is real: the experiment reads the engine (`deriveSteel`,
+`deriveTextile`, `solveSpan`, `resolveL0`, the constants), so its archived report and tables are
+a function of `src/lib/sim/`. Neither CI nor `bun run test` replays the matrix. **After a change
+under `src/lib/sim/`, run `bun experiments/spatial-aero-134/matrix.ts --check`**; if a file
+differs, regenerate and update the date and the engine commit in the dossier's index
+(`experiments/spatial-aero-134/README.md` § Rejouer).
+
 ## Rules
 
 - Read the relevant report **before** writing or changing simulation math,
