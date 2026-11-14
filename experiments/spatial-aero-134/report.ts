@@ -728,10 +728,21 @@ function cellOf(
   );
 }
 
-/** The greatest rise above A–B among the rows kept, or « — » when none leaves the floor. */
+/**
+ * The greatest rise above A–B among the rows kept — a result of the rows, not a difference. The
+ * cell keeps the words of the others: « — » is a group that holds no row, « échec » one whose
+ * rows are there and none of which passed its checks. Rows that passed and do not leave the
+ * floor print « aucune », which is neither.
+ */
 function riseCell(rows: readonly Row[], keep: (row: Row) => boolean): string {
-  const rise = Math.max(0, ...rows.filter(keep).map((row) => row.outputs?.rise ?? 0));
-  return rise >= TOLERANCES.floor.length ? fr(rise, 3) : "—";
+  const kept = rows.filter(keep);
+  if (kept.length === 0) return "—";
+  const rises = kept.flatMap(({ status, outputs }) =>
+    status === "ok" && outputs !== null ? [outputs.rise] : [],
+  );
+  if (rises.length === 0) return "échec";
+  const rise = Math.max(...rises);
+  return rise >= TOLERANCES.floor.length ? fr(rise, 3) : "aucune";
 }
 
 /** The response by probe size: per line, probe, speed and load state, pooled over the rest. */
@@ -805,7 +816,7 @@ function readingOf(rows: readonly Row[]): string {
     offset === null
       ? ""
       : ` Dans toutes les lignes résolues ici, la garde vaut ${french(Number(offset.toFixed(3)))} m moins la flèche — le sol prescrit est parallèle à A–B : \`Δgarde = −Δflèche\`, et la colonne de la garde répète celle de la flèche au signe près. Son pourcentage n'est pas imprimé : il serait la part d'une garde que fixe la hauteur d'ancrage du scénario, et changerait avec elle ; il reste dans les fichiers CSV.`;
-  return `Chaque cellule est l'écart au modèle de référence — traînée normale seule, même cas, même convention — **de plus grande valeur absolue** parmi les cas regroupés, avec son signe ; le pourcentage est celui de ce même cas, et n'est donné que si la référence est assez loin de zéro. « < plancher » : aucun écart du groupe ne dépasse le plancher numérique ; « — » : le groupe ne contient aucune ligne. Le déport latéral de référence est nul ou presque par vent presque parallèle : son écart est alors donné en mètres seuls. Les écarts de réaction sont la norme de la différence des vecteurs : une réaction qui tourne sans grandir s'y voit. « Remontée max. » n'est pas un écart : c'est la plus grande hauteur atteinte **au-dessus** de la ligne A–B dans le groupe — la flèche, elle, ne descend pas sous zéro, et une ligne soulevée au-dessus de A–B a une flèche nulle.${garde}`;
+  return `Chaque cellule est l'écart au modèle de référence — traînée normale seule, même cas, même convention — **de plus grande valeur absolue** parmi les cas regroupés, avec son signe ; le pourcentage est celui de ce même cas, et n'est donné que si la référence est assez loin de zéro. « < plancher » : aucun écart du groupe ne dépasse le plancher numérique ; « — » : le groupe ne contient aucune ligne. Le déport latéral de référence est nul ou presque par vent presque parallèle : son écart est alors donné en mètres seuls. Les écarts de réaction sont la norme de la différence des vecteurs : une réaction qui tourne sans grandir s'y voit. « Remontée max. » n'est pas un écart : c'est la plus grande hauteur atteinte **au-dessus** de la ligne A–B dans le groupe — la flèche, elle, ne descend pas sous zéro, et une ligne soulevée au-dessus de A–B a une flèche nulle ; « aucune » : aucune ligne du groupe ne remonte au-dessus de la ligne A–B, au plancher numérique près.${garde}`;
 }
 
 /** § Comparaison principale. */

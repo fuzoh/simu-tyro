@@ -597,6 +597,44 @@ describe("buildReport — section 8 states the figures the reading rests on", ()
   });
 });
 
+describe("buildReport — « Remontée max. » says what a group does above A–B", () => {
+  const bySize = (rows: readonly Row[]): string =>
+    section(
+      buildReport({ fixed: rows, pose, controls: [passing] }),
+      "### Écarts par taille de sonde",
+    );
+  const rise = (rows: readonly Row[], probe: string, speed = "20 m/s"): string =>
+    cellsOf(bySize(rows), `| ${probe} | ${speed} | vide |`)["Remontée max. (m)"];
+  const largest = "portance binormale, C_L = ±0,5";
+
+  it("prints the greatest rise of the group, in metres", () => {
+    expect(rise(handWith("NL-b+0.5", { rise: 1.22 }), largest)).toBe("1,220");
+  });
+
+  it("says « aucune » of rows that are there and do not rise — not the « — » of an empty group", () => {
+    expect(rise(HAND, largest)).toBe("aucune");
+    // 0,05 mm above A–B is under the floor: not a rise that is read.
+    expect(rise(handWith("NL-b+0.5", { rise: 5e-5 }), largest)).toBe("aucune");
+    // No case of the matrix at 10 m/s here: the group holds no row.
+    const elsewhere = {
+      ...part[0],
+      wind: windCase(10, { id: "travers", name: "de travers", from: 90 }),
+    };
+    const sparse = [...HAND, hand("N", {}, { base: elsewhere })];
+    expect(rise(sparse, largest, "10 m/s")).toBe("—");
+    const reading = bySize(HAND);
+    expect(reading).toContain("« — » : le groupe ne contient aucune ligne");
+    expect(reading).toContain(
+      "« aucune » : aucune ligne du groupe ne remonte au-dessus de la ligne A–B",
+    );
+  });
+
+  it("reads no rise off a row that failed its checks", () => {
+    const failed = handWith("NL-b+0.5", { rise: 3 }, { status: "bilan hors tolérance" });
+    expect(rise(failed, largest)).toBe("échec");
+  });
+});
+
 describe("the CSV tables", () => {
   it("rowsCsv: one line per row, the reference without differences, the others with", () => {
     const lines = rowsCsv(fixed).trimEnd().split("\n");
