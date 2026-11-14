@@ -20,7 +20,7 @@
  */
 
 import type { HoverLine } from "@/lib/chart/hover.ts";
-import type { SceneBase } from "@/lib/chart/scene.ts";
+import type { PxPath, PxPoint, SceneBase } from "@/lib/chart/scene.ts";
 import type { SharedX } from "@/lib/layout/contract.ts";
 import type { ForceUnit } from "@/lib/scenario/types.ts";
 
@@ -119,9 +119,6 @@ export function curveAt(curve: TensionCurve, x: number): number {
   return polylineAt({ xs: curve.xs, zs: curve.Ts }, x);
 }
 
-/** A pixel point, and a path through them. */
-export type PxPoint = readonly [number, number];
-
 /** One y tick: where it reads, where its 9 px label's baseline sits, and the label. */
 export type TensionTick = { readonly y: number; readonly baseline: number; readonly text: string };
 
@@ -130,8 +127,8 @@ export type TensionScene = {
   readonly height: number;
   /** The plot's top and bottom edges — bottom is zero tension. */
   readonly plot: { readonly top: number; readonly bottom: number };
-  readonly unloaded: readonly PxPoint[];
-  readonly loaded: readonly PxPoint[] | null;
+  readonly unloaded: PxPath;
+  readonly loaded: PxPath | null;
   /** The passager's rule and the node's two dots. */
   readonly rider: { readonly x: number; readonly sideA: number; readonly sideB: number } | null;
   /** Zero first, then up the ladder. The unit is the axis's name's, above the plot. */

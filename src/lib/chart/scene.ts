@@ -94,6 +94,12 @@ export type Polyline = {
   readonly zs: Float64Array;
 };
 
+/** A point in an SVG's user units — what a scene hands a chart once it has placed a point. */
+export type PxPoint = readonly [x: number, y: number];
+
+/** A polyline in an SVG's user units. */
+export type PxPath = readonly PxPoint[];
+
 /** One closed interval of rider positions, m. Signal 3 draws one tinted band per entry. */
 export type Band = { readonly from: number; readonly to: number };
 

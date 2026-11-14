@@ -19,16 +19,16 @@
 
 import type { PointerEvent as ReactPointerEvent } from "react";
 
-import { line } from "d3-shape";
 import { useMemo } from "react";
 
 import type { SceneBase, SceneFrame } from "@/lib/chart/scene.ts";
-import type { PxPoint, TensionProfile } from "@/lib/chart/tension.ts";
+import type { TensionProfile } from "@/lib/chart/tension.ts";
 import type { ForceUnit } from "@/lib/scenario/types.ts";
 
 import { useAppState } from "@/components/app/store.tsx";
 import { HoverRule, HoverTip } from "@/components/chart/hover.tsx";
 import { xTicks } from "@/components/chart/profile.tsx";
+import { pathOf } from "@/components/chart/px-path.ts";
 import { useHover } from "@/components/chart/use-hover.ts";
 import { Tip } from "@/components/rail/controls.tsx";
 import { NO_SPAN_LINE, TENSION_COPY } from "@/lib/chart/copy.ts";
@@ -49,14 +49,6 @@ import {
   tensionChartHeight,
 } from "@/lib/layout/contract.ts";
 import { label } from "@/lib/vocabulary/labels.ts";
-
-const stroke = line<PxPoint>()
-  .x((point) => point[0])
-  .y((point) => point[1]);
-
-function pathOf(points: readonly PxPoint[]): string | undefined {
-  return stroke([...points]) ?? undefined;
-}
 
 /**
  * @param frame the input half — `null` for § 8's *exception géométrique*.

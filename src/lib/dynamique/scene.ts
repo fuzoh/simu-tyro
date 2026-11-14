@@ -19,7 +19,14 @@
  *   scale — but their zero is one line, and the side that needs less room is padded to match.
  */
 
-import type { ChartScene, Polyline, SceneBase, SceneFrame } from "@/lib/chart/scene.ts";
+import type {
+  ChartScene,
+  Polyline,
+  PxPath,
+  PxPoint,
+  SceneBase,
+  SceneFrame,
+} from "@/lib/chart/scene.ts";
 import type { SharedX, ZScale } from "@/lib/layout/contract.ts";
 import type { DynamicsReading } from "@/lib/scenario/dynamics.ts";
 import type { RideSample } from "@/lib/sim";
@@ -43,12 +50,6 @@ import type { DynamiqueOutputs, RideId } from "./outputs.ts";
 
 import { ARRIVAL_LABEL, ESTIMATE, MARKER_LABEL } from "./copy.ts";
 import { firstPass, RIDE_IDS } from "./outputs.ts";
-
-/** A point in an SVG's user units. */
-export type PxPoint = readonly [x: number, y: number];
-
-/** A polyline in an SVG's user units. */
-export type PxPath = readonly PxPoint[];
 
 /** A Point d'arrêt as the charts mark it. */
 export type StopMarker = {
