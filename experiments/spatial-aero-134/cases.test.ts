@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   baseCases,
-  COEFFICIENT_SOURCES,
   COEFFICIENTS,
+  coefficientSources,
   french,
   GEOMETRIES,
   GROUND,
@@ -15,12 +15,15 @@ import {
   LOAD_STATES,
   REFERENCE_VARIANT,
   riderForce,
-  SCENARIO_SOURCES,
+  scenarioSources,
   VARIANTS,
   variantsOf,
   windCase,
   WINDS,
 } from "./cases.ts";
+
+/** The installation of the matrix as delivered. */
+const DELIVERED = scenarioSources({ geometries: GEOMETRIES, loads: LOAD_STATES, winds: WINDS });
 
 const line = (id: string) => {
   const found = LINES.find((candidate) => candidate.id === id);
@@ -65,7 +68,7 @@ describe("LINES — every property is cited arithmetic, none is invented", () =>
   });
 
   it("calls no input measured: a pose read on another span is a scenario", () => {
-    const inputs = [...LINES.flatMap((candidate) => candidate.inputs), ...SCENARIO_SOURCES];
+    const inputs = [...LINES.flatMap((candidate) => candidate.inputs), ...DELIVERED];
     expect(inputs.filter(({ provenance }) => provenance === "mesurée")).toEqual([]);
     const pose = line("corde-bandit-11").inputs.find(({ name }) => name === "tension de pose")!;
     expect(pose.provenance).toBe("scénario");
@@ -141,7 +144,7 @@ describe("WINDS — none, across, oblique, almost parallel", () => {
   });
 
   it("states the winds of the installation from the list it runs", () => {
-    const wind = SCENARIO_SOURCES.find(({ name }) => name === "vent")!;
+    const wind = DELIVERED.find(({ name }) => name === "vent")!;
     expect(wind.value).toBe("uniforme et horizontal ; 0, 10 et 20 m/s ; de 90°, 45°, 5° et 175°");
   });
 
@@ -270,10 +273,52 @@ describe("VARIANTS — a finite matrix of probes around one reference", () => {
 
   it("calls every lift and axial coefficient a probe, and C_D⊥ not transferable", () => {
     const classOf = (name: string) =>
-      COEFFICIENT_SOURCES.find((source) => source.name === name)?.provenance;
+      coefficientSources(VARIANTS).find((source) => source.name === name)?.provenance;
     expect(classOf("C_L")).toBe("sonde de sensibilité");
     expect(classOf("C_t")).toBe("sonde de sensibilité");
     expect(classOf("C_D⊥")).toBe("publiée non transférable");
+  });
+});
+
+describe("the provenance lines state the matrix that ran, not the one delivered", () => {
+  const valueOf = (sources: ReturnType<typeof coefficientSources>, name: string) =>
+    sources.find((source) => source.name === name)?.value;
+
+  it("coefficientSources: the delivered probes, zero first, the lift with both signs", () => {
+    const delivered = coefficientSources(VARIANTS);
+    expect(valueOf(delivered, "C_D⊥")).toBe("1,2");
+    expect(valueOf(delivered, "C_L")).toBe("0 ; ±0,05 ; ±0,2 ; ±0,5");
+    expect(valueOf(delivered, "C_t")).toBe("0 ; 0,02 ; 0,1");
+    expect(valueOf(delivered, "ρ")).toBe("1,225 kg/m³");
+  });
+
+  it("coefficientSources: adjusted probes are stated as written, in the order they were given", () => {
+    const adjusted = coefficientSources(
+      variantsOf({ ...COEFFICIENTS, normal: 1.1, liftMagnitudes: [0.3, 0.1], axial: [0.05] }),
+    );
+    expect(valueOf(adjusted, "C_D⊥")).toBe("1,1");
+    expect(valueOf(adjusted, "C_L")).toBe("0 ; ±0,3 ; ±0,1");
+    expect(valueOf(adjusted, "C_t")).toBe("0 ; 0,05");
+  });
+
+  it("scenarioSources: the delivered installation", () => {
+    expect(valueOf(DELIVERED, "portée")).toBe("150 m");
+    expect(valueOf(DELIVERED, "dénivelé")).toBe("0 m ; −18 m");
+    expect(valueOf(DELIVERED, "gabarit")).toBe("2,1 m");
+    expect(valueOf(DELIVERED, "passager")).toContain("120 kg");
+  });
+
+  it("scenarioSources: one level geometry, no rider, one wind — and nothing that did not run", () => {
+    const [level] = GEOMETRIES;
+    const [unloaded] = LOAD_STATES;
+    const wind = windCase(15, { id: "quasi-face", name: "presque de face", from: 10 });
+    const ran = scenarioSources({ geometries: [level], loads: [unloaded], winds: [wind] });
+    expect(valueOf(ran, "dénivelé")).toBe("0 m");
+    expect(valueOf(ran, "vent")).toBe("uniforme et horizontal ; 15 m/s ; de 10°");
+    expect(ran.map(({ name }) => name)).toEqual(["portée", "dénivelé", "sol", "gabarit", "vent"]);
+    // Without a wind that blows there is no direction to state.
+    const calm = scenarioSources({ geometries: [level], loads: [unloaded], winds: [WINDS[0]] });
+    expect(valueOf(calm, "vent")).toBe("uniforme et horizontal ; 0 m/s");
   });
 });
 

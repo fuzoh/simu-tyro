@@ -48,6 +48,8 @@ Rien d'autre n'est à modifier. Les deux comparaisons, les contrôles, le rappor
 lisent la matrice sur les lignes résolues — jamais sur une liste, un identifiant ou un compte
 répété ailleurs :
 
+- les entrées de la section 3 du rapport et de `inputs.csv` — lignes, portée, dénivelé, vents,
+  coefficients — sont celles des lignes résolues ;
 - les sondes sont imprimées telles qu'écrites, et « la plus grande » est la plus grande valeur,
   où qu'elle soit dans la liste ;
 - chaque vent de `WINDS` a sa ligne dans les tableaux, et un groupe sans aucun cas affiche « — »,

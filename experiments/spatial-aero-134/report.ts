@@ -39,14 +39,13 @@ import type { Difference, DifferenceKey, Outputs, Row } from "./run.ts";
 
 import {
   AIR_DENSITY,
-  COEFFICIENT_SOURCES,
+  coefficientSources,
   distinct,
   french,
   isReference,
   largestProbes,
-  LINES,
   list,
-  SCENARIO_SOURCES,
+  scenarioSources,
 } from "./cases.ts";
 import { CLOSED_FORM_BAR, matrixHealth } from "./controls.ts";
 import { differenceOf, lengthShift, reactionShift, TOLERANCES } from "./run.ts";
@@ -293,6 +292,8 @@ const provenanceTable = (rows: readonly Sourced[]): string =>
 /** § Entrées: every input with its class and its source. */
 function inputsSection({ fixed, pose }: Experiment): string {
   const axes = axesOf([...fixed, ...pose]);
+  const installation = scenarioSources(axes);
+  const coefficients = coefficientSources(axes.variants);
   const lines = axes.lines
     .map(
       (line) => `### ${line.label}
@@ -347,8 +348,8 @@ ${provenanceTable(line.inputs)}`,
   const bases = new Set(fixed.map(({ base }) => base.id)).size;
   const measured = [
     ...axes.lines.flatMap(({ inputs }) => inputs),
-    ...SCENARIO_SOURCES,
-    ...COEFFICIENT_SOURCES,
+    ...installation,
+    ...coefficients,
   ].some(({ provenance }) => provenance === "mesurée");
 
   return `## 3. Entrées et provenance
@@ -359,11 +360,11 @@ ${lines}
 
 ### Installation
 
-${provenanceTable(SCENARIO_SOURCES)}
+${provenanceTable(installation)}
 
 ### Coefficients aérodynamiques
 
-${provenanceTable(COEFFICIENT_SOURCES)}
+${provenanceTable(coefficients)}
 
 **Une sonde de sensibilité n'est ni un intervalle réaliste, ni une borne prudente, ni une valeur par défaut.** Un résultat obtenu avec une sonde dit comment l'équilibre répond *si* le coefficient avait cette valeur, et rien sur le fait qu'il l'ait.
 
@@ -1273,9 +1274,13 @@ export function controlsCsv(controls: readonly ControlRow[]): string {
   );
 }
 
-/** Every input of the matrix with its class and its source. */
-export function inputsCsv(): string {
-  const rows = (subject: string, sourced: readonly Sourced[]): string[][] =>
+/**
+ * Every input of the matrix with its class and its source — the lines, the installation and the
+ * coefficients the rows of both comparisons carry, as the report's own section states them.
+ */
+export function inputsCsv(rows: readonly Row[]): string {
+  const axes = axesOf(rows);
+  const entries = (subject: string, sourced: readonly Sourced[]): string[][] =>
     sourced.map(({ name, value, provenance, source }) => [
       subject,
       name,
@@ -1286,9 +1291,9 @@ export function inputsCsv(): string {
   return csv(
     ["objet", "grandeur", "valeur", "provenance", "source"],
     [
-      ...LINES.flatMap((line) => rows(line.id, line.inputs)),
-      ...rows("installation", SCENARIO_SOURCES),
-      ...rows("coefficients", COEFFICIENT_SOURCES),
+      ...axes.lines.flatMap((line) => entries(line.id, line.inputs)),
+      ...entries("installation", scenarioSources(axes)),
+      ...entries("coefficients", coefficientSources(axes.variants)),
     ],
   );
 }

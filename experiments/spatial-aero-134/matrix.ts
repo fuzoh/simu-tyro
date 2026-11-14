@@ -128,7 +128,7 @@ function main(): void {
     [join(out, "fixed-l0.csv"), rowsCsv(fixed)],
     [join(out, "pose-tension.csv"), rowsCsv(pose)],
     [join(out, "controls.csv"), controlsCsv(controls)],
-    [join(out, "inputs.csv"), inputsCsv()],
+    [join(out, "inputs.csv"), inputsCsv([...fixed, ...pose])],
     [join(out, "shapes.csv"), shapesCsv(fixed)],
     [report, buildReport({ fixed, pose, controls })],
   ]);

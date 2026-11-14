@@ -462,77 +462,102 @@ export function largestProbes(variants: readonly Variant[]): Variant[] {
   ];
 }
 
-/** The coefficients' own provenance lines, for the report. */
-export const COEFFICIENT_SOURCES: readonly Sourced[] = [
-  {
-    name: "C_D⊥",
-    value: french(COEFFICIENTS.normal),
-    provenance: "publiée non transférable",
-    source:
-      "ordre de grandeur du cylindre lisse sous-critique et d'autres câbles toronnés (`production-aerodynamics-followup.md` §4) ; convention adoptée par #127 (Q35), pas une mesure de 6×19 ni de corde sèche",
-  },
-  {
-    name: "C_L",
-    value: `0 ; ±${COEFFICIENTS.liftMagnitudes.map(french).join(" ; ±")}`,
-    provenance: "sonde de sensibilité",
-    source: "choisie pour explorer la réponse ; aucune mesure transférable (§18.4)",
-  },
-  {
-    name: "C_t",
-    value: `0 ; ${COEFFICIENTS.axial.map(french).join(" ; ")}`,
-    provenance: "sonde de sensibilité",
-    source: "choisie pour explorer la réponse ; aucune mesure exploitable (§18.4)",
-  },
-  {
-    name: "ρ",
-    value: `${french(AIR_DENSITY)} kg/m³`,
-    provenance: "convention",
-    source: "§12.2, densité au niveau de la mer, celle du moteur sans profil d'altitude",
-  },
-];
+/**
+ * The coefficients' own provenance lines, for the report — read off the variants that ran, each
+ * value once and in the order it first appears, so that an adjusted matrix is stated as it was
+ * run. The zero of a probe is the reference's.
+ */
+export function coefficientSources(variants: readonly Variant[]): Sourced[] {
+  const values = (pick: (aero: AeroCoefficients) => number, sign = ""): string =>
+    distinct(variants.map(({ aero }) => pick(aero)))
+      .map((value) => (value === 0 ? "0" : `${sign}${french(value)}`))
+      .join(" ; ");
+  return [
+    {
+      name: "C_D⊥",
+      value: values(({ normal }) => normal),
+      provenance: "publiée non transférable",
+      source:
+        "ordre de grandeur du cylindre lisse sous-critique et d'autres câbles toronnés (`production-aerodynamics-followup.md` §4) ; convention adoptée par #127 (Q35), pas une mesure de 6×19 ni de corde sèche",
+    },
+    {
+      name: "C_L",
+      value: values(({ lift }) => Math.abs(lift), "±"),
+      provenance: "sonde de sensibilité",
+      source: "choisie pour explorer la réponse ; aucune mesure transférable (§18.4)",
+    },
+    {
+      name: "C_t",
+      value: values(({ axial }) => axial),
+      provenance: "sonde de sensibilité",
+      source: "choisie pour explorer la réponse ; aucune mesure exploitable (§18.4)",
+    },
+    {
+      name: "ρ",
+      value: `${french(AIR_DENSITY)} kg/m³`,
+      provenance: "convention",
+      source: "§12.2, densité au niveau de la mer, celle du moteur sans profil d'altitude",
+    },
+  ];
+}
 
-/** The installation every line of the matrix is put in, for the report. */
-export const SCENARIO_SOURCES: readonly Sourced[] = [
-  {
-    name: "portée",
-    value: `${list(distinct(GEOMETRIES.map(({ L }) => french(L))))} m`,
-    provenance: "scénario",
-    source: "ligne de premier lancement de l'application",
-  },
-  {
-    name: "dénivelé",
-    value: GEOMETRIES.map((geometry) => `${french(geometry.h)} m`).join(" ; "),
-    provenance: "scénario",
-    source: "ancrages de niveau, puis dénivelé de la ligne de premier lancement",
-  },
-  {
-    name: "sol",
-    value: `droit entre les pieds des ancrages, ${GROUND.anchorHeight} m sous chacun, extrudé latéralement`,
-    provenance: "scénario",
-    source:
-      "hauteur de scénario, choisie pour dégager le gabarit : le rapport dit, à l'état des matrices, si elle y parvient ; extrusion Q16, pas un relevé hors axe",
-  },
-  {
-    name: "gabarit",
-    value: `${french(GROUND.gabarit)} m`,
-    provenance: "convention",
-    source: "§6.3, gabarit vertical entier de l'application, retranché en entier",
-  },
-  {
+/**
+ * The installation the lines were put in, for the report — the geometries, the load states and
+ * the winds are the ones that ran; the ground, the gabarit and the rider are this file's, the
+ * rider stated only where a load state carries one.
+ */
+export function scenarioSources(ran: {
+  readonly geometries: readonly GeometryCase[];
+  readonly loads: readonly LoadState[];
+  readonly winds: readonly WindCase[];
+}): Sourced[] {
+  const { geometries, loads, winds } = ran;
+  const directions = distinct(
+    winds.filter(({ speed }) => speed > 0).map(({ from }) => `${french(from)}°`),
+  );
+  const rider: Sourced = {
     name: "passager",
     value: `${RIDER.mass} kg, immobile, tenu au chariot au milieu de la longueur non tendue`,
     provenance: "scénario",
     source: "masse de premier lancement, non confirmée (§8.1) ; poids seul, aucune prise au vent",
-  },
-  {
-    name: "vent",
-    value: `uniforme et horizontal ; ${list(distinct(WINDS.map(({ speed }) => french(speed))))} m/s ; de ${list(
-      distinct(WINDS.filter(({ speed }) => speed > 0).map(({ from }) => `${french(from)}°`)),
-    )}`,
-    provenance: "scénario",
-    source: "vitesses d'illustration des notes archivées, pas des vents de calcul",
-  },
-];
+  };
+  return [
+    {
+      name: "portée",
+      value: `${list(distinct(geometries.map(({ L }) => french(L))))} m`,
+      provenance: "scénario",
+      source: "ligne de premier lancement de l'application",
+    },
+    {
+      name: "dénivelé",
+      value: distinct(geometries.map(({ h }) => `${french(h)} m`)).join(" ; "),
+      provenance: "scénario",
+      source: "ancrages de niveau, puis dénivelé de la ligne de premier lancement",
+    },
+    {
+      name: "sol",
+      value: `droit entre les pieds des ancrages, ${GROUND.anchorHeight} m sous chacun, extrudé latéralement`,
+      provenance: "scénario",
+      source:
+        "hauteur de scénario, choisie pour dégager le gabarit : le rapport dit, à l'état des matrices, si elle y parvient ; extrusion Q16, pas un relevé hors axe",
+    },
+    {
+      name: "gabarit",
+      value: `${french(GROUND.gabarit)} m`,
+      provenance: "convention",
+      source: "§6.3, gabarit vertical entier de l'application, retranché en entier",
+    },
+    ...(loads.some((load) => load.rider) ? [rider] : []),
+    {
+      name: "vent",
+      value: `uniforme et horizontal ; ${list(distinct(winds.map(({ speed }) => french(speed))))} m/s${
+        directions.length === 0 ? "" : ` ; de ${list(directions)}`
+      }`,
+      provenance: "scénario",
+      source: "vitesses d'illustration des notes archivées, pas des vents de calcul",
+    },
+  ];
+}
 
 /** One base case: a line on a geometry in a load state under a wind. */
 export type BaseCase = {

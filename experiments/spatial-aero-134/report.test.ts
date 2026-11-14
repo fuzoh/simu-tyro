@@ -177,8 +177,14 @@ function section(report: string, heading: string): string {
 }
 
 describe("buildReport — an adjusted matrix is reported as it was run", () => {
-  // Probes listed largest first, one axial drag, and a near-head wind 10° off the line instead of 5°.
-  const variants = variantsOf({ ...COEFFICIENTS, liftMagnitudes: [0.3, 0.1], axial: [0.05] });
+  // Another C_D⊥, probes listed largest first, one axial drag, and a near-head wind 10° off the
+  // line instead of 5°.
+  const variants = variantsOf({
+    ...COEFFICIENTS,
+    normal: 1.1,
+    liftMagnitudes: [0.3, 0.1],
+    axial: [0.05],
+  });
   const { line, geometry, load } = part[0];
   const wind = windCase(20, { id: "quasi-face", name: "presque de face", from: 10 });
   const adjusted = {
@@ -194,9 +200,28 @@ describe("buildReport — an adjusted matrix is reported as it was run", () => {
     expect(report).toContain("traînée axiale, C_t = 0,05");
     expect(report).toContain("portance binormale ±0,3 et axiale 0,05");
     expect(report).toContain("plus petites sondes (C_L = ±0,1, C_t = 0,05)");
+    expect(report).toContain("|f_n\\|, C_D⊥ = 1,1");
+    expect(report).toContain("`C_D⊥ = 1,1` est lui-même un ordre de grandeur");
     // Nothing of the default matrix is left: neither its probes nor their rounding.
     expect(report).not.toMatch(/C_t = 0,1\b/);
     expect(report).not.toMatch(/C_L = ±?0,5\b/);
+    expect(report).not.toContain("C_D⊥ = 1,2");
+  });
+
+  it("states in section 3 the coefficients and the installation that were run", () => {
+    const coefficients = section(report, "### Coefficients aérodynamiques");
+    expect(coefficients).toContain("| C_D⊥ | 1,1 | publiée non transférable |");
+    expect(coefficients).toContain("| C_L | 0 ; ±0,3 ; ±0,1 | sonde de sensibilité |");
+    expect(coefficients).toContain("| C_t | 0 ; 0,05 | sonde de sensibilité |");
+    const installation = section(report, "### Installation");
+    expect(installation).toContain("| portée | 150 m |");
+    // One level geometry and one wind: neither the −18 m nor the winds of the delivered matrix.
+    expect(installation).toContain("| dénivelé | 0 m |");
+    expect(installation).toContain("| vent | uniforme et horizontal ; 20 m/s ; de 10° |");
+    // The textile line was not run: its inputs are not listed.
+    const inputs = section(report, "## 3. Entrées et provenance");
+    expect(inputs).toContain("### Câble acier 12 mm");
+    expect(inputs).not.toContain("Courant Bandit");
   });
 
   it("shows the largest probes by their size, wherever they stand in the list", () => {
@@ -452,8 +477,25 @@ describe("the CSV tables", () => {
 
   it("controlsCsv and inputsCsv quote a field that holds the delimiter", () => {
     expect(controlsCsv([{ ...passing, source: "a, b" }])).toContain('oui,"a, b"\n');
-    const inputs = inputsCsv();
+    const inputs = inputsCsv([...fixed, ...pose]);
     expect(inputs.split("\n")[0]).toBe("objet,grandeur,valeur,provenance,source");
     expect(inputs).toContain('coefficients,C_L,"0 ; ±0,05 ; ±0,2 ; ±0,5",sonde de sensibilité,');
+  });
+
+  it("inputsCsv lists the inputs of the rows it is given, not those of the delivered matrix", () => {
+    const variants = variantsOf({ ...COEFFICIENTS, liftMagnitudes: [0.3, 0.1], axial: [0.05] });
+    const subjects = (text: string) => new Set(text.split("\n").map((line) => line.split(",")[0]));
+    const adjusted = inputsCsv(runFixedLength(part, variants));
+    expect(adjusted).toContain('coefficients,C_L,"0 ; ±0,3 ; ±0,1",sonde de sensibilité,');
+    expect(adjusted).toContain('coefficients,C_t,"0 ; 0,05",sonde de sensibilité,');
+    expect(adjusted).toContain("installation,dénivelé,0 m,scénario,");
+    expect(adjusted).toContain(
+      "installation,vent,uniforme et horizontal ; 20 m/s ; de 90°,scénario,",
+    );
+    // One steel case, unloaded: neither the textile line nor a rider is an input of these rows.
+    expect(subjects(adjusted)).toEqual(
+      new Set(["objet", "acier-12", "installation", "coefficients", ""]),
+    );
+    expect(adjusted).not.toContain("installation,passager,");
   });
 });
