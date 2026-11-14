@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
-import type { ControlFamily } from "./controls.ts";
+import type { ControlFamily, ControlRow } from "./controls.ts";
 import type { Row } from "./run.ts";
 
 import { baseCases } from "./cases.ts";
@@ -21,9 +21,15 @@ describe("judge", () => {
 });
 
 describe("runControls — §18.6, on the whole main comparison", () => {
-  // The whole matrix at fixed L₀: controls 2 and 7 read its rows.
-  const fixed = runFixedLength();
-  const controls = runControls(fixed);
+  // The whole matrix at fixed L₀, solved once: controls 2 and 7 read its rows, and the matrix as
+  // delivered must hold no failed row. In a hook, not at collection: a matrix that throws fails
+  // these tests by name. Nothing is compared with the archived tables — `matrix.ts --check` does.
+  let fixed: Row[];
+  let controls: ControlRow[];
+  beforeAll(() => {
+    fixed = runFixedLength();
+    controls = runControls(fixed);
+  }, 120_000);
   const of = (family: ControlFamily) => controls.filter((control) => control.family === family);
   const one = (family: ControlFamily, quantity: string) =>
     of(family).find((control) => control.quantity === quantity)!;

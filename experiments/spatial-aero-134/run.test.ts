@@ -161,18 +161,8 @@ describe("solveRow — one equilibrium at two step counts, with its checks", () 
     expect(solved.outputs!.clearance).toBeCloseTo(20 - 2.1 - solved.outputs!.sag, 1);
   });
 
-  it("keeps a line that does not solve as a failure, with no outputs to compare", () => {
-    // No weight: the engine has no plane line to start from.
-    const input = {
-      ...inputOf(steel, level, wind("travers-10"), REFERENCE_VARIANT, 150.5, false),
-      w: 0,
-    };
-    const solved = solveRow(input, level);
-    expect(solved.status).toBe("non convergé");
-    expect(solved.outputs).toBeNull();
-    expect(solved.detail).toContain("fermeture");
-  });
-
+  // An input the shot refuses is the one failure a row reaches from its inputs; a line with no
+  // equilibrium is injected, below.
   it("names an input it refuses", () => {
     const input = {
       ...inputOf(steel, level, wind("calme"), REFERENCE_VARIANT, 150.5, false),
