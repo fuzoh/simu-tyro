@@ -105,7 +105,9 @@ export function aeroLoadInto(
 }
 
 /**
- * §18.3 for one element, as three vectors — the reading the tables and the tests take.
+ * §18.3 for one element, as three vectors: {@link aeroLoadInto} without its packed output. The
+ * solver and the measures call the packed form; this one is what a hand calculation is checked
+ * against (`aero.test.ts`).
  *
  * @param t the unit tangent of the stretched line, pointing from A to B.
  * @param u the velocity of the air relative to the element, m/s, pointing where the air goes.

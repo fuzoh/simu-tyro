@@ -39,7 +39,6 @@ function drawn(
     pieces: [{ from: 0, to: count - 1 }],
     closure: 0,
     iterations: 0,
-    steps: count - 1,
   };
 }
 

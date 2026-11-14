@@ -50,8 +50,6 @@ export type PoseResult =
       readonly solution: SpatialSolution;
       /** `|F(0)|` there, N. */
       readonly tension: number;
-      /** Equilibria solved on the way. */
-      readonly evaluations: number;
     }
   | { readonly ok: false; readonly failure: PoseFailure };
 
@@ -72,12 +70,10 @@ export function resolvePoseLength(
   start: number,
   options: { readonly steps?: number } = {},
 ): PoseResult {
-  let evaluations = 0;
   let seed: Vec3 | undefined;
   type Reading = { L0: number; gap: number; solution: SpatialSolution };
 
   const read = (L0: number): Reading | PoseFailure => {
-    evaluations++;
     const result = solveSpatial({ ...line, L0, rider: null }, { steps: options.steps, seed });
     if (!result.ok) return { kind: "equilibrium", L0, failure: result.failure };
     const { Fx, Fy, Fz } = result.solution;
@@ -89,7 +85,6 @@ export function resolvePoseLength(
     L0: reading.L0,
     solution: reading.solution,
     tension: reading.gap + target,
-    evaluations,
   });
   const met = (reading: Reading): boolean => Math.abs(reading.gap) <= POSE.tolerance * target;
 

@@ -94,8 +94,6 @@ export type SpatialSolution = {
   readonly closure: number;
   /** Newton iterations spent, every attempt included. */
   readonly iterations: number;
-  /** RK4 steps along the whole line. */
-  readonly steps: number;
 };
 
 /** Why a line has no solution here. A non-convergence is not a physical impossibility. */
@@ -168,11 +166,12 @@ class Shot {
   private dry = 0;
   private drz = 0;
   private readonly q: number;
-  private readonly pieces: number[];
+  /** The RK4 steps of each smooth piece — {@link pieceSteps}. */
+  readonly pieces: readonly number[];
 
   constructor(
     private readonly input: SpatialInput,
-    readonly steps: number,
+    steps: number,
   ) {
     this.q = 0.5 * input.rho * input.d;
     this.pieces = pieceSteps(steps, input.L0, input.rider);
@@ -515,12 +514,11 @@ export function solveSpatial(
     return { ok: false, failure: { kind: "no-convergence", closure: best, iterations } };
   }
 
-  const pieces = pieceSteps(steps, input.L0, input.rider);
-  const nodes = new Nodes(pieces.reduce((count, n) => count + n + 1, 0));
+  const nodes = new Nodes(shot.pieces.reduce((count, n) => count + n + 1, 0));
   shot.run(found[0], found[1], found[2], nodes);
   const ranges: { from: number; to: number }[] = [];
   let from = 0;
-  for (const n of pieces) {
+  for (const n of shot.pieces) {
     ranges.push({ from, to: from + n });
     from += n + 1;
   }
@@ -538,7 +536,6 @@ export function solveSpatial(
       pieces: ranges,
       closure: Math.hypot(shot.x - input.L, shot.y, shot.z - input.h),
       iterations,
-      steps,
     },
   };
 }
