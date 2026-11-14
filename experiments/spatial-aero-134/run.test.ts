@@ -6,7 +6,15 @@ import { TOLERANCE } from "@/lib/sim/__fixtures__/theory-15.ts";
 import type { PoseFailure, PoseResult } from "./pose.ts";
 import type { Outputs, Row } from "./run.ts";
 
-import { baseCases, GEOMETRIES, LINES, REFERENCE_VARIANT, VARIANTS, WINDS } from "./cases.ts";
+import {
+  baseCases,
+  GEOMETRIES,
+  LINES,
+  REFERENCE_VARIANT,
+  VARIANTS,
+  windCase,
+  WINDS,
+} from "./cases.ts";
 import {
   balanceBreach,
   differenceOf,
@@ -159,6 +167,33 @@ describe("solveRow — one equilibrium at two step counts, with its checks", () 
     expect(solved.residuals!.force).toBeLessThan(TOLERANCES.force);
     // The rider's weight is on the line: the garde is the 20 m of the anchors less sag and gabarit.
     expect(solved.outputs!.clearance).toBeCloseTo(20 - 2.1 - solved.outputs!.sag, 1);
+  });
+
+  it("reports §18.3's three loads in N per stretched metre, each under its own name", () => {
+    // A head wind of 20 m/s on the unloaded, inclined cable: u = (−20, 0, 0), so u_t = −20·t_x
+    // and |u_n|² = 400·(1 − t_x²) at every node, whichever way the lift pushes the line.
+    const head = windCase(20, { id: "face", name: "de face", from: 0 });
+    const L0 = fixedLength(steel, inclined);
+    const solved = solveRow(
+      inputOf(steel, inclined, head, variant("NLA-b+0.5-0.1"), L0, false),
+      inclined,
+    );
+    const out = solved.outputs!;
+    // The axial drag is greatest where the line is level — its lowest point, inside the span:
+    // ½ × 1,225 × 0,1 × 0,012 × 20² = 0,294 N/m.
+    expect(out.axialMax).toBeCloseTo(0.294, 6);
+    // The normal drag is greatest where the line is steepest — at A, the upper anchor, where
+    // t_x = H_A/T_A: ½ × 1,225 × 1,2 × 0,012 × 20² = 3,528 N/m, times 1 − t_x².
+    expect(out.normalMax).toBeCloseTo(3.528 * (1 - (out.HA / out.TA) ** 2), 12);
+    // The binormal lift is the normal drag times |C_L|/C_D⊥ = 0,5/1,2, node by node.
+    expect(out.liftMax / out.normalMax).toBeCloseTo(0.5 / 1.2, 12);
+    expect(out.liftMean / out.normalMean).toBeCloseTo(0.5 / 1.2, 12);
+    // A mean stays under its maximum: far under for the normal drag, nil at the lowest point;
+    // barely for the axial drag, which a slope of a few degrees hardly reduces.
+    expect(out.normalMean).toBeGreaterThan(0);
+    expect(out.normalMean).toBeLessThan(0.5 * out.normalMax);
+    expect(out.axialMean).toBeGreaterThan(0.95 * out.axialMax);
+    expect(out.axialMean).toBeLessThan(out.axialMax);
   });
 
   it("reports the mean stretch of the line, 1 + T/EA along it", () => {

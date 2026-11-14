@@ -727,6 +727,30 @@ describe("the CSV tables", () => {
     expect(header).toContain("ecart_resolu_ecart_max_AB");
   });
 
+  it("rowsCsv: writes each load, mean and maximum, in its own column", () => {
+    const loaded = hand("NLA-b+0.5-0.1", {
+      normalMean: 2.1,
+      normalMax: 2.2,
+      liftMean: 2.3,
+      liftMax: 2.4,
+      axialMean: 2.5,
+      axialMax: 2.6,
+      stretch: 1.07,
+    });
+    const [header, , cells] = rowsCsv([hand("N"), loaded])
+      .trimEnd()
+      .split("\n")
+      .map((text) => text.split(","));
+    const at = (column: string) => Number(cells[header.indexOf(column)]);
+    expect(at("fn_moyen_N_m")).toBe(2.1);
+    expect(at("fn_max_N_m")).toBe(2.2);
+    expect(at("fL_moyen_N_m")).toBe(2.3);
+    expect(at("fL_max_N_m")).toBe(2.4);
+    expect(at("fa_moyen_N_m")).toBe(2.5);
+    expect(at("fa_max_N_m")).toBe(2.6);
+    expect(at("lambda_moyen")).toBe(1.07);
+  });
+
   it("controlsCsv and inputsCsv quote a field that holds the delimiter", () => {
     expect(controlsCsv([{ ...passing, source: "a, b" }])).toContain('oui,"a, b"\n');
     const inputs = inputsCsv([...fixed, ...pose]);

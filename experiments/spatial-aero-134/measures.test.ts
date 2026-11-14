@@ -212,7 +212,75 @@ describe("residuals — §18.6, on a solved line", () => {
   });
 });
 
-describe("loadMeasures", () => {
+describe("loadMeasures — §18.3's three forces, on lines drawn by hand", () => {
+  // ½·ρ·d = ½ × 1,225 × 0,012 = 0,00735 kg/m². Each force is that, times its coefficient, times
+  // a speed squared: C_D⊥ = 1,2, C_L = 0,5 under the binormal law, C_t = 0,1.
+  const aero = { normal: 1.2, lift: 0.5, liftLaw: "binormal", axial: 0.1 } as const;
+  /** Three nodes, the tangent level at both ends and (0,6 ; 0 ; 0,8) in the middle. */
+  const kinked = (input: SpatialInput, middle: number): SpatialSolution => {
+    const line = drawn(
+      [
+        [0, 0, 0],
+        [50, 0, 0],
+        [100, 0, 0],
+      ],
+      input,
+    );
+    line.Fx.set([1000, 0.6 * middle, 1000]);
+    line.Fz.set([0, 0.8 * middle, 0]);
+    return line;
+  };
+
+  it("gives each force its own level: normal drag and lift from u_n, axial drag from u_t", () => {
+    // A level tangent t = (1, 0, 0) in a wind of 10 m/s from the right with 6 m/s of head wind:
+    // u_t = −6, |u_n| = 10, the same at every node.
+    const line = drawn(
+      [
+        [0, 0, 0],
+        [50, 0, 0],
+        [100, 0, 0],
+      ],
+      { ...INPUT, wind: { along: -6, across: 10 }, aero },
+    );
+    const loads = loadMeasures(line);
+    // 0,00735 × 1,2 × 10² = 0,882; 0,00735 × 0,5 × 10² = 0,3675; 0,00735 × 0,1 × 6² = 0,02646.
+    expect(loads.normal.mean).toBeCloseTo(0.882, 12);
+    expect(loads.normal.max).toBeCloseTo(0.882, 12);
+    expect(loads.lift.mean).toBeCloseTo(0.3675, 12);
+    expect(loads.lift.max).toBeCloseTo(0.3675, 12);
+    expect(loads.axial.mean).toBeCloseTo(0.02646, 12);
+    expect(loads.axial.max).toBeCloseTo(0.02646, 12);
+  });
+
+  it("takes the maximum at a node and the mean by Simpson's rule along the line", () => {
+    // A tail wind of 10 m/s. At the ends u_t = 10 and u_n = 0; in the middle u_t = 6 and
+    // |u_n| = 8. Per node, in N/m:
+    //   normal drag  0 · 0,00735 × 1,2 × 8² = 0,56448 · 0
+    //   lift         0 · 0,00735 × 0,5 × 8² = 0,2352  · 0
+    //   axial drag   0,00735 × 0,1 × 10² = 0,0735 · 0,00735 × 0,1 × 6² = 0,02646 · 0,0735
+    // One tension, so one stretch at every node: the mean is Simpson's (1, 4, 1)/6.
+    const loads = loadMeasures(kinked({ ...INPUT, wind: { along: 10, across: 0 }, aero }, 1000));
+    expect(loads.normal.max).toBeCloseTo(0.56448, 12);
+    expect(loads.normal.mean).toBeCloseTo((4 * 0.56448) / 6, 12);
+    expect(loads.lift.max).toBeCloseTo(0.2352, 12);
+    expect(loads.lift.mean).toBeCloseTo((4 * 0.2352) / 6, 12);
+    expect(loads.axial.max).toBeCloseTo(0.0735, 12);
+    expect(loads.axial.mean).toBeCloseTo((0.0735 + 4 * 0.02646 + 0.0735) / 6, 12);
+  });
+
+  it("weights the mean by the stretched length: a force is per stretched metre", () => {
+    // The same line under 1000, 3000 and 1000 N on EA = 1000 N: λ = 2, 4, 2. Simpson's weights
+    // times the stretch are (2, 16, 2), of sum 20 — against (1, 4, 1)/6 on the unstretched line.
+    const input = { ...INPUT, EA: 1000, wind: { along: 10, across: 0 }, aero };
+    const loads = loadMeasures(kinked(input, 3000));
+    expect(loads.normal.mean).toBeCloseTo((16 * 0.56448) / 20, 12);
+    expect(loads.lift.mean).toBeCloseTo((16 * 0.2352) / 20, 12);
+    expect(loads.axial.mean).toBeCloseTo((2 * 0.0735 + 16 * 0.02646 + 2 * 0.0735) / 20, 12);
+    // The greatest value at a node does not depend on the stretch.
+    expect(loads.normal.max).toBeCloseTo(0.56448, 12);
+    expect(loads.axial.max).toBeCloseTo(0.0735, 12);
+  });
+
   it("a straight line in a parallel wind carries the axial drag and nothing else", () => {
     const input: SpatialInput = {
       ...INPUT,
