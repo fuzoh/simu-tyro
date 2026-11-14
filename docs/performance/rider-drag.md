@@ -37,6 +37,7 @@ Measured from the press to 1 s after the release:
   - `vue3d:render` — the rest of its frame.
   - **asked → show** — the `rider:asked` mark to `vue3d:show`: the Page's React render, commit and effects between the scrub and the renderer.
 - **Trace** (one run per gesture): the renderer's main thread over the 4 s of the gesture, split by what it ran. Input handlers (`EventDispatch`), animation frames (CesiumJS's loop), other script outside both (React's scheduler), style and layout, paint, GC. Then the busy time of the page's dedicated Workers (CesiumJS's geometry Workers) and of the GPU process's main thread.
+- **p50 and p95** of a run are nearest-rank samples: the value at index `ceil(q·n) − 1` of the sorted `n` (`quantile` in the harness). This is not the bench gate's p95 of [`docs/conventions/testing.md` § Benches](../conventions/testing.md#benches), whose `percentile` reads index `min(n − 1, floor(n·p))`, one slot higher wherever `q·n` is a whole number: the two « p95 » are not the same statistic and their figures do not compare. A figure reported for a gesture is the median of its runs' p50 or p95.
 
 Re-run:
 

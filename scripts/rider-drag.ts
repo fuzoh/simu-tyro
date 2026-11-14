@@ -36,6 +36,8 @@
  * - **The end of the gesture** — the last position asked, the last one drawn, the field's, and the
  *   time from the release to the drawing of the last; any position drawn after it is a stale result.
  * - **Stages** — each of the probe's spans: count, p50, p95, sum.
+ * - Every p50 and p95 of a run is a nearest-rank sample (`quantile`); the figure reported for a
+ *   gesture is the median of its runs' (`median`).
  * - With `--trace`: one run's trace, and the main thread's time between the press and the release by
  *   what it ran — input handlers, animation frames (CesiumJS), other script (React's scheduler),
  *   style and layout, paint, GC — then CesiumJS's workers and the GPU process.
@@ -46,7 +48,7 @@ import { writeFileSync } from "node:fs";
 import type { Cdp } from "./first-load.ts";
 
 import { CANONICAL_LINKS } from "../src/lib/url/__fixtures__/canonical-links.ts";
-import { BASE, launch, median, serve, sleep } from "./first-load.ts";
+import { arg, BASE, launch, median, serve, sleep } from "./first-load.ts";
 
 /**
  * The verified line (#103): the trial's two Positions and the 200-point profil geo.admin they were
@@ -73,11 +75,6 @@ const GESTURES: Record<string, Gesture> = {
 const VIEWPORT = { width: 1920, height: 1080 } as const;
 /** A mouse at 125 Hz. */
 const MOVE_EVERY_MS = 8;
-
-function arg(name: string, fallback: string): string {
-  const at = process.argv.indexOf(`--${name}`);
-  return at === -1 ? fallback : (process.argv[at + 1] ?? fallback);
-}
 
 /** Injected before any of the page's scripts: the probe on, the frames, moves and long tasks. */
 const OBSERVER = `(() => {
@@ -121,6 +118,13 @@ type Run = {
   trace?: Record<string, number>;
 };
 
+/**
+ * A run's p50 or p95, by **nearest rank**: the sample at index `ceil(q·n) − 1` of the sorted
+ * values, `null` for none. Not the bench gate's `percentile` (`src/lib/sim/bench-harness.ts`),
+ * which reads index `min(n − 1, floor(n·p))` — one slot higher wherever `q·n` is a whole number,
+ * as on its 40 samples — so a « p95 » here and one there are not the same statistic. Kept as the
+ * report's figures were taken: `docs/performance/rider-drag.md` § 1 says so.
+ */
 function quantile(values: number[], q: number): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);

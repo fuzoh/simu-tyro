@@ -67,7 +67,8 @@ const SCENARIOS: Record<string, { path: string; vue3d?: boolean }> = {
 export const BASE = "/simu-tyro/";
 const CHROMIUM = process.env.CHROMIUM ?? "/usr/bin/chromium";
 
-function arg(name: string, fallback: string): string {
+/** A `--name value` of the command line, or `fallback`: the one reader both protocols use. */
+export function arg(name: string, fallback: string): string {
   const at = process.argv.indexOf(`--${name}`);
   return at === -1 ? fallback : (process.argv[at + 1] ?? fallback);
 }
