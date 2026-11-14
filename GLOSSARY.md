@@ -503,6 +503,16 @@ layout as the app, so it is correct at every width for free, and replaced wholes
 hydration.
 _Avoid_: loader, loading state, placeholder, spinner, shell (the shell is the document)
 
+**Infobulle**:
+The bubble behind an icon beside a label, on the four Pages: where every explanation, note,
+Avertissement and blocking field error is read, so that only labels, values, units and controls
+stand in the open. Three tones, each with its own icon — `ⓘ` an explanation or a note, `⚠` an
+Avertissement, `⛔` a blocking error — so a warning or an error is seen without opening anything;
+it opens on hover, on keyboard focus and on touch alike. What stays in the open: the Verdict and
+its reason, « Saisie en cours », and any sentence standing where a value would (« Aucun résultat
+— … »). Not the Provenance Chip, which is a pastille worn by a value.
+_Avoid_: tooltip, bulle d'aide, hint
+
 ### The map
 
 **Fond de carte**:
