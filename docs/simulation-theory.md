@@ -1258,7 +1258,19 @@ physical impossibility.
 | déport latéral         | the lateral offset `y` of greatest magnitude, **signed**                                                                         |
 | écart maximal à A–B    | `max over the line of √((h·x/L − z)² + y²)` — combined **at each abscissa, then maximised** (Q10); not a shortest distance to A–B |
 | garde verticale        | `min over the line of z − z_ground(x) − h_gabarit`, on the ground profile **extruded sideways** (Q16) and the whole gabarit of §6.3 |
-| distributed loads      | mean over the stretched length and greatest nodal value of `\|f_n\|`, `\|f_L\|`, `\|f_a\|`, N/m, also as a share of `w`             |
+| distributed loads      | mean over the stretched length and greatest nodal value of `\|f_n\|`, `\|f_L\|`, `\|f_a\|`, N/m; each mean also as a share of `w`, taken on the same metre |
+
+**The share of the self-weight is like for like.** `f` is per stretched metre and `w` per
+unstretched metre, so `f/w` would set two different metres against each other. The share is
+§18.2's own comparison, `λ·|f|` against `w`, both per unstretched metre:
+
+```
+share = (1/L₀)·∫₀^L₀ λ·|f| dS / w = mean of |f| over the stretched length × (Σ/L₀) / w
+```
+
+with `Σ = ∫₀^L₀ λ dS` the stretched length. `Σ/L₀`, the mean stretch, is reported beside the
+loads. It exceeds 1 by the mean of `T/EA`: about a thousandth on the matrix's steel line, several
+hundredths on its textile line.
 
 An extremum is read between the nodes: inside a smooth piece, the vertex of the parabola through
 three consecutive nodes wherever it lies between them; at the rider's node, which is a corner,

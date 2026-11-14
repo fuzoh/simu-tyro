@@ -161,6 +161,17 @@ describe("solveRow — one equilibrium at two step counts, with its checks", () 
     expect(solved.outputs!.clearance).toBeCloseTo(20 - 2.1 - solved.outputs!.sag, 1);
   });
 
+  it("reports the mean stretch of the line, 1 + T/EA along it", () => {
+    // The unloaded rope on level anchors, without wind: 1400 N at both ends and, with a flèche
+    // near 1,4 m, 1 N less at its lowest point. On EA = 39,37 kN: 1 + 1400/39 370 = 1,03556.
+    const solved = solveRow(
+      inputOf(rope, level, wind("calme"), REFERENCE_VARIANT, fixedLength(rope, level), false),
+      level,
+    );
+    expect(solved.outputs!.stretch).toBeCloseTo(1 + 1400 / 39_370, 4);
+    expect(solved.outputs!.stretch).toBeLessThan(1 + 1400 / 39_370);
+  });
+
   // An input the shot refuses is the one failure a row reaches from its inputs; a line with no
   // equilibrium is injected, below.
   it("names an input it refuses", () => {

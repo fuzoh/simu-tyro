@@ -116,6 +116,10 @@ zéro pour un pourcentage) et `ecart_resolu_<grandeur>` :
 | `non` | écart sous le plancher : du bruit numérique, pas une différence entre deux modèles | **vides** |
 | vide | pas d'écart à prendre : ligne de référence, ou ligne ou référence en échec | vides |
 
+`fn_*`, `fL_*` et `fa_*` sont en N par mètre de ligne **tendue** ; `lambda_moyen` est la longueur
+tendue rapportée à `L0_m`. La part du poids propre que le rapport imprime est prise à mètre égal
+(§18.5) : `f_moyen × lambda_moyen / w`, force et poids par mètre de ligne non tendue.
+
 `ecart_max_AB_m` est l'écart maximal à A–B. Sur le sol prescrit, parallèle à A–B, la garde vaut
 partout la même constante moins la flèche : `ecart_garde_m` est l'opposé de `ecart_fleche_m`, et
 `ecart_relatif_garde` est la part d'une garde que fixe la hauteur d'ancrage du scénario — le

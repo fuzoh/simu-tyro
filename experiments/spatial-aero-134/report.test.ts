@@ -513,6 +513,7 @@ const REFERENCE: Outputs = {
   liftMax: 0,
   axialMean: 0,
   axialMax: 0,
+  stretch: 1.5,
 };
 
 function hand(id: string, outputs: Partial<Outputs> = {}, patch: Partial<Row> = {}): Row {
@@ -594,6 +595,48 @@ describe("buildReport — section 8 states the figures the reading rests on", ()
     expect(reading(failed)).toContain(
       "Traînée axiale (`C_t` jusqu'à 0,1) : `T_max` échec ; longueurs : échec.",
     );
+  });
+});
+
+describe("buildReport — section 5 gives each load in N/m and as a share of the self-weight", () => {
+  // The same rows on a line of 4 N/m, so that a share is read by hand; each row has its own
+  // mean stretch, and a load under one name is never the number under another.
+  const round = (row: Row): Row => {
+    const { line } = row.base;
+    return {
+      ...row,
+      base: { ...row.base, line: { ...line, material: { ...line.material, w: 4 } } },
+    };
+  };
+  const rows = [
+    hand("N"),
+    hand("NL-b+0.5", { normalMean: 1.9, liftMean: 1, axialMean: 0.3, stretch: 1.2 }),
+    hand("NL-y+0.5", { normalMean: 1.8, liftMean: 0.6, axialMean: 0.4, stretch: 1 }),
+    hand("NA-0.1", { normalMean: 1.7, liftMean: 0.7, axialMean: 0.1, stretch: 2 }),
+  ].map(round);
+  const loads = section(
+    buildReport({ fixed: rows, pose, controls: [passing] }),
+    "## 5. Charges distribuées",
+  );
+  const shown = cellsOf(loads, "| 20 m/s de travers (90°) |");
+
+  it("prints the mean of each force under its own header", () => {
+    expect(loads).toContain("Poids propre `w = 4,000 N/m`.");
+    // The reference's normal drag, then the lift of each law and the axial drag of the largest
+    // probes: 2, 1, 0,6 and 0,1 N/m.
+    expect(shown["\\|f_n\\|, C_D⊥ = 1,2"]).toMatch(/^2,000 /);
+    expect(shown["\\|f_L\\| binormale, sonde C_L = 0,5"]).toMatch(/^1,000 /);
+    expect(shown["\\|f_L\\| impaire en lacet, sonde C_L = 0,5"]).toMatch(/^0,600 /);
+    expect(shown["\\|f_a\\|, sonde C_t = 0,1"]).toMatch(/^0,100 /);
+  });
+
+  it("takes the share on one metre: the force per unstretched metre, λ·|f|, over w (§18.5)", () => {
+    // 2 N/m × 1,5 / 4 N/m = 75 %; 1 × 1,2 / 4 = 30 %; 0,6 × 1 / 4 = 15 %; 0,1 × 2 / 4 = 5 %.
+    expect(shown["\\|f_n\\|, C_D⊥ = 1,2"]).toBe("2,000 (75,0 %)");
+    expect(shown["\\|f_L\\| binormale, sonde C_L = 0,5"]).toBe("1,000 (30,0 %)");
+    expect(shown["\\|f_L\\| impaire en lacet, sonde C_L = 0,5"]).toBe("0,600 (15,0 %)");
+    expect(shown["\\|f_a\\|, sonde C_t = 0,1"]).toBe("0,100 (5,0 %)");
+    expect(loads).toContain("`λ·|f|` rapporté à `w`");
   });
 });
 

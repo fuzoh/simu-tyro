@@ -230,4 +230,20 @@ describe("loadMeasures", () => {
     expect(loads.normal.max).toBe(0);
     expect(loads.lift.max).toBe(0);
   });
+
+  it("reports the mean stretch Σ/L₀, which carries a mean to the unstretched metre of w", () => {
+    // Three nodes under 1000, 3000 and 1000 N on EA = 1000 N: λ = 2, 4, 2. By Simpson's rule
+    // over the unstretched length, Σ/L₀ = (2 + 4 × 4 + 2)/6 = 10/3.
+    const line = drawn(
+      [
+        [0, 0, 0],
+        [50, 0, 0],
+        [100, 0, 0],
+      ],
+      { ...INPUT, EA: 1000 },
+    );
+    line.Fx.set([1000, 1800, 1000]);
+    line.Fz.set([0, 2400, 0]);
+    expect(loadMeasures(line).stretch).toBeCloseTo(10 / 3, 12);
+  });
 });

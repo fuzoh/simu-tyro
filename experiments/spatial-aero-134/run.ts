@@ -69,7 +69,10 @@ export const TOLERANCES = {
   reference: 4e-6,
 } as const;
 
-/** What one solved row reports. Forces in N, lengths in m, distributed loads in N/m. */
+/**
+ * What one solved row reports. Forces in N, lengths in m, distributed loads in N per stretched
+ * metre.
+ */
 export type Outputs = {
   readonly TA: number;
   readonly TB: number;
@@ -88,6 +91,8 @@ export type Outputs = {
   readonly liftMax: number;
   readonly axialMean: number;
   readonly axialMax: number;
+  /** `Σ/L₀`, the mean stretch: what carries a mean per stretched metre to the metre of `w`. */
+  readonly stretch: number;
 };
 
 /** The outputs a refinement and a difference are taken on. */
@@ -179,6 +184,7 @@ function outputsOf(solution: SpatialSolution, geometry: GeometryCase): Outputs {
     liftMax: loads.lift.max,
     axialMean: loads.axial.mean,
     axialMax: loads.axial.max,
+    stretch: loads.stretch,
   };
 }
 

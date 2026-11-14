@@ -166,7 +166,7 @@ Aucun cas en échec : toutes les lignes des deux comparaisons ont un équilibre 
 
 ## 5. Charges distribuées
 
-Moyenne du module de chaque force sur la longueur tendue, en N/m, et entre parenthèses en part du poids propre de la ligne. Cas montré : ancrages inclinés, 150 m, B 18 m plus bas, à vide, à `L₀` fixe ; les maxima aux nœuds et les autres cas sont dans `results/fixed-l0.csv`. Chaque force est proportionnelle à son coefficient : une sonde cinq fois plus petite donne une charge cinq fois plus petite.
+Moyenne du module de chaque force sur la longueur tendue, en N/m, et entre parenthèses sa part du poids propre de la ligne. La part est prise à mètre égal : une force est par mètre de ligne tendue et `w` par mètre de ligne non tendue, donc c'est `λ·|f|` rapporté à `w`, tous deux par mètre non tendu (§18.5) — la moyenne imprimée, multipliée par l'étirement moyen de la ligne, puis divisée par `w`. Cas montré : ancrages inclinés, 150 m, B 18 m plus bas, à vide, à `L₀` fixe ; les maxima aux nœuds et les autres cas sont dans `results/fixed-l0.csv`. Chaque force est proportionnelle à son coefficient : une sonde cinq fois plus petite donne une charge cinq fois plus petite.
 
 ### Câble acier 12 mm, 6×19 âme métallique, 1770
 
@@ -174,11 +174,11 @@ Poids propre `w = 5,361 N/m`.
 
 | Vent | \|f_n\|, C_D⊥ = 1,2 | \|f_L\| binormale, sonde C_L = 0,5 | \|f_L\| impaire en lacet, sonde C_L = 0,5 | \|f_a\|, sonde C_t = 0,1 |
 | --- | --- | --- | --- | --- |
-| 10 m/s de travers (90°) | 0,882 (16,4 %) | 0,367 (6,9 %) | 0,005 (0,1 %) | 0,000 (0,0 %) |
+| 10 m/s de travers (90°) | 0,882 (16,5 %) | 0,367 (6,9 %) | 0,005 (0,1 %) | 0,000 (0,0 %) |
 | 10 m/s oblique de face (45°) | 0,451 (8,4 %) | 0,188 (3,5 %) | 0,184 (3,4 %) | 0,036 (0,7 %) |
 | 10 m/s presque de face (5°) | 0,026 (0,5 %) | 0,011 (0,2 %) | 0,058 (1,1 %) | 0,071 (1,3 %) |
 | 10 m/s presque de dos (175°) | 0,026 (0,5 %) | 0,011 (0,2 %) | 0,058 (1,1 %) | 0,071 (1,3 %) |
-| 20 m/s de travers (90°) | 3,519 (65,6 %) | 1,465 (27,3 %) | 0,064 (1,2 %) | 0,001 (0,0 %) |
+| 20 m/s de travers (90°) | 3,519 (65,7 %) | 1,465 (27,3 %) | 0,064 (1,2 %) | 0,001 (0,0 %) |
 | 20 m/s oblique de face (45°) | 1,801 (33,6 %) | 0,750 (14,0 %) | 0,733 (13,7 %) | 0,144 (2,7 %) |
 | 20 m/s presque de face (5°) | 0,104 (1,9 %) | 0,044 (0,8 %) | 0,231 (4,3 %) | 0,285 (5,3 %) |
 | 20 m/s presque de dos (175°) | 0,104 (1,9 %) | 0,043 (0,8 %) | 0,230 (4,3 %) | 0,285 (5,3 %) |
@@ -189,14 +189,14 @@ Poids propre `w = 0,716 N/m`.
 
 | Vent | \|f_n\|, C_D⊥ = 1,2 | \|f_L\| binormale, sonde C_L = 0,5 | \|f_L\| impaire en lacet, sonde C_L = 0,5 | \|f_a\|, sonde C_t = 0,1 |
 | --- | --- | --- | --- | --- |
-| 10 m/s de travers (90°) | 0,808 (112,8 %) | 0,337 (47,0 %) | 0,007 (1,0 %) | 0,000 (0,0 %) |
-| 10 m/s oblique de face (45°) | 0,410 (57,3 %) | 0,171 (23,9 %) | 0,168 (23,5 %) | 0,033 (4,6 %) |
-| 10 m/s presque de face (5°) | 0,018 (2,5 %) | 0,007 (1,0 %) | 0,049 (6,9 %) | 0,066 (9,2 %) |
-| 10 m/s presque de dos (175°) | 0,018 (2,5 %) | 0,007 (1,0 %) | 0,049 (6,9 %) | 0,066 (9,2 %) |
-| 20 m/s de travers (90°) | 3,208 (447,9 %) | 1,337 (186,6 %) | 0,105 (14,6 %) | 0,002 (0,3 %) |
-| 20 m/s oblique de face (45°) | 1,640 (229,1 %) | 0,683 (95,4 %) | 0,670 (93,6 %) | 0,133 (18,5 %) |
-| 20 m/s presque de face (5°) | 0,072 (10,0 %) | 0,030 (4,2 %) | 0,198 (27,6 %) | 0,264 (36,8 %) |
-| 20 m/s presque de dos (175°) | 0,071 (10,0 %) | 0,030 (4,1 %) | 0,196 (27,4 %) | 0,264 (36,8 %) |
+| 10 m/s de travers (90°) | 0,808 (116,9 %) | 0,337 (48,7 %) | 0,007 (1,1 %) | 0,000 (0,0 %) |
+| 10 m/s oblique de face (45°) | 0,410 (59,3 %) | 0,171 (24,7 %) | 0,168 (24,3 %) | 0,033 (4,8 %) |
+| 10 m/s presque de face (5°) | 0,018 (2,6 %) | 0,007 (1,1 %) | 0,049 (7,1 %) | 0,066 (9,5 %) |
+| 10 m/s presque de dos (175°) | 0,018 (2,6 %) | 0,007 (1,1 %) | 0,049 (7,1 %) | 0,066 (9,5 %) |
+| 20 m/s de travers (90°) | 3,208 (465,6 %) | 1,337 (194,0 %) | 0,105 (15,2 %) | 0,002 (0,3 %) |
+| 20 m/s oblique de face (45°) | 1,640 (237,5 %) | 0,683 (98,9 %) | 0,670 (97,1 %) | 0,133 (19,2 %) |
+| 20 m/s presque de face (5°) | 0,072 (10,4 %) | 0,030 (4,3 %) | 0,198 (28,6 %) | 0,264 (38,1 %) |
+| 20 m/s presque de dos (175°) | 0,071 (10,3 %) | 0,030 (4,3 %) | 0,196 (28,4 %) | 0,264 (38,1 %) |
 
 La traînée normale est nulle quand le vent est parallèle à la ligne, et c'est là que la traînée axiale est la plus grande : près d'un vent parallèle, le rapport d'une force ajoutée à la traînée normale n'a pas de borne, alors que sa valeur absolue reste celle de la sonde.
 

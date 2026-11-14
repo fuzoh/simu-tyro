@@ -557,7 +557,11 @@ ${table(["Convention", "Cas", "Ligne", "Statut", "Détail"], failed)}`
 }`;
 }
 
-/** § Charges distribuées: the three forces in N/m and as a share of the self-weight. */
+/**
+ * § Charges distribuées: the three forces in N/m and as a share of the self-weight. The share
+ * is taken on one metre (§18.5): a force is per stretched metre and `w` per unstretched metre,
+ * so the mean is first carried to the unstretched metre by the row's mean stretch.
+ */
 function loadsSection(fixed: readonly Row[]): string {
   const axes = axesOf(fixed);
   // One case is shown: the last geometry of the matrix, unloaded.
@@ -579,7 +583,7 @@ function loadsSection(fixed: readonly Row[]): string {
     if (row === undefined) return "—";
     if (row.outputs === null) return "échec";
     const value = pick(row.outputs);
-    return `${fr(value, 3)} (${fr((100 * value) / w, 1)} %)`;
+    return `${fr(value, 3)} (${fr((100 * value * row.outputs.stretch) / w, 1)} %)`;
   };
   const tables = axes.lines
     .map((line) => {
@@ -619,7 +623,7 @@ ${table(
     .join("\n\n");
   return `## 5. Charges distribuées
 
-Moyenne du module de chaque force sur la longueur tendue, en N/m, et entre parenthèses en part du poids propre de la ligne. Cas montré : ${geometry?.label ?? "—"}, ${load?.label ?? "—"}, à \`L₀\` fixe ; les maxima aux nœuds et les autres cas sont dans \`results/fixed-l0.csv\`. Chaque force est proportionnelle à son coefficient : une sonde cinq fois plus petite donne une charge cinq fois plus petite.
+Moyenne du module de chaque force sur la longueur tendue, en N/m, et entre parenthèses sa part du poids propre de la ligne. La part est prise à mètre égal : une force est par mètre de ligne tendue et \`w\` par mètre de ligne non tendue, donc c'est \`λ·|f|\` rapporté à \`w\`, tous deux par mètre non tendu (§18.5) — la moyenne imprimée, multipliée par l'étirement moyen de la ligne, puis divisée par \`w\`. Cas montré : ${geometry?.label ?? "—"}, ${load?.label ?? "—"}, à \`L₀\` fixe ; les maxima aux nœuds et les autres cas sont dans \`results/fixed-l0.csv\`. Chaque force est proportionnelle à son coefficient : une sonde cinq fois plus petite donne une charge cinq fois plus petite.
 
 ${tables}
 
@@ -1228,6 +1232,7 @@ export function rowsCsv(rows: readonly Row[]): string {
     "fL_max_N_m",
     "fa_moyen_N_m",
     "fa_max_N_m",
+    "lambda_moyen",
     "fermeture_m",
     "bilan_forces_N",
     "bilan_moments_N_m",
@@ -1279,6 +1284,7 @@ export function rowsCsv(rows: readonly Row[]): string {
       csvNumber(out?.liftMax),
       csvNumber(out?.axialMean),
       csvNumber(out?.axialMax),
+      csvNumber(out?.stretch),
       csvNumber(res?.closure, 3),
       csvNumber(res?.force, 3),
       csvNumber(res?.moment, 3),

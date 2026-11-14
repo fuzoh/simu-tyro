@@ -74,6 +74,12 @@ export type LoadMeasures = {
   readonly normal: LoadLevel;
   readonly lift: LoadLevel;
   readonly axial: LoadLevel;
+  /**
+   * The mean stretch: the stretched length over the unstretched one, `Σ/L₀`. A mean per
+   * stretched metre times this is the load per **unstretched** metre — the metre `w` is given
+   * on, and what §18.2's `q₀ = (0, 0, −w) + λ·f` sets against it (§18.5).
+   */
+  readonly stretch: number;
 };
 
 /** §18.6's residuals of one solved line. */
@@ -213,14 +219,17 @@ function simpsonWeight(i: number, from: number, to: number): number {
 
 /**
  * §18.3's three forces along the solved line: the mean of each magnitude over the **stretched**
- * length — the forces are per stretched metre — and its greatest value at a node.
+ * length — the forces are per stretched metre — and its greatest value at a node; and the mean
+ * stretch that carries a mean to the unstretched metre.
  */
 export function loadMeasures(solution: SpatialSolution): LoadMeasures {
   const out = new Float64Array(9);
   const sums = [0, 0, 0];
   const maxima = [0, 0, 0];
   let stretched = 0;
+  let unstretched = 0;
   for (const { from, to } of solution.pieces) {
+    unstretched += solution.S[to] - solution.S[from];
     const third = (solution.S[to] - solution.S[from]) / (to - from) / 3;
     for (let i = from; i <= to; i++) {
       const lambda = nodeLoads(solution, i, out);
@@ -234,7 +243,7 @@ export function loadMeasures(solution: SpatialSolution): LoadMeasures {
     }
   }
   const level = (k: number): LoadLevel => ({ mean: sums[k] / stretched, max: maxima[k] });
-  return { normal: level(0), lift: level(1), axial: level(2) };
+  return { normal: level(0), lift: level(1), axial: level(2), stretch: stretched / unstretched };
 }
 
 /**
