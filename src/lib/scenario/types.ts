@@ -175,7 +175,9 @@ export type TensioningDevice = "pulley" | "maestro-s" | "maestro-l";
  * mid-span. `ww` / `wa` in a link, **each absent at what ships** — a uniform wind — so a link or a
  * Session older than the keys reads one. Both are read at the whole percent they print as
  * (`windProfileOf`), and a value outside its domain is kept as given and refused by the Wind Gate.
- * No reader consumes a non-uniform profile yet: `./wind.ts` is where that boundary stands.
+ * Since #141 every reader takes the profile at its own `x` through `windAt`: §19's statics — the
+ * pose, the line's and the static passager's equilibria — and the descent. `WIND_PROFILE_ACTIVE` in
+ * `./wind.ts` is the kill switch: turned off, the gates refuse a profile that is not uniform.
  */
 export type Wind = {
   /** Wind speed, km/h (≥ 0) — along the whole line when uniform, at mid-span under a profile. */

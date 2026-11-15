@@ -370,7 +370,7 @@ describe("with the activation off, a profile of the Vent is never computed as a 
  */
 describe("the Vent's profile is read along the line (#141)", () => {
   const PLACED = "&lata=46.843556&lona=6.525035&latb=46.846166&lonb=6.520783";
-  /** The browser trial's line: a west wind, ahead and from the right of the travel. */
+  /** The browser trial's line: a west wind, ahead and from the left of the travel. */
   const LINE = `?L=200&h=-20&fl=6&ws=30&wd=264${PLACED}`;
   const uniform = arrivedOn(LINE, "terrain");
   const profiled = arrivedOn(`${LINE}&ww=30&wa=40`, "terrain");
