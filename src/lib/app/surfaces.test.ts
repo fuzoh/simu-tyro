@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import type { FieldId, FieldIssue } from "@/lib/rail/fields.ts";
 import type { Scenario, ScenarioDraft } from "@/lib/scenario/types.ts";
@@ -22,6 +22,39 @@ import { completeFromDefaults, scenarioToSearch, searchToScenario } from "@/lib/
 import { parseLinkSearch, validateSearch } from "@/lib/url/schema.ts";
 
 import { errorSurfaces, gatedRides } from "./surfaces.ts";
+
+/** The grid index a windy Sweep is holed at (`a hole in the windy Sweep`), `-1` for none. */
+const inject = vi.hoisted(() => ({ hole: -1 }));
+
+vi.mock("@/lib/sim", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/sim")>();
+  return {
+    ...real,
+    sweepSpatial: (...args: Parameters<typeof real.sweepSpatial>) => {
+      const swept = real.sweepSpatial(...args);
+      const k = inject.hole;
+      if (k < 0 || swept.input.aero === null) return swept;
+      const slots = swept.slots.map((slot, i) => (i === k ? null : slot));
+      return {
+        ...swept,
+        slots,
+        coverage: (slots.length - 1) / slots.length,
+        failures: [
+          {
+            index: k,
+            sD: swept.grid[k],
+            error: { kind: "no-convergence", attempts: 5, residual: 1, reason: "attempts" },
+          },
+        ],
+      };
+    },
+  };
+});
+
+// A pass-through at `hole = -1`, which every suite but the hole's leaves it at.
+beforeEach(() => {
+  inject.hole = -1;
+});
 
 /**
  * The error surfaces as one composition (« v1 build spec » § 7): what each standing state leaves
@@ -588,5 +621,66 @@ describe("the rose's handle over a withheld Vent", () => {
     const { surfaces } = arrivedOn(`?L=200&h=-20&fl=6&ws=30&wd=264${PLACED}`, "terrain");
     expect(surfaces.windCulprits).toEqual([]);
     expect(offered(surfaces.windCulprits)).toBe(true);
+  });
+});
+
+/**
+ * A hole in the Sweep under wind (#127 Q24), read through the whole composition: the position that
+ * did not converge is not filled by a neighbour, so the Verdict is `Indéterminé` with the count of
+ * the positions solved, and no ride descends across it. The hole is injected on the engine's sweep
+ * (`vi.mock`) at a grid index the test chose — the one way to hold a windy sweep to a hole.
+ */
+
+function windyRope(): ScenarioDraft {
+  const scenario = firstRunDefaults() as ScenarioDraft;
+  scenario.regime = "secours10";
+  scenario.usage = "TEMPORAIRE";
+  scenario.material = {
+    family: "textile",
+    ropeClass: "hmpe",
+    MBL: 90_000,
+    mu: 0.0855,
+    k: 22,
+    d: 11,
+  };
+  scenario.terminations = {
+    A: { id: "oeil-cousu-epissure", eta: 0.9 },
+    B: { id: "oeil-cousu-epissure", eta: 0.9 },
+  };
+  scenario.positions = { A: { lat: 46.8, lon: 7.4 }, B: { lat: 46.801, lon: 7.4 } };
+  scenario.wind = { ...scenario.wind, speedKmh: 40, directionDeg: 90 };
+  return scenario;
+}
+
+function readHoled(scenario: ScenarioDraft) {
+  const unloaded = deriveUnloaded(unloadedInputs(scenario, null));
+  const frame = buildSceneFrame(unloaded.span);
+  const solved = buildSceneBase(frame, unloaded, sweepRiderOf(scenario));
+  const traverse = traverseScenario(traverseInputs(scenario));
+  const surfaces = errorSurfaces({
+    failure: deducedFrom(scenario, unloaded).failure,
+    focused: null,
+    committed: null,
+    frame,
+    register: "exact",
+    report: evaluateGates({ scenario: traverse }),
+    solved,
+    traverse,
+  });
+  return { surfaces, rides: gatedRides(surfaces, traverse, null) };
+}
+
+describe("a hole in the windy Sweep (Q24)", () => {
+  test("without one the windy line is judged and ridden", () => {
+    const { surfaces, rides } = readHoled(windyRope());
+    expect(surfaces.results?.verdict?.state).not.toBe("indetermine");
+    expect(rides).not.toBeNull();
+  });
+
+  test("with one the Verdict is Indéterminé, counted against 260, and no ride is read", () => {
+    inject.hole = 120;
+    const { surfaces, rides } = readHoled(windyRope());
+    expect(surfaces.results?.verdict).toMatchObject({ state: "indetermine", stepsSolved: 259 });
+    expect(rides).toBeNull();
   });
 });
