@@ -19,6 +19,8 @@ import { msToKmh } from "@/lib/sim";
 
 import {
   ARRIVES_AT_END,
+  CALM_UNAVAILABLE,
+  CALM_UNAVAILABLE_NOTE,
   COINCIDE_NOTE,
   CONSTANTS_NOTE,
   ESTIMATE,
@@ -94,7 +96,7 @@ export function dynamiqueOutputs(
   windNotice: string | null = null,
 ): DynamiqueOutputs {
   const rides = [
-    rideOutput("calm", reading.calm, null),
+    reading.calm === null ? calmUnavailable() : rideOutput("calm", reading.calm, null),
     rideOutput("windy", reading.windy, windNotice),
   ] as const;
   return {
@@ -106,6 +108,26 @@ export function dynamiqueOutputs(
     ),
     warnings: reading.warnings.flatMap((id) => WARNING_COPY[id] ?? []),
     constants: CONSTANTS_NOTE[family],
+  };
+}
+
+/**
+ * The ride without wind when the Scenario at zero wind has none (`DynamicsReading.calm` `null`): its
+ * tiles say « indisponible », and its heading's tip says why. The ride under the Vent stands beside it.
+ */
+function calmUnavailable(): RideOutput {
+  return {
+    id: "calm",
+    label: RIDE_LABEL.calm,
+    stopX: null,
+    stop: CALM_UNAVAILABLE,
+    arrival: null,
+    noArrival: CALM_UNAVAILABLE,
+    duration: CALM_UNAVAILABLE,
+    durationLabel: OUTPUT_LABEL.duration,
+    swing: null,
+    estimate: ESTIMATE,
+    notice: CALM_UNAVAILABLE_NOTE,
   };
 }
 

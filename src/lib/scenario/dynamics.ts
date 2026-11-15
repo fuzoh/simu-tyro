@@ -45,8 +45,13 @@ export type DynamicsWarningId =
 export type DynamicsReading = {
   /** Every dynamic output is an estimation (#6), and is labelled so wherever it is shown. */
   readonly estimate: true;
-  /** Without wind — the first of the two Points d'arrêt: the Scenario with its Vent at zero. */
-  readonly calm: Ride;
+  /**
+   * Without wind — the first of the two Points d'arrêt: the Scenario with its Vent at zero. `null`
+   * under an applied Vent when that comparison does not exist — the line re-posed in still air, or
+   * its Sweep, does not complete — while the ride under the Vent, on its own complete locus, stands
+   * (Q24: the results that exist stay readable).
+   */
+  readonly calm: Ride | null;
   /** With the Vent entered, on the locus it poses (§19.15); `calm` itself without one. */
   readonly windy: Ride;
   /**
@@ -80,9 +85,9 @@ export type RiddenScenario = Pick<
  * @param profile the **active** imported profil, `null` on a manual line — a Trace cached while
  *   manual geometry drives is no altitude of this line.
  * @returns `null` when the traverse is incomplete — a ride across a hole would run on a slope nobody
- *   solved, so like the Verdict it is suppressed rather than qualified (Q24) — or when the
- *   Scenario at zero wind does not solve or sweep completely, so the ride « sans vent » it is read
- *   against does not exist.
+ *   solved, so like the Verdict it is suppressed rather than qualified (Q24). When only the
+ *   Scenario at zero wind does not solve or sweep completely, the ride under the Vent is kept and
+ *   `calm` is `null`: the comparison is what is missing, not the ride.
  */
 export function readDynamics(
   scenario: RiddenScenario,
@@ -97,22 +102,18 @@ export function readDynamics(
   const windy = ride({ ...posed, path: windyPath, wind: rideWindOf(unloaded) });
   const windless = unloaded.aero === null;
 
-  let calm = windy;
-  let calmPath = windyPath;
-  if (!windless) {
-    const still = stillAir(scenario, unloaded);
-    if (still === null) return null;
-    calmPath = still;
-    calm = ride({ ...posed, path: calmPath, wind: null });
-  }
+  const calmPath = windless ? windyPath : stillAir(scenario, unloaded);
+  const calm =
+    calmPath === null ? null : windless ? windy : ride({ ...posed, path: calmPath, wind: null });
 
-  // The member's own `μ`, kg/m: its weight per metre over the `g` that made it.
+  // The member's own `μ`, kg/m: its weight per metre over the `g` that made it. §12.1 runs over the
+  // rides that exist.
   const linearMass = unloaded.material.w / G;
-  const both = [
-    quasiStaticRatio(calm.samples, calmPath, linearMass),
-    quasiStaticRatio(windy.samples, windyPath, linearMass),
-  ];
-  const worst = both[1].ratio > both[0].ratio ? both[1] : both[0];
+  const both = [quasiStaticRatio(windy.samples, windyPath, linearMass)];
+  if (calm !== null && calmPath !== null && calm !== windy) {
+    both.unshift(quasiStaticRatio(calm.samples, calmPath, linearMass));
+  }
+  const worst = both.reduce((most, one) => (one.ratio > most.ratio ? one : most));
   const exceeded = worst.ratio > DYNAMICS.quasiStaticLimit;
 
   const warnings: DynamicsWarningId[] = [];

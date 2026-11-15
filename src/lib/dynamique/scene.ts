@@ -247,7 +247,7 @@ export function dynamiqueScene({
  */
 function loadedLine({ base, rides }: DynamiqueSolved): ChartScene["rider"] | null {
   if (base.traverse.steps.length === 0) return null;
-  const end = rides?.reading.calm.end;
+  const end = rides?.reading.calm?.end;
   const low = base.traverse.steps.reduce((lowest, step) => (step.zD < lowest.zD ? step : lowest));
   return placeRider(base, end?.kind === "stop" ? end.x : low.xD);
 }
@@ -256,7 +256,7 @@ function loadedLine({ base, rides }: DynamiqueSolved): ChartScene["rider"] | nul
 function stopMarkers({ reading, outputs }: Rides, x: SharedX, z: ZScale): readonly StopMarker[] {
   return outputs.rides.flatMap(({ id, stopX }) => {
     if (stopX === null) return [];
-    const rest = reading[id].samples.at(-1);
+    const rest = reading[id]?.samples.at(-1);
     return rest === undefined
       ? []
       : [
@@ -275,7 +275,7 @@ function stopMarkers({ reading, outputs }: Rides, x: SharedX, z: ZScale): readon
 /** The rides that reach B, named at B — the engine's `arrival`, not a Point d'arrêt at the end. */
 function arrivalMarkers({ reading }: Rides, x: SharedX, L: number): CoupeScene["arrivals"] {
   return RIDE_IDS.flatMap((id) =>
-    reading[id].end.kind === "arrival"
+    reading[id]?.end.kind === "arrival"
       ? [{ id, x: x.x(L), label: ARRIVAL_LABEL[id], row: LABEL_ROW[id] }]
       : [],
   );
@@ -290,7 +290,11 @@ function curveScene(
   const top = CURVE_TOP;
   const bottom = height - CURVE_BOTTOM;
   // Only the first pass is drawn: the swing back would loop the curves over themselves.
-  const passes = { calm: firstPass(reading.calm), windy: firstPass(reading.windy) };
+  // No ride at zero wind to compare: no calm curve, rather than one drawn from another ride.
+  const passes = {
+    calm: reading.calm === null ? [] : firstPass(reading.calm),
+    windy: firstPass(reading.windy),
+  };
   const speeds = RIDE_IDS.flatMap((id) => passes[id].map((sample) => sample.v));
   const accelerations = passes.windy.map((sample) => sample.a);
   const [speed, acceleration] = alignedDomains(signedExtent(speeds), signedExtent(accelerations));
@@ -344,10 +348,12 @@ function curveScene(
       tick(-acceleration.neg, yAcceleration, "acceleration"),
     ]),
     farthest: RIDE_IDS.flatMap((id) => {
+      const ride = reading[id];
       const turn = passes[id].at(-1);
-      return reading[id].end.kind === "arrival" ||
+      return ride === null ||
+        ride.end.kind === "arrival" ||
         turn === undefined ||
-        passes[id].length === reading[id].samples.length
+        passes[id].length === ride.samples.length
         ? []
         : [{ id, x: x.x(turn.x), y: ySpeed(turn.v) }];
     }),

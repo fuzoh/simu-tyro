@@ -57,8 +57,12 @@ export function ridesUnder(
   const frame = buildSceneFrame(unloaded.span);
   const base = buildSceneBase(frame, unloaded, sweepRiderOf(withWind));
   if (frame === null || base === null) throw new Error("the shipped line solves");
-  const reading = readDynamics(withWind, base.line, base, profil);
-  if (reading === null) throw new Error("a complete traverse has a ride");
+  const read = readDynamics(withWind, base.line, base, profil);
+  if (read === null) throw new Error("a complete traverse has a ride");
+  // The shipped line solves at zero wind too: both rides exist, and the tests read them as such.
+  const { calm } = read;
+  if (calm === null) throw new Error("the shipped line has a ride at zero wind");
+  const reading = { ...read, calm };
   const outputs = dynamiqueOutputs(reading, withWind.material.family);
   return { frame, base, reading, outputs, solved: { base, rides: { reading, outputs } } };
 }

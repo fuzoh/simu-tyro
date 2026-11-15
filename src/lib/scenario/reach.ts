@@ -250,7 +250,8 @@ export type ReachReading = {
   /** The Scenario as it stands: its rides' reach, and what the proposal is a variation of. */
   readonly current: {
     readonly windy: RideReach;
-    readonly calm: RideReach;
+    /** `null` when the Scenario at zero wind has no ride to compare (`DynamicsReading.calm`). */
+    readonly calm: RideReach | null;
     readonly h: number;
     readonly zB: number;
     readonly L0: number;
@@ -387,7 +388,7 @@ export function proposeAnchorB({
     windless: reading.windless,
     current: {
       windy: rideReach(reading.windy, L),
-      calm: rideReach(reading.calm, L),
+      calm: reading.calm === null ? null : rideReach(reading.calm, L),
       h: span.h,
       zB: span.anchors.zB,
       L0: unloaded.L0,
@@ -482,7 +483,8 @@ export function proposeAnchorB({
   // The candidate, recomputed as the Scenario would be once edited: §11, then both rides.
   const swept = sweepRider(within.line, { ...rider, carryingLines });
   const rides = swept === null ? null : readDynamics(scenario, within.line, swept, profile);
-  if (swept === null || rides === null) {
+  // A candidate is proposed with both its rides: without the one at zero wind it has no comparison.
+  if (swept === null || rides === null || rides.calm === null) {
     return refuse({ kind: "failed", deltaB, failure: { stage: "traverse", error: null } });
   }
   const { clearance } = swept;

@@ -84,8 +84,11 @@ export function curveHover(
   ];
   // Without a wind both rides are one, and the rows need no ride's name.
   const read = (coincide ? (["windy"] as const) : RIDE_IDS).flatMap((id) => {
+    const ride = rides[id];
+    // No ride at zero wind to compare: nothing to read on it.
+    if (ride === null) return [];
     // The curve draws the first pass only: the hover reads what is drawn.
-    const sample = sampleNear({ ...rides[id], samples: firstPass(rides[id]) }, metres);
+    const sample = sampleNear({ ...ride, samples: firstPass(ride) }, metres);
     return sample === null ? [] : [{ id, ...sample }];
   });
   const named = (quantity: string, id: RideId) =>
