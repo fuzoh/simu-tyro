@@ -9,7 +9,8 @@
  *   on the map. The handle also captures its pointer and takes `touch-action: none`, so a drag that
  *   leaves it, or a finger on a page that scrolls, still belongs to the rose.
  * - **The Scenario is written as the handle moves**, not at the release: the fields beside it follow
- *   the gesture, and the address bar's own debounce writes the link once it stops.
+ *   the gesture, and the address bar's own debounce writes the link once it stops. The statics
+ *   read the Vent deferred (`useUnloaded`), so a move never waits on a windy sweep.
  * - **The host is a point.** Its parent places it — at the line's midpoint on the map, at the middle
  *   of the box without one — and everything the rose draws is relative to it.
  * - **Without `onWind` there is no handle**: the Page Terrain shows the Vent and sets none (#101),
