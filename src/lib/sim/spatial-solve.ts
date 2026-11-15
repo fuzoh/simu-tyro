@@ -28,7 +28,7 @@ import type {
   Vec3,
 } from "./types.ts";
 
-import { riderEllipsoid } from "./aero.ts";
+import { normalDragInto, riderEllipsoid, riderWindForce } from "./aero.ts";
 import { xAt, zAt } from "./catenary.ts";
 import { loadNode } from "./loads.ts";
 import { REFUSAL, Shooter, type ShotInput } from "./shoot.ts";
@@ -52,30 +52,41 @@ export const SPATIAL = {
 /** The points §19.8's seed (3) reads the lateral load at, along the straight chord. */
 const CHORD_POINTS = 16;
 
+/** `solve3`'s augmented matrix `[M | b]`, row-major 3×4 — scratch, reused by every Newton step. */
+const augmented = new Float64Array(12);
+
 /** `M·v = b` for a 3×3 row-major `M`, partial pivoting; `false` when singular. Writes `v` into `out`. */
 function solve3(M: Float64Array, b0: number, b1: number, b2: number, out: Float64Array): boolean {
-  const a = [
-    [M[0], M[1], M[2], b0],
-    [M[3], M[4], M[5], b1],
-    [M[6], M[7], M[8], b2],
-  ];
+  const a = augmented;
+  a.set(M.subarray(0, 3), 0);
+  a[3] = b0;
+  a.set(M.subarray(3, 6), 4);
+  a[7] = b1;
+  a.set(M.subarray(6, 9), 8);
+  a[11] = b2;
   for (let col = 0; col < 3; col++) {
     let pivot = col;
     for (let row = col + 1; row < 3; row++) {
-      if (Math.abs(a[row][col]) > Math.abs(a[pivot][col])) pivot = row;
+      if (Math.abs(a[4 * row + col]) > Math.abs(a[4 * pivot + col])) pivot = row;
     }
-    const p = a[pivot][col];
+    const p = a[4 * pivot + col];
     if (!(Math.abs(p) > 0) || !Number.isFinite(p)) return false;
-    if (pivot !== col) [a[col], a[pivot]] = [a[pivot], a[col]];
+    if (pivot !== col) {
+      for (let k = 0; k < 4; k++) {
+        const t = a[4 * col + k];
+        a[4 * col + k] = a[4 * pivot + k];
+        a[4 * pivot + k] = t;
+      }
+    }
     for (let row = col + 1; row < 3; row++) {
-      const factor = a[row][col] / a[col][col];
-      for (let k = col; k < 4; k++) a[row][k] -= factor * a[col][k];
+      const factor = a[4 * row + col] / a[4 * col + col];
+      for (let k = col; k < 4; k++) a[4 * row + k] -= factor * a[4 * col + k];
     }
   }
   for (let row = 2; row >= 0; row--) {
-    let sum = a[row][3];
-    for (let k = row + 1; k < 3; k++) sum -= a[row][k] * out[k];
-    out[row] = sum / a[row][row];
+    let sum = a[4 * row + 3];
+    for (let k = row + 1; k < 3; k++) sum -= a[4 * row + k] * out[k];
+    out[row] = sum / a[4 * row + row];
   }
   return Number.isFinite(out[0]) && Number.isFinite(out[1]) && Number.isFinite(out[2]);
 }
@@ -261,7 +272,7 @@ function attempt(
 }
 
 /** The plane line of §4–§6 under the weight and the rider's vertical force (§19.8 seed 2). */
-function planeInput(input: SpatialSpanInput): SpanInput {
+export function planeInput(input: SpatialSpanInput): SpanInput {
   const { L, h, L0, w, EA, rider } = input;
   return {
     L,
@@ -278,7 +289,7 @@ function planeInput(input: SpatialSpanInput): SpanInput {
  * symmetric share of the lateral load estimated on the straight chord, then §5.2's two seeds lifted
  * as `(H, 0, V₀)`. Duplicates and non-finite seeds are dropped; at most `SOLVER.maxAttempts`.
  */
-export function spatialSeeds(input: ShotInput, warm?: SpatialWarm): [number, number, number][] {
+function spatialSeeds(input: ShotInput, warm?: SpatialWarm): [number, number, number][] {
   const seeds: [number, number, number][] = [];
   const push = (x: number, y: number, z: number) => {
     if (!(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z))) return;
@@ -312,27 +323,17 @@ function lateralLoadOnChord(input: ShotInput): number {
   if (isAeroNil(aero)) return total;
   const wind = new WindLine(aero.field, L, aero.bearing);
   const chord = Math.hypot(L, h);
-  const tx = L / chord;
-  const tz = h / chord;
   const q = 0.5 * aero.rho * aero.CDn * aero.d;
+  const drag = new Float64Array(3);
   for (let i = 0; i < CHORD_POINTS; i++) {
     wind.at((L * (i + 0.5)) / CHORD_POINTS);
-    const ut = wind.along * tx;
-    const nx = wind.along - ut * tx;
-    const ny = wind.across;
-    const nz = -ut * tz;
-    total += (q * Math.sqrt(nx * nx + ny * ny + nz * nz) * ny * L0) / CHORD_POINTS;
+    normalDragInto(drag, wind.along, wind.across, L / chord, 0, h / chord, q);
+    total += (drag[1] * L0) / CHORD_POINTS;
   }
   if (rider !== null) {
-    const e = riderEllipsoid(rider.hRider);
     wind.at((L * rider.sP) / L0);
-    const k =
-      0.5 *
-      aero.rho *
-      Math.PI *
-      e.c *
-      Math.sqrt(e.b * e.b * wind.along * wind.along + e.a * e.a * wind.across * wind.across);
-    total += rider.share * k * wind.across;
+    const force = riderWindForce(riderEllipsoid(rider.hRider), wind.along, wind.across, aero.rho);
+    total += rider.share * force.y;
   }
   return total;
 }
@@ -385,7 +386,7 @@ function refuse(input: SpatialSpanInput): SolveError | null {
   return null;
 }
 
-const vec = (x: number, y: number, z: number): Vec3 => ({ x, y, z });
+export const vec = (x: number, y: number, z: number): Vec3 => ({ x, y, z });
 
 /** §19.8's plane case: §4–§7's closed form, wrapped as a spatial state with `y ≡ 0`. */
 function closedForm(input: SpatialSpanInput): SpatialSolveResult {

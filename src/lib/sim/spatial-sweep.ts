@@ -27,15 +27,12 @@ import type {
   SweepResult,
   SweepStep,
   SolveError,
-  Vec3,
 } from "./types.ts";
 
 import { riderEllipsoid } from "./aero.ts";
 import { isAeroNil } from "./spatial-load.ts";
-import { SPATIAL, solveSpatialWith } from "./spatial-solve.ts";
+import { planeInput, SPATIAL, solveSpatialWith, vec } from "./spatial-solve.ts";
 import { sweep, sweepGrid, SWEEP } from "./sweep.ts";
-
-const vec = (x: number, y: number, z: number): Vec3 => ({ x, y, z });
 
 /** The member's load at one position: `P_rider/n_c`'s weight part, N — §6.2's `riderP`. */
 function riderP(rider: RiderLoad): number {
@@ -123,20 +120,14 @@ export function sweepSpatial(
   };
 
   if (isAeroNil(input.aero)) {
-    const plane: SpanInput = {
-      L: input.L,
-      h: input.h,
-      L0: input.L0,
-      w: input.w,
-      EA: input.EA,
-      loads: [],
-    };
+    // `input.rider` is `null`: the plane line carries no load.
+    const plane = planeInput(input);
     const P = riderP(rider);
     const swept = sweep({ ...plane, strength: input.strength }, P, n);
     // `sweep()` keeps its steps in grid order and its failures by index: rebuild the alignment.
-    let k = 0;
-    for (const failure of swept.failures) failures.push(failure);
+    failures.push(...swept.failures);
     const holes = new Set(swept.failures.map((f) => f.index));
+    let k = 0;
     for (let i = 0; i < grid.length; i++) {
       if (holes.has(i)) continue;
       slots[i] = lift(swept.steps[k++], plane, P);

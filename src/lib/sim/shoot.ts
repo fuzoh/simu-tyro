@@ -62,6 +62,11 @@ export function pieceSteps(steps: number, L0: number, sP: number | null): number
   return sP === null ? [even(L0)] : [even(sP), even(L0 - sP)];
 }
 
+/** The nodes a shot on `pieces` writes: each piece's steps plus its start, the trolley's node twice. */
+export function nodeCountOf(pieces: readonly number[]): number {
+  return pieces.reduce((count, n) => count + n + 1, 0);
+}
+
 /** The nodes one recorded shot fills, in ascending `S` — the trolley's node twice (`S_P⁻`, `S_P⁺`). */
 export class ShotNodes {
   readonly S: Float64Array;
@@ -186,7 +191,7 @@ export class Shooter {
     this.EA = EA;
     this.tFloor = SOLVER.slackStiffnessFactor * Math.abs(w);
     this.pieces = pieceSteps(steps, L0, rider === null ? null : rider.sP);
-    this.nodeCount = this.pieces.reduce((count, n) => count + n + 1, 0);
+    this.nodeCount = nodeCountOf(this.pieces);
 
     const applied = isAeroNil(aero) ? null : aero;
     this.windy = applied !== null;
@@ -262,6 +267,8 @@ export class Shooter {
     if (this.windy) {
       if (!this.windAt(x)) return false;
       // §19.4: `u_n = u − (u·t)·t`, `f_n = q·|u_n|·u_n` per stretched metre, `λ·f_n` per unstretched.
+      // `normalDragInto`'s arithmetic, inlined: through a call per stage the windy sweep bench ran
+      // 25–50 % slower.
       const ut = this.ux * tx + this.uy * ty;
       const nx = this.ux - ut * tx;
       const ny = this.uy - ut * ty;

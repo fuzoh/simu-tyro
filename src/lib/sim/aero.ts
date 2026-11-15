@@ -77,7 +77,8 @@ export function riderWindForce(
 /**
  * §19.4's normal drag per **stretched** metre, written into `out[0..2]`, N/m:
  * `f_n = q·|u_n|·u_n`, `u_n = u − (u·t)·t`, `q = ½·ρ·C_D⊥·d`. `t` is the unit tangent; the wind is
- * horizontal. Allocation-free — the integrator calls it at every stage.
+ * horizontal. Allocation-free. §19.8's seed reads it on the chord; the integrator inlines the same
+ * arithmetic at every stage.
  */
 export function normalDragInto(
   out: Float64Array,
