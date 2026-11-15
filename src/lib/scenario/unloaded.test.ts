@@ -214,6 +214,24 @@ describe("the line under the Vent (§19.7) — posed once, under the wind it car
     },
   );
 
+  test("a typed ρ = 0 under an applied Vent poses the still-air line, never a silent failure", () => {
+    // The field accepts 0 and no gate breaches on it, so the chain must not stop: with no air the
+    // drag is nil and the line is the one posed in still air.
+    const airless = under((draft) => {
+      draft.material = rope(11);
+      draft.positions = north;
+      draft.wind = { ...draft.wind, speedKmh: 40, directionDeg: 90 };
+      draft.dynamics = { ...draft.dynamics, rho: 0 };
+    });
+    const still = under((draft) => {
+      draft.material = rope(11);
+      draft.positions = north;
+    });
+    if (!airless.ok || !still.ok) throw new Error("expected both lines to solve");
+    expect(Math.abs(airless.L0 / still.L0 - 1)).toBeLessThan(1e-6);
+    expect(Math.abs(airless.readings.lateral.value)).toBeLessThan(1e-6);
+  });
+
   test("an unreadable Vent stops at `wind`", () => {
     const negative = under((draft) => {
       draft.material = rope(11);
