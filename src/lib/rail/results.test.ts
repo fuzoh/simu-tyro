@@ -824,3 +824,45 @@ describe("the Zones d'ancrage on Avancé's `Résultats` (#106)", () => {
     expect(clearanceRow(zoned)?.qualifier).toBe("sous la garde exigée 1,0 m, passager à x 10,4 m");
   });
 });
+
+describe("under a crosswind the results and the Verdict read the windy tensions (§19.14)", () => {
+  // A fixed `L₀`, so the wind cannot re-cut the line: the lateral drag adds load to the same length,
+  // and every tension rises — an invariant of added load, not a value read off the engine.
+  const NORTH: ScenarioDraft["positions"] = {
+    A: { lat: 46.8, lon: 7.4 },
+    B: { lat: 46.801, lon: 7.4 },
+  };
+  const cut: ScenarioDraft = {
+    ...SHIPPED,
+    regime: "en15567",
+    tightness: { mode: "length", L0: 151.2 },
+    positions: NORTH,
+  };
+  const at = (speedKmh: number): ScenarioDraft => ({
+    ...cut,
+    wind: { ...cut.wind, speedKmh, directionDeg: 90 },
+  });
+  const verdictOf = (scenario: ScenarioDraft) => {
+    const results = deriveResults({ scenario, base: solvedTraverseOf(scenario) });
+    if (results?.verdict == null) throw new Error("expected a Verdict");
+    return results.verdict;
+  };
+  const calm = verdictOf(at(0));
+  const windy = verdictOf(at(60));
+
+  test("the Verdict's tension at each anchor is higher under the crosswind", () => {
+    expect(windy.ends.A.Tstatic).toBeGreaterThan(calm.ends.A.Tstatic);
+    expect(windy.ends.B.Tstatic).toBeGreaterThan(calm.ends.B.Tstatic);
+  });
+
+  test("its worst tension is the line's greatest over the windy slots, read off the engine", () => {
+    const scenario = at(60);
+    const unloaded = deriveUnloaded(unloadedInputs(scenario, null));
+    if (!unloaded.ok) throw new Error("the windy line solves");
+    const swept = sweepRider(unloaded, sweepRiderOf(scenario));
+    if (swept === null) throw new Error("the windy traverse solves");
+    const peak = Math.max(...swept.spatial.slots.map((slot) => slot?.Tmax ?? 0));
+    const worst = Math.max(windy.ends.A.Tstatic, windy.ends.B.Tstatic);
+    expect(Math.abs(worst / peak - 1)).toBeLessThan(1e-12);
+  });
+});
