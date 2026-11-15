@@ -114,6 +114,16 @@ describe("the public surface", () => {
       deriveTextile: sim.deriveTextile,
       steelFormula: sim.steelFormula,
       resolveSteelValues: sim.resolveSteelValues,
+      // §19 — the spatial statics (#127).
+      solveSpatial: sim.solveSpatial,
+      sampleSpatial: sim.sampleSpatial,
+      unloadedReadings: sim.unloadedReadings,
+      resolveSpatialL0: sim.resolveSpatialL0,
+      sweepSpatial: sim.sweepSpatial,
+      slotState: sim.slotState,
+      trajectoryRuns: sim.trajectoryRuns,
+      evaluateSpatialClearance: sim.evaluateSpatialClearance,
+      lineAeroOf: sim.lineAeroOf,
     };
     const notFunctions = Object.entries(surface)
       .filter(([, value]) => typeof value !== "function")
@@ -127,6 +137,18 @@ describe("the public surface", () => {
     // reach it directly. Same for `sweepGrid` and the Jacobian. »
     const withheld = ["levelSpanShortcut", "sweepGrid", "jacobianAt"];
     expect(withheld.filter((name) => Object.keys(sim).includes(name))).toEqual([]);
+  });
+
+  it("withholds §19.8's integrator: a SpatialState crosses the boundary, never a shot (#127)", () => {
+    const internal = [
+      "Shooter",
+      "ShotNodes",
+      "shootSpatial",
+      "solveSpatialWith",
+      "WindLine",
+      "readExtrema",
+    ];
+    expect(internal.filter((name) => Object.keys(sim).includes(name))).toEqual([]);
   });
 
   it("withholds the wind profile's bare shape: a reader takes the local speed (#120)", () => {

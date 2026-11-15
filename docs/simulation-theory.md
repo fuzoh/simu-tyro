@@ -1650,6 +1650,17 @@ A trial shot is **refused, never clamped** (the line search then shortens the st
 - under an applied wind, a stage's `x` leaves `[0, L]`, where §8.4's field has no value: the engine
   does not extrapolate it.
 
+**Trials past the span** (an implementation rule, #127 Step A). The third refusal above applies
+to the line an attempt **ends** on, not to its trials. A Newton trial may visit an `F_A` whose
+line runs past B (a slack line under a wind along A → B) while the converged line does not;
+refusing that trial starved the line search, which could not cross `x = L`. So, during a trial
+only, a stage whose `x` lies outside `[0, L]` reads the field at the nearest anchor and the shot
+records the abscissa. A stage within `m = 10·tol(L)` of an anchor (`SHOT.domainMargin`) is that
+anchor within the last RK4 stage's rounding and records nothing. The line an attempt ends on is
+shot again and checked: if it recorded an abscissa it is **not accepted**, and the next seed runs;
+when every attempt ends so, the result is `outside-model` (§19.11). No reported equilibrium reads
+the wind outside the span; the anchor's value only lets the search pass through.
+
 **Newton's method.** `R(F_A) = 0` by damped Newton:
 
 - **Jacobian** `J = ∂R/∂F_A` by central finite differences, step `δ = 10⁻⁶·max(|F_A|, 1 N)` per
@@ -1804,6 +1815,11 @@ projection and does not survive the spatial results (#118).
 - The march runs from A to B, each position warm-started from the last solved one (§19.8 seed 1).
   A position that fails is retried once at the end of the march warm-started from the next solved
   position (reverse continuation) — a full solve to the same bars, not an interpolation.
+- The warm start of a position is the secant extrapolation of the two previous solved `F_A` in
+  `S_D` (the previous one alone at the start of a run) and the previous position's last Jacobian.
+  A seed is a guess, never an answer: the position is solved to `tol(L)`.
+- Sweep positions are accepted at `tol(L)`; the polished closure of §19.9 is the pose inversion's
+  alone, where a driver is differenced across lengths.
 - The result keeps **one slot per grid position, in grid order, holes included**: a solved slot
   holds the position's state scalars (`S_D`, `r_D`, `F_A`, `T_A`, `T_B`, `T_max`, `T⁻`, `T⁺`,
   `H_A`, `H_B`); a failed slot holds its failure (§19.11). Nothing is compacted

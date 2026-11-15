@@ -2,7 +2,13 @@ import { describe, expect, it, test } from "vitest";
 
 import type { WindField } from "./wind-profile.ts";
 
-import { WIND_PROFILE, windAt, windProfileShape, windProfileSpeed } from "./wind-profile.ts";
+import {
+  WIND_PROFILE,
+  WindLine,
+  windAt,
+  windProfileShape,
+  windProfileSpeed,
+} from "./wind-profile.ts";
 import { kmhToMs, windComponents } from "./wind.ts";
 
 /**
@@ -281,5 +287,53 @@ describe("windAt — the local wind projected on the line", () => {
     for (const span of [0, -L, Number.NaN, Number.POSITIVE_INFINITY]) {
       expect(() => windAt(field, 0, span, NORTH)).toThrow(RangeError);
     }
+  });
+});
+
+describe("WindLine — windAt hoisted for §19.8's integrator (#127)", () => {
+  const L = 150;
+  const fields: WindField[] = [
+    { speed: 15, from: 90, profile: { width: 50, attenuation: 0 } },
+    { speed: 15, from: 37, profile: { width: 50, attenuation: 40 } },
+    { speed: 8.3, from: 270, profile: { width: 10, attenuation: 100 } },
+    { speed: 22, from: 180, profile: { width: 90, attenuation: 70 } },
+    { speed: 0, from: 0, profile: { width: 50, attenuation: 40 } },
+  ];
+
+  it("reads windAt's components bit for bit at every x of the span", () => {
+    // The oracle is the entry every reader takes; `Object.is` also tells `0` from `-0`.
+    for (const field of fields) {
+      for (const bearing of [0, 12.5, 270, 301.7]) {
+        const line = new WindLine(field, L, bearing);
+        for (let i = 0; i <= 600; i++) {
+          const x = i === 600 ? L : (L * i) / 600;
+          const expected = windAt(field, x, L, bearing);
+          line.at(x);
+          expect(Object.is(line.along, expected.along)).toBe(true);
+          expect(Object.is(line.across, expected.across)).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("says a uniform profile is uniform, and nothing else is", () => {
+    expect(new WindLine(fields[0], L, 0).uniform).toBe(true);
+    expect(new WindLine(fields[1], L, 0).uniform).toBe(false);
+  });
+
+  it("refuses x outside the span, as windAt does — the caller decides what it reads there", () => {
+    const line = new WindLine(fields[1], L, 0);
+    expect(() => line.at(-1e-9)).toThrow(RangeError);
+    expect(() => line.at(L + 1e-9)).toThrow(RangeError);
+    expect(() => line.at(Number.NaN)).toThrow(RangeError);
+  });
+
+  it("refuses the inputs windAt refuses", () => {
+    const profile = { width: 50, attenuation: 0 };
+    expect(() => new WindLine({ speed: -1, from: 0, profile }, L, 0)).toThrow(RangeError);
+    expect(() => new WindLine({ speed: 1, from: 0, profile }, 0, 0)).toThrow(RangeError);
+    expect(
+      () => new WindLine({ speed: 1, from: 0, profile: { width: 95, attenuation: 0 } }, L, 0),
+    ).toThrow(RangeError);
   });
 });

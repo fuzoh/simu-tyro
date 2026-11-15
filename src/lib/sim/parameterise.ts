@@ -214,7 +214,7 @@ function spanAt(span: SpanGeometry, L0: number): SpanInput {
 }
 
 /** Tier one on the geometry itself, in `solveSpan`'s own payload shape. */
-function refuseGeometry(span: SpanGeometry): SolveError | null {
+export function refuseGeometry(span: SpanGeometry): SolveError | null {
   const positives: [string, number][] = [
     ["L", span.L],
     ["w", span.w],

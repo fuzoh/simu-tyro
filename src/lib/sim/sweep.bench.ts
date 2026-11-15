@@ -29,9 +29,18 @@
 
 import { describe, test } from "vitest";
 
-import { BENCH_CELLS, BENCH_RUNS, BENCH_STEP_COUNTS, timePair } from "./bench-harness.ts";
+import {
+  BENCH_CELLS,
+  BENCH_RUNS,
+  BENCH_STEP_COUNTS,
+  SPATIAL_BENCH_CELLS,
+  timePair,
+  timeSpatialPair,
+} from "./bench-harness.ts";
 import { CLEARANCE, evaluateClearance } from "./clearance.ts";
-import { sweep } from "./sweep.ts";
+import { evaluateSpatialClearance } from "./spatial-clearance.ts";
+import { sweepSpatial } from "./spatial-sweep.ts";
+import { SWEEP, sweep } from "./sweep.ts";
 
 /**
  * 40 runs per cell, exactly — `time: 0` is what stops tinybench from topping the sample up to its
@@ -67,6 +76,23 @@ for (const cell of BENCH_CELLS) {
               CLEARANCE.samplesPerStep,
             ));
         }),
+        CELL,
+      );
+    });
+  });
+}
+
+// §19's windy pair (#127): one cell per wind, at the default sweep. The two halves are split
+// because the clearance re-shoots every slot (§19.8: sampling is a function, not a stored line).
+for (const cell of SPATIAL_BENCH_CELLS) {
+  describe(`windy · ${cell.key} · ${cell.label}`, () => {
+    test("pair and halves", async ({ bench }) => {
+      const swept = sweepSpatial(cell.input, cell.rider);
+      await bench.compare(
+        bench("pair", () => void timeSpatialPair(cell, SWEEP.steps)),
+        bench("sweepSpatial", () => void sweepSpatial(cell.input, cell.rider)),
+        bench("evaluateSpatialClearance", () =>
+          void evaluateSpatialClearance(swept, cell.terrain, cell.hRider)),
         CELL,
       );
     });

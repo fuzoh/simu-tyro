@@ -24,6 +24,8 @@
  *   terrain-free.
  */
 
+import type { WindField } from "./wind-profile.ts";
+
 /** A point load on the line. `s` is the **unstretched material coordinate** (§6.2's variable). */
 export type PointLoad = {
   /** Load, N. */
@@ -143,7 +145,8 @@ export type SolveResult =
   | { ok: false; error: SolveError };
 
 /**
- * Three error kinds, no more, because most of §5.4 succeeds as an internal remedy (see
+ * Three error kinds for the plane engine, and a fourth — `outside-model` — that only §19's spatial
+ * engine produces under wind, because most of §5.4 succeeds as an internal remedy (see
  * {@link SolveNote}). Ground contact is **not** an error — it surfaces in `evaluateClearance` as
  * `contact: "rider" | "cable"`, which is what keeps terrain out of the solver. Exceeding `MBF`
  * is not one either: a line strung too tight solves perfectly and §10 then says unsafe.
@@ -165,8 +168,25 @@ export type SolveError =
       /** Which side the bound is: a floor (`"min"`) or a ceiling (`"max"`). */
       boundKind: "min" | "max";
     }
-  | { kind: "no-convergence"; attempts: number; residual: number }
-  | { kind: "slack-limit"; hFloored: number };
+  | {
+      kind: "no-convergence";
+      attempts: number;
+      residual: number;
+      /**
+       * Why, when the spatial engine knows (§19.10–§19.11): `"attempts"` every seed spent;
+       * `"non-monotone"` a tightness driver reversed beyond its noise band, never resolved by
+       * picking a root; `"unresolved"` a bracket that could not close; `"unreachable"` a target
+       * under the taut branch's minimum. Absent from the plane engine's own failures.
+       */
+      reason?: "attempts" | "non-monotone" | "unresolved" | "unreachable";
+    }
+  | { kind: "slack-limit"; hFloored: number }
+  /**
+   * §19.11's second « incompatible configuration »: the line, under an applied wind, needs §8.4's
+   * field outside `[0, L]` — at `x` — where it has no value. The engine does not extrapolate it.
+   * Never produced without wind.
+   */
+  | { kind: "outside-model"; reason: "wind-abscissa"; x: number };
 
 /**
  * Internal remedies the solver applies **and then succeeds**: §4.3's straight-bar fallback at
@@ -263,11 +283,176 @@ export type MaterialSpec =
       /** Stiffness factor, `EA = k·MBL`. */
       k: number;
       /**
-       * Nominal diameter, mm — **absent** when nobody typed one. Informational: no formula reads it,
-       * the tensioning work that needs it does.
+       * Nominal diameter, mm — **absent** when nobody typed one. Without wind no formula reads it;
+       * under an applied wind it is the line's aerodynamic diameter (§19.4) and **required**:
+       * `lineAeroOf` refuses its absence as `invalid-input{field:"d"}`, never a guessed diameter.
        */
       d?: number;
     };
 
 /** What the solver consumes, whichever family produced it. Units: N/m, N, N. */
 export type DerivedMaterial = { w: number; EA: number; strength: number };
+
+// —— §19 — spatial quasi-static statics under gravity and wind (#127) ————————————————————————————
+//
+// Additive: every declaration above keeps its meaning, and the plane engine's results are §19's
+// whenever no wind is applied (§19.16). Frame `(x, y, z)`: `x` horizontal A → B, `y` horizontal to
+// the left of the travel, `z` up; `A = (0, 0, 0)`, `B = (L, 0, h)` (§19.2).
+
+/** A vector of the spatial frame, SI. A plain object, so a result still structured-clones. */
+export type Vec3 = { readonly x: number; readonly y: number; readonly z: number };
+
+/**
+ * §19.4's aerodynamic description of one carrying member under the Scenario's wind. `null` where an
+ * input takes `LineAero | null` means **no wind applied** — speed 0, or no bearing because a
+ * Position is missing — and the engine then evaluates the closed form (§19.8).
+ */
+export type LineAero = {
+  /** §8.4's field: the speed at mid-span, the « from » azimuth and the profile. */
+  readonly field: WindField;
+  /** The line's bearing A → B, degrees clockwise from north — read outside the engine. */
+  readonly bearing: number;
+  /** `ρ`, kg/m³ — the Scenario's `airDensityOf`, the descent's own (§19.4). */
+  readonly rho: number;
+  /** The declared aerodynamic diameter, **m** (§19.4), constant during a calculation. */
+  readonly d: number;
+  /** `C_D⊥`, the member family's adopted normal-drag coefficient (§19.4). */
+  readonly CDn: number;
+};
+
+/**
+ * §19.5–§19.6's rider as the line receives it. `weight` is the whole `m·g`; `share` is `1/n_c`, the
+ * fraction of the **whole** rider vector — weight and static wind force — one member carries (`1`
+ * for the « one member carries all » case). The member's own `w` and wind are never shared.
+ */
+export type RiderLoad = {
+  /** `m·g`, N — the whole rider, whatever the number of members. */
+  readonly weight: number;
+  /** `1/n_c` (§19.6), in `(0, 1]`. */
+  readonly share: number;
+  /** The vertical gabarit `h_rider`, m — the ellipsoid of §19.5 is deduced from it. */
+  readonly hRider: number;
+};
+
+/** One span posed to §19's spatial solver. `rider: null` is the unloaded line. */
+export type SpatialSpanInput = {
+  /** Horizontal span, m. */
+  readonly L: number;
+  /** B's height above A, m. */
+  readonly h: number;
+  /** Unstretched length, m. */
+  readonly L0: number;
+  /** Weight per unstretched metre, N/m — never divided between members (§19.6). */
+  readonly w: number;
+  /** Axial stiffness, N. */
+  readonly EA: number;
+  /** Breaking load, N — §5.4's chord bound runs when present, as in {@link SpanInput}. */
+  readonly strength?: number;
+  /** The line's aerodynamics under the Scenario's wind, or `null` when no wind is applied. */
+  readonly aero: LineAero | null;
+  /** The rider held at the unstretched coordinate `sP`, or `null`. */
+  readonly rider: (RiderLoad & { readonly sP: number }) | null;
+};
+
+/** §19.5's ellipsoid semi-axes, m: `a` along `x` (depth), `b` along `y` (width), `c` along `z`. */
+export type Ellipsoid = { readonly a: number; readonly b: number; readonly c: number };
+
+/** The trolley's node of a loaded spatial state (§19.11). */
+export type SpatialNode = {
+  /** The node's unstretched coordinate `S_P`, m. */
+  readonly sP: number;
+  /** The node `r_D = (x_D, y_D, z_D)`, m. */
+  readonly rD: Vec3;
+  /** `|F(S_P⁻)|` and `|F(S_P⁺)|`, N — nothing makes them equal (§19.3). */
+  readonly Tminus: number;
+  readonly Tplus: number;
+  /** The external force the rider puts on this member, `P_rider/n_c`, N (§19.6). */
+  readonly Pext: Vec3;
+};
+
+/**
+ * §19.11's spatial state: one equilibrium, scalars and echoed inputs only — sampling re-runs the
+ * same shot from them (§19.8), so no polyline is stored.
+ */
+export type SpatialState = {
+  /** `closed-form`: §4–§7 evaluated, no wind applied; `shooting`: §19.8's integration. */
+  readonly method: "closed-form" | "shooting";
+  /** The inputs, echoed. */
+  readonly input: SpatialSpanInput;
+  /** §19.8's resolution `N` the state was shot at — the sampler re-shoots with it. */
+  readonly steps: number;
+  /** `F(0)`, N — the force the line exerts on A, so also A's reaction. */
+  readonly FA: Vec3;
+  /** `F(L₀)`, N — B's reaction is `−F_B`. */
+  readonly FB: Vec3;
+  /** `|F_A|`, `|F_B|`, N. */
+  readonly TA: number;
+  readonly TB: number;
+  /** The greatest `|F|` over the nodes, both sides of the trolley included, N. */
+  readonly Tmax: number;
+  /** `F_x(0)` and `F_x(L₀)`, N — §19.7's `H_A`, `H_B`; equal without wind. */
+  readonly HA: number;
+  readonly HB: number;
+  /** The trolley's node, or `null` unloaded. */
+  readonly node: SpatialNode | null;
+  /** The rider's ellipsoid, or `null` unloaded. */
+  readonly ellipsoid: Ellipsoid | null;
+  /** `‖r(L₀) − B‖` reached, m. */
+  readonly closure: number;
+  /** Newton iterations spent, every attempt included. */
+  readonly iterations: number;
+};
+
+/** Failure is a value (§19.11); `warm` is what a caller continues from — `F_A` and the Jacobian. */
+export type SpatialSolveResult =
+  | { ok: true; state: SpatialState; warm: SpatialWarm }
+  | { ok: false; error: SolveError };
+
+/**
+ * §19.8's seed (1): the previous solution's `F_A`, and its last Jacobian `∂R/∂F_A` (row-major, 9
+ * entries) when the caller has one — a sweep carries both from one position to the next.
+ */
+export type SpatialWarm = { readonly FA: Vec3; readonly jacobian: readonly number[] | null };
+
+/** One solved slot of §19.12's sweep: the position's state scalars. */
+export type SpatialStep = {
+  /** Rider's unstretched coordinate, m. */
+  readonly sD: number;
+  /** The trolley's node, m. */
+  readonly rD: Vec3;
+  readonly FA: Vec3;
+  readonly FB: Vec3;
+  readonly TA: number;
+  readonly TB: number;
+  readonly Tmax: number;
+  readonly HA: number;
+  readonly HB: number;
+  readonly Tminus: number;
+  readonly Tplus: number;
+  /** The external force on this member at the node, N. */
+  readonly Pext: Vec3;
+};
+
+/** §19.12's slot: a solved step, or `null` — a hole, whose failure is in `failures`. */
+export type SpatialSlot = SpatialStep | null;
+
+/**
+ * §19.12's sweep: **one slot per grid position, in grid order, holes kept**. Nothing is compacted;
+ * `coverage < 1` makes the Verdict indéterminé (§19.14).
+ */
+export type SpatialSweepResult = {
+  /** `sweepGrid(L₀, n)` — 260 positions at the default `n`. */
+  readonly grid: Float64Array;
+  /** `slots[i]` belongs to `grid[i]`. */
+  readonly slots: readonly SpatialSlot[];
+  /** The holes, by grid index, with their failure. */
+  readonly failures: readonly { index: number; sD: number; error: SolveError }[];
+  /** `solved / grid.length`. */
+  readonly coverage: number;
+  /** The unloaded input swept — `L₀` included — echoed so a slot can be re-sampled. */
+  readonly input: SpatialSpanInput;
+  /** The rider swept. */
+  readonly rider: RiderLoad;
+  /** §19.8's `N` every slot was shot at. */
+  readonly steps: number;
+};

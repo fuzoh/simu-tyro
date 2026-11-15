@@ -1,7 +1,8 @@
 /**
  * The engine's public barrel — « v1 build spec » § 2 (*Module layout*: « `index.ts` public barrel
  * — the only path app code imports from ») over `docs/simulation-theory.md` §§4–7, §10, §11 and
- * §13, which are the sections the eleven modules below carry one apiece. This file re-exports and
+ * §13, which are the sections the eleven modules below carry one apiece, and §19's spatial statics
+ * (#127), which six more carry after them. This file re-exports and
  * **declares nothing**: it holds no constant, no formula and no type of its own, so there is
  * nothing here for §14's fabricated-value ledger to reach and nothing to keep in step with a
  * theory §.
@@ -33,20 +34,32 @@
  *   `loads` — not physics failures, and they are not part of this contract.
  */
 
-// —— types.ts — § 2's *Public types*, the frozen declarations ————————————————————————————————
+// —— types.ts — § 2's *Public types*, the frozen declarations, and §19's spatial block ————————————
 export type {
   ClearanceResult,
   DerivedMaterial,
+  Ellipsoid,
+  LineAero,
   MaterialSpec,
   PointLoad,
+  RiderLoad,
   SolveError,
   SolveNote,
   SolveResult,
   SpanInput,
   SpanState,
+  SpatialNode,
+  SpatialSlot,
+  SpatialSolveResult,
+  SpatialSpanInput,
+  SpatialState,
+  SpatialStep,
+  SpatialSweepResult,
+  SpatialWarm,
   SweepResult,
   SweepStep,
   Terrain,
+  Vec3,
 } from "./types.ts";
 
 // —— catenary.ts — §4.1 closed form ————————————————————————————————————————————————————————
@@ -178,3 +191,22 @@ export type {
   TrolleyFriction,
 } from "./dynamics.ts";
 export { airDensity, DYNAMICS, quasiStaticRatio, ride, ridePath } from "./dynamics.ts";
+
+// —— §19 — spatial quasi-static statics under gravity and wind (#127) ——————————————————————————
+// Additive: the plane names above keep their meaning, and without wind every spatial entry below
+// evaluates them (§19.16). `shoot.ts` stays internal — the integrator is the solver's and the
+// sampler's; a `SpatialState` is what crosses this boundary.
+//
+// `AERO` and the ellipsoid's two readers because the views and the help quote §19.4–§19.5's adopted
+// conventions; `lineAeroOf` because the app holds the `MaterialSpec`, and the missing textile
+// diameter (#127 Q37) is refused in one place; `windVectorAt` because the descent reads the wind
+// at its own `x` (§19.15).
+export { AERO, riderEllipsoid, riderProjectedArea, riderWindForce } from "./aero.ts";
+export { isAeroNil, lineAeroOf, windVectorAt } from "./spatial-load.ts";
+export { SPATIAL, solveSpatial } from "./spatial-solve.ts";
+export type { Reading, SpatialReadings, SpatialSamples } from "./spatial-sample.ts";
+export { hermiteAt, sampleSpatial, unloadedReadings } from "./spatial-sample.ts";
+export type { SpatialPose } from "./spatial-pose.ts";
+export { resolveSpatialL0 } from "./spatial-pose.ts";
+export { slotState, sweepSpatial, trajectoryRuns } from "./spatial-sweep.ts";
+export { evaluateSpatialClearance } from "./spatial-clearance.ts";
