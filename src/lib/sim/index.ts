@@ -188,9 +188,11 @@ export type {
   RideInput,
   RidePath,
   RideSample,
+  RideWind,
   TrolleyFriction,
 } from "./dynamics.ts";
-export { airDensity, DYNAMICS, quasiStaticRatio, ride, ridePath } from "./dynamics.ts";
+// `locusPath` is §19.15's locus over a spatial sweep — the descent's trajectory under wind.
+export { airDensity, DYNAMICS, locusPath, quasiStaticRatio, ride, ridePath } from "./dynamics.ts";
 
 // —— §19 — spatial quasi-static statics under gravity and wind (#127) ——————————————————————————
 // Additive: the plane names above keep their meaning, and without wind every spatial entry below
@@ -208,5 +210,8 @@ export type { Reading, SpatialReadings, SpatialSamples } from "./spatial-sample.
 export { hermiteAt, sampleSpatial, unloadedReadings } from "./spatial-sample.ts";
 export type { SpatialPose } from "./spatial-pose.ts";
 export { resolveSpatialL0 } from "./spatial-pose.ts";
-export { slotState, sweepSpatial, trajectoryRuns } from "./spatial-sweep.ts";
-export { evaluateSpatialClearance } from "./spatial-clearance.ts";
+// `planeSweep` and `solvedClearance` are §19.11's coupe projection in the plane engine's shapes —
+// the Verdict's scan, the coupe and the strip read §6.2's `SweepResult` and §11's solved-aligned
+// arrays, and the projection is the engine's so that no view re-derives `θ` from forces.
+export { planeSweep, slotState, sweepSpatial, trajectoryRuns } from "./spatial-sweep.ts";
+export { evaluateSpatialClearance, solvedClearance } from "./spatial-clearance.ts";

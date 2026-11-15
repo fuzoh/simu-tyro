@@ -24,6 +24,7 @@ import type {
   SpatialSweepResult,
   SpatialState,
   SpatialWarm,
+  SweepResult,
   SweepStep,
   SolveError,
   Vec3,
@@ -56,6 +57,7 @@ function slotOf(state: SpatialState): SpatialStep {
     HB: state.HB,
     Tminus: node.Tminus,
     Tplus: node.Tplus,
+    Fminus: node.Fminus,
     Pext: node.Pext,
   };
 }
@@ -81,6 +83,7 @@ function lift(step: SweepStep, input: SpanInput, P: number): SpatialStep {
     HB: H,
     Tminus: Math.hypot(H, below),
     Tplus: Math.hypot(H, below + P),
+    Fminus: vec(H, 0, below),
     Pext: vec(0, 0, -P),
   };
 }
@@ -230,7 +233,14 @@ export function slotState(result: SpatialSweepResult, i: number): SpatialState |
     Tmax: slot.Tmax,
     HA: slot.HA,
     HB: slot.HB,
-    node: { sP: slot.sD, rD: slot.rD, Tminus: slot.Tminus, Tplus: slot.Tplus, Pext: slot.Pext },
+    node: {
+      sP: slot.sD,
+      rD: slot.rD,
+      Tminus: slot.Tminus,
+      Tplus: slot.Tplus,
+      Fminus: slot.Fminus,
+      Pext: slot.Pext,
+    },
     ellipsoid: riderEllipsoid(rider.hRider),
     // The slot keeps the position's scalars, not its solve's diagnostics.
     closure: Number.NaN,
@@ -256,4 +266,37 @@ export function trajectoryRuns(result: SpatialSweepResult): number[][] {
   }
   if (run.length > 0) runs.push(run);
   return runs;
+}
+
+/**
+ * §19.11's coupe projection of a sweep, as §6.2's {@link SweepResult}: one {@link SweepStep} per
+ * **solved** slot, in grid order, with the holes in `failures` and `coverage` unchanged — the shape
+ * the Verdict's scan, the coupe and the strip already read. Per slot: `x_D`, `z_D` the node's own;
+ * `T_A`, `T_B` the reactions' norms; `H` and `θ` read on the A side of the trolley, `F_x⁻` and
+ * `atan2(F_z⁻, F_x⁻)` — the slope of the line's `(x, z)` projection at the node; `V₀ = F_z(0)`.
+ *
+ * A projection, not a second result: `y` and the lateral forces stay on the spatial slots. Without
+ * wind every slot is §6.2's step lifted, so this returns `sweep()`'s own steps, bit for bit (§19.16).
+ */
+export function planeSweep(result: SpatialSweepResult): SweepResult {
+  const steps: SweepStep[] = [];
+  for (const slot of result.slots) {
+    if (slot === null) continue;
+    steps.push({
+      sD: slot.sD,
+      xD: slot.rD.x,
+      zD: slot.rD.z,
+      H: slot.Fminus.x,
+      V0: slot.FA.z,
+      TA: slot.TA,
+      TB: slot.TB,
+      theta: Math.atan2(slot.Fminus.z, slot.Fminus.x),
+    });
+  }
+  return {
+    grid: result.grid,
+    steps,
+    failures: result.failures.map((failure) => ({ ...failure })),
+    coverage: result.coverage,
+  };
 }

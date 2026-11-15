@@ -275,22 +275,28 @@ simulateur **n'applique pas** de combinaison normative : il juge l'enveloppe phy
 tension sur la traversée, majorée au départ) contre la marge exigée, et montre la formule non
 confirmée à titre d'information seulement.
 
-**Le vent** sur la ligne et sur le passager ne s'ajoute pas aux tensions jugées : le modèle de la
-ligne est plan (vertical), et la vitesse de vent de dimensionnement de la norme est payante. Le
-vent saisi n'intervient que dans l'estimation du mouvement du passager
-([4.2](4-dynamique.md#s-4-2)) et dans le dessin qualitatif de la Banane.
+**Le vent saisi** entre dans les tensions jugées dès qu'il est appliqué — une vitesse et les
+Positions de A et B, qui donnent l'orientation de la ligne : la traînée sur la ligne et sur le
+passager immobile s'ajoute à leur poids, la ligne quitte le plan vertical, et le Verdict juge les
+tensions de cette ligne ([§19.14](../simulation-theory.md#s-19-14)). Sur une corde, le diamètre
+est alors requis : la traînée se calcule sur lui. Les valeurs aérodynamiques retenues sont des
+conventions adoptées ([§19.4](../simulation-theory.md#s-19-4),
+[§19.5](../simulation-theory.md#s-19-5)), pas des mesures. Une position du passager où le calcul
+n'a pas convergé n'est ni comblée ni interpolée : le Verdict est alors « Indéterminé ». La vitesse
+de vent de dimensionnement de la norme reste payante : le simulateur ne juge que le vent saisi.
 
 **Le profil du vent.** La référence décrit un vent dont la vitesse varie le long de la ligne :
 entière au milieu de la portée, plus faible aux deux ancrages. Deux réglages le fixent : la
 largeur à mi-atténuation (de 10 à 90 % de la portée) et l'atténuation aux ancrages (de 0 à
-100 %). C'est un scénario que l'on prescrit, pas une prévision du vent dans la vallée. **Aucun
-calcul ne le lit encore** : le mouvement du passager et la Banane prennent une seule vitesse pour
-toute la ligne. Le simulateur n'accepte donc que le **vent uniforme** (atténuation à 0 %) : il ne
+100 %). C'est un scénario que l'on prescrit, pas une prévision du vent dans la vallée. **Il n'est
+pas encore proposé** : la Banane et la lecture de la rose prennent une seule vitesse pour toute la
+ligne. Le simulateur n'accepte donc que le **vent uniforme** (atténuation à 0 %) : il ne
 propose pas encore ces deux réglages, et un lien qui porte un profil non uniforme est refusé —
 avec la commande « Passer au vent uniforme » pour le corriger — plutôt que calculé comme un vent
 uniforme.
 
-Référence : [§8.3](../simulation-theory.md#s-8-3), [§8.4](../simulation-theory.md#s-8-4).
+Référence : [§8.3](../simulation-theory.md#s-8-3), [§8.4](../simulation-theory.md#s-8-4),
+[§19](../simulation-theory.md#s-19).
 
 ---
 

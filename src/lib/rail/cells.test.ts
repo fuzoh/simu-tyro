@@ -44,6 +44,7 @@ function riderOf(patch: (draft: ScenarioDraft) => void = () => {}): PlacedRider 
   const swept = sweepRider(unloaded, sweepRiderOf(draft));
   if (swept === null) throw new Error("expected the traverse to solve");
   const { input, state, span } = unloaded;
+  if (state === null) throw new Error("expected a line without wind");
   const { L, h, terrain } = span;
   const { P } = swept;
   const { hRider, anchorZone } = draft.rider;

@@ -7,7 +7,6 @@ import type { Positions, ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { buildSceneBase, buildSceneFrame } from "@/lib/chart/scene.ts";
-import { windBearing } from "@/lib/rail/gates.ts";
 import { readDynamics } from "@/lib/scenario/dynamics.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { sweepRiderOf } from "@/lib/scenario/traverse.ts";
@@ -58,7 +57,7 @@ export function ridesUnder(
   const frame = buildSceneFrame(unloaded.span);
   const base = buildSceneBase(frame, unloaded, sweepRiderOf(withWind));
   if (frame === null || base === null) throw new Error("the shipped line solves");
-  const reading = readDynamics(withWind, base, base, profil, windBearing(withWind));
+  const reading = readDynamics(withWind, base.line, base, profil);
   if (reading === null) throw new Error("a complete traverse has a ride");
   const outputs = dynamiqueOutputs(reading, withWind.material.family);
   return { frame, base, reading, outputs, solved: { base, rides: { reading, outputs } } };

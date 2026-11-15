@@ -101,7 +101,7 @@ const descent = ride({
   CdA: DYNAMICS.CdA,
   rho: DYNAMICS.rhoSeaLevel,
   trolley: DYNAMICS.steel,
-  windAlong: 0,
+  wind: null,
 });
 
 describe("chapter 1 — the opening line's unloaded statics", () => {

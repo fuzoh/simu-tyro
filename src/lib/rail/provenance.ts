@@ -492,7 +492,7 @@ export function warningLadder(
 export const NOT_COMPUTED_LINES = [
   "La combinaison de charges normative EN 15567 n'est pas appliquée — texte payant.",
   "L'essai de charge 2× (WorkSafe QLD) n'est pas évalué.",
-  "Banane chiffrée en mètres et garde au sol sous vent avec passager : hors périmètre (§8.4, modèle 2-D). La Banane n'est qu'une allure dessinée.",
+  "Garde au sol hors axe sur un versant réel et distance minimale aux obstacles 3D : hors périmètre (§19.13) ; l'écart latéral est calculé avec des conventions adoptées (§19.4, §19.5).",
   "Freinage et tension dynamique de la ligne : hors périmètre (§12.2, §12.3). La dynamique du passager n'est qu'une estimation, hors verdict.",
   "Aucune attestation de conformité.",
 ] as const;

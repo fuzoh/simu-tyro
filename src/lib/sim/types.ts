@@ -366,6 +366,11 @@ export type SpatialNode = {
   /** `|F(S_P⁻)|` and `|F(S_P⁺)|`, N — nothing makes them equal (§19.3). */
   readonly Tminus: number;
   readonly Tplus: number;
+  /**
+   * `F(S_P⁻)`, N — the internal force on the A side of the trolley, whose norm is `T⁻`. The slope
+   * of the coupe's projection at the node is `atan2(F_z⁻, F_x⁻)`, §6.2's `θ` read on the same side.
+   */
+  readonly Fminus: Vec3;
   /** The external force the rider puts on this member, `P_rider/n_c`, N (§19.6). */
   readonly Pext: Vec3;
 };
@@ -429,6 +434,8 @@ export type SpatialStep = {
   readonly HB: number;
   readonly Tminus: number;
   readonly Tplus: number;
+  /** `F(S_P⁻)`, N — {@link SpatialNode.Fminus}. */
+  readonly Fminus: Vec3;
   /** The external force on this member at the node, N. */
   readonly Pext: Vec3;
 };

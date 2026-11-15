@@ -60,6 +60,9 @@ export type TermId =
   | "sag"
   | "sagRatio"
   | "loadedSag"
+  | "lateralOffset"
+  | "maxOffset"
+  | "rise"
   | "span"
   | "elevationDifference"
   // The ground.
@@ -217,6 +220,13 @@ export const LABELS = {
   standingTension: exactOnly("tension à vide"),
   unstretchedLength: { terrain: "longueur à vide", exact: "longueur non tendue" },
   sag: { terrain: "flèche", exact: "flèche à vide" },
+  // §19.7's lateral readings of the line posed under the Vent (#127): the greatest `|y|`, signed by
+  // its side of A → B, and the greatest distance to A–B combined at each `x` — never « déport »,
+  // which named the qualitative Banane (#118).
+  lateralOffset: same("écart latéral"),
+  maxOffset: same("écart maximal à A–B"),
+  // A line the Vent lifts above A–B reads a flèche of zero; its rise is said beside it (§19.7).
+  rise: exactOnly("hauteur au-dessus de A–B"),
   sagRatio: exactOnly("flèche / portée"),
   loadedSag: same("flèche chargée"),
   span: same("portée"),

@@ -51,7 +51,7 @@ describe("`traverseInputs` — the fields a memo keys on", () => {
     for (const key of KEYS) expect(scrubbed[key]).toBe(inputs[key]);
   });
 
-  test("a wind edit changes `wind` alone: the Wind Gate judges it, no statics number reads it", () => {
+  test("a wind edit changes `wind` alone: the key the statics read it under (§19)", () => {
     const wind = { ...before.wind, speedKmh: 50, directionDeg: 45 };
     const windy = traverseInputs({ ...before, wind });
     expect(windy.wind).toBe(wind);
@@ -155,5 +155,54 @@ describe("`sweepRider` — two Brins porteurs, each solved under P/2", () => {
 
   test("half the load hangs the member higher, so the garde over the traverse grows", () => {
     expect(two.clearance.hMin).toBeGreaterThan(one.clearance.hMin);
+  });
+});
+
+describe("`sweepRider` under the Vent — §19.6 and the mirror of the wind", () => {
+  const north = { A: { lat: 46.8, lon: 7.4 }, B: { lat: 46.801, lon: 7.4 } };
+  const rope: ScenarioDraft["material"] = {
+    family: "textile",
+    ropeClass: "hmpe",
+    MBL: 90_000,
+    mu: 0.0855,
+    k: 22,
+    d: 11,
+  };
+  const windyLine = (directionDeg: number) => {
+    const draft = firstRunDefaults() as ScenarioDraft;
+    draft.material = rope;
+    draft.positions = north;
+    draft.wind = { ...draft.wind, speedKmh: 40, directionDeg };
+    const unloaded = deriveUnloaded(unloadedInputs(draft, null));
+    if (!unloaded.ok) throw new Error("the windy rope solves");
+    return unloaded;
+  };
+  const rider = (carryingLines: 1 | 2) => ({ mp: 120, hRider: 2.1, anchorZone: 10, carryingLines });
+
+  test("a wind from the other side of the line mirrors it: same tensions, y opposite", () => {
+    const east = sweepRider(windyLine(90), rider(1));
+    const west = sweepRider(windyLine(270), rider(1));
+    if (east === null || west === null) throw new Error("both traverses solve");
+    expect(east.spatial.coverage).toBe(1);
+    expect(west.spatial.coverage).toBe(1);
+    east.spatial.slots.forEach((slot, i) => {
+      const other = west.spatial.slots[i];
+      if (slot === null || other === null) throw new Error("no hole");
+      expect(other.TA / slot.TA).toBeCloseTo(1, 6);
+      expect(other.TB / slot.TB).toBeCloseTo(1, 6);
+      expect(other.rD.y).toBeCloseTo(-slot.rD.y, 6);
+      expect(other.rD.z).toBeCloseTo(slot.rD.z, 6);
+    });
+  });
+
+  test("two members each take half the passager's weight, and the sole carrier the whole", () => {
+    const unloaded = windyLine(90);
+    const one = sweepRider(unloaded, rider(1));
+    const two = sweepRider(unloaded, rider(2));
+    if (one === null || two === null) throw new Error("both traverses solve");
+    for (const slot of two.spatial.slots) expect(slot?.Pext.z).toBeCloseTo(-588.6, 9);
+    for (const slot of one.spatial.slots) expect(slot?.Pext.z).toBeCloseTo(-1177.2, 9);
+    // The « cas défavorable » is the single line under the whole rider vector, wind included.
+    expect(two.soleCarrier).toEqual(one.traverse);
   });
 });

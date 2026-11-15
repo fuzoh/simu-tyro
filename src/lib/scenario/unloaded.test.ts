@@ -29,13 +29,18 @@ const KEYS: readonly (keyof UnloadedInputs)[] = [
   "tensioningSide",
   "mp",
   "trace",
+  // The Vent, the Positions that give it a bearing and the typed `ρ`: under wind the line is posed
+  // under them (§19.7), so they key the unloaded memo too.
+  "wind",
+  "positions",
+  "rho",
 ];
 
 describe("`unloadedInputs` — the fields a memo keys on", () => {
   const before = scenario();
   const inputs = unloadedInputs(before, null);
 
-  test("exactly the seven inputs: no `x_D`, no `unit`", () => {
+  test("exactly the ten inputs: no `x_D`, no `unit`", () => {
     expect(Object.keys(inputs).sort()).toEqual([...KEYS].sort());
   });
 
@@ -131,5 +136,90 @@ describe("one call, one chain — `vi.mock` on the engine barrel", () => {
     expect(spies.solveSpan).toHaveBeenCalledTimes(1);
     vi.doUnmock("@/lib/sim");
     vi.resetModules();
+  });
+});
+
+describe("the line under the Vent (§19.7) — posed once, under the wind it carries", () => {
+  /** A rope the gates pass, its diameter typed or not. */
+  const rope = (d?: number): ScenarioDraft["material"] => ({
+    family: "textile",
+    ropeClass: "hmpe",
+    MBL: 90_000,
+    mu: 0.0855,
+    k: 22,
+    ...(d === undefined ? {} : { d }),
+  });
+  /** A to B toward the north, so a wind from the east blows across the line. */
+  const north: ScenarioDraft["positions"] = {
+    A: { lat: 46.8, lon: 7.4 },
+    B: { lat: 46.801, lon: 7.4 },
+  };
+  const under = (patch: (draft: ScenarioDraft) => void) =>
+    deriveUnloaded(unloadedInputs(scenario(patch), null));
+
+  test("a corde without its diameter stops at `material` under an applied Vent (Q37)", () => {
+    const windy = under((draft) => {
+      draft.material = rope();
+      draft.positions = north;
+      draft.wind = { ...draft.wind, speedKmh: 10, directionDeg: 90 };
+    });
+    expect(windy).toMatchObject({ ok: false, stage: "material", error: null });
+    // The same rope in still air needs no diameter: no formula reads it there.
+    const calm = under((draft) => {
+      draft.material = rope();
+      draft.positions = north;
+      draft.wind = { ...draft.wind, speedKmh: 0, directionDeg: 90 };
+    });
+    expect(calm.ok).toBe(true);
+  });
+
+  test("a Vent without Positions has no bearing: the line is the still-air one", () => {
+    const unplaced = under((draft) => {
+      draft.wind = { ...draft.wind, speedKmh: 40, directionDeg: 90 };
+    });
+    const still = under(() => {});
+    if (!unplaced.ok || !still.ok) throw new Error("expected both lines to solve");
+    expect(unplaced.aero).toBeNull();
+    expect(unplaced.L0).toBe(still.L0);
+    expect(unplaced.spatial).toEqual(still.spatial);
+  });
+
+  test("a crosswind lifts the line out of the plane: no plane state, a lateral offset", () => {
+    const windy = under((draft) => {
+      draft.material = rope(11);
+      draft.positions = north;
+      draft.wind = { ...draft.wind, speedKmh: 40, directionDeg: 90 };
+    });
+    if (!windy.ok) throw new Error("expected the windy rope to solve");
+    expect(windy.aero).not.toBeNull();
+    expect(windy.state).toBeNull();
+    // From the east onto a line toward the north: pushed west, to the left of A → B (+y, §19.2).
+    expect(windy.readings.lateral.value).toBeGreaterThan(0);
+    expect(windy.readings.ecart.value).toBeGreaterThan(windy.readings.sag.value);
+  });
+
+  test.each(["A", "B"] as const)(
+    "the prétension holds at the tensioning anchor %s under wind (§19.7)",
+    (side) => {
+      const T_target = 3000;
+      const windy = under((draft) => {
+        draft.material = rope(11);
+        draft.positions = north;
+        draft.wind = { ...draft.wind, speedKmh: 40, directionDeg: 90 };
+        draft.tightness = { mode: "anchor", T_target };
+        draft.tensioningSide = side;
+      });
+      if (!windy.ok) throw new Error("expected the windy rope to solve");
+      expect(Math.abs(windy.pose.T / T_target - 1)).toBeLessThan(1e-6);
+    },
+  );
+
+  test("an unreadable Vent stops at `wind`", () => {
+    const negative = under((draft) => {
+      draft.material = rope(11);
+      draft.positions = north;
+      draft.wind = { ...draft.wind, speedKmh: 40, directionDeg: 90, attenuationPct: 140 };
+    });
+    expect(negative).toMatchObject({ ok: false, stage: "wind", error: null });
   });
 });

@@ -12,8 +12,9 @@ propriété garantie de la ligne réelle.
 | Hypothèse | Conséquence | Où |
 | --- | --- | --- |
 | Une seule portée, sans appui intermédiaire | pas de ligne à plusieurs travées | [1.1](1-ligne.md#s-1-1) |
-| La ligne reste dans le **plan vertical** A–B | pas de déplacement latéral sous le vent ; la Banane n'est qu'une allure dessinée | [3.9](3-securite.md#s-3-9) |
-| Toutes les charges sont **verticales** | $H$ est la même tout le long de la ligne | [1.5](1-ligne.md#s-1-5) |
+| Sans vent appliqué, la ligne reste dans le **plan vertical** A–B, et toutes les charges sont **verticales** | $H$ est la même tout le long de la ligne | [1.5](1-ligne.md#s-1-5) |
+| Sous vent, **traînée normale** sur un diamètre déclaré et passager en **ellipsoïde** fixe, valeurs aérodynamiques adoptées | l'écart latéral et les tensions sous vent reposent sur des conventions, pas sur des mesures | [3.9](3-securite.md#s-3-9) |
+| Sous vent, le **terrain est extrudé** latéralement | la garde se lit au profil sous le chariot, quel que soit son écart latéral ; un versant réel n'est pas représenté | [3.9](3-securite.md#s-3-9) |
 | Matériau **élastique linéaire**, $EA$ constant | la souplesse non linéaire du polyamide et la souplesse du HMPE aux faibles charges ne sont pas représentées | [3.2](3-securite.md#s-3-2) |
 | **Ancrages rigides** | aucune souplesse d'arbre ou de mât ; c'est le choix prudent pour la tension | — |
 | Passager = **charge ponctuelle** | ni écartement des réas, ni balancement | [2.7](2-statique.md#s-2-7) |
@@ -22,7 +23,7 @@ propriété garantie de la ligne réelle.
 | Deux Brins porteurs partagent le passager **à 50/50** | non confirmé par l'essai ; d'où le Cas défavorable | [2.9](2-statique.md#s-2-9) |
 | Le sol est le profil reçu, **jamais lissé ni rééchantillonné** | la garde ne voit que les points du profil | [2.10](2-statique.md#s-2-10) |
 
-Référence : [§3](../simulation-theory.md#s-3), [§8.4](../simulation-theory.md#s-8-4),
+Référence : [§3](../simulation-theory.md#s-3), [§8.4](../simulation-theory.md#s-8-4), [§19](../simulation-theory.md#s-19),
 [§13.3](../simulation-theory.md#s-13-3), [§17](../simulation-theory.md#s-17).
 
 ## 5.2 Ce que l'outil ne calcule pas
@@ -31,7 +32,9 @@ La Page Avancé en garde la liste sous « Ce que cet outil ne calcule pas » :
 
 - la **combinaison de charges normative** EN 15567 (texte payant) ([3.9](3-securite.md#s-3-9)) ;
 - l'**essai de charge à 2 fois** exigé par WorkSafe QLD ([3.5](3-securite.md#s-3-5)) ;
-- la **Banane chiffrée en mètres** et la garde au sol sous vent avec passager (modèle plan) ;
+- la **garde au sol hors axe sur un versant réel** et la distance minimale aux obstacles en 3D ;
+  l'écart latéral, lui, est calculé avec des conventions adoptées
+  ([§19.13](../simulation-theory.md#s-19-13)) ;
 - le **freinage** et la **tension dynamique** de la ligne ([4.7](4-dynamique.md#s-4-7)) ; la
   dynamique du passager n'est qu'une estimation, hors Verdict ;
 - **aucune attestation de conformité**.

@@ -209,6 +209,21 @@ describe("« Cible inatteignable » — the bracket failure, naming the target",
     );
   });
 
+  // §19.10: under wind the pose inversion says why it failed. Only a target past the taut branch is
+  // a target nobody can reach; the rest is a calculation that did not converge (Q41).
+  test.each([
+    ["unreachable", "cible-inatteignable"],
+    ["non-monotone", "calcul-impossible"],
+    ["unresolved", "calcul-impossible"],
+    ["attempts", "calcul-impossible"],
+  ] as const)("under wind, a pose failing for « %s » is « %s »", (reason, id) => {
+    const refusal = engineRefusal(
+      { stage: "L0", error: { kind: "no-convergence", attempts: 5, residual: 1, reason } },
+      { tightness: { mode: "anchor", T_target: 3000 } },
+    );
+    expect(refusal?.id).toBe(id);
+  });
+
   test("the **same kind** out of `solveSpan` is « Calcul impossible », not this", () => {
     // ELECTIONS §0.2: `no-convergence` has two origins needing two surfaces, hence three states
     // and not the two a naive collapse gives. The stage is the whole of the distinction.
@@ -222,7 +237,7 @@ describe("« Cible inatteignable » — the bracket failure, naming the target",
 
 describe("« Calcul impossible » — two kinds, one surface, one non-action", () => {
   const copy =
-    "⛔ Calcul impossible pour cette configuration. Le solveur n'a pas convergé — ce cas n'est pas censé se produire. Modifiez légèrement la tension ou la géométrie.";
+    "⛔ Calcul impossible pour cette configuration. Le calcul n'a pas convergé, ce qui ne prouve pas que la ligne ne puisse pas exister. Modifiez légèrement la tension ou la géométrie.";
 
   test("`no-convergence` and `slack-limit` render the same surface", () => {
     const tightness = { mode: "sag", D_target: 6 } as const;

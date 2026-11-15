@@ -44,19 +44,32 @@ const NORTH = 0;
 const HEAD = 0;
 const TAIL = 180;
 
+/**
+ * The Scenario on a line running due north — its Positions give the Vent that bearing — or with no
+ * Positions at all, so no bearing and the Vent is not applied. The span stays the manual geometry's.
+ */
+function placed(scenario: ScenarioDraft, bearing: typeof NORTH | null): ScenarioDraft {
+  const positions =
+    bearing === null
+      ? { A: null, B: null }
+      : { A: { lat: 46.8, lon: 7.4 }, B: { lat: 46.81, lon: 7.4 } };
+  return { ...scenario, positions };
+}
+
 type Pose = {
   readonly profile?: Trace | null;
-  readonly bearing?: number | null;
+  readonly bearing?: typeof NORTH | null;
   readonly clearanceJudged?: boolean;
 };
 
 /** The Scenario solved, swept and ridden as the Page does it — the forward chain. */
-function forward(scenario: ScenarioDraft, { profile = null, bearing = NORTH }: Pose = {}) {
+function forward(given: ScenarioDraft, { profile = null, bearing = NORTH }: Pose = {}) {
+  const scenario = placed(given, bearing);
   const unloaded = deriveUnloaded(unloadedInputs(scenario, profile));
   if (!unloaded.ok) return { ok: false, unloaded } as const;
   const swept = sweepRider(unloaded, sweepRiderOf(scenario));
   if (swept === null) throw new Error("the traverse does not solve");
-  const reading = readDynamics(scenario, unloaded, swept, profile, bearing);
+  const reading = readDynamics(scenario, unloaded, swept, profile);
   if (reading === null) throw new Error("a complete traverse has a ride");
   return { ok: true, unloaded, swept, reading } as const;
 }
@@ -71,11 +84,10 @@ function propose(scenario: ScenarioDraft, pose: Pose = {}): ReachReading {
   const { profile = null, bearing = NORTH, clearanceJudged = true } = pose;
   const { unloaded, reading } = solved(scenario, pose);
   return proposeAnchorB({
-    scenario: traverseScenario(traverseInputs(scenario)),
+    scenario: traverseScenario(traverseInputs(placed(scenario, bearing))),
     unloaded,
     reading,
     profile,
-    bearing,
     clearanceJudged,
   });
 }
@@ -360,8 +372,8 @@ describe("`proposeAnchorB` — the inverse, checked against the forward chain", 
     if (once.reading.windy.end.kind !== "stop") throw new Error("the candidate stops short");
     expect(proposal.windy.stopX).toBeCloseTo(once.reading.windy.end.x, 9);
     expect(proposal.L0).toBeCloseTo(once.unloaded.L0, 9);
-    expect(proposal.Tvide.TA).toBeCloseTo(once.unloaded.state.TA, 6);
-    expect(proposal.Tvide.TB).toBeCloseTo(once.unloaded.state.TB, 6);
+    expect(proposal.Tvide.TA).toBeCloseTo(once.unloaded.spatial.TA, 6);
+    expect(proposal.Tvide.TB).toBeCloseTo(once.unloaded.spatial.TB, 6);
     expect(proposal.clearance).toBeCloseTo(once.swept.clearance.hMin, 9);
     expect(proposal.quasiStatic).toBe(once.reading.quasiStatic.exceeded);
   });
@@ -383,7 +395,6 @@ describe("`proposeAnchorB` — the inverse, checked against the forward chain", 
       unloaded,
       reading,
       profile: null,
-      bearing: NORTH,
       clearanceJudged: true,
     });
     expect(out.outcome.ok).toBe(true);
@@ -451,7 +462,7 @@ describe("the Tightness Driver is kept, and resolved afresh at every height", ()
     expect(proposalOf(held).Tvide.TA).toBeCloseTo(2634, 1);
     // The line's own state, both ends: B hangs lower, so its tension is the lighter one.
     const { unloaded } = solved(SHIPPED);
-    expect(held.current.Tvide).toEqual({ TA: unloaded.state.TA, TB: unloaded.state.TB });
+    expect(held.current.Tvide).toEqual({ TA: unloaded.spatial.TA, TB: unloaded.spatial.TB });
     expect(held.current.Tvide.TB).toBeLessThan(held.current.Tvide.TA);
 
     // A typed length is not re-cut, so raising B goes into the tension — the consequence of the
@@ -461,8 +472,8 @@ describe("the Tightness Driver is kept, and resolved afresh at every height", ()
     const proposal = proposalOf(reading);
     expect(proposal.deltaB).toBeGreaterThan(0);
     const once = solved(edited(cut, tenths(proposal.deltaB)));
-    expect(proposal.Tvide.TA).toBeCloseTo(once.unloaded.state.TA, 6);
-    expect(proposal.Tvide.TB).toBeCloseTo(once.unloaded.state.TB, 6);
+    expect(proposal.Tvide.TA).toBeCloseTo(once.unloaded.spatial.TA, 6);
+    expect(proposal.Tvide.TB).toBeCloseTo(once.unloaded.spatial.TB, 6);
     expect(proposal.Tvide.TA).not.toBeCloseTo(reading.current.Tvide.TA, 0);
   });
 
@@ -564,19 +575,40 @@ describe("a refusal is a reason, never a height", () => {
     expect(refusalOf(reading)).toEqual({ kind: "unreachable", bound: "lowest", deltaB: 0 });
   });
 
-  test("a line climbing at 45° and the passager still past the target: out of reach, highest", () => {
-    // Only a gale does it — 400 km/h in the back, far outside any line's use: the bound is the
-    // one thing read here. The dénivelé may grow to the span: 150 − (−18) = 168 m.
-    const gale: ScenarioDraft = {
-      ...targeting(SHIPPED, 50),
-      wind: { ...SHIPPED.wind, speedKmh: 400, directionDeg: TAIL },
-    };
-    expect(refusalOf(propose(gale))).toEqual({
-      kind: "unreachable",
-      bound: "highest",
-      deltaB: 168,
+  test("a line climbing at 45° and the passager still past the target: out of reach, highest", async () => {
+    // The bound is the one thing read here. It took a 400 km/h gale in the back while only the ride
+    // read the Vent; under §19 that gale carries the loaded line past B, where the wind has no value
+    // (`outside-model`), so the ride is injected instead (`testing.md`: injected, not hunted) — one
+    // that arrives at B on every height. The dénivelé may grow to the span: 150 − (−18) = 168 m.
+    vi.resetModules();
+    vi.doMock("@/lib/sim", async () => {
+      const sim = await vi.importActual<typeof import("@/lib/sim")>("@/lib/sim");
+      const ride: typeof sim.ride = () => ({
+        samples: [{ t: 0, x: 0, z: 0, v: 0, a: 0 }],
+        end: { kind: "arrival", v: 3, t: 20 },
+      });
+      return { ...sim, ride };
     });
-    expect(farthestAt(gale, 1680).atB).toBe(true);
+    try {
+      const mocked = await import("./reach.ts");
+      const scenario = targeting(SHIPPED, 50);
+      const { unloaded, reading } = solved(scenario);
+      const arrival: Ride = {
+        samples: [{ t: 0, x: 0, z: 0, v: 0, a: 0 }],
+        end: { kind: "arrival", v: 3, t: 20 },
+      };
+      const out = mocked.proposeAnchorB({
+        scenario: traverseScenario(traverseInputs(scenario)),
+        unloaded,
+        reading: { ...reading, calm: arrival, windy: arrival },
+        profile: null,
+        clearanceJudged: true,
+      });
+      expect(refusalOf(out)).toEqual({ kind: "unreachable", bound: "highest", deltaB: 168 });
+    } finally {
+      vi.doUnmock("@/lib/sim");
+      vi.resetModules();
+    }
   });
 
   test("a line that stops solving on the way: the height where it stops, and the engine's reason", () => {
@@ -713,7 +745,6 @@ describe("injected — `vi.doMock` on the engine barrel", () => {
         unloaded,
         reading,
         profile: null,
-        bearing: NORTH,
         clearanceJudged: true,
       }),
     );

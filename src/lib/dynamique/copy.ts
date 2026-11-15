@@ -111,11 +111,11 @@ export const SWING_UNSETTLED = `puis ${NEVER_SETTLES}`;
 export const INCOMPLETE = "Traversée incomplète : ni point d'arrêt ni vitesse d'arrivée calculés.";
 
 /**
- * The sentence under the two rides when they are one: no wind entered, or one that does not push
- * along the line — a crosswind — so it names neither case.
+ * The sentence under the two rides when they are one: no Vent applied — none entered, or no bearing
+ * to project it on, which says itself on its ride. Under §19 a crosswind moves the line and enters
+ * the ride on its locus (§19.15), so it no longer makes them one.
  */
-export const COINCIDE_NOTE =
-  "Aucun vent ne pousse le long de la ligne : les deux points d'arrêt coïncident.";
+export const COINCIDE_NOTE = "Aucun vent appliqué : les deux points d'arrêt coïncident.";
 
 /** The curve's caption: what each line is, in the units it is read in. */
 export const CURVE_CAPTION = {

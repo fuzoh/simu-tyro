@@ -273,3 +273,35 @@ function planeClearance(
     whole: { ...plane.whole, atStepIndex: gridIndex(plane.whole.atStepIndex) },
   };
 }
+
+/**
+ * A grid-aligned {@link ClearanceResult} — {@link evaluateSpatialClearance}'s, one entry per slot,
+ * holes `NaN` — re-indexed on the **solved** slots alone, in grid order: the alignment of
+ * `planeSweep(swept).steps`, which §11's plane reducer always used. `atStepIndex` follows, and stays
+ * `−1` where it was. Without holes it is the same arrays, copied.
+ */
+export function solvedClearance(
+  clearance: ClearanceResult,
+  swept: Pick<SpatialSweepResult, "slots">,
+): ClearanceResult {
+  const index: number[] = [];
+  swept.slots.forEach((slot, i) => {
+    if (slot !== null) index.push(i);
+  });
+  const toSolved = new Map(index.map((grid, k) => [grid, k]));
+  const solvedIndex = (i: number) => (i < 0 ? -1 : (toSolved.get(i) ?? -1));
+  const pick = <A extends Float64Array | Uint8Array>(from: A, make: (n: number) => A): A => {
+    const out = make(index.length);
+    for (let k = 0; k < index.length; k++) out[k] = from[index[k]];
+    return out;
+  };
+  return {
+    ...clearance,
+    atStepIndex: solvedIndex(clearance.atStepIndex),
+    perStep: pick(clearance.perStep, (n) => new Float64Array(n)),
+    perStepX: pick(clearance.perStepX, (n) => new Float64Array(n)),
+    perStepCable: pick(clearance.perStepCable, (n) => new Uint8Array(n)),
+    perStepJudged: pick(clearance.perStepJudged, (n) => new Uint8Array(n)),
+    whole: { ...clearance.whole, atStepIndex: solvedIndex(clearance.whole.atStepIndex) },
+  };
+}

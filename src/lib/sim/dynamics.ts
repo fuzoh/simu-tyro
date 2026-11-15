@@ -16,14 +16,21 @@
  *   F_drag` holds on a câble as on a corde (Jojić 2025, éq. 18), but the friction does not travel:
  *   the SSF fit `F₀ + k_v·v` is a corde measurement and a câble gets §12.2's constant-`μ` fallback,
  *   an Unconfirmed Default. {@link TrolleyFriction} is the union that keeps them apart.
- * - **Wind enters as its projection on the tangent.** `v_rel` is the component of
- *   `v_passager − v_vent` along the trajectory, so only the along-line wind, times `cos θ`, ever
- *   reaches the drag; a cross wind changes nothing here.
+ * - **Wind enters as its projection on the tangent** (§19.15). `v_rel,t = v − u(x)·t`, with `u` the
+ *   horizontal wind **read at the passager's current `x`** and `t` the unit tangent of the locus
+ *   — in the vertical plane `v − u_x·cos θ`, §12.2's; on a locus that leaves it (`t_y ≠ 0`) the
+ *   crosswind enters too, `−u_y·t_y`. The « no along-line wind hence calm » shortcut is gone.
+ * - **The locus is the Sweep's** (§19.15): A, every solved trolley node `r_D` in grid order, B —
+ *   {@link ridePath} on the plane's steps, {@link locusPath} on §19.12's slots, which refuses a
+ *   hole: no descent across a position that did not converge (Q24).
  * - **The engine is dependency-free and SI** — m, s, kg, N, rad; positions and velocities are
  *   signed along A → B, `z` positive up, as §2 fixes.
  */
 
-import type { SweepStep } from "./types.ts";
+import type { SpatialSweepResult, SweepStep } from "./types.ts";
+
+import { isAeroNil } from "./spatial-load.ts";
+import { planeSweep } from "./spatial-sweep.ts";
 
 /**
  * The trolley's resistance, one law per family (§12.2, research #8). Never a pulley efficiency:
@@ -95,6 +102,11 @@ export function airDensity(altitude: number): number {
 export type RidePath = {
   /** Horizontal position, m, strictly increasing from `0` (A) to `L` (B). */
   readonly x: Float64Array;
+  /**
+   * Lateral position, m, to the left of A → B (§19.2). Zeros, or absent, on a trajectory in the
+   * vertical plane of A–B.
+   */
+  readonly y?: Float64Array;
   /** Height relative to A, m. */
   readonly z: Float64Array;
   /** Tension in the member at the trolley, N — what §12.1's wave speed reads. */
@@ -128,8 +140,62 @@ export function ridePath(
   x.push(L);
   z.push(h);
   T.push(tension(steps[steps.length - 1]));
-  return { x: Float64Array.from(x), z: Float64Array.from(z), T: Float64Array.from(T) };
+  return {
+    x: Float64Array.from(x),
+    y: new Float64Array(x.length),
+    z: Float64Array.from(z),
+    T: Float64Array.from(T),
+  };
 }
+
+/**
+ * §19.15's locus: A, the solved `r_D` of every slot in grid order, B — the trajectory the passager
+ * rides under wind. `T` is `|F|` at the node on the A side (`T⁻`), which is §12.1's `H/cos θ`
+ * without wind. A node that would not advance `x` is skipped, as {@link ridePath} skips a step.
+ *
+ * Without wind it **is** {@link ridePath} over the plane's steps, bit for bit (§19.16).
+ *
+ * @returns `null` when the sweep has a hole — no descent across a position that did not converge
+ *   (§19.15, Q24) — or no solved slot at all.
+ */
+export function locusPath(
+  result: SpatialSweepResult,
+  span: { readonly L: number; readonly h: number },
+): RidePath | null {
+  if (result.coverage < 1 || result.slots.some((slot) => slot === null)) return null;
+  if (result.slots.length === 0) return null;
+  if (isAeroNil(result.input.aero)) return ridePath(planeSweep(result).steps, span);
+  const { L, h } = span;
+  const slots = result.slots as readonly NonNullable<SpatialSweepResult["slots"][number]>[];
+  const x = [0];
+  const y = [0];
+  const z = [0];
+  const T = [slots[0].Tminus];
+  for (const slot of slots) {
+    if (!(slot.rD.x > x[x.length - 1] && slot.rD.x < L)) continue;
+    x.push(slot.rD.x);
+    y.push(slot.rD.y);
+    z.push(slot.rD.z);
+    T.push(slot.Tminus);
+  }
+  x.push(L);
+  y.push(0);
+  z.push(h);
+  T.push(slots[slots.length - 1].Tminus);
+  return {
+    x: Float64Array.from(x),
+    y: Float64Array.from(y),
+    z: Float64Array.from(z),
+    T: Float64Array.from(T),
+  };
+}
+
+/**
+ * The horizontal wind a ride reads at an abscissa, m/s, in §19.2's frame: `u_x` along A → B (> 0
+ * dans le dos), `u_y` to the left of A → B. `windVectorAt` over the Scenario's field, read at the
+ * passager's current `x` (§19.15).
+ */
+export type RideWind = (x: number) => { readonly ux: number; readonly uy: number };
 
 /** One ride posed to the integrator. */
 export type RideInput = {
@@ -141,8 +207,8 @@ export type RideInput = {
   /** `ρ`, kg/m³. */
   readonly rho: number;
   readonly trolley: TrolleyFriction;
-  /** The wind's horizontal component along A → B, m/s — positive blows toward B (dans le dos). */
-  readonly windAlong: number;
+  /** The wind along the locus (§19.15), or `null` for still air. */
+  readonly wind: RideWind | null;
 };
 
 /** The passager at one instant. */
@@ -151,6 +217,8 @@ export type RideSample = {
   readonly t: number;
   /** Horizontal position, m. */
   readonly x: number;
+  /** Lateral position, m, to the left of A → B — `0` on a plane trajectory. */
+  readonly y?: number;
   /** Height relative to A, m. */
   readonly z: number;
   /** Speed along the trajectory, m/s — signed, positive toward B. */
@@ -189,64 +257,81 @@ type Rest = { i: number; sigma: number; d: 1 | -1 };
  * At rest on a segment the passager starts again only if the net drive — gravity along the
  * trajectory plus the wind's drag at zero speed — beats the trolley's hold, `F₀` or `μ·N`.
  */
-export function ride({ path, m, CdA, rho, trolley, windAlong: u }: RideInput): Ride {
+export function ride({ path, m, CdA, rho, trolley, wind }: RideInput): Ride {
   const { g } = DYNAMICS;
   const n = path.x.length - 1;
+  const ys = path.y ?? new Float64Array(n + 1);
   const length = new Float64Array(n);
-  const sin = new Float64Array(n);
-  const cos = new Float64Array(n);
+  // The segment's unit tangent `t`, and `√(t_x² + t_y²)`, the cosine of its inclination to the
+  // horizontal — §12.2's `cos θ`, which the câble's normal force reads (§19.15).
+  const tx = new Float64Array(n);
+  const ty = new Float64Array(n);
+  const tz = new Float64Array(n);
+  const flat = new Float64Array(n);
   for (let i = 0; i < n; i++) {
     const dx = path.x[i + 1] - path.x[i];
+    const dy = ys[i + 1] - ys[i];
     const dz = path.z[i + 1] - path.z[i];
-    length[i] = Math.hypot(dx, dz);
-    sin[i] = dz / length[i];
-    cos[i] = dx / length[i];
+    // In the vertical plane the arithmetic stays §12.2's own, bit for bit (§19.16).
+    length[i] = dy === 0 ? Math.hypot(dx, dz) : Math.hypot(dx, dy, dz);
+    tx[i] = dx / length[i];
+    ty[i] = dy / length[i];
+    tz[i] = dz / length[i];
+    flat[i] = dy === 0 ? Math.abs(tx[i]) : Math.hypot(tx[i], ty[i]);
   }
   /** `½·ρ·C_dA`, kg/m. */
   const drag = 0.5 * rho * CdA;
+
+  /** `u(x)·t` on segment `i` at `sigma` along it, m/s — the wind read where the passager is. */
+  const windOn = (i: number, sigma: number) => {
+    if (wind === null) return 0;
+    const u = wind(path.x[i] + sigma * tx[i]);
+    return u.ux * tx[i] + u.uy * ty[i];
+  };
 
   /** The trolley's resistance on segment `i` at a speed, N — magnitude, opposed to the travel. */
   const resistance: (i: number, speed: number) => number =
     trolley.law === "ssf"
       ? (_i: number, speed: number) => trolley.F0 + trolley.kv * speed
-      : (i: number) => trolley.mu * m * g * cos[i];
+      : (i: number) => trolley.mu * m * g * flat[i];
 
-  /** §12.2's acceleration along A → B on segment `i`, at velocity `v`, travelling in `d`. */
-  const accel = (i: number, v: number, d: 1 | -1) => {
-    // `v_rel`: `v_passager − v_vent` projected on the tangent (research #8, #89).
-    const rel = v - u * cos[i];
-    return -g * sin[i] - (d * resistance(i, Math.abs(v)) + drag * rel * Math.abs(rel)) / m;
+  /** §19.15's acceleration along A → B on segment `i` at `sigma`, at velocity `v`, travelling in `d`. */
+  const accel = (i: number, sigma: number, v: number, d: 1 | -1) => {
+    // `v_rel,t = v − u(x)·t` (§19.15; research #8, #89).
+    const rel = v - windOn(i, sigma);
+    return -g * tz[i] - (d * resistance(i, Math.abs(v)) + drag * rel * Math.abs(rel)) / m;
   };
 
   /** `d(v²/2)/dσ` travelling in `d`, which is the acceleration counted along the travel. */
-  const slope = (i: number, e: number, d: 1 | -1) =>
-    d * accel(i, d * Math.sqrt(2 * Math.max(e, 0)), d);
+  const slope = (i: number, sigma: number, e: number, d: 1 | -1) =>
+    d * accel(i, sigma, d * Math.sqrt(2 * Math.max(e, 0)), d);
 
-  /** One classical Runge–Kutta step of `v²/2` over `h` metres of segment `i`. */
-  const step = (i: number, e: number, d: 1 | -1, h: number) => {
-    const k1 = slope(i, e, d);
-    const k2 = slope(i, e + 0.5 * h * k1, d);
-    const k3 = slope(i, e + 0.5 * h * k2, d);
-    const k4 = slope(i, e + h * k3, d);
+  /** One classical Runge–Kutta step of `v²/2` over `h` metres of segment `i`, from `sigma`. */
+  const step = (i: number, sigma: number, e: number, d: 1 | -1, h: number) => {
+    const half = sigma + 0.5 * d * h;
+    const k1 = slope(i, sigma, e, d);
+    const k2 = slope(i, half, e + 0.5 * h * k1, d);
+    const k3 = slope(i, half, e + 0.5 * h * k2, d);
+    const k4 = slope(i, sigma + d * h, e + h * k3, d);
     return e + (h / 6) * (k1 + 2 * k2 + 2 * k3 + k4);
   };
 
   /** The distance in `(0, h]` at which `v²/2` reaches zero, by bisection on the step's length. */
-  const turningDistance = (i: number, e: number, d: 1 | -1, h: number) => {
+  const turningDistance = (i: number, sigma: number, e: number, d: 1 | -1, h: number) => {
     let lo = 0;
     let hi = h;
     for (let k = 0; k < 60; k++) {
       const mid = 0.5 * (lo + hi);
-      if (step(i, e, d, mid) >= 0) lo = mid;
+      if (step(i, sigma, e, d, mid) >= 0) lo = mid;
       else hi = mid;
     }
     return lo;
   };
 
-  /** Along A → B, the force at rest on segment `i`: gravity, and the wind's drag at `v = 0`. */
-  const drive = (i: number) => {
-    const rel = -u * cos[i];
-    return -m * g * sin[i] - drag * rel * Math.abs(rel);
+  /** Along A → B, the force at rest on segment `i` at `sigma`: gravity, and the wind at `v = 0`. */
+  const drive = (i: number, sigma: number) => {
+    const rel = -windOn(i, sigma);
+    return -m * g * tz[i] - drag * rel * Math.abs(rel);
   };
 
   /**
@@ -255,16 +340,18 @@ export function ride({ path, m, CdA, rho, trolley, windAlong: u }: RideInput): R
    * toward it holds. `"A"` and `"B"` are the line's ends.
    */
   const depart = (i: number, sigma: number): Rest | "A" | "B" | null => {
-    const F = drive(i);
+    const F = drive(i, sigma);
     if (Math.abs(F) <= resistance(i, 0)) return null;
     const d = F > 0 ? 1 : -1;
     if (d > 0 && sigma >= length[i]) {
       if (i === n - 1) return "B";
-      return drive(i + 1) > resistance(i + 1, 0) ? { i: i + 1, sigma: 0, d } : null;
+      return drive(i + 1, 0) > resistance(i + 1, 0) ? { i: i + 1, sigma: 0, d } : null;
     }
     if (d < 0 && sigma <= 0) {
       if (i === 0) return "A";
-      return drive(i - 1) < -resistance(i - 1, 0) ? { i: i - 1, sigma: length[i - 1], d } : null;
+      return drive(i - 1, length[i - 1]) < -resistance(i - 1, 0)
+        ? { i: i - 1, sigma: length[i - 1], d }
+        : null;
     }
     return { i, sigma, d };
   };
@@ -272,7 +359,14 @@ export function ride({ path, m, CdA, rho, trolley, windAlong: u }: RideInput): R
   const samples: RideSample[] = [];
   let t = 0;
   const record = (i: number, sigma: number, v: number, a: number) =>
-    samples.push({ t, x: path.x[i] + sigma * cos[i], z: path.z[i] + sigma * sin[i], v, a });
+    samples.push({
+      t,
+      x: path.x[i] + sigma * tx[i],
+      y: ys[i] + sigma * ty[i],
+      z: path.z[i] + sigma * tz[i],
+      v,
+      a,
+    });
 
   const start = depart(0, 0);
   if (start === null || start === "A" || start === "B") {
@@ -282,15 +376,15 @@ export function ride({ path, m, CdA, rho, trolley, windAlong: u }: RideInput): R
   let { i, sigma, d } = start;
   let e = 0;
   let restarts = 0;
-  record(i, sigma, 0, accel(i, 0, d));
+  record(i, sigma, 0, accel(i, sigma, 0, d));
 
   for (;;) {
     const remaining = d > 0 ? length[i] - sigma : sigma;
     const h = Math.min(DYNAMICS.step, remaining);
     const before = Math.sqrt(2 * e);
-    let after = step(i, e, d, h);
+    let after = step(i, sigma, e, d, h);
     const turned = after <= 0;
-    const travelled = after < 0 ? turningDistance(i, e, d, h) : h;
+    const travelled = after < 0 ? turningDistance(i, sigma, e, d, h) : h;
     if (turned) after = 0;
     const v = Math.sqrt(2 * after);
     if (before + v > 0) t += (2 * travelled) / (before + v);
@@ -300,19 +394,19 @@ export function ride({ path, m, CdA, rho, trolley, windAlong: u }: RideInput): R
     if (!turned) {
       if (sigma === (d > 0 ? length[i] : 0)) {
         if (d > 0 && i === n - 1) {
-          record(i, sigma, v, accel(i, v, d));
+          record(i, sigma, v, accel(i, sigma, v, d));
           return { samples, end: { kind: "arrival", v, t } };
         }
         if (d < 0 && i === 0) {
-          record(i, sigma, -v, accel(i, -v, d));
+          record(i, sigma, -v, accel(i, sigma, -v, d));
           return { samples, end: { kind: "stop", x: 0, t } };
         }
-        record(i, sigma, d * v, accel(i, d * v, d));
+        record(i, sigma, d * v, accel(i, sigma, d * v, d));
         i += d;
         sigma = d > 0 ? 0 : length[i];
         continue;
       }
-      record(i, sigma, d * v, accel(i, d * v, d));
+      record(i, sigma, d * v, accel(i, sigma, d * v, d));
       continue;
     }
 
@@ -332,7 +426,7 @@ export function ride({ path, m, CdA, rho, trolley, windAlong: u }: RideInput): R
       return { samples, end: { kind: "unsettled", t } };
     }
     ({ i, sigma, d } = next);
-    record(i, sigma, 0, accel(i, 0, d));
+    record(i, sigma, 0, accel(i, sigma, 0, d));
   }
 }
 

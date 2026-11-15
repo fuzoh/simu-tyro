@@ -37,29 +37,35 @@ function solved(scenario: ScenarioDraft): { unloaded: UnloadedLine; rider: Rider
   return { unloaded, rider };
 }
 
-/**
- * The line's bearing, unless a test says otherwise: due north, so the Vent's azimuth is its angle
- * from head-on — 0 a head wind, 90 from the right, 180 a tail wind.
- */
-const NORTH = 0;
+/** The four bearings a test turns the line to, as the Positions that give them exactly. */
+type Bearing = 0 | 90 | 180 | 270;
 
-function reading(
-  scenario: ScenarioDraft,
-  profile: Trace | null = null,
-  bearing: number | null = NORTH,
-) {
+/**
+ * The anchors' Positions for a line running at `bearing` — due north unless a test says otherwise,
+ * so the Vent's azimuth is its angle from head-on: 0 a head wind, 90 from the right, 180 a tail
+ * wind. The Positions give the Vent its bearing (`lineBearing`) and change nothing else: the span
+ * is the manual geometry's. `null` is no Positions, hence no bearing.
+ */
+function positionsFor(bearing: Bearing | null): ScenarioDraft["positions"] {
+  if (bearing === null) return { A: null, B: null };
+  const A = { lat: 46.8, lon: 7.4 };
+  const step = { 0: [0.01, 0], 90: [0, 0.01], 180: [-0.01, 0], 270: [0, -0.01] }[bearing];
+  return { A, B: { lat: A.lat + step[0], lon: A.lon + step[1] } };
+}
+
+function reading(scenario: ScenarioDraft, profile: Trace | null = null) {
   const { unloaded, rider } = solved(scenario);
-  const read = readDynamics(scenario, unloaded, rider, profile, bearing);
+  const read = readDynamics(scenario, unloaded, rider, profile);
   if (read === null) throw new Error("a complete traverse has a ride");
   return read;
 }
 
-function windy(directionDeg: number, bearing: number | null = NORTH) {
-  return reading(
-    { ...SHIPPED, wind: { ...SHIPPED.wind, speedKmh: 50, directionDeg } },
-    null,
-    bearing,
-  );
+function windy(directionDeg: number, bearing: Bearing | null = 0) {
+  return reading({
+    ...SHIPPED,
+    positions: positionsFor(bearing),
+    wind: { ...SHIPPED.wind, speedKmh: 50, directionDeg },
+  });
 }
 
 function lowest(one: Ride): number {
@@ -87,10 +93,13 @@ describe("`readDynamics` — what every dynamic output carries", () => {
     expect(shipped.warnings).toContain("steel-trolley-unconfirmed");
   });
 
-  test("a wind with a component along the line is not windless, and a crosswind or none is", () => {
+  test("an applied Vent is not windless, a crosswind included; no speed or no bearing is (§19.15)", () => {
     expect(shipped.windless).toBe(true);
     expect(windy(0).windless).toBe(false);
-    expect(windy(90).windless).toBe(true);
+    // Under §19 a crosswind moves the line sideways and enters the ride on the locus: the old
+    // « no along-line wind hence calm » shortcut is gone.
+    expect(windy(90).windless).toBe(false);
+    expect(windy(0, null).windless).toBe(true);
   });
 
   test("a corde rides on the SSF trolley, which carries no such warning", () => {
@@ -107,23 +116,37 @@ describe("`readDynamics` — what every dynamic output carries", () => {
     expect(tweak(CORDE, { mu: 0.03 })).toEqual(reading(CORDE).calm);
   });
 
-  test("an incomplete traverse has no ride: a slope nobody solved is not ridden", () => {
+  test("an incomplete traverse has no ride: a slope nobody solved is not ridden (Q24)", () => {
     const { unloaded, rider } = solved(SHIPPED);
-    const holed = { ...rider, traverse: { ...rider.traverse, coverage: 0.5 } };
-    expect(readDynamics(SHIPPED, unloaded, holed, null, NORTH)).toBeNull();
+    const slots = rider.spatial.slots.map((slot, i) => (i === 100 ? null : slot));
+    const holed = { spatial: { ...rider.spatial, slots, coverage: 259 / 260 } };
+    expect(readDynamics(SHIPPED, unloaded, holed, null)).toBeNull();
   });
 });
 
-describe("the windy ride — the Vent's component along the line", () => {
+describe("the windy ride — on the locus the Vent poses (§19.15)", () => {
   const calm = reading(SHIPPED);
 
   test("without wind, the windy ride is the calm one", () => {
     expect(calm.windy).toBe(calm.calm);
   });
 
-  test("a pure cross wind changes nothing, from either side", () => {
-    expect(windy(90).windy).toEqual(calm.calm);
-    expect(windy(270).windy).toEqual(calm.calm);
+  test("a pure crosswind moves the ride sideways, and from the other side it is its mirror", () => {
+    const right = windy(90);
+    const left = windy(270);
+    expect(right.windy).not.toEqual(calm.calm);
+    // §19.17 control 6: `u_y → −u_y` mirrors the line, so the locus and the ride: `y → −y`, the
+    // same `x`, `z` and speed — `v_rel,t` reads `u_y·t_y`, whose sign the mirror leaves alone.
+    const [a, b] = [right.windy.samples, left.windy.samples];
+    expect(a.length).toBe(b.length);
+    const lateral = Math.max(...a.map(({ y }) => Math.abs(y ?? 0)));
+    expect(lateral).toBeGreaterThan(0.1);
+    for (let i = 0; i < a.length; i += 17) {
+      expect(a[i].x).toBeCloseTo(b[i].x, 6);
+      expect(a[i].z).toBeCloseTo(b[i].z, 6);
+      expect(a[i].v).toBeCloseTo(b[i].v, 6);
+      expect(a[i].y ?? 0).toBeCloseTo(-(b[i].y ?? 0), 6);
+    }
   });
 
   test("a head wind stops the passager on the line the calm ride crosses whole", () => {
@@ -139,8 +162,10 @@ describe("the windy ride — the Vent's component along the line", () => {
     expect(pushed.end.v).toBeGreaterThan(still.end.v);
   });
 
-  test("the calm ride does not depend on the wind", () => {
+  test("the ride « sans vent » is the Scenario at zero wind, whatever the Vent (§19.15)", () => {
+    // The whole chain re-run in still air — pose, sweep, ride — not the windy locus ridden calm.
     expect(windy(0).calm).toEqual(calm.calm);
+    expect(windy(90).calm).toEqual(calm.calm);
   });
 });
 
@@ -160,15 +185,14 @@ describe("the windy ride — the Vent on the line's bearing", () => {
     expect(south.windy.end.v).toBeGreaterThan(calm.calm.end.v);
   });
 
-  test("a north wind on a line running east is a cross wind, and changes nothing", () => {
-    expect(windy(0, 90).windy).toEqual(calm.calm);
-    expect(windy(0, 90).windless).toBe(true);
-  });
-
   test("turning the line and the wind by the same angle rides the same", () => {
-    // The trial's west wind of 264° on its line at 312° is 312° from head-on, as a wind from 312°
-    // on a line running north.
-    expect(windy(264, 312).windy).toEqual(windy(312, NORTH).windy);
+    // A west wind on a line running west is the north wind on a line running north: head-on.
+    const turned = windy(270, 270).windy;
+    const north = windy(0, 0).windy;
+    expect(turned.end.kind).toBe(north.end.kind);
+    expect(turned.samples.length).toBe(north.samples.length);
+    const last = turned.samples.length - 1;
+    expect(turned.samples[last].x).toBeCloseTo(north.samples[last].x, 6);
   });
 
   test("without a bearing — no Positions — the Vent is not applied: the windy ride is the calm one", () => {
@@ -199,7 +223,7 @@ describe("two Brins porteurs — one member's trajectory under P/2, the whole pa
       CdA: SHIPPED.dynamics.CdA,
       rho: read.rho.value,
       trolley: { law: "coulomb", mu: SHIPPED.dynamics.mu },
-      windAlong: 0,
+      wind: null,
     });
     expect(read.calm).toEqual(whole);
   });

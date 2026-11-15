@@ -46,7 +46,13 @@ import type { VerdictState } from "@/lib/sim";
 import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { fieldErrorLabel, lowerFirst } from "@/lib/rail/fields.ts";
-import { blockingSummary, GATE_CONSEQUENCE, passedGates } from "@/lib/rail/gates.ts";
+import {
+  blockingSummary,
+  GATE_CONSEQUENCE,
+  passedGates,
+  readsStatics,
+  windTakesStatics,
+} from "@/lib/rail/gates.ts";
 import { NO_REGIME_BANNER_BY_REGISTER } from "@/lib/rail/results.ts";
 import { label } from "@/lib/vocabulary/labels.ts";
 
@@ -204,7 +210,12 @@ export function noResultCause({
 }): string | null {
   if (refusal !== null)
     return `${label("aucun-resultat", register)} — ${REFUSAL_CAUSE[refusal.id]}.`;
-  const first = standingReport(report, saisie).errors.find((error) => error.gate === "solve");
+  const standing = standingReport(report, saisie);
+  // A Vent or an air the statics read and the gates refuse removes the result as a Solve breach.
+  const statics = windTakesStatics(standing);
+  const first = standing.errors.find(
+    (error) => error.gate === "solve" || (statics && readsStatics(error)),
+  );
   if (first === undefined) return null;
   return `${label("aucun-resultat", register)} — ${fieldCause(first, register)}.`;
 }
@@ -286,8 +297,11 @@ export function rideCause({
   readonly register?: Register;
 }): string | null {
   if (refusal !== null) return null;
-  const { errors } = standingReport(report, saisie);
+  const standing = standingReport(report, saisie);
+  const { errors } = standing;
   if (errors.some((error) => error.gate === "solve")) return null;
+  // Nothing stands for the ride to be withheld from: « Aucun résultat » says why, once.
+  if (windTakesStatics(standing)) return null;
   return withheld(errors, ["wind", "ride"], GATE_CONSEQUENCE.ride, register);
 }
 

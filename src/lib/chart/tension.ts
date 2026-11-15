@@ -23,11 +23,13 @@ import type { HoverLine } from "@/lib/chart/hover.ts";
 import type { PxPath, PxPoint, SceneBase } from "@/lib/chart/scene.ts";
 import type { SharedX } from "@/lib/layout/contract.ts";
 import type { ForceUnit } from "@/lib/scenario/types.ts";
+import type { SpatialSamples } from "@/lib/sim";
 
-import { polylineAt, solveRider } from "@/lib/chart/scene.ts";
+import { polylineAt, solveRider, windySlot } from "@/lib/chart/scene.ts";
 import { DECIMAL_MARK, formatQuantity, fromDisplay, toDisplay } from "@/lib/format/quantity.ts";
 import { niceStep } from "@/lib/layout/contract.ts";
-import { sampleTension } from "@/lib/sim";
+import { clampX } from "@/lib/scenario/geometry.ts";
+import { sampleSpatial, sampleTension } from "@/lib/sim";
 import { label } from "@/lib/vocabulary/labels.ts";
 
 import { TENSION_COPY } from "./copy.ts";
@@ -63,7 +65,10 @@ export type TensionProfile = {
  * memoises it on the solved half alone and a scrub never re-samples it.
  */
 export function unloadedTension(base: SceneBase): TensionCurve {
-  return curveOf(sampleTension(base.unloaded, TENSION_SAMPLES));
+  const plane = base.line.state;
+  return plane === null
+    ? spatialCurve(sampleSpatial(base.unloaded))
+    : curveOf(sampleTension(plane, TENSION_SAMPLES));
 }
 
 /**
@@ -78,8 +83,7 @@ export function tensionProfile(
   requestedXD: number,
   unloaded: TensionCurve = unloadedTension(base),
 ): TensionProfile {
-  const resolved = solveRider(base, requestedXD);
-  const loaded = resolved === null ? null : curveOf(sampleTension(resolved.state, TENSION_SAMPLES));
+  const loaded = loadedTension(base, requestedXD);
   return {
     L: base.L,
     unloaded,
@@ -87,6 +91,25 @@ export function tensionProfile(
     rider: loaded === null ? null : riderOn(loaded),
     perLine: base.members.length > 1,
   };
+}
+
+/**
+ * The loaded line's curve at the passager's position: § 5's exact solve without wind, and under
+ * wind the slot the position selects (§19.12), re-sampled — its nodes' `|F|`, the trolley's node
+ * twice. `null` where the coupe draws no loaded line either.
+ */
+function loadedTension(base: SceneBase, requestedXD: number): TensionCurve | null {
+  if (base.line.aero === null) {
+    const resolved = solveRider(base, requestedXD);
+    return resolved === null ? null : curveOf(sampleTension(resolved.state, TENSION_SAMPLES));
+  }
+  const slot = windySlot(base, clampX(requestedXD, base.L));
+  return slot === null ? null : spatialCurve(slot.samples);
+}
+
+/** §19.8's samples as a curve: `x` and `T = |F|` at every node, in node order. */
+function spatialCurve({ x, T }: Pick<SpatialSamples, "x" | "T">): TensionCurve {
+  return { xs: Float64Array.from(x), Ts: Float64Array.from(T) };
 }
 
 /** `sampleTension`'s interleaved pairs, split. */

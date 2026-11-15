@@ -8,7 +8,7 @@ import { formatQuantity, roundToDisplay } from "@/lib/format/quantity.ts";
 import { firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { steelFormula } from "@/lib/sim";
 
-import { deducedRows, deduceValues } from "./deduced.ts";
+import { deducedRows, deduceValues, lateralText } from "./deduced.ts";
 
 /**
  * `Valeurs déduites` — « v1 build spec » § 3's read-out table and § 9's opening screen, region by
@@ -545,4 +545,48 @@ describe("#85 — the prétension is read at the tensioning anchor, `H` beside i
     // takes less length.
     expect(solvedB?.L0 ?? NaN).toBeLessThan(solvedA?.L0 ?? NaN);
   });
+});
+
+describe("§19.7 under the Vent — how far the line hangs off A–B", () => {
+  test("the side is the travel's: y > 0 is to the left of A → B (§19.2)", () => {
+    expect(lateralText({ value: 0.42, atX: 75 })).toBe("0,42 m à gauche de A → B (à x 75,0 m)");
+    expect(lateralText({ value: -1.234, atX: 60.04 })).toBe(
+      "1,23 m à droite de A → B (à x 60,0 m)",
+    );
+    // A line in its plane names no side, and no point.
+    expect(lateralText({ value: 0, atX: Number.NaN })).toBe("0,00 m");
+  });
+
+  test("an applied crosswind adds the écart rows after the flèche; still air adds none", () => {
+    const windy = scenario((draft) => {
+      draft.positions = { A: { lat: 46.8, lon: 7.4 }, B: { lat: 46.801, lon: 7.4 } };
+      draft.wind = { ...draft.wind, speedKmh: 60, directionDeg: 90 };
+    });
+    const labels = (draft: ScenarioDraft) =>
+      deducedRows(draft, deduceValues(draft, null), null).map((row) => row.label);
+    const still = labels(scenario());
+    const blown = labels(windy);
+    expect(still).not.toContain("Écart latéral");
+    expect(blown.slice(blown.indexOf("Rapport V") + 1, blown.indexOf("Flèche / portée"))).toEqual([
+      "Écart latéral",
+      "Écart maximal à A–B",
+    ]);
+    const row = deducedRows(windy, deduceValues(windy, null), null).find(
+      (r) => r.label === "Écart latéral",
+    );
+    // A wind from the east on a line toward the north pushes it west: to the left of the travel.
+    expect(row?.value).toMatch(/ à gauche de A → B \(à x /);
+  });
+});
+
+test("a rise that does not print is no row: rounding over A–B at an anchor is no hump", () => {
+  // At 60 km/h across the shipped line the shot ends a few ulps over A–B at B: 0,00 m at display.
+  const draft = scenario((d) => {
+    d.positions = { A: { lat: 46.8, lon: 7.4 }, B: { lat: 46.801, lon: 7.4 } };
+    d.wind = { ...d.wind, speedKmh: 60, directionDeg: 90 };
+  });
+  const deduced = deduceValues(draft, null);
+  expect(deduced.solve?.lateral?.rise.value).toBeGreaterThan(0);
+  const labels = deducedRows(draft, deduced, null).map((row) => row.label);
+  expect(labels).not.toContain("Hauteur au-dessus de A–B");
 });

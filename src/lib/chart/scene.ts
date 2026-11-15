@@ -54,12 +54,15 @@
 
 import type { SweepRider } from "@/lib/scenario/traverse.ts";
 import type { CarryingLines, ScenarioDraft } from "@/lib/scenario/types.ts";
-import type { Unloaded } from "@/lib/scenario/unloaded.ts";
+import type { Unloaded, UnloadedLine } from "@/lib/scenario/unloaded.ts";
 import type {
   ClearanceResult,
   DerivedMaterial,
   SpanInput,
   SpanState,
+  SpatialSamples,
+  SpatialState,
+  SpatialSweepResult,
   SweepResult,
   SweepStep,
   Terrain,
@@ -74,6 +77,8 @@ import {
   CLEARANCE,
   evaluateClearance,
   sampleCable,
+  sampleSpatial,
+  slotState,
   solveAtHorizontalPosition,
   sweepStep,
   zGroundAt,
@@ -259,6 +264,12 @@ export type SceneFrame = {
  * else — cannot invalidate it.
  */
 export type SceneBase = SceneFrame & {
+  /**
+   * The unloaded line the scene stands on — `deriveUnloaded`'s, with the Vent it was posed under
+   * (`aero`, `null` without one): the rides re-read it, and under wind every loaded number is a
+   * slot of {@link spatial}.
+   */
+  readonly line: UnloadedLine;
   /** The span posed to the solver, rider excluded. */
   readonly span: SpanInput;
   /** The load one member carries, N — the whole design load on one member, half on each of two. */
@@ -267,11 +278,22 @@ export type SceneBase = SceneFrame & {
   readonly members: readonly DrawnMember[];
   /** What the solver consumed. */
   readonly material: DerivedMaterial;
-  /** The unloaded line — « ligne à vide », the layer that is **off** by default. */
-  readonly unloaded: SpanState;
-  /** Its polyline, sampled at {@link CABLE_SAMPLES}. */
+  /**
+   * The unloaded line — « ligne à vide », the layer that is **off** by default: §19.11's state, so
+   * its `T_A` / `T_B` are the `T_vide` the Verdict reads under wind as without (§19.14).
+   */
+  readonly unloaded: SpatialState;
+  /**
+   * Its coupe polyline, `(x, z)`: §4.1 sampled at {@link CABLE_SAMPLES} without wind, §19.8's nodes
+   * under wind — the same coordinates every view projects (§19.11).
+   */
   readonly unloadedCable: Polyline;
-  /** The precomputed traverse. `coverage < 1` is `Indéterminé` and the scrub track gains gaps. */
+  /** §19.12's sweep, one slot per grid position — the loaded lines under wind are its slots. */
+  readonly spatial: SpatialSweepResult;
+  /**
+   * The precomputed traverse, as the coupe reads it (`planeSweep`). `coverage < 1` is
+   * `Indéterminé` and the scrub track gains gaps.
+   */
   readonly traverse: SweepResult;
   /** One member under the whole design load — `sweepRider`'s « cas défavorable », never drawn. */
   readonly soleCarrier: SweepResult | null;
@@ -358,18 +380,21 @@ export function buildSceneBase(
   if (frame === null || !unloaded.ok) return null;
   const swept = sweepRider(unloaded, rider);
   if (swept === null) return null;
-  const { input: span, material, state } = unloaded;
-  const { P, traverse, clearance, soleCarrier } = swept;
-  const unloadedCable = polyline(sampleCable(state, CABLE_SAMPLES));
+  const { input: span, material, state, spatial: line } = unloaded;
+  const { P, traverse, clearance, soleCarrier, spatial } = swept;
+  const unloadedCable =
+    state === null ? coupeOf(sampleSpatial(line)) : polyline(sampleCable(state, CABLE_SAMPLES));
 
   return {
     ...frame,
+    line: unloaded,
     span,
     P,
     members: drawnMembers(rider.carryingLines),
     material,
-    unloaded: state,
+    unloaded: line,
     unloadedCable,
+    spatial,
     traverse,
     soleCarrier,
     trajectory: trajectoryRuns(traverse),
@@ -469,37 +494,49 @@ function drawnGround({ L, terrain, bases }: PlacedSpan): {
 export function placeRider(base: SceneBase, requestedXD: number): SceneRider | null {
   const { span, P, terrain, hRider, anchorZone, L, h, unloadedCable } = base;
   const xD = clampX(requestedXD, L);
-  const resolved = solveRider(base, xD);
-  if (resolved === null) return null;
-  const { step, state } = resolved;
+  const placed = riderLine(base, xD);
+  if (placed === null) return null;
+  const { step, cable } = placed;
 
-  // §11's **inner** minimum at this one rider position: the reducer, over a one-step traverse —
-  // over the line outside the Zones d'ancrage, as the traverse's own. Zones that leave no point of
-  // the line between them are the Clearance Gate's to refuse; until then the cell reads the whole
-  // line rather than the identity of an empty minimum.
-  const at = evaluateClearance(
-    span,
-    P,
-    [step],
-    terrain,
-    hRider,
-    CLEARANCE.samplesPerStep,
-    anchorZone,
-  );
-  const worst = Number.isFinite(at.perStep[0])
-    ? { hClear: at.perStep[0], atX: at.perStepX[0] }
-    : { hClear: at.whole.hMin, atX: at.whole.atX };
+  let worst: SceneRider["worst"];
+  if (placed.solvedIndex === null) {
+    // §11's **inner** minimum at this one rider position: the reducer, over a one-step traverse —
+    // over the line outside the Zones d'ancrage, as the traverse's own. Zones that leave no point
+    // of the line between them are the Clearance Gate's to refuse; until then the cell reads the
+    // whole line rather than the identity of an empty minimum.
+    const at = evaluateClearance(
+      span,
+      P,
+      [step],
+      terrain,
+      hRider,
+      CLEARANCE.samplesPerStep,
+      anchorZone,
+    );
+    worst = Number.isFinite(at.perStep[0])
+      ? { hClear: at.perStep[0], atX: at.perStepX[0] }
+      : { hClear: at.whole.hMin, atX: at.whole.atX };
+  } else {
+    // Under wind the position is a slot (§19.12), and §19.13 already read its garde in the sweep.
+    const k = placed.solvedIndex;
+    const { clearance } = base;
+    worst = Number.isFinite(clearance.perStep[k])
+      ? { hClear: clearance.perStep[k], atX: clearance.perStepX[k] }
+      : { hClear: clearance.whole.hMin, atX: clearance.whole.atX };
+  }
   // Read on the requested `x_D`, not on the solve's: the re-solved step lands within a few µm of
-  // it, and `x_D = z` typed in the field must be in the zone the field's help says it is.
-  const inAnchorZone = isInAnchorZone(xD, L, anchorZone);
+  // it, and `x_D = z` typed in the field must be in the zone the field's help says it is. Under
+  // wind the slot's own `x_D` is the position shown, so it is read there.
+  const inAnchorZone = isInAnchorZone(placed.solvedIndex === null ? xD : step.xD, L, anchorZone);
 
   return {
     step,
-    cable: polyline(sampleCable(state, CABLE_SAMPLES)),
+    cable,
     worst,
     // The same three terms as §11's `h_clear`, read at the rider's own `x` instead of minimised
     // over the line — voir {@link SceneRider.underRider}. `z_D` is exact here (the trolley sits on
-    // the kink), so this is the one clearance in the app that carries no scan error at all.
+    // the kink), so this is the one clearance in the app that carries no scan error at all. Under
+    // wind the terrain is §19.13's extruded profile, read at the displaced trolley's `x_D`.
     underRider: step.zD - zGroundAt(terrain, step.xD) - hRider,
     belowUnloaded: polylineAt(unloadedCable, step.xD) - step.zD,
     // « Only when the worst point is further than max(1 m, 1 % of span) from the rider ». On the
@@ -512,6 +549,72 @@ export function placeRider(base: SceneBase, requestedXD: number): SceneRider | n
     envelope: hRider,
     sagAtRider: (h * step.xD) / L - step.zD,
   };
+}
+
+/**
+ * The loaded line at `x_D` as the coupe draws it: the step, its `(x, z)` polyline, and — under
+ * wind — the slot's index among the solved ones.
+ *
+ * - **Without wind**, § 5's exact §6.1-case-2 solve at the typed position ({@link solveRider}).
+ * - **Under wind**, the position is a **slot of the sweep** (§19.12): the nearest solved one, its
+ *   state re-sampled, nothing solved. A position that falls toward a hole — past the nearest
+ *   solved slot, on the side of a slot that did not converge — has **no** loaded line (§19.11,
+ *   Q24): no neighbour stands in for it.
+ *
+ * @returns `null` when there is no loaded line at this position.
+ */
+function riderLine(
+  base: SceneBase,
+  xD: number,
+): { step: SweepStep; cable: Polyline; solvedIndex: number | null } | null {
+  if (base.line.aero === null) {
+    const resolved = solveRider(base, xD);
+    if (resolved === null) return null;
+    const cable = polyline(sampleCable(resolved.state, CABLE_SAMPLES));
+    return { step: resolved.step, cable, solvedIndex: null };
+  }
+  const slot = windySlot(base, xD);
+  if (slot === null) return null;
+  return { step: slot.step, cable: coupeOf(slot.samples), solvedIndex: slot.solvedIndex };
+}
+
+/**
+ * Under wind, the slot the passager at `x_D` selects (§19.12) and its samples — **no solve**: the
+ * slot's state is re-shot from its stored `F_A` (§19.8). `null` on a position toward a hole, or
+ * without wind, where the typed position is solved exactly instead.
+ *
+ * @returns the step as the coupe reads it, the slot's grid index, its index among the solved
+ *   slots — the alignment of `traverse.steps` and of `clearance`'s arrays — and its samples.
+ */
+export function windySlot(
+  base: Pick<SceneBase, "line" | "spatial" | "traverse">,
+  xD: number,
+): { step: SweepStep; gridIndex: number; solvedIndex: number; samples: SpatialSamples } | null {
+  if (base.line.aero === null) return null;
+  const { slots } = base.spatial;
+  let best = -1;
+  let bestSolved = -1;
+  let bestGap = Number.POSITIVE_INFINITY;
+  let solved = -1;
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
+    if (slot === null) continue;
+    solved++;
+    const gap = Math.abs(slot.rD.x - xD);
+    if (gap < bestGap) {
+      bestGap = gap;
+      best = i;
+      bestSolved = solved;
+    }
+  }
+  if (best < 0) return null;
+  const at = slots[best]?.rD.x ?? Number.NaN;
+  const toward = xD > at ? best + 1 : xD < at ? best - 1 : best;
+  if (toward >= 0 && toward < slots.length && slots[toward] === null) return null;
+  const state = slotState(base.spatial, best);
+  const step = base.traverse.steps[bestSolved];
+  if (state === null || step === undefined) return null;
+  return { step, gridIndex: best, solvedIndex: bestSolved, samples: sampleSpatial(state) };
 }
 
 /**
@@ -681,6 +784,14 @@ function solvedZExtent(
     if (z > max) max = z;
   }
   return { min, max };
+}
+
+/**
+ * §19.11's coupe of a spatial state's samples: `(x, z)` at every node, in node order — the
+ * trolley's node twice, at the same point. `y` is the vue de dessus's, not the coupe's.
+ */
+export function coupeOf(samples: Pick<SpatialSamples, "x" | "z">): Polyline {
+  return { xs: Float64Array.from(samples.x), zs: Float64Array.from(samples.z) };
 }
 
 /** `sampleCable`'s interleaved `x, z` pairs, split into the two arrays a path generator wants. */

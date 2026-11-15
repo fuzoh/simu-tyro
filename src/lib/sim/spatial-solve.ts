@@ -405,6 +405,7 @@ function closedForm(input: SpatialSpanInput): SpatialSolveResult {
       rD: vec(at.x, 0, at.z),
       Tminus: Math.hypot(H, below),
       Tplus: Math.hypot(H, below + P),
+      Fminus: vec(H, 0, below),
       Pext: vec(0, 0, -P),
     };
   }
@@ -534,6 +535,7 @@ function stateOf(
             rD: vec(shot.xD, shot.yD, shot.zD),
             Tminus: shot.Tminus,
             Tplus: shot.Tplus,
+            Fminus: vec(shot.FmX, shot.FmY, shot.FmZ),
             Pext: vec(shot.Px, shot.Py, shot.Pz),
           },
     ellipsoid: shot.ellipsoid,

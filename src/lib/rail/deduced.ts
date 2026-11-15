@@ -36,10 +36,16 @@
 import type { PlacedSpan } from "@/lib/scenario/geometry.ts";
 import type { ScenarioDraft } from "@/lib/scenario/types.ts";
 import type { EngineFailure, Unloaded } from "@/lib/scenario/unloaded.ts";
-import type { SteelValues } from "@/lib/sim";
+import type { Reading, SteelValues } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
-import { equalAtDisplayPrecision, formatAtX, formatQuantity, G } from "@/lib/format/quantity.ts";
+import {
+  equalAtDisplayPrecision,
+  formatAtX,
+  formatQuantity,
+  G,
+  roundToDisplay,
+} from "@/lib/format/quantity.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { resolveSteelValues, STEEL, steelFormula, TEXTILE } from "@/lib/sim";
 import { heading } from "@/lib/vocabulary/labels.ts";
@@ -106,6 +112,16 @@ export type DeducedSolve = {
    * `Prétension` row is read, at the tensioning side (`pretensionOf`).
    */
   readonly Tvide: { readonly TA: number; readonly TB: number };
+  /**
+   * §19.7's lateral readings of the line posed under the Vent (#127), or `null` without one — the
+   * line is then in the vertical plane of A–B and they are nil: the signed `y` of greatest `|y|`
+   * (`> 0` to the left of A → B), the écart maximal à A–B, and the rise above A–B, each with its `x`.
+   */
+  readonly lateral: {
+    readonly offset: Reading;
+    readonly ecart: Reading;
+    readonly rise: Reading;
+  } | null;
 };
 
 /** Everything § 3's `Valeurs déduites` block reports, plus why a row is missing when one is. */
@@ -155,20 +171,25 @@ export function deducedFrom(
     return { material, span, solve: null, failure };
   }
 
-  const { L0, state, sag, sagAtX } = unloaded;
+  const { L0, spatial, sag, sagAtX, pose, readings } = unloaded;
   return {
     material,
     span,
     solve: {
       L0,
-      H: state.H,
+      // §19.7's `H_K` at the tensioning anchor — §4's constant `H` without wind.
+      H: pose.H,
       sag,
       sagAtX,
       sagRatio: (sag / unloaded.span.L) * 100,
       // The **greater unloaded anchor tension**, which is what §9.2's cap is read against — not
       // `H`, whose 2,79 % would flatter the shipped line by a tenth of a point.
-      standingTension: (Math.max(state.TA, state.TB) / unloaded.material.strength) * 100,
-      Tvide: { TA: state.TA, TB: state.TB },
+      standingTension: (Math.max(spatial.TA, spatial.TB) / unloaded.material.strength) * 100,
+      Tvide: { TA: spatial.TA, TB: spatial.TB },
+      lateral:
+        unloaded.aero === null
+          ? null
+          : { offset: readings.lateral, ecart: readings.ecart, rise: readings.rise },
     },
     failure: null,
   };
@@ -190,7 +211,10 @@ export type DeducedRowId =
   | "sag"
   | "vRatio"
   | "sagRatio"
-  | "standingTension";
+  | "standingTension"
+  | "lateralOffset"
+  | "maxOffset"
+  | "rise";
 
 /** One read-only row of `Valeurs déduites`. A row that has nothing to show is absent. */
 export type ReadOutRow = {
@@ -284,6 +308,17 @@ export function deducedRows(
     const ratio = (scenario.rider.mp * G) / solve.H;
     push("vRatio", heading("vRatio", "exact"), formatQuantity("vRatio", ratio));
   }
+  if (solve.lateral !== null) {
+    // §19.7: under the Vent the line leaves the vertical plane of A–B. The flèche above stays the
+    // vertical drop; these say how far sideways, and how far from A–B at all, it hangs.
+    const { offset, ecart, rise } = solve.lateral;
+    push("lateralOffset", heading("lateralOffset", "exact"), lateralText(offset));
+    push("maxOffset", heading("maxOffset", "exact"), readingText(ecart));
+    // Only a rise that prints: a few ulps over A–B at an anchor is the shot's rounding, not a hump.
+    if (roundToDisplay("sag", rise.value) > 0) {
+      push("rise", heading("rise", "exact"), readingText(rise));
+    }
+  }
   push("sagRatio", heading("sagRatio", "exact"), formatQuantity("sagRatio", solve.sagRatio));
   const standing = formatQuantity("standingTension", solve.standingTension);
   push(
@@ -292,6 +327,23 @@ export function deducedRows(
     `${standing} ${strengthSymbol(material.family)}`,
   );
   return rows;
+}
+
+/** A length read on the line and where: « 0,42 m (à x 75,0 m) », or the length alone when nil. */
+function readingText({ value, atX }: Reading): string {
+  const length = formatQuantity("sag", value);
+  return Number.isFinite(atX) ? `${length} (${formatAtX(atX)})` : length;
+}
+
+/**
+ * §19.7's signed lateral offset, worded by its side of the travel: `y > 0` is to the left of A → B
+ * (§19.2), where a wind from the right pushes the line.
+ */
+export function lateralText({ value, atX }: Reading): string {
+  const length = formatQuantity("sag", Math.abs(value));
+  if (!(Math.abs(value) > 0)) return length;
+  const side = value > 0 ? "à gauche de A → B" : "à droite de A → B";
+  return Number.isFinite(atX) ? `${length} ${side} (${formatAtX(atX)})` : `${length} ${side}`;
 }
 
 /** § 3's material read-outs, overrides and stale badges included. */

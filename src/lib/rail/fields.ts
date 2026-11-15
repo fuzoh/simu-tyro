@@ -406,8 +406,9 @@ export const FIELDS = {
     rule: { kind: "positive", sentence: "un diamètre strictement positif est requis" },
     optional: true,
     warning: null,
-    // Solve although no formula reads `d`: a zero or negative diameter from a link is a malformed
-    // spec, and the link carries `d` onward for the tensioning use.
+    // Solve: under an applied Vent the statics read `d` (§19.4) and it is required there (#127
+    // Q37, `textileDiameterRequired`); a zero or negative diameter from a link is a malformed spec
+    // in any case, and the link carries `d` onward for the tensioning use.
     gate: "solve",
   },
   k: {
@@ -591,8 +592,9 @@ export const FIELDS = {
     warning: null,
     gate: null,
   },
-  // The Wind Gate: only the ride (#89), the Banane and the rose read the Vent, so a bad one withholds
-  // them and never takes the statics or the Verdict down.
+  // The Wind Gate: the ride (#89), the Banane, the rose — and, wherever the Vent is applied, the
+  // statics (#127, §19): a bad one withholds them, and with the line placed `windTakesStatics` takes
+  // the statics and the Verdict down too, since nothing may be read under another wind.
   windSpeed: {
     id: "windSpeed",
     label: heading("windSpeed", "exact"),
@@ -641,8 +643,9 @@ export const FIELDS = {
     warning: null,
     gate: "wind",
   },
-  // The ride's constants (#89, #104): §12.2's, every one editable and labelled. The Ride Gate: only
-  // the passager's ride reads them, so a bad one withholds it and nothing else.
+  // The ride's constants (#89, #104): §12.2's, every one editable and labelled. The Ride Gate: the
+  // passager's ride reads them, so a bad one withholds it — and, `ρ` being the statics' air too
+  // under an applied Vent (§19.4), a bad `ρ` then withholds them as well (`windTakesStatics`).
   CdA: {
     id: "CdA",
     label: heading("dragArea", "exact"),
@@ -684,7 +687,9 @@ export const FIELDS = {
     warning: null,
     gate: "ride",
   },
-  // Blank is §12.2's « lu » half: the ISA density at the profil's mean altitude, or 1,225.
+  // Blank is §12.2's « lu » half: the ISA density at the profil's mean altitude, or 1,225. Under an
+  // applied Vent the statics read it too (§19.4): a refused one then takes them down as well
+  // (`windTakesStatics`), since nothing may be read under another air.
   rho: {
     id: "rho",
     label: heading("airDensity", "exact"),

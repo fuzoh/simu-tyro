@@ -31,8 +31,8 @@
  *   the Vent is projected on — and its absence is not a breach either: see the next rule.
  * - **The Vent needs Positions, and their absence is not an error.** The Vent's direction is
  *   geographic, so without A and B on the map the line has no bearing to project it on. Then the
- *   wind fields are disabled with {@link WIND_UNPLACED}'s reason, the ride and the Banane run without
- *   wind, and a Vent that arrived in a link or a Session is **kept as given** (ADR-0001) with a
+ *   wind fields are disabled with {@link WIND_UNPLACED}'s reason, the statics, the ride and the Banane
+ *   run without wind, and a Vent that arrived in a link or a Session is **kept as given** (ADR-0001) with a
  *   notice where the results would have read it. {@link windBearing} is the one check: the fields,
  *   the rose, the rides and the notice all read it, so a link, a Session and a click cannot
  *   disagree. Like an absent régime it is a flag on the report, never an entry on the blocking
@@ -83,7 +83,7 @@ import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
 import { lineBearing, spanOfGeometry } from "@/lib/scenario/geometry.ts";
-import { isWindUniform, WIND_PROFILE_ACTIVE } from "@/lib/scenario/wind.ts";
+import { isWindApplied, isWindUniform, WIND_PROFILE_ACTIVE } from "@/lib/scenario/wind.ts";
 import { isFamilyAllowed, REGIMES, regimeMismatch, TERMINATIONS } from "@/lib/sim";
 import { heading, label } from "@/lib/vocabulary/labels.ts";
 
@@ -101,6 +101,7 @@ import {
   GATE_IDS,
   gateOf,
   isOptionalField,
+  REQUIRED_MESSAGE,
 } from "./fields.ts";
 import {
   FIELD_ACCESS,
@@ -235,6 +236,11 @@ export type GateReport = {
    * Vent is not applied.
    */
   readonly windNeedsPositions: boolean;
+  /**
+   * The Vent is applied — a speed other than zero and a bearing (`isWindApplied`): the statics read
+   * it (§19), and a refused Vent or `ρ` then takes them down ({@link windTakesStatics}).
+   */
+  readonly windApplied: boolean;
 };
 
 /**
@@ -243,7 +249,8 @@ export type GateReport = {
  */
 export const WIND_UNPLACED = {
   reason: "Placez A et B sur la carte pour saisir le vent.",
-  notice: "Vent saisi non appliqué : sans A et B sur la carte, la ligne n'a pas d'orientation.",
+  notice:
+    "Vent saisi non appliqué : sans A et B sur la carte, la ligne n'a pas d'orientation. Tout est calculé sans vent.",
 } as const;
 
 /**
@@ -254,6 +261,46 @@ export const WIND_UNPLACED = {
  */
 export function windBearing({ positions }: Pick<ScenarioDraft, "positions">): number | null {
   return lineBearing(positions);
+}
+
+/**
+ * The corde's diameter under an applied Vent, unfilled — the neutral « empty » message: the field
+ * is required there because the statics read it (§19.4, #127 Q37), and nowhere else.
+ */
+export const DIAMETER_UNDER_WIND = `${REQUIRED_MESSAGE} sous vent : le vent sur la corde se calcule sur son diamètre`;
+
+/**
+ * Is the corde's diameter required — a corde, under an applied Vent (a speed and a bearing), with
+ * no diameter typed? Then the statics have nothing to read the line's drag on, and every result
+ * under wind is withheld with the field named (#127 Q37). Without wind nothing reads it.
+ */
+export function textileDiameterRequired(
+  scenario: Pick<ScenarioDraft, "material" | "wind" | "positions">,
+): boolean {
+  const { material } = scenario;
+  return (
+    material.family === "textile" &&
+    material.d === undefined &&
+    isWindApplied(scenario.wind, windBearing(scenario))
+  );
+}
+
+/**
+ * Does a refused Vent take the statics down? Under §19 the statics read the Vent — its speed,
+ * direction, profile and `ρ` — wherever it is applied ({@link GateReport.windApplied}), so a Vent
+ * or an air the gates refuse cannot be stood in for by another: a Wind Gate breach, or a refused
+ * `ρ`, then removes « tout l'aval » like a Solve breach. Without an applied Vent nothing of the
+ * statics reads either, and each breach keeps its own, narrower consequence.
+ */
+export function windTakesStatics(
+  report: Pick<GateReport, "passed" | "windApplied" | "errors">,
+): boolean {
+  return report.windApplied && (!report.passed.wind || report.errors.some(readsStatics));
+}
+
+/** A breach that, under an applied Vent, stands on what the statics read beside the Vent: `ρ`. */
+export function readsStatics(error: Pick<BlockingError, "gate" | "field">): boolean {
+  return error.gate === "wind" || error.field === "rho";
 }
 
 /** The two fields of the Vent's profile (#120), in rail order. */
@@ -750,7 +797,20 @@ export function evaluateGates({
       // blank required fields — which is **not** « Saisie en cours »: a field the user never
       // filled is not mid-edit, so it blocks and keeps no stale picture. Polyester adds a third,
       // and its message carries the reason rather than the hole.
-      // An optional field's blank is « absent » (the textile diameter) and judges nothing either.
+      // An optional field's blank is « absent » (the textile diameter) and judges nothing either —
+      // but for one case: under an applied Vent the statics read the corde's diameter (§19.4), and
+      // it is **required** there (#127 Q37). Never invented, never a nil drag: the Solve Gate.
+      if (field === "dTextile" && textileDiameterRequired(scenario)) {
+        push({
+          gate: "solve",
+          kind: "empty",
+          field,
+          alsoOutlined: [],
+          message: DIAMETER_UNDER_WIND,
+          fixes: [],
+        });
+        continue;
+      }
       if (!isOverrideField(field) && !isOptionalField(field)) {
         push({
           gate: "solve",
@@ -809,7 +869,15 @@ export function evaluateGates({
   const passed = passedGates(errors, noRegime);
   const worst = errors.length === 0 ? null : errors[0].gate;
 
-  return { errors, passed, worst, noRegime, windNeedsPositions: windBearing(scenario) === null };
+  const bearing = windBearing(scenario);
+  return {
+    errors,
+    passed,
+    worst,
+    noRegime,
+    windNeedsPositions: bearing === null,
+    windApplied: isWindApplied(scenario.wind, bearing),
+  };
 }
 
 /**
@@ -853,7 +921,8 @@ export function noRiderBetweenMessage(
  */
 export function blockingSummary(report: GateReport, refused = false): string | null {
   if (report.worst === null) return null;
-  const gate: GateId = refused ? "solve" : report.worst;
+  // A Vent the statics read and the gates refuse leaves no result at all ({@link windTakesStatics}).
+  const gate: GateId = refused || windTakesStatics(report) ? "solve" : report.worst;
   const count = report.errors.length;
   const plural = count > 1 ? "s" : "";
   return `⛔ ${count} erreur${plural} bloquante${plural} — ${GATE_CONSEQUENCE[gate]}`;

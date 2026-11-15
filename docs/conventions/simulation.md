@@ -82,7 +82,7 @@ allowed from there.
   read off the Positions outside `src/lib/sim/` — `lineBearing` (`src/lib/scenario/geometry.ts`), the
   rhumb line the north-up map draws — and reaches every reader through the gates' `windBearing`
   (`src/lib/rail/gates.ts`), the one check behind « the Vent needs Positions ». Without a bearing
-  nothing is projected: the ride and the Banane run without wind, the wind fields are disabled, and
+  nothing is projected: the statics, the ride and the Banane run without wind, the wind fields are disabled, and
   a carried Vent is kept as given with a notice — never a Blocking Error. A wind value the Wind
   Gate refuses (`ws=-5`, `ww=95`) is one with or without a bearing, and its field stays typable
   so that the breach can be repaired (`fieldUnavailable`). A withheld Vent is drawn as none, so
@@ -90,6 +90,17 @@ allowed from there.
   `ws=-5` — and never over a refused profile, where the drag would replace the speed and the
   direction the Scenario holds and lift nothing (`windControls`, `src/lib/map/wind-rose.ts`).
   Moving an anchor changes the components and never `wd`.
+- **The statics read the Vent wherever it is applied** (#127, `docs/simulation-theory.md` §19). A
+  speed other than zero and a bearing (`isWindApplied`, `src/lib/scenario/wind.ts`) pose the line
+  under the wind (`unloadedOn` → `resolveSpatialL0`), sweep it with `sweepSpatial`, judge it on
+  `planeSweep`'s projection and ride its locus (`locusPath`). Anything else — no speed, no bearing —
+  takes **the zero-wind path**: §4–§7's plane solve, lifted bit for bit (§19.16), so §15, the
+  guide's figures and the first-run strings never move. A refused Vent or `ρ` under an applied Vent
+  withholds every result (`windTakesStatics`, `src/lib/rail/gates.ts`), never reads as another wind;
+  a corde under an applied Vent requires its diameter (`textileDiameterRequired`). A position that
+  does not converge stays a hole: no neighbour fills it, the Verdict is `Indéterminé`, no ride
+  crosses it (Q24). The ride « sans vent » is the same Scenario with its Vent at zero — re-posed,
+  swept and ridden — not the windy locus ridden in still air.
 - **The Vent's profile is a prescribed scenario, read locally, and refused until it is read**
   (#120, `docs/simulation-theory.md` §8.4). `windAt(field, x, L, bearing)`
   (`src/lib/sim/wind-profile.ts`) is the one entry a spatial reader takes — at its own `x`, for

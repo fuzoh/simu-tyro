@@ -6,7 +6,9 @@
  * The dependency lists **are** {@link unloadedInputs}'s fields: a rider patch merges shallowly,
  * so a scrub leaves every one of them identical, and `unit` is not among them. They are split in
  * two memos, the placement on its three fields and the solve on the rest, so a material, tightness
- * or `mp` edit hands `useScene` the same `span` and the chart frame keyed on it holds.
+ * or `mp` edit hands `useScene` the same `span` and the chart frame keyed on it holds. The Vent,
+ * the Positions it is projected on and the typed `ρ` are among the rest: under wind the line is
+ * posed under them (`docs/simulation-theory.md` §19.7), so an edit of either re-poses it.
  */
 
 import { useMemo } from "react";
@@ -20,13 +22,32 @@ import { useAppState } from "./store.tsx";
 
 export function useUnloaded(): Unloaded {
   const state = useAppState();
-  const { geometry, anchors, material, tightness, tensioningSide, mp, trace } = unloadedInputs(
-    state.scenario,
-    state.trace,
-  );
+  const {
+    geometry,
+    anchors,
+    material,
+    tightness,
+    tensioningSide,
+    mp,
+    trace,
+    wind,
+    positions,
+    rho,
+  } = unloadedInputs(state.scenario, state.trace);
   const placed = useMemo(() => placeSpan({ geometry, anchors }, trace), [geometry, anchors, trace]);
   return useMemo(
-    () => unloadedOn(placed, { material, tightness, tensioningSide, mp }),
-    [placed, material, tightness, tensioningSide, mp],
+    () =>
+      unloadedOn(placed, {
+        material,
+        tightness,
+        tensioningSide,
+        mp,
+        trace,
+        geometry,
+        wind,
+        positions,
+        rho,
+      }),
+    [placed, material, tightness, tensioningSide, mp, trace, geometry, wind, positions, rho],
   );
 }
