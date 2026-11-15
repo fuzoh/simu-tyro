@@ -7,7 +7,7 @@ import type { DynamiqueScene } from "./scene.ts";
 
 import { ridesUnder, SHIPPED } from "./__fixtures__/rides.ts";
 import { ARRIVAL_LABEL, ESTIMATE } from "./copy.ts";
-import { firstPass } from "./outputs.ts";
+import { dynamiqueOutputs, firstPass } from "./outputs.ts";
 import { dynamiqueScene } from "./scene.ts";
 
 const WIDTH = 1000;
@@ -188,6 +188,21 @@ describe("the curve", () => {
       expect(y).toBeGreaterThanOrEqual(curve.plot.top - 1e-9);
       expect(y).toBeLessThanOrEqual(curve.plot.bottom + 1e-9);
     }
+  });
+});
+
+describe("no ride at zero wind to compare", () => {
+  test("draws no calm curve and marks no Point d'arrêt without wind", () => {
+    const outputs = dynamiqueOutputs({ ...HEAD.reading, calm: null }, "steel");
+    const solved = {
+      base: HEAD.base,
+      rides: { reading: { ...HEAD.reading, calm: null }, outputs },
+    };
+    const without = dynamiqueScene({ width: 800, frame: HEAD.frame, solved });
+    expect(without.curve?.speed.calm).toEqual([]);
+    expect(without.curve?.speed.windy.length).toBeGreaterThan(0);
+    expect(without.coupe.markers.map(({ id }) => id)).not.toContain("calm");
+    expect(without.coupe.arrivals.map(({ id }) => id)).not.toContain("calm");
   });
 });
 

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import type { Ride } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
@@ -19,6 +19,25 @@ import { deriveUnloaded, unloadedInputs } from "./unloaded.ts";
  * qualifies both. The ride's own physics — Z8, energy, the band of the Point d'arrêt, the wind's
  * signs — is `src/lib/sim/dynamics.test.ts`'s; this file holds what the Scenario adds.
  */
+
+/** Whether the chain at zero wind — the ride « sans vent »'s re-pose — is made to fail. */
+const inject = vi.hoisted(() => ({ calmFails: false }));
+
+vi.mock("./unloaded.ts", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./unloaded.ts")>();
+  return {
+    ...real,
+    // `readDynamics` re-poses the line in still air through `unloadedOn`, and only there.
+    unloadedOn: (...args: Parameters<typeof real.unloadedOn>) =>
+      inject.calmFails && args[1].wind.speedKmh === 0
+        ? ({ ok: false, stage: "L0", error: null, span: args[0] } as const)
+        : real.unloadedOn(...args),
+  };
+});
+
+beforeEach(() => {
+  inject.calmFails = false;
+});
 
 const SHIPPED = firstRunDefaults() as ScenarioDraft;
 
@@ -57,7 +76,9 @@ function reading(scenario: ScenarioDraft, profile: Trace | null = null) {
   const { unloaded, rider } = solved(scenario);
   const read = readDynamics(scenario, unloaded, rider, profile);
   if (read === null) throw new Error("a complete traverse has a ride");
-  return read;
+  const { calm } = read;
+  if (calm === null) throw new Error("the line has a ride at zero wind");
+  return { ...read, calm };
 }
 
 function windy(directionDeg: number, bearing: Bearing | null = 0) {
@@ -160,6 +181,23 @@ describe("the windy ride — on the locus the Vent poses (§19.15)", () => {
       throw new Error("both rides reach B");
     }
     expect(pushed.end.v).toBeGreaterThan(still.end.v);
+  });
+
+  test("when the Scenario at zero wind has no ride, the ride under the Vent stands (Q24)", () => {
+    const scenario = {
+      ...SHIPPED,
+      positions: positionsFor(0),
+      wind: { ...SHIPPED.wind, speedKmh: 50, directionDeg: 90 },
+    };
+    const { unloaded, rider } = solved(scenario);
+    const whole = readDynamics(scenario, unloaded, rider, null);
+    inject.calmFails = true;
+    const partial = readDynamics(scenario, unloaded, rider, null);
+    if (whole === null || partial === null) throw new Error("the windy traverse is complete");
+    expect(partial.calm).toBeNull();
+    expect(partial.windless).toBe(false);
+    // The ride under the Vent owes the comparison nothing.
+    expect(partial.windy).toEqual(whole.windy);
   });
 
   test("the ride « sans vent » is the Scenario at zero wind, whatever the Vent (§19.15)", () => {

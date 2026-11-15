@@ -222,7 +222,7 @@ describe("the Vent needs Positions", () => {
     expect(surfaces.windNotice).toBeNull();
     expect(reading?.windless).toBe(false);
     // The head component drags the passager back: the fastest point of the ride is slower.
-    const fastest = (ride: Ride | undefined) =>
+    const fastest = (ride: Ride | null | undefined) =>
       Math.max(...(ride?.samples ?? []).map((at) => at.v));
     expect(fastest(reading?.windy)).toBeLessThan(fastest(reading?.calm));
   });
@@ -260,7 +260,7 @@ describe("the Vent needs Positions", () => {
     expect(moved.scenario.wind).toMatchObject({ speedKmh: 30, directionDeg: 264 });
     expect(scenarioToSearch(moved.scenario as Scenario)).toMatchObject({ ws: 30, wd: 264 });
     expect(moved.surfaces.windNotice).toBeNull();
-    const calm = moved.reading?.calm.end;
+    const calm = moved.reading?.calm?.end;
     const windy = moved.reading?.windy.end;
     if (calm?.kind !== "arrival" || windy?.kind !== "arrival") throw new Error("both reach B");
     expect(windy.v).toBeGreaterThan(calm.v);
@@ -431,7 +431,7 @@ describe("the Vent's profile is read along the line (#141)", () => {
   });
 
   test("the ride reads the field: it lands between still air and the uniform wind", () => {
-    const calm = uniform.reading?.calm.end;
+    const calm = uniform.reading?.calm?.end;
     const flat = uniform.reading?.windy.end;
     const shaped = profiled.reading?.windy.end;
     if (calm?.kind !== "arrival" || flat?.kind !== "arrival" || shaped?.kind !== "arrival") {

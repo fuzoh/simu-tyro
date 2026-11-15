@@ -307,6 +307,8 @@ function Curve({
 }) {
   const { plot } = scene;
   const separate = !rides.outputs.coincide;
+  // Under wind the ride at zero wind may have no result: no lighter curve, and no caption for it.
+  const calm = separate && rides.reading.calm !== null;
 
   return (
     <svg
@@ -318,7 +320,7 @@ function Curve({
     >
       <text className="fill-muted-foreground text-[10px]" x={x.gutter} y={12}>
         {wide ? CURVE_CAPTION.full : CURVE_CAPTION.short}
-        {separate && ` · ${CURVE_CAPTION.calm}`}
+        {calm && ` · ${CURVE_CAPTION.calm}`}
       </text>
 
       <line
@@ -330,7 +332,7 @@ function Curve({
       />
 
       {/* The ride without wind only when the Vent entered makes it differ: then it is the lighter. */}
-      {separate && (
+      {calm && (
         <path
           className="stroke-muted-foreground fill-none"
           d={pathOf(scene.speed.calm)}

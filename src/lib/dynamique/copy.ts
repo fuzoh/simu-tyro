@@ -107,6 +107,16 @@ export const SWING_THEN = "puis oscille jusqu'à l'arrêt";
 /** The same, when the swing never settles: no Point d'arrêt to give. */
 export const SWING_UNSETTLED = `puis ${NEVER_SETTLES}`;
 
+/**
+ * The ride without wind's tiles when the Scenario with its Vent at zero has no result — its line,
+ * re-posed in still air, or its Sweep, does not complete — while the ride under the Vent does.
+ */
+export const CALM_UNAVAILABLE = "indisponible";
+
+/** Why, on the heading of the ride without wind: the comparison is missing, not the ride. */
+export const CALM_UNAVAILABLE_NOTE =
+  "Le scénario avec le vent à zéro n'a pas de résultat : la ligne posée sans vent ne se calcule pas jusqu'au bout. La descente avec le vent saisi reste calculée.";
+
 /** Why there is no ride to read when the traverse solved only in part. */
 export const INCOMPLETE = "Traversée incomplète : ni point d'arrêt ni vitesse d'arrivée calculés.";
 

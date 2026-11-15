@@ -9,6 +9,8 @@ import { msToKmh } from "@/lib/sim";
 import { ridesUnder, SHIPPED } from "./__fixtures__/rides.ts";
 import {
   ARRIVES_AT_END,
+  CALM_UNAVAILABLE,
+  CALM_UNAVAILABLE_NOTE,
   COINCIDE_NOTE,
   CONSTANTS_NOTE,
   NEVER_SETTLES,
@@ -90,6 +92,30 @@ describe("the two Points d'arrêt are the engine's", () => {
     expect(placed.outputs.coincide).toBe(false);
     expect(unplaced.reading.windy).toBe(unplaced.reading.calm);
     expect(unplaced.reading.calm).toEqual(placed.reading.calm);
+  });
+});
+
+describe("no ride at zero wind to compare (Q24)", () => {
+  // The Scenario at zero wind may not solve while the one under its Vent does: the ride under the
+  // Vent is printed as it is, and the ride without wind says it is unavailable, and why.
+  const { reading } = ridesUnder(50, 0);
+  const outputs = dynamiqueOutputs({ ...reading, calm: null }, "steel");
+  const [calm, windy] = outputs.rides;
+
+  test("the ride without wind says « indisponible » in every tile, and why on its heading", () => {
+    expect(calm.label).toBe(RIDE_LABEL.calm);
+    expect(calm.stopX).toBeNull();
+    expect([calm.stop, calm.noArrival, calm.duration]).toEqual([
+      CALM_UNAVAILABLE,
+      CALM_UNAVAILABLE,
+      CALM_UNAVAILABLE,
+    ]);
+    expect(calm.arrival).toBeNull();
+    expect(calm.notice).toBe(CALM_UNAVAILABLE_NOTE);
+  });
+
+  test("the ride under the Vent is printed as when the comparison exists", () => {
+    expect(windy).toEqual(ridesUnder(50, 0).outputs.rides[1]);
   });
 });
 

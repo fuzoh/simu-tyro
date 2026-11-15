@@ -69,9 +69,11 @@ function forward(given: ScenarioDraft, { profile = null, bearing = NORTH }: Pose
   if (!unloaded.ok) return { ok: false, unloaded } as const;
   const swept = sweepRider(unloaded, sweepRiderOf(scenario));
   if (swept === null) throw new Error("the traverse does not solve");
-  const reading = readDynamics(scenario, unloaded, swept, profile);
-  if (reading === null) throw new Error("a complete traverse has a ride");
-  return { ok: true, unloaded, swept, reading } as const;
+  const read = readDynamics(scenario, unloaded, swept, profile);
+  if (read === null) throw new Error("a complete traverse has a ride");
+  const { calm } = read;
+  if (calm === null) throw new Error("the line has a ride at zero wind");
+  return { ok: true, unloaded, swept, reading: { ...read, calm } } as const;
 }
 
 function solved(scenario: ScenarioDraft, pose: Pose = {}) {
