@@ -2,8 +2,10 @@
  * The wind seen from the line — decision of #6 (*Effets du vent*) and the research « Modèles de
  * vitesse du passager » (#8), whose rule is that wind enters `F_drag = ½·ρ·C_dA·(v ± v_wind)²`
  * (`docs/simulation-theory.md` §12.2) as a **vector projected on the tangent**, never as a whole
- * collinear `±`. This module does the projection and nothing else: the drag is the ride's
- * (`./dynamics.ts`, #89), and the line's lateral deflection has no source yet.
+ * collinear `±`. This module does the projection and nothing else: `windAt` (`./wind-profile.ts`)
+ * calls it to give the statics and the ride their wind at each `x`, and the rose's reading calls it
+ * for display. The drag is the ride's (`./dynamics.ts`, #89); the line's lateral deflection is
+ * §19's spatial statics (`./spatial-solve.ts`), which read the wind through `windAt`.
  *
  * Both angles are geographic, in degrees clockwise from north: the wind's is the azimuth it comes
  * **from** (0° a north wind, 270° a west wind), the line's is the bearing of the travel A → B. The
