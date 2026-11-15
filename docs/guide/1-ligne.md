@@ -24,8 +24,10 @@ Pour une ligne et un passager donnés, il calcule :
 - **une estimation du mouvement** du passager : vitesse, point d'arrêt, vitesse d'arrivée —
   [chapitre 4](4-dynamique.md).
 
-Il ne calcule ni le freinage, ni la déformation latérale sous le vent en mètres, ni la conformité à
-une norme ; le [chapitre 5](5-limites.md) en fait la liste.
+Sous un vent appliqué, la ligne et le passager immobile quittent le plan vertical de A–B : le
+simulateur calcule alors leur équilibre dans l'espace, et l'écart latéral de la ligne
+([§19](../simulation-theory.md#s-19) de la référence). Il ne calcule ni le freinage, ni la
+conformité à une norme ; le [chapitre 5](5-limites.md) en fait la liste.
 
 Référence : en-tête et [§3](../simulation-theory.md#s-3) de la référence technique.
 
@@ -137,7 +139,9 @@ donc les forces qui s'exercent sur lui s'équilibrent. Son poids est vertical ; 
 horizontales sont les composantes $H$ tirées par ses deux voisins, qui doivent donc être égales et
 opposées. Tant que toutes les charges sont verticales (poids de la ligne, poids du passager), la
 tension horizontale $H$ est **la même en tout point de la ligne**. C'est la grandeur centrale de
-toute la statique.
+toute la statique sans vent. Sous un vent appliqué, la traînée sur la ligne est horizontale :
+$H$ n'est plus constante, et le simulateur la lit à l'ancrage de la Mise en tension
+([§19.7](../simulation-theory.md#s-19-7)).
 
 **Pourquoi $V$ change d'un point à l'autre.** Le même raisonnement, appliqué à la verticale, dit
 que $V$ augmente du poids de la ligne qu'on parcourt : en avançant de A vers B, $V$ gagne $w$

@@ -40,14 +40,14 @@ import type { Ride, RideEnd } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { roundToDisplay } from "@/lib/format/quantity.ts";
-import { ride, ridePath, sweep } from "@/lib/sim";
+import { locusPath, ride, sweepSpatial } from "@/lib/sim";
 
 import type { DynamicsReading } from "./dynamics.ts";
 import type { TraverseScenario } from "./traverse.ts";
 import type { EngineFailure, UnloadedLine } from "./unloaded.ts";
 
-import { poseRides, readDynamics } from "./dynamics.ts";
-import { memberLoad, sweepRider } from "./traverse.ts";
+import { poseRides, readDynamics, rideWindOf } from "./dynamics.ts";
+import { riderLoad, sweepRider } from "./traverse.ts";
 import { unloadedOn } from "./unloaded.ts";
 
 /**
@@ -205,9 +205,9 @@ export type ReachRefusal =
  */
 export type StandingTension = { readonly TA: number; readonly TB: number };
 
-const standingTension = ({ state }: UnloadedLine): StandingTension => ({
-  TA: state.TA,
-  TB: state.TB,
+const standingTension = ({ spatial }: UnloadedLine): StandingTension => ({
+  TA: spatial.TA,
+  TB: spatial.TB,
 });
 
 /** A height of B that puts the farthest point on the target, and what it was recomputed to. */
@@ -264,7 +264,15 @@ export type ReachReading = {
 /** What the search reads of the Scenario — Traverse scope, so a scrub of `x_D` re-runs nothing. */
 export type ReachScenario = Pick<
   TraverseScenario,
-  "material" | "tightness" | "tensioningSide" | "carryingLines" | "wind" | "dynamics" | "rider"
+  | "material"
+  | "tightness"
+  | "tensioningSide"
+  | "carryingLines"
+  | "wind"
+  | "dynamics"
+  | "rider"
+  | "positions"
+  | "geometry"
 >;
 
 export type ReachInput = {
@@ -275,8 +283,6 @@ export type ReachInput = {
   readonly reading: DynamicsReading;
   /** The **active** imported profil, `null` on a manual line — it sets `ρ`, as for the rides. */
   readonly profile: Trace | null;
-  /** The bearing of A → B the Vent is projected on, or `null` without Positions. */
-  readonly bearing: number | null;
   /** May §11's garde be read on this line? False on a Clearance Gate breach. */
   readonly clearanceJudged: boolean;
 };
@@ -367,7 +373,6 @@ export function proposeAnchorB({
   unloaded,
   reading,
   profile,
-  bearing,
   clearanceJudged,
 }: ReachInput): ReachReading {
   const { span } = unloaded;
@@ -397,9 +402,10 @@ export function proposeAnchorB({
   if (!isReachTarget(target)) return refuse({ kind: "target" });
   if (!clearanceJudged) return refuse({ kind: "unjudged" });
 
-  const { material, tightness, tensioningSide, carryingLines, rider } = scenario;
-  const { posed, along } = poseRides(scenario, profile, bearing);
-  const P = memberLoad(rider.mp, carryingLines);
+  const { material, tightness, tensioningSide, carryingLines, rider, wind, positions, geometry } =
+    scenario;
+  const { posed } = poseRides(scenario, profile);
+  const load = riderLoad(rider.mp, rider.hRider, carryingLines);
   const heightOf = (steps: number) => steps / STEPS_PER_METRE;
 
   const trials = new Map<number, Trial>();
@@ -415,18 +421,27 @@ export function proposeAnchorB({
         h: span.h + delta,
         anchors: { ...span.anchors, zB: span.anchors.zB + delta },
       };
+      // The candidate is posed under the Scenario's own Vent, as the Scenario would be (§19.7).
       const line =
         steps === 0
           ? unloaded
-          : unloadedOn(moved, { material, tightness, tensioningSide, mp: rider.mp });
+          : unloadedOn(moved, {
+              material,
+              tightness,
+              tensioningSide,
+              mp: rider.mp,
+              trace: profile,
+              geometry,
+              wind,
+              positions,
+              rho: scenario.dynamics.rho,
+            });
       if (!line.ok) return { ok: false, failure: line };
-      const traverse = sweep(line.input, P);
       // As for the Scenario's own rides: a ride across a hole would run on a slope nobody solved.
-      if (traverse.steps.length === 0 || traverse.coverage < 1) {
-        return { ok: false, failure: { stage: "traverse", error: null } };
-      }
-      const path = ridePath(traverse.steps, line.span);
-      return { ok: true, line, reach: rideReach(ride({ ...posed, path, windAlong: along }), L) };
+      const path = locusPath(sweepSpatial(line.spatial.input, load), line.span);
+      if (path === null) return { ok: false, failure: { stage: "traverse", error: null } };
+      const windy = ride({ ...posed, path, wind: rideWindOf(line) });
+      return { ok: true, line, reach: rideReach(windy, L) };
     })();
     trials.set(steps, made);
     return made;
@@ -466,8 +481,7 @@ export function proposeAnchorB({
 
   // The candidate, recomputed as the Scenario would be once edited: §11, then both rides.
   const swept = sweepRider(within.line, { ...rider, carryingLines });
-  const rides =
-    swept === null ? null : readDynamics(scenario, within.line, swept, profile, bearing);
+  const rides = swept === null ? null : readDynamics(scenario, within.line, swept, profile);
   if (swept === null || rides === null) {
     return refuse({ kind: "failed", deltaB, failure: { stage: "traverse", error: null } });
   }

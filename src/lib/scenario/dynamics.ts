@@ -8,34 +8,31 @@
  * It is a composition above the engine, like `./traverse.ts`: the trajectory is the Sweep's, so
  * with two Brins porteurs it is a member's under `P/2`, while the mass that rides it is the whole
  * passager. Nothing here feeds the statics or the Verdict.
+ *
+ * **Under wind the ride is §19.15's**: on the trolley's locus — A, every solved `r_D`, B — with the
+ * wind read at the passager's own `x` (`windVectorAt`), its crosswind entering wherever the locus
+ * leaves the vertical plane. **The ride « sans vent » is the same Scenario with its Vent at zero**:
+ * the line re-posed in still air, swept and ridden — not the windy locus ridden in still air. Both
+ * need a complete Sweep: no descent across a hole (Q24).
  */
 
-import type { DerivedMaterial, QuasiStatic, Ride, RideInput, TrolleyFriction } from "@/lib/sim";
+import type { QuasiStatic, Ride, RideInput, RidePath, RideWind, TrolleyFriction } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { G } from "@/lib/format/quantity.ts";
-import {
-  airDensity,
-  DYNAMICS,
-  kmhToMs,
-  quasiStaticRatio,
-  ride,
-  ridePath,
-  windComponents,
-} from "@/lib/sim";
-import { meanAltitude } from "@/lib/terrain/trace.ts";
+import { DYNAMICS, locusPath, quasiStaticRatio, ride, windVectorAt } from "@/lib/sim";
 
-import type { RiderSweep } from "./traverse.ts";
+import type { RiderSweep, SweepRider } from "./traverse.ts";
 import type { ScenarioDraft } from "./types.ts";
+import type { UnloadedInputs, UnloadedLine } from "./unloaded.ts";
 
-/** Where the `ρ` of the rides comes from — the « lu » half of « lu et éditable ». */
-export type AirDensitySource =
-  /** Typed: `rho` is in the link. */
-  | "typed"
-  /** §12.2's ISA density at the imported profil's mean altitude. */
-  | "profile"
-  /** §12.2's sea-level 1,225 — a manual line has no altitude to read. */
-  | "sea-level";
+import { sweepRider } from "./traverse.ts";
+import { unloadedOn } from "./unloaded.ts";
+import { airDensityOf, type AirDensity } from "./wind.ts";
+
+// The air the rides and the statics share (§19.4) lives with the Vent; it is re-exported where the
+// rides' readers have always found it.
+export { airDensityOf, type AirDensity, type AirDensitySource } from "./wind.ts";
 
 /** The dynamic outputs' warnings, as identifiers: the app owns every sentence. */
 export type DynamicsWarningId =
@@ -48,68 +45,73 @@ export type DynamicsWarningId =
 export type DynamicsReading = {
   /** Every dynamic output is an estimation (#6), and is labelled so wherever it is shown. */
   readonly estimate: true;
-  /** Without wind — the first of the two Points d'arrêt. */
+  /** Without wind — the first of the two Points d'arrêt: the Scenario with its Vent at zero. */
   readonly calm: Ride;
-  /** With the Vent entered, through its component along the line; `calm` itself without one. */
+  /** With the Vent entered, on the locus it poses (§19.15); `calm` itself without one. */
   readonly windy: Ride;
   /**
-   * The Vent entered has no component along the line — none, a crosswind, or no bearing to project
-   * it on: `windy` is `calm`.
+   * No Vent is applied — no speed, or no bearing to project it on: `windy` is `calm`. A crosswind
+   * is applied: under §19 it moves the line and enters the ride, so it is not windless.
    */
   readonly windless: boolean;
   /** The air density both rides used, kg/m³. */
-  readonly rho: { readonly value: number; readonly source: AirDensitySource };
+  readonly rho: AirDensity;
   /** §12.1 over both rides, and whether it passes the warning threshold. */
   readonly quasiStatic: QuasiStatic & { readonly exceeded: boolean };
   readonly warnings: readonly DynamicsWarningId[];
 };
 
 /**
- * What a ride reads of the line it is swept over: its span, and the member's weight per metre. An
- * `UnloadedLine` and a chart `SceneBase` both qualify, which is why the solved scene can stand for
- * both.
+ * What the rides read of the Scenario beside its line: the passager, the trolley, the air — and,
+ * for the ride « sans vent » under an applied Vent, what re-poses the line in still air.
  */
-export type RiddenLine = {
-  readonly span: { readonly L: number; readonly h: number };
-  readonly material: Pick<DerivedMaterial, "w">;
+export type RiddenScenario = Pick<
+  ScenarioDraft,
+  "material" | "wind" | "dynamics" | "tightness" | "tensioningSide" | "carryingLines" | "geometry"
+> & {
+  readonly rider: Pick<ScenarioDraft["rider"], "mp" | "hRider" | "anchorZone">;
 };
 
 /**
  * The two rides of a solved traverse.
  *
- * @param unloaded the line the traverse was swept over.
+ * @param unloaded the line the traverse was swept over, posed under the Scenario's Vent.
+ * @param swept its Sweep: the slots the locus is read off.
  * @param profile the **active** imported profil, `null` on a manual line — a Trace cached while
  *   manual geometry drives is no altitude of this line.
- * @param bearing the bearing of A → B the Vent is projected on, degrees from north, or `null` when
- *   the line has none (no Positions): the Vent's direction is geographic, so without a bearing it
- *   has no component along the line and the ride with the Vent is the ride without.
- * @returns `null` when the traverse is incomplete: a ride across a hole would run on a slope
- *   nobody solved, so like the Verdict it is suppressed rather than qualified.
+ * @returns `null` when the traverse is incomplete — a ride across a hole would run on a slope nobody
+ *   solved, so like the Verdict it is suppressed rather than qualified (Q24) — or when the
+ *   Scenario at zero wind does not solve or sweep completely, so the ride « sans vent » it is read
+ *   against does not exist.
  */
 export function readDynamics(
-  {
-    material,
-    rider,
-    wind,
-    dynamics,
-  }: Pick<ScenarioDraft, "material" | "wind" | "dynamics"> & {
-    readonly rider: Pick<ScenarioDraft["rider"], "mp">;
-  },
-  unloaded: RiddenLine,
-  { traverse }: Pick<RiderSweep, "traverse">,
+  scenario: RiddenScenario,
+  unloaded: UnloadedLine,
+  swept: Pick<RiderSweep, "spatial">,
   profile: Trace | null,
-  bearing: number | null,
 ): DynamicsReading | null {
-  if (traverse.coverage < 1) return null;
+  const windyPath = locusPath(swept.spatial, unloaded.span);
+  if (windyPath === null) return null;
 
-  const path = ridePath(traverse.steps, unloaded.span);
-  const { posed, along, rho } = poseRides({ material, rider, wind, dynamics }, profile, bearing);
-  const calm = ride({ ...posed, path, windAlong: 0 });
-  const windy = along === 0 ? calm : ride({ ...posed, path, windAlong: along });
+  const { posed, rho } = poseRides(scenario, profile);
+  const windy = ride({ ...posed, path: windyPath, wind: rideWindOf(unloaded) });
+  const windless = unloaded.aero === null;
+
+  let calm = windy;
+  let calmPath = windyPath;
+  if (!windless) {
+    const still = stillAir(scenario, unloaded);
+    if (still === null) return null;
+    calmPath = still;
+    calm = ride({ ...posed, path: calmPath, wind: null });
+  }
 
   // The member's own `μ`, kg/m: its weight per metre over the `g` that made it.
   const linearMass = unloaded.material.w / G;
-  const both = [calm, windy].map((one) => quasiStaticRatio(one.samples, path, linearMass));
+  const both = [
+    quasiStaticRatio(calm.samples, calmPath, linearMass),
+    quasiStaticRatio(windy.samples, windyPath, linearMass),
+  ];
   const worst = both[1].ratio > both[0].ratio ? both[1] : both[0];
   const exceeded = worst.ratio > DYNAMICS.quasiStaticLimit;
 
@@ -121,20 +123,58 @@ export function readDynamics(
     estimate: true,
     calm,
     windy,
-    windless: along === 0,
+    windless,
     rho,
     quasiStatic: { ...worst, exceeded },
     warnings,
   };
 }
 
-/** What a Scenario's rides are posed with, whatever trajectory they run on. */
+/**
+ * The locus of the Scenario with its Vent at zero (§19.15's comparison): the line re-posed in still
+ * air by the same driver, swept, and its trajectory — or `null` when that chain does not complete.
+ */
+function stillAir(scenario: RiddenScenario, unloaded: UnloadedLine): RidePath | null {
+  const inputs: Parameters<typeof unloadedOn>[1] = {
+    material: scenario.material,
+    tightness: scenario.tightness,
+    tensioningSide: scenario.tensioningSide,
+    mp: scenario.rider.mp,
+    trace: null,
+    geometry: scenario.geometry,
+    wind: { ...scenario.wind, speedKmh: 0 },
+    positions: { A: null, B: null },
+    rho: null,
+  } satisfies Pick<UnloadedInputs, keyof Parameters<typeof unloadedOn>[1]>;
+  const line = unloadedOn(unloaded.span, inputs);
+  if (!line.ok) return null;
+  const rider: SweepRider = {
+    mp: scenario.rider.mp,
+    hRider: scenario.rider.hRider,
+    anchorZone: scenario.rider.anchorZone,
+    carryingLines: scenario.carryingLines,
+  };
+  const swept = sweepRider(line, rider);
+  return swept === null ? null : locusPath(swept.spatial, line.span);
+}
+
+/**
+ * The wind a ride on this line reads (§19.15): the Vent the line was posed under, at the
+ * passager's own `x` — `null` when none is applied. `x` is held on `[0, L]`: a sample's position
+ * is a sum along the locus that may round a few ulps past B, where the field has no value.
+ */
+export function rideWindOf(unloaded: Pick<UnloadedLine, "aero" | "span">): RideWind | null {
+  const { aero } = unloaded;
+  if (aero === null) return null;
+  const { L } = unloaded.span;
+  return (x) => windVectorAt(aero, Math.min(L, Math.max(0, x)), L);
+}
+
+/** What a Scenario's rides are posed with, whatever trajectory and wind they run on. */
 export type RidePosing = {
   /** Everything of a ride but its trajectory and its wind. */
-  readonly posed: Omit<RideInput, "path" | "windAlong">;
-  /** The Vent's component along A → B, m/s — `0` without a bearing to project it on. */
-  readonly along: number;
-  readonly rho: DynamicsReading["rho"];
+  readonly posed: Omit<RideInput, "path" | "wind">;
+  readonly rho: AirDensity;
 };
 
 /**
@@ -142,25 +182,20 @@ export type RidePosing = {
  * so a ride over another trajectory of the same Scenario (`./reach.ts`) is posed as these are.
  *
  * @param profile the **active** imported profil, `null` on a manual line.
- * @param bearing the bearing of A → B, degrees from north, or `null` without Positions.
  */
 export function poseRides(
   {
     material,
     rider,
-    wind,
     dynamics,
-  }: Pick<ScenarioDraft, "material" | "wind" | "dynamics"> & {
+  }: Pick<ScenarioDraft, "material" | "dynamics"> & {
     readonly rider: Pick<ScenarioDraft["rider"], "mp">;
   },
   profile: Trace | null,
-  bearing: number | null,
 ): RidePosing {
   const rho = airDensityOf(dynamics.rho, profile);
   const trolley = trolleyOf(material.family, dynamics);
-  const along =
-    bearing === null ? 0 : windComponents(kmhToMs(wind.speedKmh), wind.directionDeg, bearing).along;
-  return { posed: { m: rider.mp, CdA: dynamics.CdA, rho: rho.value, trolley }, along, rho };
+  return { posed: { m: rider.mp, CdA: dynamics.CdA, rho: rho.value, trolley }, rho };
 }
 
 /**
@@ -172,11 +207,4 @@ function trolleyOf(
   { F0, kv, mu }: ScenarioDraft["dynamics"],
 ): TrolleyFriction {
   return family === "textile" ? { law: "ssf", F0, kv } : { law: "coulomb", mu };
-}
-
-/** The `ρ` a ride uses: the typed one, else §12.2's ISA at the profil's mean altitude, else 1,225. */
-export function airDensityOf(typed: number | null, profile: Trace | null): DynamicsReading["rho"] {
-  if (typed !== null) return { value: typed, source: "typed" };
-  if (profile !== null) return { value: airDensity(meanAltitude(profile)), source: "profile" };
-  return { value: DYNAMICS.rhoSeaLevel, source: "sea-level" };
 }

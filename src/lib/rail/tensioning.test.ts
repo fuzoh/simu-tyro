@@ -264,12 +264,21 @@ function resultsOf(scenario: ScenarioDraft) {
   if (!unloaded.ok) throw new Error("the line solves");
   const swept = sweepRider(unloaded, sweepRiderOf(scenario));
   if (swept === null) throw new Error("the traverse solves");
-  const { span, state, material } = unloaded;
+  const { span, material } = unloaded;
   const { P, traverse, clearance, soleCarrier } = swept;
   const traverseScenarioOf = traverseScenario(traverseInputs(scenario));
   const results = deriveResults({
     scenario: traverseScenarioOf,
-    base: { L: span.L, h: span.h, unloaded: state, material, P, traverse, clearance, soleCarrier },
+    base: {
+      L: span.L,
+      h: span.h,
+      unloaded: unloaded.spatial,
+      material,
+      P,
+      traverse,
+      clearance,
+      soleCarrier,
+    },
     report: evaluateGates({ scenario: traverseScenarioOf }),
   });
   if (results === null) throw new Error("the line gives results");

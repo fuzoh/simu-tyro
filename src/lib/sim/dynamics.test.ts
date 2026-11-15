@@ -1,10 +1,11 @@
 import { describe, expect, test } from "vitest";
 
 import type { RidePath, TrolleyFriction } from "./dynamics.ts";
-import type { SpanInput } from "./types.ts";
+import type { LineAero, SpanInput, SpatialSweepResult } from "./types.ts";
 
 import { TOLERANCE, Z4, Z8 } from "./__fixtures__/theory-15.ts";
-import { airDensity, DYNAMICS, quasiStaticRatio, ride, ridePath } from "./dynamics.ts";
+import { airDensity, DYNAMICS, locusPath, quasiStaticRatio, ride, ridePath } from "./dynamics.ts";
+import { sweepSpatial } from "./spatial-sweep.ts";
 import { sweep, sweepStep } from "./sweep.ts";
 import { kmhToMs, windComponents } from "./wind.ts";
 
@@ -35,15 +36,15 @@ const DESCENDING: SpanInput = { L: 300, h: -60, L0: 307, w: 5.36, EA: 6.9e6, loa
 const SSF: TrolleyFriction = DYNAMICS.textile;
 const STEEL: TrolleyFriction = DYNAMICS.steel;
 
-/** The level line's ride, calm unless a wind is given. */
-function levelRide(trolley: TrolleyFriction, windAlong = 0) {
+/** The level line's ride, calm unless a wind is given — uniform, as `windComponents` projects it. */
+function levelRide(trolley: TrolleyFriction, u: { along: number; across: number } | null = null) {
   return ride({
     path: LEVEL_PATH,
     m: LEVEL_MASS,
     CdA: DYNAMICS.CdA,
     rho: DYNAMICS.rhoSeaLevel,
     trolley,
-    windAlong,
+    wind: u === null ? null : () => ({ ux: u.along, uy: u.across }),
   });
 }
 
@@ -84,7 +85,7 @@ describe("Z8 — the terminal velocity on a 10° slope, §15", () => {
       CdA,
       rho,
       trolley: { law: "ssf", F0, kv },
-      windAlong: 0,
+      wind: null,
     });
     expect(end.kind).toBe("arrival");
     if (end.kind !== "arrival") return;
@@ -105,7 +106,7 @@ describe("energy — without friction or drag, ½mv² at the arrival is m·g·Δ
     ["μ = 0", { law: "coulomb", mu: 0 }],
   ])("%s, along a loaded trajectory", (_name, trolley) => {
     const m = 120;
-    const { end } = ride({ path, m, CdA: 0, rho: DYNAMICS.rhoSeaLevel, trolley, windAlong: 0 });
+    const { end } = ride({ path, m, CdA: 0, rho: DYNAMICS.rhoSeaLevel, trolley, wind: null });
     expect(end.kind).toBe("arrival");
     if (end.kind !== "arrival") return;
     const kinetic = 0.5 * m * end.v * end.v;
@@ -121,9 +122,9 @@ describe("energy — without friction or drag, ½mv² at the arrival is m·g·Δ
       CdA: 0,
       rho: 1.225,
       trolley: { law: "ssf", F0: 0, kv: 0 },
-      windAlong: 0,
+      wind: null,
     });
-    const real = ride({ path, m, CdA: DYNAMICS.CdA, rho: 1.225, trolley: SSF, windAlong: 0 });
+    const real = ride({ path, m, CdA: DYNAMICS.CdA, rho: 1.225, trolley: SSF, wind: null });
     expect(free.end.kind).toBe("arrival");
     expect(real.end.kind).toBe("arrival");
     if (free.end.kind !== "arrival" || real.end.kind !== "arrival") return;
@@ -165,24 +166,22 @@ describe("wind shifts the Point d'arrêt, through its component along the line o
   const calm = stopX(levelRide(SSF).end);
 
   test("a head wind stops the passager before the calm Point d'arrêt", () => {
-    expect(stopX(levelRide(SSF, windComponents(wind, 0, NORTH).along).end)).toBeLessThan(calm);
+    expect(stopX(levelRide(SSF, windComponents(wind, 0, NORTH)).end)).toBeLessThan(calm);
   });
 
   test("a tail wind stops the passager beyond it", () => {
-    expect(stopX(levelRide(SSF, windComponents(wind, 180, NORTH).along).end)).toBeGreaterThan(calm);
+    expect(stopX(levelRide(SSF, windComponents(wind, 180, NORTH)).end)).toBeGreaterThan(calm);
   });
 
   test("a pure cross wind changes nothing", () => {
-    expect(levelRide(SSF, windComponents(wind, 90, NORTH).along)).toEqual(levelRide(SSF));
-    expect(levelRide(SSF, windComponents(wind, 270, NORTH).along)).toEqual(levelRide(SSF));
+    expect(levelRide(SSF, windComponents(wind, 90, NORTH))).toEqual(levelRide(SSF));
+    expect(levelRide(SSF, windComponents(wind, 270, NORTH))).toEqual(levelRide(SSF));
   });
 
   test("the same holds on a câble", () => {
     const steelCalm = stopX(levelRide(STEEL).end);
-    expect(stopX(levelRide(STEEL, windComponents(wind, 0, NORTH).along).end)).toBeLessThan(
-      steelCalm,
-    );
-    expect(stopX(levelRide(STEEL, windComponents(wind, 180, NORTH).along).end)).toBeGreaterThan(
+    expect(stopX(levelRide(STEEL, windComponents(wind, 0, NORTH)).end)).toBeLessThan(steelCalm);
+    expect(stopX(levelRide(STEEL, windComponents(wind, 180, NORTH)).end)).toBeGreaterThan(
       steelCalm,
     );
   });
@@ -203,7 +202,7 @@ describe("the departure is controlled: from rest at A", () => {
       CdA: DYNAMICS.CdA,
       rho: DYNAMICS.rhoSeaLevel,
       trolley: SSF,
-      windAlong: 0,
+      wind: null,
     });
     expect(end).toEqual({ kind: "stop", x: 0, t: 0 });
     expect(samples).toHaveLength(1);
@@ -217,7 +216,7 @@ describe("the departure is controlled: from rest at A", () => {
       CdA: DYNAMICS.CdA,
       rho: DYNAMICS.rhoSeaLevel,
       trolley: SSF,
-      windAlong: -kmhToMs(100),
+      wind: () => ({ ux: -kmhToMs(100), uy: 0 }),
     });
     expect(end).toEqual({ kind: "stop", x: 0, t: 0 });
   });
@@ -240,7 +239,7 @@ describe("time", () => {
       CdA: 0,
       rho: 1.225,
       trolley: { law: "ssf", F0: 0, kv: 0 },
-      windAlong: 0,
+      wind: null,
     });
     const along = DYNAMICS.g * Math.sin((theta * Math.PI) / 180);
     expect(end.kind).toBe("arrival");
@@ -329,5 +328,153 @@ describe("airDensity — §12.2's ISA model", () => {
 
   test("falls with altitude", () => {
     expect(airDensity(1400)).toBeLessThan(airDensity(500));
+  });
+});
+
+/** One straight segment from A along the direction `(3, 4, −12)/13`, 13·`k` m long. */
+function obliqueSegment(k: number): RidePath {
+  return {
+    x: Float64Array.from([0, 3 * k]),
+    y: Float64Array.from([0, 4 * k]),
+    z: Float64Array.from([0, -12 * k]),
+    T: Float64Array.from([1, 1]),
+  };
+}
+
+describe("§19.15 — the ride on a locus that leaves the vertical plane", () => {
+  const frictionless: TrolleyFriction = { law: "coulomb", mu: 0 };
+
+  test("the crosswind enters the relative speed: v_rel,t − (v − u_x·t_x) = −u_y·t_y", () => {
+    // t = (3, 4, −12)/13; u = (2, 5) m/s, so u·t = (6 + 20)/13 = 2 m/s, of which u_y·t_y = 20/13.
+    // At rest, v_rel,t = −2 m/s, and the drag ½·ρ·C_dA·v_rel·|v_rel| = 0,3 · (−2) · 2 = −1,2 N pushes
+    // toward B: a = g·12/13 + 1,2/m. The plane reading u_x·t_x alone would give 0,3·(6/13)²/m.
+    const m = 100;
+    const { samples } = ride({
+      path: obliqueSegment(10),
+      m,
+      CdA: 0.5,
+      rho: 1.2,
+      trolley: frictionless,
+      wind: () => ({ ux: 2, uy: 5 }),
+    });
+    expect(samples[0].a).toBeCloseTo((DYNAMICS.g * 12) / 13 + 1.2 / m, 12);
+  });
+
+  test("a câble's normal force reads cos θ = √(t_x² + t_y²), the inclination to the horizontal", () => {
+    // sin θ = 12/13, cos θ = 5/13: a = g·(12 − μ·5)/13 at rest, still air.
+    const mu = 0.1;
+    const { samples } = ride({
+      path: obliqueSegment(10),
+      m: 80,
+      CdA: 0,
+      rho: 1.2,
+      trolley: { law: "coulomb", mu },
+      wind: null,
+    });
+    expect(samples[0].a).toBeCloseTo((DYNAMICS.g * (12 - mu * 5)) / 13, 12);
+  });
+
+  test("energy: without friction or drag, ½v² at B is g·Δz along a 3-D locus", () => {
+    const path: RidePath = {
+      x: Float64Array.from([0, 30, 80, 140, 200]),
+      y: Float64Array.from([0, 4, 7, 5, 0]),
+      z: Float64Array.from([0, -10, -22, -31, -40]),
+      T: Float64Array.from([1, 1, 1, 1, 1]),
+    };
+    const { end, samples } = ride({
+      path,
+      m: 90,
+      CdA: 0,
+      rho: 1.2,
+      trolley: frictionless,
+      wind: null,
+    });
+    expect(end.kind).toBe("arrival");
+    if (end.kind !== "arrival") return;
+    expect(Math.abs((0.5 * end.v * end.v) / (DYNAMICS.g * 40) - 1)).toBeLessThan(1e-9);
+    // The samples sit on the locus: the last one is B, lateral offset back to zero.
+    expect(samples[samples.length - 1].y).toBeCloseTo(0, 9);
+  });
+
+  test("a ride is the same when its plane is turned about the vertical", () => {
+    // The plane path and the same path in a vertical plane at 30° to A–B: same lengths, same drops.
+    const plane = trajectory(DESCENDING, 120 * DYNAMICS.g);
+    const [c, s] = [Math.cos(Math.PI / 6), Math.sin(Math.PI / 6)];
+    const turned: RidePath = {
+      ...plane,
+      x: plane.x.map((x) => x * c),
+      y: plane.x.map((x) => x * s),
+    };
+    const ridden = (path: RidePath) =>
+      ride({ path, m: 120, CdA: DYNAMICS.CdA, rho: 1.225, trolley: STEEL, wind: null }).end;
+    const [a, b] = [ridden(plane), ridden(turned)];
+    expect(a.kind).toBe("arrival");
+    expect(b.kind).toBe("arrival");
+    if (a.kind !== "arrival" || b.kind !== "arrival") return;
+    expect(b.v).toBeCloseTo(a.v, 9);
+    expect(b.t).toBeCloseTo(a.t, 9);
+  });
+
+  test("on a plane locus, y zeros or absent, the ride is §12.2's bit for bit", () => {
+    const plane = trajectory(DESCENDING, 120 * DYNAMICS.g);
+    const { y: _y, ...without } = plane;
+    const ridden = (path: RidePath) =>
+      ride({
+        path,
+        m: 120,
+        CdA: DYNAMICS.CdA,
+        rho: 1.225,
+        trolley: SSF,
+        wind: () => ({ ux: 3, uy: 7 }),
+      });
+    expect(ridden(plane)).toEqual(ridden(without));
+  });
+});
+
+describe("locusPath — the trolley's locus, A to B (§19.15)", () => {
+  const WIND: LineAero = {
+    field: { speed: 15, from: 90, profile: { width: 50, attenuation: 0 } },
+    bearing: 0,
+    rho: 1.225,
+    d: 0.012,
+    CDn: 1.2,
+  };
+  const LINE = { L: 150, h: -18, L0: 151.644, w: 0.5465 * 9.81, EA: 6.9e6, rider: null };
+  const RIDER = { weight: 90 * 9.81, share: 1, hRider: 2.1 } as const;
+
+  test("without wind it is ridePath over sweep()'s steps, bit for bit (§19.16)", () => {
+    const swept = sweepSpatial(
+      { ...LEVEL, aero: null, rider: null },
+      { ...RIDER, weight: Z4.in.P },
+    );
+    expect(locusPath(swept, LEVEL)).toEqual(ridePath(sweep(LEVEL, Z4.in.P).steps, LEVEL));
+  });
+
+  test("under wind it runs A, every slot's node, B — off the vertical plane", () => {
+    const swept = sweepSpatial({ ...LINE, aero: WIND }, RIDER);
+    const path = locusPath(swept, LINE);
+    expect(path).not.toBeNull();
+    if (path === null) return;
+    const last = path.x.length - 1;
+    expect([path.x[0], path.y?.[0], path.z[0]]).toEqual([0, 0, 0]);
+    expect([path.x[last], path.y?.[last], path.z[last]]).toEqual([LINE.L, 0, LINE.h]);
+    for (let k = 1; k < path.x.length; k++) expect(path.x[k]).toBeGreaterThan(path.x[k - 1]);
+    const nodes = swept.slots.map((slot) => slot?.rD);
+    const inner = Array.from(path.x.subarray(1, -1), (x, k) => [x, path.y?.[k + 1], path.z[k + 1]]);
+    expect(inner).toEqual(
+      nodes
+        .filter((r) => r !== undefined && r.x > 0 && r.x < LINE.L)
+        .map((r) => [r?.x, r?.y, r?.z]),
+    );
+    // A wind from the east, line toward the north: the trolley leaves A–B to the left (+y).
+    expect(Math.max(...(path.y ?? []))).toBeGreaterThan(0);
+  });
+
+  test("has no locus across a hole (Q24)", () => {
+    const swept = sweepSpatial({ ...LINE, aero: WIND }, RIDER);
+    const slots = [...swept.slots];
+    slots[60] = null;
+    const holed: SpatialSweepResult = { ...swept, slots, coverage: 259 / 260 };
+    expect(locusPath(holed, LINE)).toBeNull();
   });
 });

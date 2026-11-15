@@ -12,7 +12,7 @@ import type { LineAero, SpatialSpanInput, SpatialSweepResult, Terrain } from "./
 
 import { FIRST_RUN_CLEARANCE, GROUND_CONTACT_CABLE, TOLERANCE } from "./__fixtures__/theory-15.ts";
 import { evaluateClearance } from "./clearance.ts";
-import { evaluateSpatialClearance } from "./spatial-clearance.ts";
+import { evaluateSpatialClearance, solvedClearance } from "./spatial-clearance.ts";
 import { sampleSpatial, type SpatialSamples } from "./spatial-sample.ts";
 import { slotState, sweepSpatial } from "./spatial-sweep.ts";
 import { sweep } from "./sweep.ts";
@@ -83,6 +83,31 @@ describe("without wind — §11's evaluateClearance, bit for bit (§19.16)", () 
       expect(spatial).toEqual(reference);
     });
   }
+
+  it("re-indexes on the solved slots as §11 reduces the steps a hole leaves", () => {
+    const swept = sweepSpatial({ ...input, aero: null, rider: null }, rider);
+    const full = evaluateSpatialClearance(swept, terrain, given.hRider, 10);
+    // A hole before the minimum, so its index moves by one; a second after it, which moves nothing.
+    const holes = [40, full.atStepIndex + 30];
+    const slots = swept.slots.map((slot, i) => (holes.includes(i) ? null : slot));
+    const holed: SpatialSweepResult = { ...swept, slots, coverage: 258 / 260 };
+    const plane = sweep({ ...input, loads: [] }, given.P);
+    const reference = evaluateClearance(
+      { ...input, loads: [] },
+      given.P,
+      plane.steps.filter((_, i) => !holes.includes(i)),
+      terrain,
+      given.hRider,
+      given.samplesPerStep,
+      10,
+    );
+    const solved = solvedClearance(
+      evaluateSpatialClearance(holed, terrain, given.hRider, 10),
+      holed,
+    );
+    expect(solved).toEqual(reference);
+    expect(solved.atStepIndex).toBe(full.atStepIndex - 1);
+  });
 
   it("keeps the first run's [MEASURED] garde, 2,42 m at x 74,4", () => {
     const swept = sweepSpatial({ ...input, aero: null, rider: null }, rider);

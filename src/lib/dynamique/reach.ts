@@ -25,7 +25,6 @@ import type { Trace } from "@/lib/terrain/trace.ts";
 import { engineRefusal, REFUSAL_CAUSE } from "@/lib/app/refusals.ts";
 import { formatAtX, formatQuantity, formatValue } from "@/lib/format/quantity.ts";
 import { FIELDS } from "@/lib/rail/fields.ts";
-import { windBearing } from "@/lib/rail/gates.ts";
 import { pretensionOf } from "@/lib/rail/tensioning.ts";
 import { tightnessDriver } from "@/lib/rail/values.ts";
 import { proposeAnchorB, REACH } from "@/lib/scenario/reach.ts";
@@ -325,7 +324,6 @@ export function reachSearch({
       unloaded,
       reading: rides,
       profile: traverse.geometry.source === "trace" ? trace : null,
-      bearing: windBearing(traverse),
       clearanceJudged: clearance,
     },
     wording: {

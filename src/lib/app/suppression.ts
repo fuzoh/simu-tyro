@@ -19,7 +19,7 @@
  * | **Solve Gate** | tout l'aval : ni `SpanState`, ni câble, ni read-out |
  * | **Clearance Gate** | la garde au sol et la courbe de garde **seules** — le câble se dessine |
  * | **Verdict Gate** | le bandeau et la grille critères × extrémités **seuls** |
- * | **Wind Gate** | la Banane, le vent de la rose et sa lecture — et toute estimation, qui lit le vent |
+ * | **Wind Gate** | la Banane, le vent de la rose et sa lecture — et toute estimation, qui lit le vent ; la ligne placée (A et B sur la carte), **tout l'aval** : la statique lit le vent (§19) |
  * | **Ride Gate** | toute estimation **seule** : points d'arrêt, vitesse d'arrivée, durée, courbes, `v/c` |
  * | **L'exception géométrique** | les deux tracés, sans graduations et sans piste de pointeur |
  *
@@ -43,6 +43,8 @@
 import type { EngineRefusal } from "@/lib/app/refusals.ts";
 import type { FieldId } from "@/lib/rail/fields.ts";
 import type { GateReport } from "@/lib/rail/gates.ts";
+
+import { windTakesStatics } from "@/lib/rail/gates.ts";
 
 /**
  * The two fields whose failure leaves **no shared x domain at all** — it is defined as span + 5 %,
@@ -83,7 +85,9 @@ export function suppression({
   const geometry = report.errors.some((error) => GEOMETRY_FIELDS.has(error.field));
   // A geometry failure is a Solve breach in the report already; it is restated here because the
   // implication is what the type promises, not something a caller may re-derive from the flags.
-  const solve = geometry || refusal !== null || !report.passed.solve;
+  // Under §19 the statics read the Vent wherever it is applied: a Vent the gates refuse takes them
+  // down rather than be read as another wind (`windTakesStatics`).
+  const solve = geometry || refusal !== null || !report.passed.solve || windTakesStatics(report);
   return {
     geometry,
     solve,

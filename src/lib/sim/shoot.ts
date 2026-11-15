@@ -118,6 +118,10 @@ export class Shooter {
   zD = 0;
   Tminus = 0;
   Tplus = 0;
+  /** `F(S_P⁻)`, N. */
+  FmX = 0;
+  FmY = 0;
+  FmZ = 0;
   /** `P_ext` at the node, N. */
   Px = 0;
   Py = 0;
@@ -358,6 +362,9 @@ export class Shooter {
         this.yD = y;
         this.zD = z;
         this.Tminus = Tend;
+        this.FmX = Fx;
+        this.FmY = Fy;
+        this.FmZ = Fz;
         this.Px = Px;
         this.Py = Py;
         this.Pz = Pz;

@@ -165,7 +165,9 @@ export type TensioningDevice = "pulley" | "maestro-s" | "maestro-l";
  * forecast gives. It is projected on the line through the bearing A → B the {@link Positions} give,
  * so moving an anchor turns the line under it and leaves it as it is; without both Positions it is
  * kept as given and not applied (`windBearing`). `ws` / `wd` in a link, **both absent for no wind**.
- * Only the passager's ride and the Banane read it (#89, #96): statics and the Verdict are unchanged.
+ * Applied — a speed and a bearing — the statics read it (§19, #127): the line and the static passager
+ * leave the vertical plane, and the tensions, the garde and the Verdict are those of the line it
+ * poses; the passager's ride descends that line's locus (§19.15), and the Banane still draws it.
  *
  * Its **profile** (#120) says how that speed varies along the line — `docs/simulation-theory.md`
  * §8.4: a scenario the user prescribes, never a valley forecast. `speedKmh` is then the speed at
@@ -209,14 +211,14 @@ export type Position = {
  * unknown**. They place the anchors on the map and in the Vue 3D and give Mesure its distances; the
  * `ph` link key (`offPositions`) says whether the profil runs between them; « Charger le profil
  * geo.admin » (#103) reads them, only when pressed; and their bearing A → B is what the Vent is
- * projected on. Statics and the Verdict never read them.
+ * projected on — so under an applied Vent the statics read them through it, and nothing else.
  */
 export type Positions = { A: Position | null; B: Position | null };
 
 /**
  * The constants of the passager's ride (#89) — §12.2's, every one editable and each **absent from a
- * link at its default**: `cda`, `rho`, `f0`, `kv` and `mur`. Only the ride reads them: statics and
- * the Verdict are unchanged.
+ * link at its default**: `cda`, `rho`, `f0`, `kv` and `mur`. Only the ride reads them, but for `rho`:
+ * under an applied Vent it is also the air of the line's drag (§19.4), so the statics read it.
  *
  * Both trolley laws are held, and the family picks one: the SSF fit on a corde, a constant `μ` on a
  * câble. A family flip therefore cannot pair a law with the wrong material, and a link carries only

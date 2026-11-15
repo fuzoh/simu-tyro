@@ -59,9 +59,18 @@ function solvedTraverseOf(scenario: ScenarioDraft): SolvedTraverse {
   if (!unloaded.ok) throw new Error("the shipped scenario solves");
   const swept = sweepRider(unloaded, sweepRiderOf(scenario));
   if (swept === null) throw new Error("the shipped traverse solves");
-  const { span, state, material } = unloaded;
+  const { span, material } = unloaded;
   const { P, traverse, clearance, soleCarrier } = swept;
-  return { L: span.L, h: span.h, unloaded: state, material, P, traverse, clearance, soleCarrier };
+  return {
+    L: span.L,
+    h: span.h,
+    unloaded: unloaded.spatial,
+    material,
+    P,
+    traverse,
+    clearance,
+    soleCarrier,
+  };
 }
 
 function resultsOf(patch: Partial<ScenarioDraft> = {}): Results {

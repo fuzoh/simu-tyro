@@ -100,7 +100,7 @@ describe("the Points d'arrêt are marked where the engine put them", () => {
   });
 
   test("two markers at one abscissa stand on two label rows", () => {
-    const gentle = ridesUnder(50, 90, GENTLE);
+    const gentle = ridesUnder(0, 0, GENTLE);
     expect(gentle.outputs.coincide).toBe(true);
     const drawn = dynamiqueScene({ width: WIDTH, frame: gentle.frame, solved: gentle.solved });
     expect(drawn.coupe.markers.map((marker) => marker.row)).toEqual([0, 1]);

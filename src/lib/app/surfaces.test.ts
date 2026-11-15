@@ -251,9 +251,9 @@ describe("the Vent needs Positions", () => {
 });
 
 /**
- * The Vent's profile (#120). Today's rides, Banane and rose take one speed for the whole line, so a
- * link that carries a profile which is not uniform is **kept as given and withheld** — never read
- * as the uniform wind it is not — until a calculation takes the field.
+ * The Vent's profile (#120). Until its activation (#141) a link that carries a profile which is not
+ * uniform is **kept as given and withheld** — never read as the uniform wind it is not. Under §19
+ * the statics read the Vent once it is applied, so with A and B placed they are withheld with it.
  */
 describe("a profile of the Vent no calculation reads is never computed as a uniform wind", () => {
   /** The browser trial's line: a west wind, ahead and from the left. */
@@ -282,9 +282,8 @@ describe("a profile of the Vent no calculation reads is never computed as a unif
   });
 
   test.each(["exact", "terrain"] as const)(
-    "a profile that is not uniform, on a Page in the %s register: no ride, no Vent, the statics stand",
+    "a profile that is not uniform, on a Page in the %s register: no ride, no Vent, no statics",
     (register) => {
-      const sound = arrivedOn(LINE, register);
       const { scenario, surfaces, reading } = arrivedOn(`${LINE}&ww=30&wa=40`, register);
       // Kept as given: the Scenario and the link it writes back still carry the profile.
       expect(scenario.wind).toEqual({
@@ -294,12 +293,15 @@ describe("a profile of the Vent no calculation reads is never computed as a unif
         attenuationPct: 40,
       });
       expect(scenarioToSearch(scenario as Scenario)).toMatchObject({ ww: 30, wa: 40 });
-      // Withheld: nothing is integrated under 30 km/h along the whole line.
+      // Withheld: nothing is integrated under 30 km/h along the whole line. Under §19 the statics
+      // read the Vent too, so they are withheld with it rather than computed under another wind —
+      // « Aucun résultat » says why, once, and the ride has nothing left to be withheld from.
       expect(reading).toBeNull();
-      expect(surfaces.rideCause).toBe("Aucune estimation — atténuation aux ancrages invalide.");
+      expect(surfaces.rideCause).toBeNull();
       expect(surfaces.windCause).toBe("Vent indisponible — atténuation aux ancrages invalide.");
-      expect(surfaces.cause).toBeNull();
-      expect(surfaces.results?.rows).toEqual(sound.surfaces.results?.rows);
+      expect(surfaces.cause).toBe("Aucun résultat — atténuation aux ancrages invalide.");
+      expect(surfaces.results).toBeNull();
+      expect(surfaces.solved).toBeNull();
     },
   );
 
@@ -309,8 +311,8 @@ describe("a profile of the Vent no calculation reads is never computed as a unif
     expect(scenarioToSearch(scenario as Scenario)).toMatchObject({ ww: 95 });
     expect(reading).toBeNull();
     expect(surfaces.windCause).toBe("Vent indisponible — largeur à mi-atténuation invalide.");
-    expect(surfaces.rideCause).toBe("Aucune estimation — largeur à mi-atténuation invalide.");
-    expect(surfaces.results).not.toBeNull();
+    expect(surfaces.cause).toBe("Aucun résultat — largeur à mi-atténuation invalide.");
+    expect(surfaces.results).toBeNull();
   });
 
   test("without Positions it is refused all the same: the unplaced Vent's ride is not offered", () => {

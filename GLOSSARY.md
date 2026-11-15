@@ -44,7 +44,7 @@ The tension wanted on the unloaded line, read **at the anchor that carries the M
 tension**, per member: what a dynamometer rigged between that ancrage and the Maestro
 shows. That anchor is A or B, held by the Scenario (`cp`; absent is A). It is a Tightness
 Driver of its own (`tp`), not the horizontal component `H`; Avancé shows that one beside it
-as tension horizontale. Simplified Pages say tension de pose; Avancé says prétension.
+as tension horizontale. Under a Vent the line is posed under it and the tension de pose is the whole force at that anchor; whatever drives the line, the tension de pose it gives is read back. Simplified Pages say tension de pose; Avancé says prétension.
 _Avoid_: tension cible, tension permanente, pretension setting, tension horizontale (as the
 simplified label)
 
@@ -59,7 +59,7 @@ The multiplier on the passager's extra tension because a controlled step-off set
 _Avoid_: coefficient dynamique, DAF, limite, marge
 
 **Rapport V**:
-A way to ask for the unloaded tension: passenger weight divided by the tension horizontale `H`. Not the measured depth of the V. A larger rapport V asks for a slacker line, and the deep V under the passager is the consequence. Named only on Avancé.
+A way to ask for the unloaded tension: passenger weight divided by the tension horizontale `H`. Under a Vent, `H` is the component along the horizontal A–B axis at the côté de la Mise en tension — it is not constant along the line there, and it is neither the tension de pose nor the horizontal norm of the force. Not the measured depth of the V. A larger rapport V asks for a slacker line, and the deep V under the passager is the consequence. Named only on Avancé.
 _Avoid_: poids / tension, creux, flèche
 
 **Tightness Spec**:
@@ -174,7 +174,9 @@ _Avoid_: frame, sample, position
 
 **Coverage**:
 The fraction of a Sweep whose steps actually solved. Anything derived from an incomplete
-Sweep — worst tension, minimum clearance, the Verdict — is unreliable and must say so.
+Sweep — worst tension, minimum clearance, the Verdict — is unreliable and must say so: the
+Verdict is Indéterminé, no ride crosses a position that did not converge, and that position shows
+no ligne chargée. A position that did not converge proves no physical impossibility.
 _Avoid_: completeness, success rate
 
 **Traverse scope vs Position scope**:
@@ -228,6 +230,14 @@ _Avoid_: cible, flèche cible
 **Écart maximal à A–B**:
 The maximum combined vertical and lateral offset of a line from the straight Ligne A–B, with both offsets measured at the same position along the horizontal span. Not the combination of separate maxima, nor the shortest perpendicular distance to an inclined A–B.
 
+**Écart latéral**:
+How far the unloaded line, posed under the Vent, hangs sideways out of the vertical plane of Ligne A–B: the greatest horizontal offset, in metres, with its side of the travel A → B (« à gauche » or « à droite ») and the position along the span where it is read. A result of the spatial statics (`docs/simulation-theory.md` §19.7), shown only when a Vent is applied; the flèche stays vertical beside it, and the Écart maximal à A–B combines the two at each position. It replaces the qualitative Banane. The brief's « déport calculé » is this word.
+_Avoid_: déport, banane, flèche latérale, drift
+
+**Hauteur au-dessus de A–B**:
+How far a ligne à vide that the Vent lifts rises above the straight Ligne A–B, in metres. Its flèche then reads zero, which means « no downward drop », not « the line lies on A–B ». Named on Avancé only.
+_Avoid_: flèche négative, soulèvement
+
 **Écart à vide**:
 How far the passager hangs below the ligne à vide at the passager's own position, in metres — the loaded line's drop, read like a flèche. A read-out cell on every Page that has the coupe, and also in the coupe's tip beside the passager. Not a garde au sol, which is measured to the ground.
 _Avoid_: flèche locale, écart ligne, descente
@@ -253,7 +263,7 @@ The unloaded line, drawn. Not the longueur à vide, which is a length.
 _Avoid_: câble à vide, corde à vide
 
 **Banane**:
-The lateral bow of the unloaded line in a cross-wind, seen from above. Qualitative. Not a distance the app states in metres.
+The lateral bow of the unloaded line in a cross-wind, seen from above. Qualitative. Not a distance the app states in metres. Replaced by the computed Écart latéral and the spatial lines the views project (#118); never shown beside a spatial result.
 _Avoid_: déport, drift, flèche latérale
 
 **Vent**:
@@ -264,9 +274,13 @@ geographic: the azimuth the wind comes **from**, in degrees clockwise from north
 The engine projects it onto the line through the bearing A → B the two Positions give, as a
 component along it (positive toward B, so a tail wind) and one across it (positive from the right);
 it is a vector, never a whole `±` along the line. Moving an anchor therefore changes those
-components and never the Vent. **The Vent needs Positions**: without A and B on the map the line
+components and never the Vent. **Once applied — a speed and a bearing — the statics read it**
+(`docs/simulation-theory.md` §19): the line is posed under it, its shape, tensions and garde follow,
+and the passager rides the locus it gives. A corde then needs its diamètre, which the wind's drag is
+computed on; without it no result stands under wind, and the field says so. A refused Vent, or a
+refused masse volumique de l'air, then withholds every result rather than be read as another. **The Vent needs Positions**: without A and B on the map the line
 has no bearing, so the wind fields and the Rose des vents' handle are disabled with that reason,
-and the passager's ride and the Banane run without wind. A wind field whose value is refused — a
+and the statics, the passager's ride and the Banane run without wind. A wind field whose value is refused — a
 Blocking Error on the Wind Gate, Positions or not — stays typable, so that it can be repaired
 where its message stands. A Vent a link or a Session carries without
 Positions is kept as given, never dropped, and the results read with it say it is not applied and
@@ -362,7 +376,7 @@ The word every dynamic value carries — Point d'arrêt, vitesse d'arrivée, dur
 _Avoid_: prédiction, validé, précis, exact
 
 **Trajectoire**:
-The path of the passager's load over the whole traverse — where the trolley hangs at every Sweep Step — drawn dotted on the coupe as the **trajectoire** (**trajet** on the toggle where the row is narrow), against the ligne à vide; the line it hangs from is the **ligne chargée**. The ride follows it as a point mass, frozen: solved once from the statics and never again as the passager moves (§12.1), which is why a swift ride on a slack line warns that it describes the traverse badly. Not the Sweep, which is the set of Span States it is read from.
+The path of the passager's load over the whole traverse — where the trolley hangs at every Sweep Step, the **lieu du chariot**; under a Vent it leaves the vertical plane of A–B and is split wherever a position did not converge, never bridged — drawn dotted on the coupe as the **trajectoire** (**trajet** on the toggle where the row is narrow), against the ligne à vide; the line it hangs from is the **ligne chargée**. The ride follows it as a point mass, frozen: solved once from the statics and never again as the passager moves (§12.1), which is why a swift ride on a slack line warns that it describes the traverse badly. Not the Sweep, which is the set of Span States it is read from.
 _Avoid_: parcours, chemin, animation
 
 **Dynamique du passager**:
@@ -378,6 +392,9 @@ _Avoid_: empreinte, hauteur du passager, enveloppe, maître-couple, rider height
 The distance from the passager to the ground. The minimum is where, over the traverse outside
 the two Zones d'ancrage, the passager comes closest to the ground. At the passager's position it
 is the same quantity, not a second name. The maximum is the inverse and is not a shown value.
+Under a Vent the line leaves the vertical plane of A–B and the ground is the profile under A–B
+extruded sideways: the garde stays vertical, with the whole gabarit, read at the displaced line —
+a hypothesis, not a survey of the ground actually overflown, and no distance to obstacles beside it.
 _Avoid_: garde sous le passager, garde passager
 
 **Zone d'ancrage**:

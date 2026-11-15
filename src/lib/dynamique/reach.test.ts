@@ -12,7 +12,7 @@ import { exactTermsIn, proscribedIn } from "@/lib/vocabulary/labels.ts";
 
 import type { ReachOutputs, ReachWording } from "./reach.ts";
 
-import { DUE_NORTH, ON_PROFIL, PROFIL, ridesUnder, SHIPPED } from "./__fixtures__/rides.ts";
+import { ON_PROFIL, PROFIL, ridesUnder, SHIPPED } from "./__fixtures__/rides.ts";
 import { ESTIMATE, REACH_COPY } from "./copy.ts";
 import { reachOutputs, reachProposal, reachSearch } from "./reach.ts";
 
@@ -572,13 +572,6 @@ describe("`reachSearch` — the search as the gates leave it", () => {
     expect(search?.input.clearanceJudged).toBe(false);
     if (search == null) throw new Error("a ride poses a search");
     expect(reachProposal(search).refusal).toBe(worded(refused({ kind: "unjudged" })).refusal);
-  });
-
-  test("the Vent is projected on the line's bearing, or not at all without Positions", () => {
-    expect(reachSearch(page())?.input.bearing).toBeNull();
-    const placed = { ...SHIPPED, positions: DUE_NORTH };
-    // Due north: A and B on one meridian.
-    expect(reachSearch(page(placed))?.input.bearing).toBeCloseTo(0, 6);
   });
 
   test("a cached profil sets ρ only while it is the line's ground", () => {

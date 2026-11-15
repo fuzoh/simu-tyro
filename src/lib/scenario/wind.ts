@@ -11,16 +11,19 @@
  *   is always one the engine can evaluate.
  * - **Uniform is the attenuation at zero, whatever the width.** The width is kept through it and
  *   has no effect; « Vent uniforme » ({@link uniformWind}) writes the attenuation alone.
- * - **A non-uniform profile is not computed under a uniform wind.** Today's readers — §12.2's
- *   ride, the Banane, the rose's reading — take one speed for the whole line. While
+ * - **A non-uniform profile is not computed under a uniform wind.** The spatial statics and the
+ *   ride on their locus read the field (§19), but the Banane and the rose's reading take one speed
+ *   for the whole line. While
  *   {@link WIND_PROFILE_ACTIVE} is off, the gates refuse a profile that is not uniform and its
  *   controls are not offered, so no reader of one speed ever stands in for the field.
  */
 
 import type { WindField, WindProfile } from "@/lib/sim";
+import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { roundToDisplay } from "@/lib/format/quantity.ts";
-import { kmhToMs } from "@/lib/sim";
+import { airDensity, DYNAMICS, kmhToMs, WIND_PROFILE } from "@/lib/sim";
+import { meanAltitude } from "@/lib/terrain/trace.ts";
 
 import type { Wind } from "./types.ts";
 
@@ -83,4 +86,53 @@ export function windFieldOf(wind: Wind): WindField {
     from: wind.directionDeg,
     profile: windProfileOf(wind),
   };
+}
+
+/**
+ * Can the physics read this Vent as {@link windFieldOf} gives it — a finite speed `≥ 0`, a finite
+ * direction, and a profile inside §8.4's domains as it is read? The Wind Gate refuses every other
+ * one; the statics (#127) ask before they evaluate the field, because `windAt` raises on a profile
+ * out of its domain rather than read another wind.
+ */
+export function isWindReadable(wind: Wind): boolean {
+  const { width, attenuation } = windProfileOf(wind);
+  return (
+    Number.isFinite(wind.speedKmh) &&
+    wind.speedKmh >= 0 &&
+    Number.isFinite(wind.directionDeg) &&
+    width >= WIND_PROFILE.width.min &&
+    width <= WIND_PROFILE.width.max &&
+    attenuation >= WIND_PROFILE.attenuation.min &&
+    attenuation <= WIND_PROFILE.attenuation.max
+  );
+}
+
+/**
+ * Is the Vent **applied** to the line — §19.8's « wind applied »: a speed above zero and a bearing
+ * to project it on (both Positions)? Without, the statics are §4–§7's closed form, the rides run in
+ * still air and nothing reads the textile diameter (§19.16, #127 Q37).
+ *
+ * @param bearing the line's bearing A → B (`lineBearing`), or `null` without Positions.
+ */
+export function isWindApplied(wind: Pick<Wind, "speedKmh">, bearing: number | null): boolean {
+  return bearing !== null && wind.speedKmh !== 0;
+}
+
+/** Where the `ρ` of the rides comes from — the « lu » half of « lu et éditable ». */
+export type AirDensitySource =
+  /** Typed: `rho` is in the link. */
+  | "typed"
+  /** §12.2's ISA density at the imported profil's mean altitude. */
+  | "profile"
+  /** §12.2's sea-level 1,225 — a manual line has no altitude to read. */
+  | "sea-level";
+
+/** The air density the rides — and, under an applied Vent, the statics (§19.4) — read. */
+export type AirDensity = { readonly value: number; readonly source: AirDensitySource };
+
+/** The `ρ` a ride uses: the typed one, else §12.2's ISA at the profil's mean altitude, else 1,225. */
+export function airDensityOf(typed: number | null, profile: Trace | null): AirDensity {
+  if (typed !== null) return { value: typed, source: "typed" };
+  if (profile !== null) return { value: airDensity(meanAltitude(profile)), source: "profile" };
+  return { value: DYNAMICS.rhoSeaLevel, source: "sea-level" };
 }

@@ -57,7 +57,6 @@ import type {
   CellState,
   ClearanceResult,
   DerivedMaterial,
-  SpanState,
   SweepResult,
   VerdictCell,
   VerdictResult,
@@ -260,8 +259,8 @@ export const NO_REGIME_BANNER_BY_REGISTER: Record<Register, string> = {
 export type SolvedTraverse = {
   readonly L: number;
   readonly h: number;
-  /** The unloaded line — `T_vide` at both ends. */
-  readonly unloaded: SpanState;
+  /** The unloaded line — `T_vide` at both ends, under the Scenario's wind (§19.14). */
+  readonly unloaded: { readonly TA: number; readonly TB: number };
   readonly material: DerivedMaterial;
   /** The load one member carries, N. */
   readonly P: number;
@@ -777,7 +776,11 @@ type Envelope = {
  * as the static one and the scan needs one pass. At `DAF ≤ 0` — a value a link can carry — the two
  * orderings part, which is why `staticHeadline` is picked on `Tstatic` and never through `Tdaf`.
  */
-function envelopes(traverse: SweepResult, unloaded: SpanState, DAF: number): Envelope {
+function envelopes(
+  traverse: SweepResult,
+  unloaded: { readonly TA: number; readonly TB: number },
+  DAF: number,
+): Envelope {
   const Tvide = { A: unloaded.TA, B: unloaded.TB };
   // §10.1's suspended denominator rides along on the same pass and is dropped here: § 9 never
   // prints it, and at a refused `DAF ≤ 0` it is a maximum of negatives with no meaning to print.

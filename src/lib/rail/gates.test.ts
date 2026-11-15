@@ -132,6 +132,45 @@ describe("the optional textile diameter", () => {
     expect(errors.filter((error) => error.field === "dTextile")).toEqual([]);
   });
 
+  // #127 Q37: the corde's diameter is what the wind on the line is computed on, so it is required
+  // exactly when a corde stands under an applied Vent — a speed **and** a bearing — and never else.
+  const PLACED = { A: { lat: 46.8, lon: 7.4 }, B: { lat: 46.801, lon: 7.4 } };
+  const UNPLACED = { A: null, B: null };
+  test.each<[string, boolean, "textile" | "steel", number, boolean]>([
+    ["corde, vent, A et B placés", true, "textile", 20, true],
+    ["corde, vent nul, A et B placés", false, "textile", 0, true],
+    ["corde, vent, sans Positions", false, "textile", 20, false],
+    ["câble, vent, A et B placés", false, "steel", 20, true],
+  ])("%s → `d` requis : %s", (_name, required, family, speedKmh, placed) => {
+    const report = evaluateGates({
+      scenario: scenario((draft) => {
+        if (family === "textile") {
+          onRope(draft, { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22 });
+          draft.usage = "TEMPORAIRE";
+        }
+        draft.wind = { ...draft.wind, speedKmh, directionDeg: 90 };
+        draft.positions = placed ? PLACED : UNPLACED;
+      }),
+    });
+    const breach = report.errors
+      .filter((error) => error.field === "dTextile")
+      .map(({ gate, kind }) => ({ gate, kind }));
+    expect(breach).toEqual(required ? [{ gate: "solve", kind: "empty" }] : []);
+    expect(report.passed.solve).toBe(!required);
+  });
+
+  test("a typed `d` lifts the breach under wind", () => {
+    const report = evaluateGates({
+      scenario: scenario((draft) => {
+        onRope(draft, { family: "textile", ropeClass: "hmpe", MBL: 1e5, mu: 0.1, k: 22, d: 11 });
+        draft.usage = "TEMPORAIRE";
+        draft.wind = { ...draft.wind, speedKmh: 20, directionDeg: 90 };
+        draft.positions = PLACED;
+      }),
+    });
+    expect(report.errors.filter((error) => error.field === "dTextile")).toEqual([]);
+  });
+
   test("`d: 0` from a link is an `invalid` Solve breach", () => {
     const { errors } = evaluateGates({ scenario: rope(0) });
     expect(errors.find((error) => error.field === "dTextile")).toMatchObject({
@@ -1183,7 +1222,10 @@ describe("the Vent's profile is gated (#120)", () => {
         },
       ]);
       expect(report.passed).toEqual(WIND_ALONE);
-      expect(blockingSummary(report)).toBe("⛔ 1 erreur bloquante — vent indisponible");
+      // Under §19 the statics read the Vent once it is applied — a speed and A, B placed — so a
+      // refused one leaves no result at all (`windTakesStatics`), and the summary says so.
+      expect(report.windApplied).toBe(true);
+      expect(blockingSummary(report)).toBe("⛔ 1 erreur bloquante — aucun résultat");
     });
 
     test.each([false, true])("an attenuation of 110 (profile read: %s)", (windProfileActive) => {
@@ -1216,7 +1258,7 @@ describe("the Vent's profile is gated (#120)", () => {
         ["wind", "windWidth"],
         ["wind", "windAttenuation"],
       ]);
-      expect(blockingSummary(report)).toBe("⛔ 2 erreurs bloquantes — vent indisponible");
+      expect(blockingSummary(report)).toBe("⛔ 2 erreurs bloquantes — aucun résultat");
     });
 
     test("nothing is brought back into its domain: the Scenario stays as it arrived", () => {
@@ -1256,6 +1298,24 @@ describe("the Vent's profile is gated (#120)", () => {
         },
       ]);
       expect(report.passed).toEqual(WIND_ALONE);
+      expect(blockingSummary(report)).toBe("⛔ 1 erreur bloquante — aucun résultat");
+    });
+
+    test("without A and B on the map nothing of the statics reads it: the Wind Gate's own consequence", () => {
+      const report = evaluateGates({
+        scenario: { ...profiled(30, 40), positions: { A: null, B: null } },
+      });
+      expect(report.windApplied).toBe(false);
+      expect(report.passed).toEqual(WIND_ALONE);
+      expect(blockingSummary(report)).toBe("⛔ 1 erreur bloquante — vent indisponible");
+    });
+
+    test("nor at zero speed, where no Vent is applied", () => {
+      const still = profiled(30, 40);
+      const report = evaluateGates({
+        scenario: { ...still, wind: { ...still.wind, speedKmh: 0 } },
+      });
+      expect(report.windApplied).toBe(false);
       expect(blockingSummary(report)).toBe("⛔ 1 erreur bloquante — vent indisponible");
     });
 

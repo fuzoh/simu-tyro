@@ -59,8 +59,8 @@ describe("the two Points d'arrêt are the engine's", () => {
     expect(windy).toEqual({ ...calm, id: "windy", label: windy.label });
   });
 
-  test("a crosswind pushes nothing along the line: the rides coincide though a wind is entered", () => {
-    expect(ridesUnder(30, 90).outputs.coincide).toBe(true);
+  test("a crosswind moves the line and enters the ride on its locus: the rides differ (§19.15)", () => {
+    expect(ridesUnder(30, 90).outputs.coincide).toBe(false);
   });
 
   test("with a wind entered the two Points d'arrêt differ", () => {

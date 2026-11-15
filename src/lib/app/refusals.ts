@@ -11,8 +11,9 @@
  * | Engine | Surface |
  * | --- | --- |
  * | `invalid-input{field: "L0" \| "D_target" \| "H_target" \| "T_target"}` | **Tension impossible**, with the attainable bound and **no Fix Action** |
- * | `resolveL0`'s bracket failure — `no-convergence` at stage `L0` | **Cible inatteignable**, naming the *target* |
- * | `solveSpan`'s `no-convergence` **or** `slack-limit` | **Calcul impossible**, with `[ Copier le diagnostic ]` |
+ * | `resolveL0`'s bracket failure — `no-convergence` at stage `L0` (under wind: reason `unreachable`) | **Cible inatteignable**, naming the *target* |
+ * | `solveSpan`'s `no-convergence` **or** `slack-limit`, and under wind a driver not monotone, a bracket unresolved or an inner solve out of seeds | **Calcul impossible**, with `[ Copier le diagnostic ]` |
+ * | §19.11's `outside-model` | **Hors de la portée du vent**, with `[ Copier le diagnostic ]` |
  *
  * Rules this module exists to keep:
  *
@@ -84,7 +85,9 @@ const TENSION_LEAD = `⛔ ${label("tension-impossible", "exact")} — la ligne c
 /** One surface, two kinds, same user action. It is thin on purpose: no residual, no note. */
 const CALCUL_IMPOSSIBLE: EngineRefusal = {
   id: "calcul-impossible",
-  message: `⛔ ${label("calcul-impossible", "exact")} pour cette configuration. Le solveur n'a pas convergé — ce cas n'est pas censé se produire. Modifiez légèrement la tension ou la géométrie.`,
+  // §19.11: a calculation that did not converge proves no physical impossibility — under wind it
+  // can happen on a configuration that exists, so the copy no longer calls the case unexpected.
+  message: `⛔ ${label("calcul-impossible", "exact")} pour cette configuration. Le calcul n'a pas convergé, ce qui ne prouve pas que la ligne ne puisse pas exister. Modifiez légèrement la tension ou la géométrie.`,
   diagnostic: true,
 };
 
@@ -184,7 +187,20 @@ export function engineRefusal(
   // A bracket failure for any reason **other** than rupture, and only `resolveL0` can produce one:
   // the same kind out of `solveSpan` is the solver failing on a target it was handed, which is a
   // different sentence and a different (non-)action.
-  if (error.kind === "no-convergence" && stage === "L0" && tightness.mode !== "length") {
+  // Under wind (§19.10) the pose inversion says why: a target under the taut branch's minimum is
+  // unreachable, while a driver that reverses, a bracket that cannot close or an inner solve that
+  // spends its seeds is a calculation that did not converge — never « Cible inatteignable ».
+  const unconverged =
+    error.kind === "no-convergence" &&
+    (error.reason === "non-monotone" ||
+      error.reason === "unresolved" ||
+      error.reason === "attempts");
+  if (
+    error.kind === "no-convergence" &&
+    stage === "L0" &&
+    tightness.mode !== "length" &&
+    !unconverged
+  ) {
     return {
       id: "cible-inatteignable",
       message: `⛔ ${label("cible-inatteignable", register)} — aucune ${label(

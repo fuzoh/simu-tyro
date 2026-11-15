@@ -10,7 +10,7 @@ import type { LineAero, SpatialSpanInput } from "./types.ts";
 
 import { Z5 } from "./__fixtures__/theory-15.ts";
 import { solveSpatial } from "./spatial-solve.ts";
-import { slotState, sweepSpatial, trajectoryRuns } from "./spatial-sweep.ts";
+import { planeSweep, slotState, sweepSpatial, trajectoryRuns } from "./spatial-sweep.ts";
 import { sweep, sweepGrid } from "./sweep.ts";
 
 /** Which grid position the injected solve fails at, and whether a retry lifts it. */
@@ -179,5 +179,48 @@ describe("§19.6 — two members and the sole carrier", () => {
 
   it("refuses a loaded input: the sweep places the rider", () => {
     expect(() => sweepSpatial({ ...LINE, rider: { ...RIDER, sP: 1 } }, RIDER)).toThrow(RangeError);
+  });
+});
+
+describe("planeSweep — the coupe's projection of a sweep (§19.11)", () => {
+  it("returns sweep()'s own result without wind, bit for bit (§19.16)", () => {
+    const { L, h, L0, w, EA, P } = Z5.in;
+    const swept = sweepSpatial(
+      { L, h, L0, w, EA, aero: null, rider: null },
+      { weight: P, share: 1, hRider: 2.1 },
+    );
+    expect(planeSweep(swept)).toEqual(sweep({ L, h, L0, w, EA, loads: [] }, P));
+  });
+
+  it("keeps one step per solved slot, in grid order, and the holes in failures", () => {
+    const k = 97;
+    inject.failAt = sweepGrid(LINE.L0)[k];
+    const swept = sweepSpatial(LINE, RIDER);
+    const plane = planeSweep(swept);
+    expect(plane.steps.length).toBe(259);
+    expect(plane.steps.map((step) => step.sD)).toEqual(
+      swept.slots.filter((slot) => slot !== null).map((slot) => slot.sD),
+    );
+    expect(plane.failures).toEqual(swept.failures);
+    expect(plane.coverage).toBe(259 / 260);
+  });
+
+  it("reads x, z and the anchors' tensions of the node; H and θ on the A side of the trolley", () => {
+    const swept = sweepSpatial(LINE, RIDER);
+    const slot = swept.slots[130];
+    const step = planeSweep(swept).steps[130];
+    expect([step.xD, step.zD, step.TA, step.TB, step.V0]).toEqual([
+      slot?.rD.x,
+      slot?.rD.z,
+      slot?.TA,
+      slot?.TB,
+      slot?.FA.z,
+    ]);
+    // Under a crosswind the A-side force has a y component: H is its horizontal part along A–B
+    // only, so it sits below the plane's |F_h| — the y of the force is not folded into the coupe.
+    const Fm = slot?.Fminus ?? { x: 0, y: 0, z: 0 };
+    expect(Math.abs(Fm.y)).toBeGreaterThan(0);
+    expect(step.H).toBe(Fm.x);
+    expect(Math.tan(step.theta)).toBeCloseTo(Fm.z / Fm.x, 12);
   });
 });

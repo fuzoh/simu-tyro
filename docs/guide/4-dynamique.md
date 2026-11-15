@@ -72,10 +72,15 @@ Le produit $v_{\text{rel}} \cdot \lvert v_{\text{rel}} \rvert$ garde le signe de
 s'oppose toujours au mouvement par rapport à l'air.
 
 **Le vent.** Le Vent saisi est géographique (vitesse et direction d'où il vient) ; le simulateur
-le projette sur la direction de la ligne, ce qui exige de connaître les Positions de A et B. Seule
-sa composante **le long de la ligne** entre dans l'équation ; l'effet direct du vent de travers
-sur la vitesse du passager n'est pas modélisé, ce qui n'est pas une affirmation qu'il n'existe
-pas. Sans Positions, le mouvement est calculé sans vent.
+le rapporte à la direction de la ligne, ce qui exige de connaître les Positions de A et B. Sous
+vent, le passager descend le **lieu du chariot** : la suite des positions d'équilibre de la poulie,
+qui quitte le plan vertical de A–B. La vitesse relative le long de ce lieu lit les deux
+composantes du vent, $v_{\text{rel}} = v - (u_x t_x + u_y t_y)$, où $t$ est la direction locale
+du lieu : le vent de travers y entre dès que le lieu s'écarte de A–B
+([§19.15](../simulation-theory.md#s-19-15)). Sur une ligne sans vent, $t_y = 0$ et l'on retrouve
+la formule ci-dessus. Si une position du passager n'a pas convergé, aucune descente n'est
+calculée : le mouvement ne traverse pas un trou. Sans Positions, le mouvement est calculé sans
+vent.
 
 **Ce qui est négligé.** La force centrifuge dans les creux de la trajectoire (en général moins de
 2 %) ; le balancement du passager sous la poulie ; la tension dynamique de la ligne.
@@ -148,8 +153,8 @@ Référence : cas Z8 au [§15](../simulation-theory.md#s-15).
 - la **vitesse d'arrivée** en B, quand le passager l'atteint, sans freinage ;
 - le **point d'arrêt** : là où la vitesse revient à zéro et où la pente, vent compris, ne suffit
   plus à vaincre la retenue de la poulie. Sans vent, c'est en gros le point bas de la ligne
-  chargée, décalé par le frottement. Il est calculé deux fois : **sans vent**, puis **avec le vent
-  saisi** ;
+  chargée, décalé par le frottement. Il est calculé deux fois : **sans vent** — le même scénario, vent à zéro,
+  ligne posée et parcourue sans vent — puis **avec le vent saisi** ;
 - le **point le plus loin** atteint vers B, balancements compris, et la **distance restante à B**
   depuis ce point. Ce n'est pas le point d'arrêt : un passager qui repart en arrière s'immobilise
   bien en deçà de l'endroit où il a fait demi-tour ;

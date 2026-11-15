@@ -97,6 +97,39 @@ describe("the gates, each removing exactly what § 7 says it does", () => {
   });
 });
 
+describe("§19 — a Vent the statics read and the gates refuse takes the statics down", () => {
+  const PLACED = { A: { lat: 46.8, lon: 7.4 }, B: { lat: 46.801, lon: 7.4 } };
+  const windWith = (placed: boolean, patch: (draft: ScenarioDraft) => void) =>
+    report((draft) => {
+      draft.regime = "en15567";
+      draft.wind = { ...draft.wind, speedKmh: 30, directionDeg: 90 };
+      if (placed) draft.positions = PLACED;
+      patch(draft);
+    });
+
+  test.each<[string, (draft: ScenarioDraft) => void]>([
+    ["an attenuation outside its domain", (draft) => void (draft.wind.attenuationPct = 140)],
+    ["a negative ρ", (draft) => void (draft.dynamics.rho = -1)],
+  ])("applied, %s removes tout l'aval", (_name, patch) => {
+    expect(suppression({ report: windWith(true, patch), refusal: null })).toEqual({
+      geometry: false,
+      solve: true,
+      clearance: true,
+      verdict: true,
+    });
+  });
+
+  test("without Positions the Vent is not applied: a bad ρ leaves the statics standing", () => {
+    const unplaced = windWith(false, (draft) => void (draft.dynamics.rho = -1));
+    expect(suppression({ report: unplaced, refusal: null }).solve).toBe(false);
+  });
+
+  test("a Ride breach that is not ρ leaves the statics standing under wind", () => {
+    const cda = windWith(true, (draft) => void (draft.dynamics.CdA = -1));
+    expect(suppression({ report: cda, refusal: null }).solve).toBe(false);
+  });
+});
+
 describe("l'exception géométrique — scoped to `L` / `h` failures", () => {
   test.each([
     [

@@ -34,3 +34,20 @@ Inside the Vitest suite, run with every other file in parallel, the profile cell
 ## 3. What would lower it
 
 Not done in Step A, listed for the maintainer: a forward finite-difference Jacobian (4 shots per refresh instead of 7), variational sensitivities, or a cheaper `φ` that is no longer bit-identical to `windAt`. `N` stays at 240, the value §19.9's refinement bars were measured at.
+
+## 4. The proposition for anchor B under wind (Step B)
+
+**Date:** 15 November 2026, on #127's Step B (the app wired to the spatial engine). Same machine and runtime as § 1.
+
+`proposeAnchorB` (`src/lib/scenario/reach.ts`) re-poses, sweeps and rides the line at every trial height of B. Without wind each trial takes the closed form; under an applied Vent each trial is a windy pose, a windy sweep (§ 2's pair, without the clearance) and a ride on the locus. Measured with a scratch Vitest file (not committed): the shipped steel line on a manual 300 m span, `h = −40 m`, Positions due north, one warm-up-free call repeated three times, `performance.now()` around the whole call.
+
+| Vent | Time per proposal | Outcome |
+| --- | --: | --- |
+| none | 16–26 ms | refusal (`contact`) |
+| 30 km/h, head | 433–441 ms | refusal (`contact`) |
+| 30 km/h, tail | 540–552 ms | refusal (`contact`) |
+| 40 km/h, across | 561–562 ms | refusal (`contact`) |
+| 100 km/h, tail | 595–598 ms | proposal |
+| 150 km/h, tail | 685–691 ms | proposal |
+
+During development, the same call on the shipped 150 m line under 100–250 km/h tail winds took 0,6–1,1 s; from about 200 km/h of tail wind some trial heights leave holes (`outside-model`, § 19.8), which the search reads as a failed trial, never as a ride. No coarse sweep was added (plan, Step B). Under the plan's 1 s per target, except at the gale end; the lever is the sweep's cost (§ 3).
