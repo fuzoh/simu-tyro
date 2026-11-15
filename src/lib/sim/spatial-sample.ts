@@ -20,8 +20,9 @@
 import type { SpanState, SpatialState } from "./types.ts";
 
 import { verticalTensionAt, xAt, zAt, type CableShape } from "./catenary.ts";
-import { unloadedSag } from "./parameterise.ts";
-import { pieceSteps, Shooter, ShotNodes } from "./shoot.ts";
+import { GOLDEN_SECTION, unloadedSag } from "./parameterise.ts";
+import { nodeCountOf, pieceSteps, Shooter, ShotNodes } from "./shoot.ts";
+import { planeInput } from "./spatial-solve.ts";
 
 /**
  * A sampled spatial state: one entry per node in ascending `S`, the trolley's node twice — `S_P⁻`
@@ -66,13 +67,13 @@ export type SpatialReadings = {
 export function sampleSpatial(state: SpatialState): SpatialSamples {
   const { input } = state;
   const sP = input.rider === null ? null : input.rider.sP;
+  const pieces = pieceSteps(state.steps, input.L0, sP);
   let nodes: ShotNodes;
   if (state.method === "shooting") {
-    const shot = new Shooter(input, state.steps);
-    nodes = new ShotNodes(shot.nodeCount);
-    shot.run(state.FA.x, state.FA.y, state.FA.z, nodes);
+    nodes = new ShotNodes(nodeCountOf(pieces));
+    new Shooter(input, state.steps).run(state.FA.x, state.FA.y, state.FA.z, nodes);
   } else {
-    nodes = closedFormNodes(state, pieceSteps(state.steps, input.L0, sP));
+    nodes = closedFormNodes(state, pieces);
   }
   const count = nodes.count;
   const T = new Float64Array(count);
@@ -89,19 +90,14 @@ export function sampleSpatial(state: SpatialState): SpatialSamples {
     Fz: nodes.Fz,
     T,
     EA: input.EA,
-    node: sP === null ? -1 : nodeIndexOf(state.steps, input.L0, sP),
+    // `S_P⁻` closes the first piece.
+    node: sP === null ? -1 : pieces[0],
   };
-}
-
-/** Index of `S_P⁻` in a loaded state's nodes: the end of the first piece. */
-function nodeIndexOf(steps: number, L0: number, sP: number): number {
-  return pieceSteps(steps, L0, sP)[0];
 }
 
 /** The plane state a closed-form spatial state wraps — §4.1's `(H, V₀)` and its loads. */
 export function planeStateOf(state: SpatialState): SpanState {
   const { input } = state;
-  const rider = input.rider;
   return {
     H: state.FA.x,
     V0: state.FA.z,
@@ -112,7 +108,7 @@ export function planeStateOf(state: SpatialState): SpanState {
     L0: input.L0,
     w: input.w,
     EA: input.EA,
-    loads: rider === null ? [] : [{ P: rider.share * rider.weight, s: rider.sP }],
+    loads: planeInput(input).loads,
     iterations: state.iterations,
   };
 }
@@ -121,7 +117,7 @@ export function planeStateOf(state: SpatialState): SpanState {
 function closedFormNodes(state: SpatialState, pieces: readonly number[]): ShotNodes {
   const plane = planeStateOf(state);
   const shape: CableShape = plane;
-  const nodes = new ShotNodes(pieces.reduce((count, n) => count + n + 1, 0));
+  const nodes = new ShotNodes(nodeCountOf(pieces));
   const { L0 } = plane;
   const sP = plane.loads.length === 0 ? null : plane.loads[0].s;
   const P = plane.loads.length === 0 ? 0 : plane.loads[0].P;
@@ -156,6 +152,14 @@ function cubic(p0: number, m0: number, p1: number, m1: number): [number, number,
   return [p0, m0, -3 * p0 - 2 * m0 + 3 * p1 - m1, 2 * p0 + m0 - 2 * p1 + m1];
 }
 
+/** {@link cubic}'s coefficients written into `out[at..at+3]`. */
+function cubicInto(out: Float64Array, at: number, p0: number, m0: number, p1: number, m1: number) {
+  out[at] = p0;
+  out[at + 1] = m0;
+  out[at + 2] = -3 * p0 - 2 * m0 + 3 * p1 - m1;
+  out[at + 3] = 2 * p0 + m0 - 2 * p1 + m1;
+}
+
 function evalCubic(c: readonly number[], t: number): number {
   return c[0] + t * (c[1] + t * (c[2] + t * c[3]));
 }
@@ -176,10 +180,10 @@ function segment(s: SpatialSamples, i: number) {
  * {@link hermiteAt}, for a reader that evaluates it many times (§19.13's clearance).
  */
 export function hermiteCoefficients(s: SpatialSamples, i: number, out: Float64Array): void {
-  const c = segment(s, i);
-  out.set(c.x, 0);
-  out.set(c.y, 4);
-  out.set(c.z, 8);
+  const dS = s.S[i + 1] - s.S[i];
+  cubicInto(out, 0, s.x[i], dS * slope(s, i, s.Fx), s.x[i + 1], dS * slope(s, i + 1, s.Fx));
+  cubicInto(out, 4, s.y[i], dS * slope(s, i, s.Fy), s.y[i + 1], dS * slope(s, i + 1, s.Fy));
+  cubicInto(out, 8, s.z[i], dS * slope(s, i, s.Fz), s.z[i + 1], dS * slope(s, i + 1, s.Fz));
 }
 
 /**
@@ -232,14 +236,13 @@ function argmaxCubic(c: readonly number[]): number {
 
 /** Iterations of the golden-section search on a segment — `0,618⁸⁰` is far below an ulp of `t`. */
 const GOLDEN_STEPS = 80;
-const GOLDEN = (Math.sqrt(5) - 1) / 2;
 
 /** The `t ∈ [0, 1]` where `f` is greatest, by golden section — `f` unimodal near its maximum. */
 function argmaxGolden(f: (t: number) => number): number {
   let lo = 0;
   let hi = 1;
-  let a = hi - GOLDEN * (hi - lo);
-  let b = lo + GOLDEN * (hi - lo);
+  let a = hi - GOLDEN_SECTION * (hi - lo);
+  let b = lo + GOLDEN_SECTION * (hi - lo);
   let fa = f(a);
   let fb = f(b);
   for (let k = 0; k < GOLDEN_STEPS; k++) {
@@ -247,13 +250,13 @@ function argmaxGolden(f: (t: number) => number): number {
       lo = a;
       a = b;
       fa = fb;
-      b = lo + GOLDEN * (hi - lo);
+      b = lo + GOLDEN_SECTION * (hi - lo);
       fb = f(b);
     } else {
       hi = b;
       b = a;
       fb = fa;
-      a = hi - GOLDEN * (hi - lo);
+      a = hi - GOLDEN_SECTION * (hi - lo);
       fa = f(a);
     }
   }

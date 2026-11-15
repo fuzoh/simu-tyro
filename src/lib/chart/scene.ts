@@ -773,7 +773,7 @@ export function trajectoryLines(spatial: Pick<SpatialSweepResult, "slots">): Spa
  * A line with the trolley's node `(x_D, 0, z_D)` among its vertices, for a plane line sampled evenly
  * along its length: inserted in `x` order, or replacing the vertex already at `x_D`.
  */
-export function throughNode(line: SpaceLine, xD: number, zD: number): SpaceLine {
+function throughNode(line: SpaceLine, xD: number, zD: number): SpaceLine {
   const at = line.xs.findIndex((x) => x >= xD);
   if (at === -1) return line;
   if (line.xs[at] === xD) {
@@ -887,7 +887,7 @@ function solvedZExtent(
  * §19.11's line of a spatial state's samples: `(x, y, z)` at every node, in node order — the
  * trolley's node twice, at the same point.
  */
-export function lineOf(samples: Pick<SpatialSamples, "x" | "y" | "z">): SpaceLine {
+function lineOf(samples: Pick<SpatialSamples, "x" | "y" | "z">): SpaceLine {
   return {
     xs: Float64Array.from(samples.x),
     ys: Float64Array.from(samples.y),

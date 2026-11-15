@@ -389,7 +389,7 @@ function bracketL0(
 }
 
 /** `(√5 − 1)/2` — the interval a golden-section search keeps per step. Arithmetic, not physics. */
-const GOLDEN_SECTION = (Math.sqrt(5) - 1) / 2;
+export const GOLDEN_SECTION = (Math.sqrt(5) - 1) / 2;
 
 /**
  * The taut branch of a driver that turns: a golden-section search for its minimum inside

@@ -21,7 +21,13 @@
 import type { AnchorSide, Result, SpanGeometry, TightnessSpec } from "./parameterise.ts";
 import type { LineAero, SolveError, SpatialSpanInput, SpatialState, SpatialWarm } from "./types.ts";
 
-import { PARAMETERISE, refuseGeometry, resolveL0, tightnessFloor } from "./parameterise.ts";
+import {
+  GOLDEN_SECTION,
+  PARAMETERISE,
+  refuseGeometry,
+  resolveL0,
+  tightnessFloor,
+} from "./parameterise.ts";
 import { residualTolerance } from "./solve.ts";
 import { isAeroNil } from "./spatial-load.ts";
 import { unloadedReadings } from "./spatial-sample.ts";
@@ -94,14 +100,6 @@ function driverOf(spec: InverseSpec, span: SpanGeometry, side: AnchorSide): Driv
   };
 }
 
-function targetOf(spec: InverseSpec): number {
-  if (spec.mode === "tension") return spec.H_target;
-  if (spec.mode === "anchor") return spec.T_target;
-  return spec.D_target;
-}
-
-const FIELD = { tension: "H_target", anchor: "T_target", sag: "D_target" } as const;
-
 /** A solved length the search has visited: the continuation's warm starts come from these. */
 type Visit = { L0: number; value: number; state: SpatialState; warm: SpatialWarm };
 
@@ -155,13 +153,14 @@ export function resolveSpatialL0(
 
   const geometry = refuseGeometry(span);
   if (geometry) return { ok: false, error: geometry };
-  const target = targetOf(spec);
+  const driver = driverOf(spec, span, side);
+  const target = driver.target;
   if (!Number.isFinite(target) || target <= 0) {
     return {
       ok: false,
       error: {
         kind: "invalid-input",
-        field: FIELD[spec.mode],
+        field: driver.field,
         value: target,
         bound: 0,
         boundKind: "min",
@@ -169,7 +168,6 @@ export function resolveSpatialL0(
     };
   }
 
-  const driver = driverOf(spec, span, side);
   const visits: Visit[] = [];
   const visit = (L0: number): Result<Visit, SolveError> => {
     let nearest: Visit | undefined;
@@ -301,9 +299,6 @@ function reversed(driver: Driver, from: Visit, to: Visit): boolean {
   return driver.falling ? to.value > from.value + band : to.value < from.value - band;
 }
 
-/** `(√5 − 1)/2` — the golden section. Arithmetic, not physics. */
-const GOLDEN = (Math.sqrt(5) - 1) / 2;
-
 /**
  * §19.10 item 4: the tension de pose falls from the floor, bottoms out and rises again. Its minimum
  * lies between `before` and `after`; a golden-section search walks toward it and stops at the
@@ -318,10 +313,9 @@ function tautBranch(
 ): Result<{ lo: Visit; hi: Visit }, SolveError> {
   let lower = before.L0;
   let upper = after.L0;
-  const read = (L0: number) => visit(L0);
-  let near = read(upper - GOLDEN * (upper - lower));
+  let near = visit(upper - GOLDEN_SECTION * (upper - lower));
   if (!near.ok) return near;
-  let far = read(lower + GOLDEN * (upper - lower));
+  let far = visit(lower + GOLDEN_SECTION * (upper - lower));
   if (!far.ok) return far;
   for (let k = 0; k < PARAMETERISE.maxBisections; k++) {
     if (near.value.value <= driver.target)
@@ -331,12 +325,12 @@ function tautBranch(
     if (near.value.value < far.value.value) {
       upper = far.value.L0;
       far = near;
-      near = read(upper - GOLDEN * (upper - lower));
+      near = visit(upper - GOLDEN_SECTION * (upper - lower));
       if (!near.ok) return near;
     } else {
       lower = near.value.L0;
       near = far;
-      far = read(lower + GOLDEN * (upper - lower));
+      far = visit(lower + GOLDEN_SECTION * (upper - lower));
       if (!far.ok) return far;
     }
   }
