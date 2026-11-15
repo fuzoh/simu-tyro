@@ -794,6 +794,27 @@ describe("the worst-tension-per-end scan, as one owner (ticket 38)", () => {
     expect(scan.suspended).toEqual({ value: 1.2 * 5000, atStepIndex: 0, end: "A" });
   });
 
+  test("an interior peak past both anchors is judged at both ends (§19.14)", () => {
+    // Under wind `T⁺` can exceed `T_A` and `T_B`. Step 1's peak 5300 is above both its anchors, so
+    // both ends read it; step 0's `T_max` is an anchor's own and changes nothing.
+    const steps: SweepStep[] = [
+      { ...stepsOf([5000, 4000])[0], Tmax: 5000 },
+      { ...stepsOf([4800, 4900])[0], Tmax: 5300 },
+    ];
+    const scan = scanTensionEnvelope(steps, { TA: 4600, TB: 4000 }, 1.2);
+    expect(scan.A).toEqual({ Tstatic: 5300, atStepIndex: 1 });
+    expect(scan.B).toEqual({ Tstatic: 5300, atStepIndex: 1 });
+    expect(scan.suspended).toEqual({ value: 1.2 * (5300 - 4000), atStepIndex: 1, end: "B" });
+  });
+
+  test("a `T_max` that is an anchor's own leaves each end on its anchor", () => {
+    // The plane case: `T_max = max(T_A, T_B)` must not hand A the B side's tension.
+    const steps: SweepStep[] = [{ ...stepsOf([5000, 4000])[0], Tmax: 5000 }];
+    const scan = scanTensionEnvelope(steps, { TA: 0, TB: 0 }, 1);
+    expect(scan.A.Tstatic).toBe(5000);
+    expect(scan.B.Tstatic).toBe(4000);
+  });
+
   test("a refused `DAF ≤ 0` still gives the Rail its static envelope", () => {
     // `evaluateVerdict` refuses a non-positive `DAF` outright, so this path is the Rail's alone:
     // § 9 keeps « T max statique » and the garde on screen while the amplified rows go. The static

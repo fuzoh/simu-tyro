@@ -560,6 +560,19 @@ export type TensionEnvelopeScan = {
 };
 
 /**
+ * The tension each end's cell judges at one step (§19.14). In the plane `T_max = max(T_A, T_B)`
+ * and each end reads its own anchor. Under wind the line's peak can sit inside the span — `T⁺`,
+ * the trolley's B side, past both anchors — where no end reads it: that peak is then judged at
+ * **both** ends. `η_t ≤ 1` makes `η·MBF/T_max` conservative for the rope at the peak, and which
+ * termination the excess belongs to is not attributed.
+ */
+function endTensions(step: SweepStep): { TA: number; TB: number } {
+  const Tmax = step.Tmax ?? Number.NEGATIVE_INFINITY;
+  if (!(Tmax > Math.max(step.TA, step.TB))) return { TA: step.TA, TB: step.TB };
+  return { TA: Tmax, TB: Tmax };
+}
+
+/**
  * **The** worst-tension-per-end scan — one pass over the traverse, one owner.
  *
  * `evaluateVerdict` scores the régime against it, and A10's reduced row set prints `T max` from it
@@ -591,21 +604,22 @@ export function scanTensionEnvelope(
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
-    if (step.TA > TstaticA) {
-      TstaticA = step.TA;
+    const { TA, TB } = endTensions(step);
+    if (TA > TstaticA) {
+      TstaticA = TA;
       atA = i;
     }
-    if (step.TB > TstaticB) {
-      TstaticB = step.TB;
+    if (TB > TstaticB) {
+      TstaticB = TB;
       atB = i;
     }
-    const suspendedA = DAF * (step.TA - Tvide.TA);
+    const suspendedA = DAF * (TA - Tvide.TA);
     if (suspendedA > suspended) {
       suspended = suspendedA;
       suspendedAt = i;
       suspendedEnd = "A";
     }
-    const suspendedB = DAF * (step.TB - Tvide.TB);
+    const suspendedB = DAF * (TB - Tvide.TB);
     if (suspendedB > suspended) {
       suspended = suspendedB;
       suspendedAt = i;

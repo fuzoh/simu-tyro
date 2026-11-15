@@ -12,6 +12,7 @@ import { Z5 } from "./__fixtures__/theory-15.ts";
 import { solveSpatial } from "./spatial-solve.ts";
 import { planeSweep, slotState, sweepSpatial, trajectoryRuns } from "./spatial-sweep.ts";
 import { sweep, sweepGrid } from "./sweep.ts";
+import { scanTensionEnvelope } from "./verdict.ts";
 
 /** Which grid position the injected solve fails at, and whether a retry lifts it. */
 const inject = vi.hoisted(() => ({ failAt: Number.NaN, once: false, calls: 0 }));
@@ -87,6 +88,72 @@ describe("sweepSpatial without wind — §6.2's sweep, lifted (§19.16)", () => 
       RIDER.weight / 2,
     );
     expect(swept.slots.map((s) => s?.TA)).toEqual(plane.steps.map((s) => s.TA));
+  });
+});
+
+describe("planeSweep's T_max under a head wind — §19.14", () => {
+  // An inclined line, a head wind (from the bearing): the rider's drag points back towards A, so
+  // `F` jumps at the node by `−P_ext` and `T⁺ = |F⁻ − P_ext|` can exceed both anchors' tension.
+  const headWind: SpatialSpanInput = {
+    L: 150,
+    h: -18,
+    L0: 151,
+    w: 5,
+    EA: 7e6,
+    aero: { ...WIND, field: { ...WIND.field, speed: 30, from: 0 } },
+    rider: null,
+  };
+  const swept = sweepSpatial(headWind, { weight: 1000, share: 0.5, hRider: 2.1 });
+  const plane = planeSweep(swept);
+
+  it("carries each slot's T_max, which is at least the node's B-side force |F⁻ − P_ext|", () => {
+    expect(swept.coverage).toBe(1);
+    plane.steps.forEach((step, k) => {
+      const slot = swept.slots[k];
+      if (slot === null) throw new Error("every slot solves");
+      // §19.6's node balance, by hand from the slot's own forces.
+      const Tplus = Math.hypot(
+        slot.Fminus.x - slot.Pext.x,
+        slot.Fminus.y - slot.Pext.y,
+        slot.Fminus.z - slot.Pext.z,
+      );
+      expect(step.Tmax).toBe(slot.Tmax);
+      expect(step.Tmax ?? 0).toBeGreaterThanOrEqual(Tplus * (1 - 1e-12));
+      expect(step.Tmax ?? 0).toBeGreaterThanOrEqual(Math.max(step.TA, step.TB) * (1 - 1e-12));
+    });
+  });
+
+  it("has positions where the node's T⁺ is above both anchors, the peak the Verdict must read", () => {
+    const inside = plane.steps.filter((step, k) => {
+      const slot = swept.slots[k];
+      if (slot === null) return false;
+      const Tplus = Math.hypot(
+        slot.Fminus.x - slot.Pext.x,
+        slot.Fminus.y - slot.Pext.y,
+        slot.Fminus.z - slot.Pext.z,
+      );
+      return Tplus > Math.max(step.TA, step.TB) + 1;
+    });
+    expect(inside.length).toBeGreaterThan(0);
+  });
+
+  it("is what the Verdict's envelope reads: no end below the greatest T⁺ of the traverse", () => {
+    let peak = 0;
+    for (const slot of swept.slots) {
+      if (slot === null) continue;
+      peak = Math.max(
+        peak,
+        Math.hypot(
+          slot.Fminus.x - slot.Pext.x,
+          slot.Fminus.y - slot.Pext.y,
+          slot.Fminus.z - slot.Pext.z,
+        ),
+      );
+    }
+    const scan = scanTensionEnvelope(plane.steps, { TA: 0, TB: 0 }, 1);
+    expect(peak).toBeGreaterThan(Math.max(...plane.steps.map((s) => Math.max(s.TA, s.TB))));
+    expect(scan.A.Tstatic).toBeGreaterThanOrEqual(peak * (1 - 1e-12));
+    expect(scan.B.Tstatic).toBeGreaterThanOrEqual(peak * (1 - 1e-12));
   });
 });
 

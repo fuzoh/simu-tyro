@@ -272,7 +272,8 @@ export function trajectoryRuns(result: SpatialSweepResult): number[][] {
  * §19.11's coupe projection of a sweep, as §6.2's {@link SweepResult}: one {@link SweepStep} per
  * **solved** slot, in grid order, with the holes in `failures` and `coverage` unchanged — the shape
  * the Verdict's scan, the coupe and the strip already read. Per slot: `x_D`, `z_D` the node's own;
- * `T_A`, `T_B` the reactions' norms; `H` and `θ` read on the A side of the trolley, `F_x⁻` and
+ * `T_A`, `T_B` the reactions' norms; `T_max` the line's greatest tension, which the Verdict reads
+ * (§19.14); `H` and `θ` read on the A side of the trolley, `F_x⁻` and
  * `atan2(F_z⁻, F_x⁻)` — the slope of the line's `(x, z)` projection at the node; `V₀ = F_z(0)`.
  *
  * A projection, not a second result: `y` and the lateral forces stay on the spatial slots. Without
@@ -290,6 +291,7 @@ export function planeSweep(result: SpatialSweepResult): SweepResult {
       V0: slot.FA.z,
       TA: slot.TA,
       TB: slot.TB,
+      Tmax: slot.Tmax,
       theta: Math.atan2(slot.Fminus.z, slot.Fminus.x),
     });
   }
