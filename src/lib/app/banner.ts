@@ -307,8 +307,8 @@ export function rideCause({
 
 /**
  * What withholds the Vent — « Vent indisponible — vitesse du vent invalide. » — said where the rose
- * would read it, on every Page that draws the vue de dessus. The Banane and the rose's wind are not
- * drawn meanwhile: a negative speed would bow the line the wrong way.
+ * would read it, on every Page that draws the vue de dessus. The rose's wind is not drawn
+ * meanwhile: a negative speed would point it the wrong way.
  *
  * @returns `null` while the Vent may be read. The statics have no say: the Vent is drawn over the
  *   ligne A–B, which stands without a solve.

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { topView } from "./top-view.ts";
+import { onDrawing, topView } from "./top-view.ts";
 
 /** Points near Bern, well inside the LV95 domain; 0,01° is about 1,1 km north and 0,76 km east. */
 const BOX = { width: 320, height: 200, pad: 24 };
@@ -50,5 +50,24 @@ describe("topView", () => {
 
   test("two Positions on one point give no bearing, so the line is drawn level", () => {
     expect(topView({ A: HERE, B: HERE }, BOX).unoriented).toBe("coincident");
+  });
+});
+
+describe("onDrawing — the scene's (x, y) on the plain drawing (#118)", () => {
+  test("x runs along A–B, y to its left at the drawing's own scale for the portée", () => {
+    // A–B drawn east, 100 units long for a 200 m portée: half a unit per metre. With `y` down,
+    // the left of an eastbound travel is up.
+    const on = onDrawing({ x: 0, y: 100 }, { x: 100, y: 100 }, 200);
+    expect(on(0, 0)).toEqual({ x: 0, y: 100 });
+    expect(on(200, 0)).toEqual({ x: 100, y: 100 });
+    expect(on(100, 10)).toEqual({ x: 50, y: 95 });
+    expect(on(100, -10)).toEqual({ x: 50, y: 105 });
+  });
+
+  test("on a line drawn north, the left of the travel is to the left of the drawing", () => {
+    // A at the bottom, B 60 units above it, for a 120 m portée.
+    const on = onDrawing({ x: 50, y: 80 }, { x: 50, y: 20 }, 120);
+    expect(on(60, 0)).toEqual({ x: 50, y: 50 });
+    expect(on(60, 4)).toEqual({ x: 48, y: 50 });
   });
 });

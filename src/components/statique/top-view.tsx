@@ -3,8 +3,9 @@
  * drawing the map falls back to when it cannot start at all.
  *
  * The map itself is `@/components/map/top-map.tsx`. The plain drawing — the ligne A–B from above,
- * its two anchors, a north arrow when the Positions say where north is (`@/lib/statique/top-view.ts`)
- * — stands in for it only where the browser cannot draw a map (no WebGL), so that case, too, keeps
+ * its two anchors, a north arrow when the Positions say where north is (`@/lib/statique/top-view.ts`),
+ * and the computed traces the map would draw (`@/lib/map/traces.ts`, projected by `onDrawing`) —
+ * stands in for it only where the browser cannot draw a map (no WebGL), so that case, too, keeps
  * the line and its anchors on a plain background rather than an error.
  *
  * **The letters are HTML over the drawing, not SVG `<text>`**: the `viewBox` scales whatever is
@@ -14,12 +15,13 @@
 
 import type { CSSProperties, ReactNode } from "react";
 
+import type { SpaceLine } from "@/lib/chart/scene.ts";
+import type { SpanTraces } from "@/lib/map/traces.ts";
 import type { Positions } from "@/lib/scenario/types.ts";
 import type { TopViewPoint } from "@/lib/statique/top-view.ts";
 
-import { bananeOnDrawing } from "@/lib/map/banane.ts";
 import { TOP_VIEW, UNORIENTED } from "@/lib/statique/copy.ts";
-import { topView } from "@/lib/statique/top-view.ts";
+import { onDrawing, topView } from "@/lib/statique/top-view.ts";
 
 /** The drawing's own units, at the frame's 3 : 2; the SVG scales them to the column. */
 export const TOP_VIEW_BOX = { width: 330, height: 220, pad: 28 } as const;
@@ -30,12 +32,12 @@ const NORTH = { x: TOP_VIEW_BOX.width - 14, y: 14 } as const;
 /**
  * The plain drawing, and why it cannot say where north is — `null` when it can.
  *
- * @param across the wind's cross component, m/s: the Banane is drawn dashed beside the line when it
- *   is not nil (#96).
+ * @param traces the computed traces, as the map would draw them (#118), or `null` while there are
+ *   none to draw: the Ligne à vide dashed, the Trajectoire dotted, the loaded line solid.
  */
 export function plainDrawing(
   positions: Positions,
-  across: number,
+  traces: SpanTraces | null,
 ): {
   figure: ReactNode;
   unoriented: string | null;
@@ -44,6 +46,14 @@ export function plainDrawing(
 } {
   const { A, B, unoriented } = topView(positions, TOP_VIEW_BOX);
   const { width, height } = TOP_VIEW_BOX;
+  const onPlan = traces === null ? null : onDrawing(A, B, traces.L);
+  const points = (line: SpaceLine) =>
+    onPlan === null
+      ? ""
+      : Array.from(line.xs, (x, i) => {
+          const at = onPlan(x, line.ys[i] ?? 0);
+          return `${at.x},${at.y}`;
+        }).join(" ");
   const anchors = [
     ["A", A],
     ["B", B],
@@ -62,15 +72,32 @@ export function plainDrawing(
         >
           <title>{TOP_VIEW.title}</title>
           <line stroke="currentColor" strokeWidth={2} x1={A.x} x2={B.x} y1={A.y} y2={B.y} />
-          {across !== 0 && (
+          {traces?.unloaded != null && (
             <polyline
               fill="none"
-              points={bananeOnDrawing(A, B, across)
-                .map(({ x, y }) => `${x},${y}`)
-                .join(" ")}
+              points={points(traces.unloaded)}
               stroke="currentColor"
               strokeDasharray="6 4"
-              strokeWidth={2}
+              strokeWidth={1.5}
+            />
+          )}
+          {traces?.trajectory.map((run) => (
+            <polyline
+              fill="none"
+              key={run.xs[0]}
+              points={points(run)}
+              stroke="currentColor"
+              strokeDasharray="0 4"
+              strokeLinecap="round"
+              strokeWidth={1.5}
+            />
+          ))}
+          {traces?.loaded != null && (
+            <polyline
+              fill="none"
+              points={points(traces.loaded)}
+              stroke="currentColor"
+              strokeWidth={1.5}
             />
           )}
           {anchors.map(([name, point]) => (

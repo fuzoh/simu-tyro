@@ -12,8 +12,9 @@
  *
  * **A module that cannot arrive is the map's failure, not the Page's.** Offline before it came, the
  * frame shows what the map's own no-WebGL fallback draws without MapLibre: the plain drawing of the
- * ligne A–B and its Banane, the anchors, the Vent's line, « fond de carte indisponible » and the
- * Banane's note — the same caption (`./map-caption.tsx`). What needs the map's module is not there:
+ * ligne A–B, the computed traces the map would draw over it (`@/lib/map/traces.ts`), the anchors,
+ * the Vent's line and « fond de carte indisponible » — the same caption (`./map-caption.tsx`), the
+ * same traces. What needs the map's module is not there:
  * no rose, no « 3D » (its renderer is fetched from the map's chunk), no Mesure, no anchor placed.
  * The Page stays usable, and the next Page that shows the map asks for it again.
  *
@@ -28,8 +29,10 @@ import { useEffect, useState } from "react";
 
 import { useAppState } from "@/components/app/store.tsx";
 import { MapOverCoupe, plainDrawing, TopViewFrame } from "@/components/statique/top-view.tsx";
-import { bananeAcross } from "@/lib/map/banane.ts";
+import { placeRider } from "@/lib/chart/scene.ts";
 import { profileCaption, windReading } from "@/lib/map/copy.ts";
+import { topTraces } from "@/lib/map/traces.ts";
+import { vue3dLayers, vue3dPlacement } from "@/lib/map/vue-3d.ts";
 import { profilePreview, windControls } from "@/lib/map/wind-rose.ts";
 import { windBearing } from "@/lib/rail/gates.ts";
 
@@ -85,6 +88,8 @@ export function TopMap({ readOnly, ...props }: TopMapProps) {
   ) : (
     <Unavailable
       frame={props.frame}
+      locked={readOnly !== undefined}
+      solved={props.solved}
       windCause={props.windCause}
       windCulprits={props.windCulprits}
     />
@@ -96,19 +101,35 @@ export function TopMap({ readOnly, ...props }: TopMapProps) {
   );
 }
 
-/** The map's own no-WebGL fallback, drawn without MapLibre: the line, its anchors, its Banane. */
+/**
+ * The map's own no-WebGL fallback, drawn without MapLibre: the line, its anchors, its traces.
+ *
+ * @param locked the Page Terrain, whose View Strip hides with its coupe under the 3D: the traces
+ *   then read the layers the live map gives a view with no strip beside it (`vue3dLayers`).
+ */
 function Unavailable({
   frame,
+  locked,
+  solved,
   windCause,
   windCulprits,
-}: Pick<TopMapProps, "frame" | "windCause" | "windCulprits">) {
-  const { scenario } = useAppState();
+}: Pick<TopMapProps, "frame" | "solved" | "windCause" | "windCulprits"> & { locked: boolean }) {
+  const { scenario, trace, layers } = useAppState();
   const { positions } = scenario;
   // A withheld Vent is drawn as none, as the live map draws it.
   const wind = windCause === null ? scenario.wind : { ...scenario.wind, speedKmh: 0 };
   const bearing = windBearing({ positions });
-  const across = bananeAcross(wind, bearing);
-  const plain = plainDrawing(positions, across);
+  const traces = topTraces({
+    placement: vue3dPlacement(
+      positions,
+      frame,
+      scenario.geometry.source === "trace" ? trace : null,
+    ),
+    solved,
+    rider: solved === null ? null : placeRider(solved, scenario.rider.xD),
+    layers: vue3dLayers(layers, { viewStrip: !locked }),
+  });
+  const plain = plainDrawing(positions, traces?.span ?? null);
   // A frame that writes nothing and measures nothing: of the Vent's controls it has the profile's
   // readings alone, where the live map's rule reads the profile out.
   const controls = windControls({
@@ -122,7 +143,6 @@ function Unavailable({
     <TopViewFrame
       caption={
         <MapCaption
-          banane={across !== 0 && positions.A !== null && positions.B !== null}
           positions={positions}
           profile={preview === null ? null : profileCaption(preview)}
           unavailable

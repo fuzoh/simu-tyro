@@ -82,7 +82,7 @@ allowed from there.
   read off the Positions outside `src/lib/sim/` — `lineBearing` (`src/lib/scenario/geometry.ts`), the
   rhumb line the north-up map draws — and reaches every reader through the gates' `windBearing`
   (`src/lib/rail/gates.ts`), the one check behind « the Vent needs Positions ». Without a bearing
-  nothing is projected: the statics, the ride and the Banane run without wind, the wind fields are disabled, and
+  nothing is projected: the statics and the ride run without wind, the wind fields are disabled, and
   a carried Vent is kept as given with a notice — never a Blocking Error. A wind value the Wind
   Gate refuses (`ws=-5`, `ww=95`) is one with or without a bearing, and its field stays typable
   so that the breach can be repaired (`fieldUnavailable`). A withheld Vent is drawn as none, so

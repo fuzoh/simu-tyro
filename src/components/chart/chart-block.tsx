@@ -32,7 +32,7 @@ import type { ReactNode } from "react";
 
 import { useMemo, useState } from "react";
 
-import type { ChartScene, SceneBase, SceneFrame } from "@/lib/chart/scene.ts";
+import type { DrawnScene, SceneBase, SceneFrame } from "@/lib/chart/scene.ts";
 import type { Register } from "@/lib/vocabulary/labels.ts";
 
 import {
@@ -167,11 +167,12 @@ export function ChartBlock({
   const { rider: riderInput } = state.scenario;
 
   // The cheap half — one exact §6.1-case-2 solve plus a one-step clearance reduction, ~40 µs —
-  // keyed on `x_D` alone. This is the only thing a drag frame recomputes.
-  const scene = useMemo<ChartScene | null>(() => {
+  // keyed on `x_D` alone. This is the only thing a drag frame recomputes. A position with no loaded
+  // line keeps the solved half: each trace has its own availability (§19.11).
+  const scene = useMemo<DrawnScene | null>(() => {
     if (solved === null) return null;
     const rider = probeSpan("coupe:rider", riderInput.xD, () => placeRider(solved, riderInput.xD));
-    return rider === null ? null : { ...solved, rider };
+    return { ...solved, rider };
   }, [solved, riderInput.xD]);
 
   // **The two empty-band paths end the transient too**, and for the same reason the `"off"` band

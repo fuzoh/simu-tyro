@@ -114,7 +114,6 @@ export type TermId =
   | "stopPoint"
   | "farthestPoint"
   | "reachTarget"
-  | "banana"
   | "position"
   | "latitude"
   | "longitude"
@@ -160,7 +159,7 @@ function exactOnly(word: string): Wording {
  * with a prefix a word-start match cannot see through. « validé » is never said of the engine: the
  * essai makes it « cohérent », and what it does not show is « pas confirmé ». The rest are
  * GLOSSARY's _Avoid_ words for a corde or a câble (textile, acier, âme, gaine), an ancrage
- * (amarrage), the Banane (déport), the flèche, the longueur à vide, the marge exigée and the garde.
+ * (amarrage), the Écart latéral (déport, banane — the qualitative bow it replaced, #118), the flèche, the longueur à vide, the marge exigée and the garde.
  */
 export const PROSCRIBED_WORDS = [
   "montage",
@@ -184,6 +183,7 @@ export const PROSCRIBED_WORDS = [
   "gaine",
   "amarrage",
   "déport",
+  "banane",
   "flèche cible",
   "longueur de corde",
   "marge de sécurité",
@@ -288,7 +288,6 @@ export const LABELS = {
   // the point d'arrêt, which a ride that swings back leaves far behind.
   farthestPoint: same("point le plus loin"),
   reachTarget: same("cible du point le plus loin"),
-  banana: same("banane"),
   position: same("position"),
   latitude: same("latitude"),
   longitude: same("longitude"),

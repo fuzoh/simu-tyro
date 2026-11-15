@@ -19,7 +19,7 @@
  * | **Solve Gate** | tout l'aval : ni `SpanState`, ni câble, ni read-out |
  * | **Clearance Gate** | la garde au sol et la courbe de garde **seules** — le câble se dessine |
  * | **Verdict Gate** | le bandeau et la grille critères × extrémités **seuls** |
- * | **Wind Gate** | la Banane, le vent de la rose et sa lecture — et toute estimation, qui lit le vent ; la ligne placée (A et B sur la carte), **tout l'aval** : la statique lit le vent (§19) |
+ * | **Wind Gate** | le vent de la rose et sa lecture — et toute estimation, qui lit le vent ; la ligne placée (A et B sur la carte), **tout l'aval** : la statique lit le vent (§19) |
  * | **Ride Gate** | toute estimation **seule** : points d'arrêt, vitesse d'arrivée, durée, courbes, `v/c` |
  * | **L'exception géométrique** | les deux tracés, sans graduations et sans piste de pointeur |
  *

@@ -432,8 +432,8 @@ export function Shell({
 
               The Chart Block sits right under the caption, so the caption reserves its **seven**
               lines (`--top-view-caption`, as Statique's first row): one per line it can hold in 2D
-              — A, B, the Vent, the gesture, the fond indisponible, the Banane, the Vue 3D. A cross
-              wind or a failing Fond then adds a line inside the reserve rather than pushing the
+              — A, B, the Vent, the gesture, the fond indisponible, the Vent's profile, the Vue 3D.
+              A profile or a failing Fond then adds a line inside the reserve rather than pushing the
               whole block down while the user edits, and the Skeleton, which shares this section,
               reserves the same box: ui.md's « the caption sets the row's height ». */}
           {views !== undefined && (

@@ -79,7 +79,7 @@ export type ErrorSurfaces = {
   readonly rideCause: string | null;
   /**
    * Why the Vent is withheld — « Vent indisponible — … » — or `null`. While it stands the vue de
-   * dessus draws no Banane and no wind on the rose, and says this where the rose's reading goes.
+   * dessus draws no wind on the rose, and says this where the rose's reading goes.
    */
   readonly windCause: string | null;
   /**

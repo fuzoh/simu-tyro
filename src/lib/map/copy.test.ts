@@ -17,7 +17,6 @@ import type { ProfilePreview } from "./wind-rose.ts";
 
 import {
   anchorReading,
-  BANANE_HELP,
   clickHint,
   describeRelative,
   EMBARK_BLOCKED,
@@ -219,18 +218,9 @@ describe("the profile's reading (#120)", () => {
   });
 });
 
-describe("the Banane's words", () => {
-  test("say a shape, not a distance, with no figure and no length attached", () => {
-    expect(MAP_COPY.bananeNote).toBe("Banane : allure, pas une distance.");
-    for (const text of [MAP_COPY.bananeNote, BANANE_HELP]) {
-      expect(text).not.toMatch(/\d/);
-      expect(text).not.toMatch(/\bm\b|mètre/);
-    }
-  });
-
-  test("the help names the proportionality factor a [CONVENTION], not an engine output", () => {
-    expect(BANANE_HELP).toContain("[CONVENTION]");
-    expect(BANANE_HELP).toContain("jamais une sortie du moteur");
+describe("the Banane is gone (#118)", () => {
+  test("no word of the vue de dessus names it: the traces are computed, not a drawn bow", () => {
+    for (const text of mapLabelTable()) expect(text.toLowerCase()).not.toContain("banane");
   });
 });
 

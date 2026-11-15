@@ -3,7 +3,8 @@
  * line. Pure — the map's projection hands it the two ends and the pointer in the same pixels, and
  * the distance and the ground come from `@/lib/chart/hover.ts`, read at that share of the portée.
  *
- * The Banane is not picked: it is a shape drawn beside the line, and it carries no measure.
+ * The computed traces (#118) are not picked: the reading is the ligne A–B's, at a share of the
+ * portée, and the traces' own numbers are the coupe's.
  */
 
 import type { Px } from "@/lib/chart/hover-gesture.ts";

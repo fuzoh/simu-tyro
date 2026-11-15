@@ -269,7 +269,7 @@ describe("dragging B in the Vue 3D (#97) — the same machine, the same release"
     const scene = buildScene({ scenario, trace });
     const at = vue3dPlacement(scenario.positions, scene, trace);
     if (scene === null || !at.ok) throw new Error("the line stands in the Vue 3D");
-    return vue3dScene({ placement: at.placement, solved: scene, rider: scene.rider, across: 0 });
+    return vue3dScene({ placement: at.placement, solved: scene, rider: scene.rider });
   }
 
   test("only B, its Fil à plomb and the Ligne A–B follow the relief; nothing is asked until the release", async () => {

@@ -501,8 +501,8 @@ the preparatory note (`docs/references/spatial-wind/wind-profile-contract-follow
 evaluated `ww=50.5` as held. The fields and the profile's handle write whole percents only.
 
 **Engine:** `src/lib/sim/wind-profile.ts` evaluates `φ`, `U` and the local wind vector. **No
-reader consumes it yet**: §12.2's ride and the Banane take one speed for the whole line. Until the
-spatial statics (#127) and the views (#118) read `U(x)`, the app accepts a uniform wind only and
+reader consumes it yet**: the spatial statics and the ride read the field through `windAt` (§19), but
+until the profile is activated (#141) the app accepts a uniform wind only and
 **refuses a non-uniform profile at the Wind Gate** — it never computes under a uniform wind what a
 link entered as a profile. This shape is the one adopted for #120; it is not to be swapped for
 another curve silently.
@@ -1280,12 +1280,10 @@ real ground off the A–B axis.
 
 **Two names.** « Écart maximal à A–B » is the glossary's term and Q10's; #134's brief wrote it
 « écart combiné maximal à A–B ». « Déport latéral » is the brief's name for the lateral offset
-this experiment computes in metres. It is **not the Banane**: the glossary keeps the Banane
-qualitative — never a distance — and lists « déport » among the words to avoid for it. Which
-word a computed lateral offset takes in the interface is an open decision of the maintainer
-(`docs/references/spatial-wind/descent-views-contract-followup.md` §7,
-`agent-readiness-views.md` §10); the experiment's tables are not the interface and settle
-nothing.
+this experiment computes in metres. The interface calls a computed lateral offset « écart
+latéral » (§19.7, GLOSSARY) and keeps « déport » among the words to avoid; the qualitative Banane
+it was once kept apart from is gone (#118). The experiment's tables are not the interface and
+settle nothing.
 
 **On a ground parallel to A–B the garde adds nothing to the flèche.** The matrix's prescribed
 ground is a straight line a fixed height under each anchor, so
@@ -1807,6 +1805,15 @@ including stretches where `x` decreases. Four traces, each with its own availabi
 line, the loaded line at the chosen position (holding its trolley node), the trajectory (§19.12)
 and the straight A–B reference, which no calculation moves. The qualitative Banane is not a
 projection and does not survive the spatial results (#118).
+
+One projector serves the vue de dessus and the 3-D view (`earthFrame`, `src/lib/map/vue-3d.ts`):
+`x / L` of the way from Position A to Position B, `y` metres to the left of A → B square to it on
+the local plane, so `y = 0` is the straight line between the Positions. The vue de dessus draws the
+traces only where the line stands on the earth — both Positions and the profil between them, the
+3-D view's own condition — since on any other two points `x` and `y` would not be the line's; its
+plain drawing scales `y` by the drawn length of A–B over `L`. The loaded line carries the trolley's
+node among its vertices in both methods: §19.8's nodes hold it, and §4.1's even samples get it
+inserted.
 
 ### 19.12 Sweep contract
 

@@ -197,6 +197,15 @@ line solid. The Trajectoire takes the coupe's `foreground/60`; the coupe draws i
 60 % too and reads a shade darker than the coupe's. Which of them is shown is the View Strip's: the Vue 3D has no
 layer picker of its own (#111).
 
+The vue de dessus draws the same three computed lines over its ligne A–B (#118), in `LINE_INK`
+two pixels wide on one `LINE_CASING` halo: the Ligne à vide dashed, the Trajectoire dotted, the
+loaded line solid — thinner than the ligne A–B it lies on without wind. **No view draws a shape
+of its own**: the coupe, the vue de dessus and the Vue 3D project the scene's one set of `(x, y,
+z)` (`SpaceLine`, `docs/simulation-theory.md` §19.11) — `(x, z)`, `(x, y)` and all three — and
+the wind never moves a vertex in a view. Each line has its own availability: where the chosen
+position has no loaded line the coupe says « Ligne chargée : le calcul n'a pas convergé à cette
+position. » in its place, and the Ligne à vide and the Trajectoire stay.
+
 **The Gimbal is HTML over the canvas, from `ui/`** (#111). CesiumJS has no navigation control and
 none is brought in: `vue-3d-gimbal.tsx` is `ui/button` at `size="icon-sm"` (the pad) and
 `size="sm"` (« Vue du départ », « Vue latérale »), `.touch-44` at each call site, over the view's
@@ -272,9 +281,7 @@ explanation, note, Avertissement and blocking field error sits behind an icon �
   height the layout reserves; Provenance's aggregate summary (« ⚠ N valeurs sans référence
   normative confirmée »), which is a count and the toggle of its `<details>`, not an explanation —
   the entries and their chips are behind it. The terrain lines in the open keep their glyph, `✓`
-  for a check that passed and `ℹ` for one that could not be made, so the two never read alike. The
-  Banane note's explanation moved from a `title` — which the mouse
-  alone could read — to an `ⓘ`.
+  for a check that passed and `ℹ` for one that could not be made, so the two never read alike.
 - **Where a section's notes go.** On its heading: `Group`'s `tip`, `Region`'s and `RailSection`'s
   `tips`. « Ce que cet outil ne calcule pas » keeps its heading in the open and its lines behind the
   heading's `ⓘ`; §8.3's formula stays behind its own chip inside that bubble.
@@ -338,7 +345,7 @@ and `max-w-[1984px]`, and `contract.test.ts` holds the two together. B2 and B3 a
   36 + 629 px: its 448 px cap plus its controls and **seven** caption lines), 489,7 px at 1024
   (36 + 453,7) — and the profile under the banner at 709 and 565,7 px (routing.md's measurements).
   The seven lines are Statique's first row's reserve (`--top-view-caption: 7rem`, below), for the
-  same reason: the block sits right under the caption, so a Banane line from a cross wind, a
+  same reason: the block sits right under the caption, so a Vent's profile line, a
   failing Fond or a blocked Vue 3D must land inside the reserve, not push the whole block — and the
   coupe the Skeleton placed — 16 px down per line while the user edits.
   So the banner is below the fold on a window shorter than about 665 px (490 at 1024), and
@@ -478,10 +485,10 @@ arithmetic over the shell, measured by `agent-browser` (`docs/conventions/routin
 - **Seven caption lines in the row** (`--top-view-caption`, 7 rem, as Avancé's middle column, and
   against five on Terrain and the stacked shape): the caption sets the row's height, and so the
   coupe's place, where it was the last region and moved nothing. Seven is one per line the caption can hold in 2D (A, B, the Vent, the gesture, the fond
-  indisponible, the Banane, the Vue 3D); on the narrow map from 1024 to about 1200 px the Vent and
+  indisponible, the Vent's profile, the Vue 3D); on the narrow map from 1024 to about 1200 px the Vent and
   the Vue 3D lines wrap to two each, and the trial line's six lines on load, seven with « Mesure »
   armed, stay inside it. **What it costs**: 32 to 48 px of empty caption at 1440 on a calm line;
-  and a caption of more than seven lines — a Vent, the Banane and « Mesure » armed on the 287 px
+  and a caption of more than seven lines — a Vent, its profile and « Mesure » armed on the 287 px
   map make eight — still pushes the coupe down a line. The Skeleton cannot foresee a caption any
   more than a tile's Avertissement; seven covers every line the caption can hold unwrapped.
 - **The map's own controls at 287 px**: « Placer A / Placer B / Mesure » wrap onto a second line

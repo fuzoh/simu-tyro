@@ -592,7 +592,7 @@ export const FIELDS = {
     warning: null,
     gate: null,
   },
-  // The Wind Gate: the ride (#89), the Banane, the rose — and, wherever the Vent is applied, the
+  // The Wind Gate: the ride (#89), the rose — and, wherever the Vent is applied, the
   // statics (#127, §19): a bad one withholds them, and with the line placed `windTakesStatics` takes
   // the statics and the Verdict down too, since nothing may be read under another wind.
   windSpeed: {

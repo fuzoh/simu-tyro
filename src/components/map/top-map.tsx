@@ -17,9 +17,12 @@
  *   exactly where they are; the line is inside every style for the same reason.
  * - **Every network call goes through one `fetch`**, the platform's own, passed to the two pure
  *   loaders — the profil geo.admin and the carte claire's style.
- * - **The Banane is drawn, not computed** (#96): the wind's cross component alone sets how far the
- *   line bows (`@/lib/map/banane.ts`). It has its own source in every style, redrawn with the wind
- *   and with the anchors during a drag, and the note under the map says it is a shape, not a distance.
+ * - **The traces are the engine's, as on the coupe and in the Vue 3D** (#118): the Ligne à vide,
+ *   the loaded line at the passager and the Trajectoire, their `(x, y)` placed on the two Positions
+ *   (`@/lib/map/traces.ts`). They have their own source in every style; nothing here reads the wind
+ *   to draw them. They stand where the Vue 3D's line does — both Positions and the profil between
+ *   them (`vue3dPlacement`) — and not while an anchor moves or its profil loads, when they belong to
+ *   the last release.
  * - **The Vent's controls are one rule's** (#94, #120): `windControls`
  *   (`@/lib/map/wind-rose.ts`) says whether the rose's handle and the profile's pad stand and
  *   whether the profile is read out, for this map and for the frame that stands in for it
@@ -73,7 +76,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import type { Px } from "@/lib/chart/hover-gesture.ts";
 import type { HoverLine } from "@/lib/chart/hover.ts";
-import type { SceneBase, SceneFrame } from "@/lib/chart/scene.ts";
+import type { SceneBase, SceneFrame, SceneRider } from "@/lib/chart/scene.ts";
 import type { Fond, MapDisplay } from "@/lib/map/display.ts";
 import type { Anchor, MapEvent, MapGesture } from "@/lib/map/gesture.ts";
 import type { MeasurePoints, MeasureReading } from "@/lib/map/measure.ts";
@@ -98,7 +101,6 @@ import { Toggle } from "@/components/ui/toggle.tsx";
 import { probeSpan, probeTag, probeTagOf } from "@/lib/app/probe.ts";
 import { coupeLines, coupeReading } from "@/lib/chart/hover.ts";
 import { placeRider } from "@/lib/chart/scene.ts";
-import { bananeAcross } from "@/lib/map/banane.ts";
 import {
   clickHint,
   EMBARK_BLOCKED,
@@ -117,8 +119,6 @@ import { clickTarget, drawnPositions, IDLE, stepGesture } from "@/lib/map/gestur
 import { type LineEnds, type LinePick, pointerOnLine } from "@/lib/map/hover.ts";
 import { measureAim } from "@/lib/map/measure.ts";
 import {
-  BANANE_SOURCE,
-  bananeData,
   fondAttribution,
   fondUnavailable,
   freshHealth,
@@ -131,7 +131,10 @@ import {
   measureData,
   measureDrawing,
   SWISSTOPO_COVERAGE,
+  TRACES_SOURCE,
+  tracesData,
 } from "@/lib/map/style.ts";
+import { type PlanTraces, topTraces } from "@/lib/map/traces.ts";
 import { vue3dKeyCommand } from "@/lib/map/vue-3d-camera.ts";
 import {
   embarkBlock,
@@ -166,8 +169,8 @@ const FIT = { padding: 48, maxZoom: 16 } as const;
 /**
  * @param frame the coupe's input half and `solved` its solved half, as the Page's gates leave them:
  *   the Vue 3D draws the same line the coupe does, or none.
- * @param windCause why the Wind Gate withholds the Vent, or `null`: while it stands no Banane bows
- *   and the rose draws no wind, and the line under the map says it in place of the rose's reading.
+ * @param windCause why the Wind Gate withholds the Vent, or `null`: while it stands the rose draws no
+ *   wind, and the line under the map says it in place of the rose's reading.
  * @param windCulprits the fields that breach stands on (`ErrorSurfaces.windCulprits`), empty
  *   without one: the rose's handle is offered over a withheld Vent only where a drag of it lifts
  *   them (`windControls`).
@@ -206,7 +209,10 @@ export function TopMap({
   const [failed, setFailed] = useState(false);
   const [health, setHealth] = useState<FondHealth>(() => freshHealth(display.fond));
 
-  const placement = vue3dPlacement(positions, frame, profil);
+  const placement = useMemo(
+    () => vue3dPlacement(positions, frame, profil),
+    [positions, frame, profil],
+  );
   // The Vue 3D fell over this visit: the vue de dessus is back until the switch is pressed again.
   const [lost3d, setLost3d] = useState(false);
   const shows3d = display.view === "3d" && placement.ok && !lost3d;
@@ -223,8 +229,8 @@ export function TopMap({
   // The Vent is geographic: the line it is projected on is the one drawn, a dragged anchor included.
   // Without A and B there is none, and no Vent bows it — the gates' one check, `windBearing`.
   const bearing = windBearing({ positions: drawn });
-  const across = bananeAcross(wind, bearing);
-  const scene3d = useVue3dScene(shows3d, frame, profil, solved, across);
+  const placed = usePlacedRider(solved);
+  const scene3d = useVue3dScene(shows3d, frame, profil, solved, placed);
   const ride = rides?.windy ?? null;
   const ride3d = useVue3dRide(shows3d, frame, profil, ride);
   // While an anchor moves or its profil loads, the rides on hand are the last release's.
@@ -232,8 +238,16 @@ export function TopMap({
   // The View Strip's layers where the strip stands beside the Vue 3D; on the Page Terrain it hides
   // with the coupe while the 3D is shown, and toggles out of reach decide nothing.
   const layers3d = useMemo(() => vue3dLayers(layers, { viewStrip: !locked }), [locked, layers]);
+  // The vue de dessus's traces read the same layers, on the line the Vue 3D would stand.
+  const traces = useMemo(
+    () =>
+      gesture.kind === "idle"
+        ? topTraces({ placement, solved, rider: placed, layers: layers3d })
+        : null,
+    [gesture.kind, placement, solved, placed, layers3d],
+  );
 
-  const plain = failed ? plainDrawing(drawn, across) : null;
+  const plain = failed ? plainDrawing(drawn, traces?.span ?? null) : null;
   const measure = useMeasure(browserFetch, profil);
   const measuring = measure.active && !shows3d && plain === null;
   const { click: measureClick } = measure;
@@ -298,14 +312,6 @@ export function TopMap({
         }
       : null;
   const unavailable = failed || fondUnavailable(health, drawn);
-  // The Banane is on screen when there is a cross wind and a line for it to bow: the map's, or the
-  // Ligne à vide the Vue 3D drew — which it does not while an anchor follows the pointer, nor while
-  // the View Strip's « ligne à vide » is off.
-  const bananeShown =
-    across !== 0 &&
-    (shows3d
-      ? scene3d?.unloaded != null && layers3d.unloaded && gesture.kind === "idle"
-      : drawn.A !== null && drawn.B !== null);
   // A release loads its profil the same way in both views, and says so under either.
   const gestureLine = measuring
     ? measureHint(measure.points)
@@ -323,7 +329,6 @@ export function TopMap({
     <TopViewFrame
       caption={
         <MapCaption
-          banane={bananeShown}
           gesture={gestureLine}
           positions={drawn}
           profile={shows3d || controls.pad || preview === null ? null : profileCaption(preview)}
@@ -387,7 +392,7 @@ export function TopMap({
                   onClick={clicked}
                   onFailed={() => setFailed(true)}
                   onHealth={setHealth}
-                  across={across}
+                  traces={traces?.plan ?? null}
                   measure={measure.points}
                   measuring={measuring}
                   reperes={display.reperes}
@@ -743,6 +748,16 @@ function useVue3dRide(
 }
 
 /**
+ * The passager where the Scenario puts it, on the solved line — the coupe's own `placeRider`, so the
+ * loaded line every view draws is the coupe's. `null` without a solved line, or where the chosen
+ * position has no loaded line.
+ */
+function usePlacedRider(solved: SceneBase | null) {
+  const { xD } = useAppState().scenario.rider;
+  return useMemo(() => (solved === null ? null : placeRider(solved, xD)), [solved, xD]);
+}
+
+/**
  * What the Vue 3D draws, while it is shown: the coupe's line placed on the two Positions, the
  * passager where the Scenario puts it.
  */
@@ -751,7 +766,7 @@ function useVue3dScene(
   frame: SceneFrame | null,
   profil: Trace | null,
   solved: SceneBase | null,
-  across: number,
+  placed: SceneRider | null,
 ) {
   const { positions, rider } = useAppState().scenario;
   const { xD } = rider;
@@ -760,11 +775,10 @@ function useVue3dScene(
     const at = vue3dPlacement(positions, frame, profil);
     if (!at.ok) return null;
     return probeSpan("vue3d:scene", xD, () => {
-      const placed = solved === null ? null : placeRider(solved, xD);
-      const scene = vue3dScene({ placement: at.placement, solved, rider: placed, across });
+      const scene = vue3dScene({ placement: at.placement, solved, rider: placed });
       return probeTag(scene, xD);
     });
-  }, [shown, positions, frame, profil, solved, xD, across]);
+  }, [shown, positions, frame, profil, solved, placed, xD]);
 }
 
 function MapControls({
@@ -908,7 +922,7 @@ function MapCanvas({
   gesture,
   locked,
   target,
-  across,
+  traces,
   measure,
   measuring,
   reperes,
@@ -937,8 +951,8 @@ function MapCanvas({
   reperes: boolean;
   /** What a click on the map does: place an anchor, or set a point of the Mesure. */
   onClick: (at: Position) => void;
-  /** The wind's cross component, m/s: the Banane's only input. */
-  across: number;
+  /** The computed traces on the map, or `null` while there are none to draw. */
+  traces: PlanTraces | null;
   /** Hands over the map's projection while the map lives: where a Position stands in its box. */
   onProject: (project: Project | null) => void;
   /** The view moved, by the user or by the line. */
@@ -958,7 +972,7 @@ function MapCanvas({
   const applied = useRef<string | null>(null);
   // What a style built later must draw: the line where it is **now**, not where it was at mount.
   const line = useRef(drawn);
-  const bow = useRef(across);
+  const lines = useRef(traces);
   const ruler = useRef(measure);
   const shownReperes = useRef(reperes);
   // The aperçu (#107): the pixel the pointer hovers in the map's box — re-read on every move of the
@@ -1013,7 +1027,7 @@ function MapCanvas({
           display,
           vector: vector.current,
           positions: line.current,
-          across: bow.current,
+          traces: lines.current,
           measure: drawing(),
         }),
         attributionControl: false,
@@ -1117,7 +1131,7 @@ function MapCanvas({
           display,
           vector: vector.current,
           positions: line.current,
-          across: bow.current,
+          traces: lines.current,
           // The aperçu included: a Fond changed under the pointer leaves the cross where it was.
           measure: drawing(),
         }),
@@ -1190,12 +1204,12 @@ function MapCanvas({
     }
   }, [drawn, draggable, measuring]);
 
-  // The Banane follows the wind and the line: a source of its own, so a drag or a typed wind never
-  // touches the camera.
+  // The traces follow the solved line and the layers: a source of its own, so a new solve or a
+  // toggle never touches the camera.
   useEffect(() => {
-    bow.current = across;
-    void map.current?.getSource<GeoJSONSource>(BANANE_SOURCE)?.setData(bananeData(drawn, across));
-  }, [drawn, across]);
+    lines.current = traces;
+    void map.current?.getSource<GeoJSONSource>(TRACES_SOURCE)?.setData(tracesData(traces));
+  }, [traces]);
 
   // The Mesure follows its clicks, the Repères d'ancrage the anchors as drawn — a dragged one under
   // the pointer — and the Repères' button hides or shows every cross: a source of its own, in every

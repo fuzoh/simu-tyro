@@ -259,11 +259,11 @@ The ratio of available strength to the judged tension, compared with the marge e
 _Avoid_: coeff, coefficient, pourcentage
 
 **Ligne à vide**:
-The unloaded line, drawn. Not the longueur à vide, which is a length.
+The unloaded line, drawn. Under a Vent it is the line the spatial statics computed, `y` included, and every view — coupe, vue de dessus, Vue 3D — projects those same coordinates (#118). Not the longueur à vide, which is a length.
 _Avoid_: câble à vide, corde à vide
 
 **Banane**:
-The lateral bow of the unloaded line in a cross-wind, seen from above. Qualitative. Not a distance the app states in metres. Replaced by the computed Écart latéral and the spatial lines the views project (#118); never shown beside a spatial result.
+Historical. The qualitative bow of the unloaded line in a cross-wind that the vue de dessus and the Vue 3D drew until #118 — drawn, never computed, never a distance. Removed: the views now project the lines the spatial statics compute, and the lateral offset is the Écart latéral. The interface no longer prints the word.
 _Avoid_: déport, drift, flèche latérale
 
 **Vent**:
@@ -280,7 +280,7 @@ and the passager rides the locus it gives. A corde then needs its diamètre, whi
 computed on; without it no result stands under wind, and the field says so. A refused Vent, or a
 refused masse volumique de l'air, then withholds every result rather than be read as another. **The Vent needs Positions**: without A and B on the map the line
 has no bearing, so the wind fields and the Rose des vents' handle are disabled with that reason,
-and the statics, the passager's ride and the Banane run without wind. A wind field whose value is refused — a
+and the statics and the passager's ride run without wind. A wind field whose value is refused — a
 Blocking Error on the Wind Gate, Positions or not — stays typable, so that it can be repaired
 where its message stands. A Vent a link or a Session carries without
 Positions is kept as given, never dropped, and the results read with it say it is not applied and
@@ -547,9 +547,9 @@ _Avoid_: slope layer, hillshade, relief
 
 **Vue 3D**:
 The relief view of the line: swisstopo terrain and imagery, both anchors on their Fils à
-plomb, the loaded line from the engine and, as the View Strip's layers say, the Ligne à vide
-with its Banane, the Ligne A–B and the Trajectoire — the coupe's curves, with no picker of its
-own. Context, not measurement: it states nothing the coupe does not. Anchors drag there as on
+plomb, the loaded line from the engine and, as the View Strip's layers say, the Ligne à vide,
+the Ligne A–B and the Trajectoire — the coupe's curves, the same computed coordinates placed on
+the earth, with no picker of its own. Context, not measurement: it states nothing the coupe does not. Anchors drag there as on
 the carte: the line follows the pointer, the recalculation waits for the release. The camera
 moves by the Gimbal, by the keys once the view has the focus, and to the two Vues
 prédéfinies; on Avancé and Terrain it also rides the passager's computed motion in the Vue embarquée. Loaded only when chosen.
@@ -572,7 +572,7 @@ _Avoid_: preset, bookmark, saved view
 The Vue prédéfinie on the platform at A: the eye 4,5 m to the left of A when one looks
 toward B, 1,7 m above the ground at A's foot — or above the ground under the eye, where a cross
 slope lifts it higher — looking along A → B and aimed at anchor B — to see the line run away
-from the start and the Banane bow it. Key 1.
+from the start and, under a Vent, leave the vertical plane of A–B. Key 1.
 _Avoid_: vue passager, vue subjective
 
 **Vue latérale**:
@@ -598,7 +598,7 @@ controls.
 _Avoid_: vue passager, vue subjective, animation, simulation, VR
 
 **Rose des vents**:
-The compass rose drawn on the vue de dessus, with a handle that sets the Vent's direction and force by dragging. It edits the azimuth directly: on the north-up map the handle stands where the wind comes from. Its reading gives that azimuth and, from the line's bearing, where the wind comes from relative to the line A → B (« Vent d'ouest (264°), 30 km/h : par la gauche à l'avant, 312° par rapport à la ligne A → B »). Without A and B on the map it has no handle and says why. On Terrain it is read-only. While the Wind Gate withholds the Vent it draws no wind, and its handle waits at the centre only where a drag from there repairs the Vent — a refused speed; over a refused Profil du vent it has no handle, since that drag would replace the Vent's speed and direction and repair nothing. It sets the wind that draws the Banane. A second handle sets the Profil du vent, on a pad of its own whose axes are the screen's and do not turn with the wind: to the right the Largeur à mi-atténuation grows, upward the Atténuation aux ancrages does, and a diagonal sets both. Beside it a preview draws the speed from A, on the left, through mid-span to B, with the speed at mid-span, the speed at the anchors and the width; « Vent uniforme » is its one command. Each handle writes its own values and keeps the rest of the Vent. Neither that handle nor the preview is offered until a computation reads the Profil du vent, and never on Terrain.
+The compass rose drawn on the vue de dessus, with a handle that sets the Vent's direction and force by dragging. It edits the azimuth directly: on the north-up map the handle stands where the wind comes from. Its reading gives that azimuth and, from the line's bearing, where the wind comes from relative to the line A → B (« Vent d'ouest (264°), 30 km/h : par la gauche à l'avant, 312° par rapport à la ligne A → B »). Without A and B on the map it has no handle and says why. On Terrain it is read-only. While the Wind Gate withholds the Vent it draws no wind, and its handle waits at the centre only where a drag from there repairs the Vent — a refused speed; over a refused Profil du vent it has no handle, since that drag would replace the Vent's speed and direction and repair nothing. It sets the wind the statics and the ride read. A second handle sets the Profil du vent, on a pad of its own whose axes are the screen's and do not turn with the wind: to the right the Largeur à mi-atténuation grows, upward the Atténuation aux ancrages does, and a diagonal sets both. Beside it a preview draws the speed from A, on the left, through mid-span to B, with the speed at mid-span, the speed at the anchors and the width; « Vent uniforme » is its one command. Each handle writes its own values and keeps the rest of the Vent. Neither that handle nor the preview is offered until a computation reads the Profil du vent, and never on Terrain.
 _Avoid_: boussole, anémomètre
 
 **Fil à plomb**:

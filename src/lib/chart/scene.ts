@@ -81,6 +81,7 @@ import {
   slotState,
   solveAtHorizontalPosition,
   sweepStep,
+  trajectoryRuns,
   zGroundAt,
 } from "@/lib/sim";
 
@@ -97,6 +98,18 @@ export type Polyline = {
   readonly xs: Float64Array;
   /** Heights relative to anchor A's top, m. */
   readonly zs: Float64Array;
+};
+
+/**
+ * A line of §19.2's frame in three dimensions: `ys` horizontal, to the left of A → B, beside the
+ * {@link Polyline}'s `xs` and `zs`. **The one set of coordinates every view projects** (§19.11,
+ * #118): the coupe reads `(x, z)`, the vue de dessus `(x, y)`, the Vue 3D all three — none
+ * recomputes a shape. Vertices in the engine's node order, `x` included where it decreases; without
+ * wind every `y` is `0`.
+ */
+export type SpaceLine = Polyline & {
+  /** Lateral positions, m, to the left of A → B. */
+  readonly ys: Float64Array;
 };
 
 /** A point in an SVG's user units — what a scene hands a chart once it has placed a point. */
@@ -129,8 +142,13 @@ export type DrawnMember = {
 export type SceneRider = {
   /** The exact §6.1-case-2 solve at the Scenario's `x_D`, as the sweep's own record. */
   readonly step: SweepStep;
-  /** The loaded line at this position — regenerated, never stored on a result. */
-  readonly cable: Polyline;
+  /** The trolley's lateral position, m, to the left of A → B — `0` without wind (§19.11). */
+  readonly yD: number;
+  /**
+   * The loaded line at this position — regenerated, never stored on a result — **through the
+   * trolley's own node** `(x_D, y_D, z_D)`, so every view draws its kink where the engine put it.
+   */
+  readonly cable: SpaceLine;
   /**
    * §11's **inner** minimum at this rider position: the worst clearance, and where it sits.
    *
@@ -284,10 +302,10 @@ export type SceneBase = SceneFrame & {
    */
   readonly unloaded: SpatialState;
   /**
-   * Its coupe polyline, `(x, z)`: §4.1 sampled at {@link CABLE_SAMPLES} without wind, §19.8's nodes
-   * under wind — the same coordinates every view projects (§19.11).
+   * Its line, `(x, y, z)`: §4.1 sampled at {@link CABLE_SAMPLES} without wind (`y` nil), §19.8's
+   * nodes under wind — the same coordinates every view projects (§19.11).
    */
-  readonly unloadedCable: Polyline;
+  readonly unloadedCable: SpaceLine;
   /** §19.12's sweep, one slot per grid position — the loaded lines under wind are its slots. */
   readonly spatial: SpatialSweepResult;
   /**
@@ -298,11 +316,12 @@ export type SceneBase = SceneFrame & {
   /** One member under the whole design load — `sweepRider`'s « cas défavorable », never drawn. */
   readonly soleCarrier: SweepResult | null;
   /**
-   * « Trajectoire » — the load's own path, `(x_D, z_D)` over every solved step, **split at
-   * `Indéterminé`'s gaps** rather than bridged across them: a line through a step that did not solve
-   * would draw a position nobody computed. Usually one run.
+   * « Trajectoire » — the lieu du chariot, `r_D` over every solved slot (§19.12), **split at
+   * `Indéterminé`'s gaps** rather than bridged across them: a line through a slot that did not
+   * converge would draw a position nobody computed. Usually one run. Not a shape of the line: the
+   * loaded line meets it at its own trolley node only.
    */
-  readonly trajectory: readonly Polyline[];
+  readonly trajectory: readonly SpaceLine[];
   /**
    * §11 over the traverse, outside the Zones d'ancrage: the aggregate `h_min`, its `x`, the
    * per-step arrays, and the minimum with the zones included.
@@ -330,6 +349,14 @@ export type ChartScene = SceneBase & {
   /** The current rider — {@link placeRider}, the only half a scrub re-runs. */
   readonly rider: SceneRider;
 };
+
+/**
+ * What a coupe draws once the line solved: the scenario's half, and the rider **or `null`** where
+ * there is no loaded line at the chosen position (§19.11, #118). Each trace keeps its own
+ * availability: the unloaded line and the trajectory stand without the rider, the loaded line and
+ * everything read at the rider go.
+ */
+export type DrawnScene = SceneBase & { readonly rider: SceneRider | null };
 
 /**
  * The input half of the picture — the placement, the terrain and the shared x domain. **No
@@ -383,7 +410,7 @@ export function buildSceneBase(
   const { input: span, material, state, spatial: line } = unloaded;
   const { P, traverse, clearance, soleCarrier, spatial } = swept;
   const unloadedCable =
-    state === null ? coupeOf(sampleSpatial(line)) : polyline(sampleCable(state, CABLE_SAMPLES));
+    state === null ? lineOf(sampleSpatial(line)) : planeLine(sampleCable(state, CABLE_SAMPLES));
 
   return {
     ...frame,
@@ -397,7 +424,7 @@ export function buildSceneBase(
     spatial,
     traverse,
     soleCarrier,
-    trajectory: trajectoryRuns(traverse),
+    trajectory: trajectoryLines(spatial),
     clearance,
     hRider: rider.hRider,
     anchorZone: rider.anchorZone,
@@ -496,7 +523,7 @@ export function placeRider(base: SceneBase, requestedXD: number): SceneRider | n
   const xD = clampX(requestedXD, L);
   const placed = riderLine(base, xD);
   if (placed === null) return null;
-  const { step, cable } = placed;
+  const { step, yD, cable } = placed;
 
   let worst: SceneRider["worst"];
   if (placed.solvedIndex === null) {
@@ -531,6 +558,7 @@ export function placeRider(base: SceneBase, requestedXD: number): SceneRider | n
 
   return {
     step,
+    yD,
     cable,
     worst,
     // The same three terms as §11's `h_clear`, read at the rider's own `x` instead of minimised
@@ -552,8 +580,8 @@ export function placeRider(base: SceneBase, requestedXD: number): SceneRider | n
 }
 
 /**
- * The loaded line at `x_D` as the coupe draws it: the step, its `(x, z)` polyline, and — under
- * wind — the slot's index among the solved ones.
+ * The loaded line at `x_D` as every view draws it: the step, the trolley's `y_D`, its line through
+ * the trolley's node, and — under wind — the slot's index among the solved ones.
  *
  * - **Without wind**, § 5's exact §6.1-case-2 solve at the typed position ({@link solveRider}).
  * - **Under wind**, the position is a **slot of the sweep** (§19.12): the nearest solved one, its
@@ -566,16 +594,26 @@ export function placeRider(base: SceneBase, requestedXD: number): SceneRider | n
 function riderLine(
   base: SceneBase,
   xD: number,
-): { step: SweepStep; cable: Polyline; solvedIndex: number | null } | null {
+): { step: SweepStep; yD: number; cable: SpaceLine; solvedIndex: number | null } | null {
   if (base.line.aero === null) {
     const resolved = solveRider(base, xD);
     if (resolved === null) return null;
-    const cable = polyline(sampleCable(resolved.state, CABLE_SAMPLES));
-    return { step: resolved.step, cable, solvedIndex: null };
+    const { step } = resolved;
+    // §4.1 samples the cable evenly along its length, so the kink under the trolley — the loaded
+    // line's own low point — falls between two vertices: the node goes in as one of them.
+    const cable = throughNode(
+      planeLine(sampleCable(resolved.state, CABLE_SAMPLES)),
+      step.xD,
+      step.zD,
+    );
+    return { step, yD: 0, cable, solvedIndex: null };
   }
   const slot = windySlot(base, xD);
   if (slot === null) return null;
-  return { step: slot.step, cable: coupeOf(slot.samples), solvedIndex: slot.solvedIndex };
+  const { samples } = slot;
+  // §19.8's nodes hold the trolley's twice, `S_P⁻` and `S_P⁺`, at the same point.
+  const yD = samples.node < 0 ? 0 : samples.y[samples.node];
+  return { step: slot.step, yD, cable: lineOf(samples), solvedIndex: slot.solvedIndex };
 }
 
 /**
@@ -663,35 +701,47 @@ export function polylineAt(points: Polyline, at: number): number {
 }
 
 /**
- * The load's path over the traverse, one polyline per run of consecutive solved steps. A failed
- * step ends a run; a run of one step has no line to draw and is dropped.
+ * The lieu du chariot (§19.12): the solved slots' trolley nodes `r_D`, in grid order, one line per
+ * run between holes (`trajectoryRuns`). A hole ends a run — no segment bridges a position that did
+ * not converge — and a run of one slot has no line to draw and is dropped.
  *
- * Exported for its test: a failed step is **injected, never hunted** (`testing.md`), and a
- * hand-built traverse is the injection that needs no mock.
+ * Exported for its test: a hole is **injected, never hunted** (`testing.md`), and hand-built slots
+ * are the injection that needs no mock.
  */
-export function trajectoryRuns(traverse: SweepResult): Polyline[] {
-  const failed = new Set(traverse.failures.map((failure) => failure.index));
-  const runs: Polyline[] = [];
-  let xs: number[] = [];
-  let zs: number[] = [];
-  const close = () => {
-    if (xs.length > 1) runs.push({ xs: Float64Array.from(xs), zs: Float64Array.from(zs) });
-    xs = [];
-    zs = [];
-  };
-  // `steps` is the grid minus `failures`, in grid order, so walking the grid re-aligns the two.
-  let next = 0;
-  for (let index = 0; index < traverse.grid.length; index++) {
-    if (failed.has(index)) {
-      close();
-      continue;
-    }
-    const step = traverse.steps[next++];
-    xs.push(step.xD);
-    zs.push(step.zD);
+export function trajectoryLines(spatial: Pick<SpatialSweepResult, "slots">): SpaceLine[] {
+  const lines: SpaceLine[] = [];
+  for (const run of trajectoryRuns(spatial as SpatialSweepResult)) {
+    if (run.length < 2) continue;
+    const nodes = run.map((i) => spatial.slots[i]?.rD ?? { x: Number.NaN, y: 0, z: Number.NaN });
+    lines.push({
+      xs: Float64Array.from(nodes, (rD) => rD.x),
+      ys: Float64Array.from(nodes, (rD) => rD.y),
+      zs: Float64Array.from(nodes, (rD) => rD.z),
+    });
   }
-  close();
-  return runs;
+  return lines;
+}
+
+/**
+ * A line with the trolley's node `(x_D, 0, z_D)` among its vertices, for a plane line sampled evenly
+ * along its length: inserted in `x` order, or replacing the vertex already at `x_D`.
+ */
+export function throughNode(line: SpaceLine, xD: number, zD: number): SpaceLine {
+  const at = line.xs.findIndex((x) => x >= xD);
+  if (at === -1) return line;
+  if (line.xs[at] === xD) {
+    const zs = Float64Array.from(line.zs);
+    zs[at] = zD;
+    return { xs: line.xs, ys: line.ys, zs };
+  }
+  const insert = (values: Float64Array, value: number) => {
+    const out = new Float64Array(values.length + 1);
+    out.set(values.subarray(0, at));
+    out[at] = value;
+    out.set(values.subarray(at), at + 1);
+    return out;
+  };
+  return { xs: insert(line.xs, xD), ys: insert(line.ys, 0), zs: insert(line.zs, zD) };
 }
 
 /**
@@ -787,15 +837,22 @@ function solvedZExtent(
 }
 
 /**
- * §19.11's coupe of a spatial state's samples: `(x, z)` at every node, in node order — the
- * trolley's node twice, at the same point. `y` is the vue de dessus's, not the coupe's.
+ * §19.11's line of a spatial state's samples: `(x, y, z)` at every node, in node order — the
+ * trolley's node twice, at the same point.
  */
-export function coupeOf(samples: Pick<SpatialSamples, "x" | "z">): Polyline {
-  return { xs: Float64Array.from(samples.x), zs: Float64Array.from(samples.z) };
+export function lineOf(samples: Pick<SpatialSamples, "x" | "y" | "z">): SpaceLine {
+  return {
+    xs: Float64Array.from(samples.x),
+    ys: Float64Array.from(samples.y),
+    zs: Float64Array.from(samples.z),
+  };
 }
 
-/** `sampleCable`'s interleaved `x, z` pairs, split into the two arrays a path generator wants. */
-function polyline(interleaved: Float64Array): Polyline {
+/**
+ * `sampleCable`'s interleaved `x, z` pairs, split into the arrays a path generator wants: a plane
+ * line, every `y` nil.
+ */
+function planeLine(interleaved: Float64Array): SpaceLine {
   const count = interleaved.length / 2;
   const xs = new Float64Array(count);
   const zs = new Float64Array(count);
@@ -803,5 +860,5 @@ function polyline(interleaved: Float64Array): Polyline {
     xs[i] = interleaved[2 * i];
     zs[i] = interleaved[2 * i + 1];
   }
-  return { xs, zs };
+  return { xs, ys: new Float64Array(count), zs };
 }

@@ -167,7 +167,8 @@ export type TensioningDevice = "pulley" | "maestro-s" | "maestro-l";
  * kept as given and not applied (`windBearing`). `ws` / `wd` in a link, **both absent for no wind**.
  * Applied — a speed and a bearing — the statics read it (§19, #127): the line and the static passager
  * leave the vertical plane, and the tensions, the garde and the Verdict are those of the line it
- * poses; the passager's ride descends that line's locus (§19.15), and the Banane still draws it.
+ * poses; the passager's ride descends that line's locus (§19.15), and every view projects the
+ * lines it computes (§19.11, #118).
  *
  * Its **profile** (#120) says how that speed varies along the line — `docs/simulation-theory.md`
  * §8.4: a scenario the user prescribes, never a valley forecast. `speedKmh` is then the speed at

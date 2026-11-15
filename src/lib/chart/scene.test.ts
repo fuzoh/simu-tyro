@@ -13,7 +13,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { Scenario, ScenarioDraft } from "@/lib/scenario/types.ts";
-import type { SweepResult, SweepStep } from "@/lib/sim";
+import type { SpatialSweepResult, SpatialStep } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
 import { formatQuantity } from "@/lib/format/quantity.ts";
@@ -21,7 +21,7 @@ import { exaggeration, PLOT_ASPECT_BAND, PROFILE_ASPECT, VE_BAND } from "@/lib/l
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "@/lib/scenario/first-run.ts";
 import { sweepRiderOf } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
-import { CLEARANCE, evaluateClearance } from "@/lib/sim";
+import { CLEARANCE, evaluateClearance, sampleSpatial, zGroundAt } from "@/lib/sim";
 
 import {
   anchorZoneBands,
@@ -31,7 +31,7 @@ import {
   placeRider,
   polylineAt,
   snapToStep,
-  trajectoryRuns,
+  trajectoryLines,
 } from "./scene.ts";
 
 /** A scene that must exist — the `null` arm is « Aucun résultat », and these cases are not it. */
@@ -158,8 +158,9 @@ describe("the first-run scene — § 9's opening screen, drawn", () => {
 
   it("regenerates both polylines rather than storing one on a result", () => {
     // « No polyline is ever stored in a result object » — the cable is `sampleCable(state, n)` at
-    // render time, and the `SpanState` the engine returned carries no such field.
-    expect(first.rider.cable.xs.length).toBe(first.unloadedCable.xs.length);
+    // render time, and the `SpanState` the engine returned carries no such field. The loaded line
+    // holds one vertex more: the trolley's node, which §4.1's even samples miss mid-span.
+    expect(first.rider.cable.xs.length).toBe(first.unloadedCable.xs.length + 1);
     expect(Object.keys(first.unloaded)).not.toContain("polyline");
     // The loaded line hangs below the unloaded one at mid-span — the toggle's whole point.
     const mid = Math.floor(first.rider.cable.zs.length / 2);
@@ -750,34 +751,22 @@ describe("the load against the unloaded line, and its trajectory — the 2026-09
     const [run] = base.trajectory;
     expect(Array.from(run.xs)).toEqual(base.traverse.steps.map((step) => step.xD));
     expect(Array.from(run.zs)).toEqual(base.traverse.steps.map((step) => step.zD));
+    // Without wind the lieu du chariot stays in the plane of A–B (§19.16).
+    expect(run.ys.every((y) => y === 0)).toBe(true);
   });
 
   it("the trajectory breaks at an Indéterminé gap instead of bridging it", () => {
-    const step = (xD: number): SweepStep => ({
-      sD: xD,
-      xD,
-      zD: -xD / 10,
-      H: 1,
-      V0: 0,
-      TA: 1,
-      TB: 1,
-      theta: 0,
-    });
-    const failure = (index: number) => ({
-      index,
-      sD: index,
-      error: { kind: "no-convergence" as const, attempts: 3, residual: 1 },
-    });
-    // Six grid steps, 2 and 4 failed: a run of two, then two lone steps with no line to draw.
-    const traverse: SweepResult = {
-      grid: Float64Array.from([0, 1, 2, 3, 4, 5]),
-      steps: [step(0), step(1), step(3), step(5)],
-      failures: [failure(2), failure(4)],
-      coverage: 4 / 6,
-    };
-    const runs = trajectoryRuns(traverse);
-    expect(runs).toHaveLength(1);
+    const slot = (x: number) => ({ rD: { x, y: x / 100, z: -x / 10 } }) as SpatialStep;
+    // Seven grid positions, 2 and 5 holes: a run of two, a run of two, then a lone slot with no
+    // line to draw.
+    const slots = [slot(0), slot(1), null, slot(3), slot(4), null, slot(6)];
+    const runs = trajectoryLines({ slots } as Pick<SpatialSweepResult, "slots">);
+    expect(runs).toHaveLength(2);
     expect(Array.from(runs[0].xs)).toEqual([0, 1]);
+    expect(Array.from(runs[1].xs)).toEqual([3, 4]);
+    // Each vertex is its slot's `r_D`, `y` included.
+    expect(Array.from(runs[1].ys)).toEqual([0.03, 0.04]);
+    expect(Array.from(runs[1].zs)).toEqual([-0.3, -0.4]);
   });
 
   it("polylineAt interpolates between vertices and holds the ends", () => {
@@ -1010,3 +999,74 @@ function riderContact(): Scenario {
     tightness: { mode: "sag", D_target: 6 },
   };
 }
+
+describe("the coordinates every view projects (#118, §19.11)", () => {
+  // The shipped line laid on two Positions due east of one another, under 40 km/h from the south:
+  // across the travel from its right, so the line goes to its left, `y > 0`.
+  const placed: Scenario = {
+    ...firstRunDefaults(),
+    positions: { A: { lat: 46.95, lon: 7.44 }, B: { lat: 46.95, lon: 7.442 } },
+  };
+  const windy: Scenario = { ...placed, wind: { ...placed.wind, speedKmh: 40, directionDeg: 180 } };
+  const built = baseOf(windy);
+  if (built === null) throw new Error("the windy line solves");
+  const base = built;
+
+  it("without wind every line of the scene lies in the plane of A–B", () => {
+    expect(first.unloadedCable.ys.every((y) => y === 0)).toBe(true);
+    expect(first.rider.cable.ys.every((y) => y === 0)).toBe(true);
+    expect(first.rider.yD).toBe(0);
+  });
+
+  it("the loaded line holds the trolley's node as a vertex, with and without wind", () => {
+    for (const rider of [first.rider, placeRider(base, 75)]) {
+      if (rider === null) throw new Error("a loaded line at 75 m");
+      const { cable, step, yD } = rider;
+      const vertex = Array.from(cable.xs).findIndex(
+        (x, i) => x === step.xD && cable.zs[i] === step.zD && cable.ys[i] === yD,
+      );
+      expect(vertex).toBeGreaterThan(0);
+    }
+  });
+
+  it("under wind the unloaded line is §19.8's own nodes, y included", () => {
+    const samples = sampleSpatial(base.unloaded);
+    expect(Array.from(base.unloadedCable.xs)).toEqual(Array.from(samples.x));
+    expect(Array.from(base.unloadedCable.ys)).toEqual(Array.from(samples.y));
+    expect(Array.from(base.unloadedCable.zs)).toEqual(Array.from(samples.z));
+    expect(Math.max(...base.unloadedCable.ys)).toBeGreaterThan(0.01);
+  });
+
+  it("under wind the trajectory is the slots' trolley nodes r_D, in grid order", () => {
+    const nodes = base.spatial.slots.flatMap((slot) => (slot === null ? [] : [slot.rD]));
+    expect(base.trajectory).toHaveLength(1);
+    const [run] = base.trajectory;
+    expect(Array.from(run.xs)).toEqual(nodes.map((rD) => rD.x));
+    expect(Array.from(run.ys)).toEqual(nodes.map((rD) => rD.y));
+    expect(Array.from(run.zs)).toEqual(nodes.map((rD) => rD.z));
+  });
+
+  it("the garde under the displaced trolley reads the profil at its own x: the terrain is extruded", () => {
+    // §19.13: z_terrain(x, y) = z_profil(x) — the trolley's `y` moves nothing on the ground.
+    const rider = placeRider(base, 75);
+    if (rider === null) throw new Error("a loaded line at 75 m");
+    expect(rider.yD).toBeGreaterThan(0.01);
+    const { xD, zD } = rider.step;
+    expect(rider.underRider).toBe(zD - zGroundAt(base.terrain, xD) - base.hRider);
+  });
+
+  it("a position falling toward a hole has no loaded line, and the trajectory splits there", () => {
+    // A hole injected at the slot nearest 75 m: the cursor there selects no neighbour in its place.
+    const k = base.spatial.slots.findIndex((slot) => slot !== null && slot.rD.x >= 75);
+    const slots = base.spatial.slots.map((slot, i) => (i === k ? null : slot));
+    const holed = { ...base, spatial: { ...base.spatial, slots } };
+    const hole = base.spatial.slots[k]?.rD.x ?? Number.NaN;
+    // Just past the solved slot before the hole, toward it.
+    const before = base.spatial.slots[k - 1]?.rD.x ?? Number.NaN;
+    expect(placeRider(holed, before + 0.25 * (hole - before))).toBeNull();
+    const runs = trajectoryLines(holed.spatial);
+    expect(runs).toHaveLength(2);
+    expect(runs[0].xs.at(-1)).toBe(before);
+    expect(runs[1].xs[0]).toBe(base.spatial.slots[k + 1]?.rD.x);
+  });
+});

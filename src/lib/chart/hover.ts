@@ -6,7 +6,7 @@
  *
  * The ground is read through the engine's own `zGroundAt`, so the number under the pointer is the
  * one the clearance scan used. The vue de dessus reads the same function at a distance it has
- * measured along the line: the Banane adds no measure of its own.
+ * measured along the line: the traces it draws beside it add no measure of their own.
  */
 
 import type { Polyline, SceneFrame, SceneRider } from "@/lib/chart/scene.ts";

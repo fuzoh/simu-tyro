@@ -289,8 +289,7 @@ de vent de dimensionnement de la norme reste payante : le simulateur ne juge que
 entière au milieu de la portée, plus faible aux deux ancrages. Deux réglages le fixent : la
 largeur à mi-atténuation (de 10 à 90 % de la portée) et l'atténuation aux ancrages (de 0 à
 100 %). C'est un scénario que l'on prescrit, pas une prévision du vent dans la vallée. **Il n'est
-pas encore proposé** : la Banane et la lecture de la rose prennent une seule vitesse pour toute la
-ligne. Le simulateur n'accepte donc que le **vent uniforme** (atténuation à 0 %) : il ne
+pas encore proposé** : la lecture de la rose prend une seule vitesse pour toute la ligne. Le simulateur n'accepte donc que le **vent uniforme** (atténuation à 0 %) : il ne
 propose pas encore ces deux réglages, et un lien qui porte un profil non uniforme est refusé —
 avec la commande « Passer au vent uniforme » pour le corriger — plutôt que calculé comme un vent
 uniforme.

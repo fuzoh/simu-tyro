@@ -346,7 +346,7 @@ describe("the vitesse d'arrivée under a ride value the app refuses", () => {
       value: "Aucune estimation — vitesse du vent invalide.",
       notes: [],
     });
-    // The rose and the Banane withhold the same Vent.
+    // The rose and the statics withhold the same Vent.
     expect(surfaces.windCause).toBe("Vent indisponible — vitesse du vent invalide.");
     expect(surfaces.occupant).toMatchObject({
       rank: 1,

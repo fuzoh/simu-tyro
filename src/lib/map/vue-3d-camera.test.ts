@@ -18,7 +18,6 @@ import { TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
 import type { Key } from "./vue-3d-camera.ts";
 import type { EarthPoint, FilAPlomb } from "./vue-3d.ts";
 
-import { bananePoint } from "./banane.ts";
 import { horizontalDistance } from "./measure.ts";
 import {
   CAMERA_STEP,
@@ -32,7 +31,7 @@ import {
   walkAmount,
   zoomAmount,
 } from "./vue-3d-camera.ts";
-import { CAMERA_REACH } from "./vue-3d.ts";
+import { CAMERA_REACH, earthFrame } from "./vue-3d.ts";
 
 const A = { lat: 46.84, lon: 6.52 };
 /** About 445 m due north of A. */
@@ -126,9 +125,11 @@ describe("the Vue du départ", () => {
     // (1 − M/N)·sin β·cos β ≈ 0,0016 rad, 0,09°.
     expect(Math.abs(headingDeg - (lineBearing(TRIAL_ENDS) ?? 0))).toBeLessThan(0.1);
     expect(horizontalDistance(destination, TRIAL_ENDS.A)).toBeCloseTo(4.5, 3);
-    // The Banane of a positive cross component bows to the left of the travel: the same side.
+    // A positive `y` of §19.2's frame — a line the wind blows to the left — stands on the same side.
     expect(side(TRIAL_ENDS, destination)).toBe(1);
-    expect(side(TRIAL_ENDS, bananePoint(TRIAL_ENDS, 0.5, 10))).toBe(1);
+    const onEarth = earthFrame({ ends: TRIAL_ENDS, L: 435.2, topA: 0 });
+    expect(side(TRIAL_ENDS, onEarth(217.6, 10, 0))).toBe(1);
+    expect(side(TRIAL_ENDS, onEarth(217.6, -10, 0))).toBe(-1);
   });
 });
 

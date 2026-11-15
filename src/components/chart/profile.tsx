@@ -33,12 +33,13 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 
 import { area, line } from "d3-shape";
 
-import type { ChartScene, Polyline, SceneFrame, SceneRider } from "@/lib/chart/scene.ts";
+import type { DrawnScene, Polyline, SceneFrame, SceneRider } from "@/lib/chart/scene.ts";
 import type { PixelLine } from "@/lib/chart/tip-placement.ts";
 import type { SharedX, ZScale } from "@/lib/layout/contract.ts";
 import type { LayerToggles } from "@/lib/session/session.ts";
 import type { Register } from "@/lib/vocabulary/labels.ts";
 
+import { NO_LOADED_LINE } from "@/lib/chart/copy.ts";
 import { coupeLines, coupeReading, RIDER_REACH_PX } from "@/lib/chart/hover.ts";
 import { polylineAt } from "@/lib/chart/scene.ts";
 import { placeTip, tipRows } from "@/lib/chart/tip-placement.ts";
@@ -90,9 +91,11 @@ export function Profile({
    * The solved half, or `null` for § 8's « Aucun résultat » — where « les entrées se dessinent
    * toujours » and the cable, the unloaded line, the danger bands, the dimension line and the
    * rider are **absent**. The plot stays a pointer surface: only the geometric exception takes
-   * that away, and it never reaches this component.
+   * that away, and it never reaches this component. Its `rider` is `null` where the chosen
+   * position has no loaded line (§19.11): the loaded line and what is read at the rider go, with
+   * {@link NO_LOADED_LINE} in their place, while the unloaded line and the trajectory stay.
    */
-  scene: ChartScene | null;
+  scene: DrawnScene | null;
   x: SharedX;
   z: ZScale;
   /** The plot area's top edge and height, SVG user units. */
@@ -280,8 +283,10 @@ export function Profile({
 
         {/* Everything below is the **solved** half. Under « Aucun résultat » it is absent — not
             dashed, not ghosted — while the terrain, the anchors and the bracket carry on: § 8 lists
-            the five layers that go, and they are exactly these. */}
-        {scene !== null && rider !== null && (
+            the five layers that go, and they are exactly these. Each trace has its own
+            availability (§19.11): the unloaded line and the trajectory are the line's, the loaded
+            line and the rider the chosen position's. */}
+        {scene !== null && (
           <>
             {layers.unloadedLine &&
               scene.members.map((member) => (
@@ -309,7 +314,25 @@ export function Profile({
                   strokeWidth={1.5}
                 />
               ))}
+          </>
+        )}
 
+        {/* No loaded line at the chosen position — under wind, a slot that did not converge: said
+            in words, never replaced by a neighbouring line, an interpolation or the plane model
+            (§19.11, Q24). */}
+        {scene !== null && rider === null && (
+          <text
+            className="fill-muted-foreground text-[10px]"
+            textAnchor="middle"
+            x={x.width / 2}
+            y={plot.top + 14}
+          >
+            {NO_LOADED_LINE}
+          </text>
+        )}
+
+        {scene !== null && rider !== null && (
+          <>
             {/* One path per Brin porteur: both are the same solve, so two are told apart by a
                 pixel shift alone — the gap is not a parameter and measures nothing (#4). */}
             {scene.members.map((member) => (

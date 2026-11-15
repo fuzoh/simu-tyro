@@ -659,8 +659,8 @@ export function RailInputs({
           />
         </Group>
 
-        {/* The Vent (#87): no statics, clearance or Verdict reads it — the ride (#89) and the
-              Banane do. The rose writes the same two fields from the vue de dessus. Its direction
+        {/* The Vent (#87): the statics (§19, #127) and the ride (#89) read it wherever it is
+              applied. The rose writes the same two fields from the vue de dessus. Its direction
               is geographic, so both rows are disabled while A or B is not on the map. */}
         <Group title={heading("wind", "exact")}>
           <NumericRow hint="km/h" id="windSpeed" />
