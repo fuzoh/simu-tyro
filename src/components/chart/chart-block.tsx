@@ -48,7 +48,7 @@ import {
 import { useAppDispatch, useAppState } from "@/components/app/store.tsx";
 import { probeMark, probeSpan } from "@/lib/app/probe.ts";
 import { NO_SPAN_LINE } from "@/lib/chart/copy.ts";
-import { placeRider, snapToStep } from "@/lib/chart/scene.ts";
+import { loadedLineHole, placeRider, snapToStep } from "@/lib/chart/scene.ts";
 import { roundToDisplay } from "@/lib/format/quantity.ts";
 import {
   CELL_WRAP_PX,
@@ -172,7 +172,11 @@ export function ChartBlock({
   const scene = useMemo<DrawnScene | null>(() => {
     if (solved === null) return null;
     const rider = probeSpan("coupe:rider", riderInput.xD, () => placeRider(solved, riderInput.xD));
-    return { ...solved, rider };
+    return {
+      ...solved,
+      rider,
+      hole: rider === null ? loadedLineHole(solved, riderInput.xD) : null,
+    };
   }, [solved, riderInput.xD]);
 
   // **The two empty-band paths end the transient too**, and for the same reason the `"off"` band

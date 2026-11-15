@@ -58,6 +58,7 @@ import type { Unloaded, UnloadedLine } from "@/lib/scenario/unloaded.ts";
 import type {
   ClearanceResult,
   DerivedMaterial,
+  SolveError,
   SpanInput,
   SpanState,
   SpatialSamples,
@@ -356,7 +357,18 @@ export type ChartScene = SceneBase & {
  * availability: the unloaded line and the trajectory stand without the rider, the loaded line and
  * everything read at the rider go.
  */
-export type DrawnScene = SceneBase & { readonly rider: SceneRider | null };
+export type DrawnScene = SceneBase & {
+  readonly rider: SceneRider | null;
+  /**
+   * Why {@link rider} is `null` under wind — the failure class of the slot the position falls
+   * toward ({@link loadedLineHole}) — so the words keep a configuration the model does not cover
+   * apart from a calculation that did not converge (Q24). Absent: did not converge.
+   */
+  readonly hole?: LoadedLineHole | null;
+};
+
+/** The failure class of a sweep's hole, as the coupe and the maps word it. */
+export type LoadedLineHole = SolveError["kind"];
 
 /**
  * The input half of the picture — the placement, the terrain and the shared x domain. **No
@@ -628,6 +640,44 @@ export function windySlot(
   base: Pick<SceneBase, "line" | "spatial" | "traverse">,
   xD: number,
 ): { step: SweepStep; gridIndex: number; solvedIndex: number; samples: SpatialSamples } | null {
+  const near = nearestSlot(base, xD);
+  if (near === null || near.hole !== null) return null;
+  const { best, bestSolved } = near;
+  const state = slotState(base.spatial, best);
+  const step = base.traverse.steps[bestSolved];
+  if (state === null || step === undefined) return null;
+  return { step, gridIndex: best, solvedIndex: bestSolved, samples: sampleSpatial(state) };
+}
+
+/**
+ * Under wind, why the passager at `x_D` has no loaded line: the failure class of the hole the
+ * position falls toward (`spatial.failures`), or `null` when there is a loaded line, no wind or no
+ * hole there. `outside-model` is a configuration the model does not cover, not a calculation that
+ * did not converge, and is worded apart (Q24).
+ */
+export function loadedLineHole(
+  base: Pick<SceneBase, "line" | "spatial">,
+  xD: number,
+): LoadedLineHole | null {
+  const near = nearestSlot(base, xD);
+  if (near === null) {
+    // No slot solved at all: the first failure says why.
+    return base.line.aero === null ? null : (base.spatial.failures[0]?.error.kind ?? null);
+  }
+  if (near.hole === null) return null;
+  const failure = base.spatial.failures.find(({ index }) => index === near.hole);
+  return failure?.error.kind ?? "no-convergence";
+}
+
+/**
+ * The solved slot nearest `x_D`, its index among the solved ones, and the grid index of the hole
+ * the position falls toward — past the nearest slot, on the side of one that did not converge —
+ * or `null` without wind or without a solved slot.
+ */
+function nearestSlot(
+  base: Pick<SceneBase, "line" | "spatial">,
+  xD: number,
+): { best: number; bestSolved: number; hole: number | null } | null {
   if (base.line.aero === null) return null;
   const { slots } = base.spatial;
   let best = -1;
@@ -648,11 +698,8 @@ export function windySlot(
   if (best < 0) return null;
   const at = slots[best]?.rD.x ?? Number.NaN;
   const toward = xD > at ? best + 1 : xD < at ? best - 1 : best;
-  if (toward >= 0 && toward < slots.length && slots[toward] === null) return null;
-  const state = slotState(base.spatial, best);
-  const step = base.traverse.steps[bestSolved];
-  if (state === null || step === undefined) return null;
-  return { step, gridIndex: best, solvedIndex: bestSolved, samples: sampleSpatial(state) };
+  const hole = toward >= 0 && toward < slots.length && slots[toward] === null ? toward : null;
+  return { best, bestSolved, hole };
 }
 
 /**

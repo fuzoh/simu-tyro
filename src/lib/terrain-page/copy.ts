@@ -14,6 +14,7 @@ import {
   COUPE_HOVER,
   LAYER_LABEL,
   NO_LOADED_LINE,
+  NO_LOADED_LINE_OUTSIDE,
   NO_SPAN_LINE,
   PEEK_LABEL,
 } from "@/lib/chart/copy.ts";
@@ -97,6 +98,7 @@ export function terrainLabelTable(): readonly string[] {
     peekBadgeLabel({ peek: "fit", autofit: 2.4 }),
     NO_SPAN_LINE,
     NO_LOADED_LINE,
+    NO_LOADED_LINE_OUTSIDE,
     DISMISS_LABEL,
     JUMP_LABEL,
     CHOOSE_REGIME_BY_REGISTER.terrain,

@@ -23,11 +23,13 @@ import { sweepRiderOf } from "@/lib/scenario/traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "@/lib/scenario/unloaded.ts";
 import { CLEARANCE, evaluateClearance, sampleSpatial, zGroundAt } from "@/lib/sim";
 
+import { NO_LOADED_LINE, NO_LOADED_LINE_OUTSIDE, noLoadedLine } from "./copy.ts";
 import {
   anchorZoneBands,
   buildScene,
   buildSceneBase,
   buildSceneFrame,
+  loadedLineHole,
   placeRider,
   polylineAt,
   snapToStep,
@@ -1068,5 +1070,32 @@ describe("the coordinates every view projects (#118, §19.11)", () => {
     expect(runs).toHaveLength(2);
     expect(runs[0].xs.at(-1)).toBe(before);
     expect(runs[1].xs[0]).toBe(base.spatial.slots[k + 1]?.rD.x);
+  });
+
+  it("names the hole's failure class: outside the model is not a non-convergence (Q24)", () => {
+    const k = base.spatial.slots.findIndex((slot) => slot !== null && slot.rD.x >= 75);
+    const slots = base.spatial.slots.map((slot, i) => (i === k ? null : slot));
+    const sD = base.spatial.grid[k];
+    const holedWith = (error: SpatialSweepResult["failures"][number]["error"]) => ({
+      ...base,
+      spatial: { ...base.spatial, slots, failures: [{ index: k, sD, error }] },
+    });
+    const hole = base.spatial.slots[k]?.rD.x ?? Number.NaN;
+    const before = base.spatial.slots[k - 1]?.rD.x ?? Number.NaN;
+    const xD = before + 0.25 * (hole - before);
+    const outside = holedWith({ kind: "outside-model", reason: "wind-abscissa", x: 151 });
+    const stalled = holedWith({
+      kind: "no-convergence",
+      attempts: 5,
+      residual: 1,
+      reason: "attempts",
+    });
+    expect(loadedLineHole(outside, xD)).toBe("outside-model");
+    expect(noLoadedLine(loadedLineHole(outside, xD))).toBe(NO_LOADED_LINE_OUTSIDE);
+    expect(loadedLineHole(stalled, xD)).toBe("no-convergence");
+    expect(noLoadedLine(loadedLineHole(stalled, xD))).toBe(NO_LOADED_LINE);
+    // Where the position has its loaded line, there is no hole to name.
+    expect(loadedLineHole(outside, 30)).toBeNull();
+    expect(NO_LOADED_LINE_OUTSIDE).not.toMatch(/converg/);
   });
 });

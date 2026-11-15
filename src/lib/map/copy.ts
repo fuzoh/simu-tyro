@@ -8,6 +8,7 @@
 import type { Positions, Wind } from "@/lib/scenario/types.ts";
 import type { RideEnd } from "@/lib/sim";
 
+import { NO_LOADED_LINE, NO_LOADED_LINE_OUTSIDE } from "@/lib/chart/copy.ts";
 import { RIDE_LABEL } from "@/lib/dynamique/copy.ts";
 import { formatAtX, formatQuantity, formatValue } from "@/lib/format/quantity.ts";
 import { WIND_UNPLACED } from "@/lib/rail/gates.ts";
@@ -430,6 +431,9 @@ export function mapLabelTable(): readonly string[] {
     ...Object.values(MEASURE_COPY),
     WIND_UNPLACED.reason,
     WIND_UNPLACED.notice,
+    // Under either view where the passager's position has no loaded line (`loadedLineCaption`).
+    NO_LOADED_LINE,
+    NO_LOADED_LINE_OUTSIDE,
     ...[0, 90, 180, 270, 45, 108].map(describeRelative),
     ...new Set([...FONDS.map(fondAttribution), ...FONDS.map(drapedAttribution)]),
     ...(["A", "B"] as const).flatMap((anchor) => [

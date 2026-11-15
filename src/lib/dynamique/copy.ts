@@ -227,6 +227,8 @@ export function dynamiqueLabelTable(): readonly string[] {
     SWING_UNSETTLED,
     COINCIDE_NOTE,
     INCOMPLETE,
+    CALM_UNAVAILABLE,
+    CALM_UNAVAILABLE_NOTE,
     ...Object.values(CURVE_CAPTION),
     ...Object.values(CHART_TITLE),
     ...Object.values(HOVER_LABEL),

@@ -39,7 +39,7 @@ import type { SharedX, ZScale } from "@/lib/layout/contract.ts";
 import type { LayerToggles } from "@/lib/session/session.ts";
 import type { Register } from "@/lib/vocabulary/labels.ts";
 
-import { NO_LOADED_LINE } from "@/lib/chart/copy.ts";
+import { noLoadedLine } from "@/lib/chart/copy.ts";
 import { coupeLines, coupeReading, RIDER_REACH_PX } from "@/lib/chart/hover.ts";
 import { polylineAt } from "@/lib/chart/scene.ts";
 import { placeTip, tipRows } from "@/lib/chart/tip-placement.ts";
@@ -93,7 +93,7 @@ export function Profile({
    * rider are **absent**. The plot stays a pointer surface: only the geometric exception takes
    * that away, and it never reaches this component. Its `rider` is `null` where the chosen
    * position has no loaded line (§19.11): the loaded line and what is read at the rider go, with
-   * {@link NO_LOADED_LINE} in their place, while the unloaded line and the trajectory stay.
+   * `noLoadedLine(scene.hole)` in their place, while the unloaded line and the trajectory stay.
    */
   scene: DrawnScene | null;
   x: SharedX;
@@ -327,7 +327,7 @@ export function Profile({
             x={x.width / 2}
             y={plot.top + 14}
           >
-            {NO_LOADED_LINE}
+            {noLoadedLine(scene.hole)}
           </text>
         )}
 
