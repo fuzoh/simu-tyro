@@ -110,6 +110,8 @@ describe("§19 — a Vent the statics read and the gates refuse takes the static
   test.each<[string, (draft: ScenarioDraft) => void]>([
     ["an attenuation outside its domain", (draft) => void (draft.wind.attenuationPct = 140)],
     ["a negative ρ", (draft) => void (draft.dynamics.rho = -1)],
+    // §19.5: under wind `h_rider` sizes the rider's ellipsoid, so the statics read it.
+    ["a nil gabarit du passager", (draft) => void (draft.rider.hRider = 0)],
   ])("applied, %s removes tout l'aval", (_name, patch) => {
     expect(suppression({ report: windWith(true, patch), refusal: null })).toEqual({
       geometry: false,
@@ -122,6 +124,16 @@ describe("§19 — a Vent the statics read and the gates refuse takes the static
   test("without Positions the Vent is not applied: a bad ρ leaves the statics standing", () => {
     const unplaced = windWith(false, (draft) => void (draft.dynamics.rho = -1));
     expect(suppression({ report: unplaced, refusal: null }).solve).toBe(false);
+  });
+
+  test("without an applied Vent a refused gabarit withholds the garde alone", () => {
+    const unplaced = windWith(false, (draft) => void (draft.rider.hRider = 0));
+    expect(suppression({ report: unplaced, refusal: null })).toEqual({
+      geometry: false,
+      solve: false,
+      clearance: true,
+      verdict: false,
+    });
   });
 
   test("a Ride breach that is not ρ leaves the statics standing under wind", () => {

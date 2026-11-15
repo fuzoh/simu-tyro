@@ -543,7 +543,8 @@ export const FIELDS = {
     quantity: "h_rider",
     rule: { kind: "positive", sentence: POSITIVE_HEIGHT },
     warning: null,
-    // It enters only `evaluateClearance`'s envelope.
+    // In still air it enters only `evaluateClearance`'s envelope. Under an applied Vent it also sizes
+    // the rider's ellipsoid (§19.5), and a breach then takes the statics down (`readsStatics`).
     gate: "clearance",
   },
   hClearMin: {

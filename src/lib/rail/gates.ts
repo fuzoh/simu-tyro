@@ -289,9 +289,10 @@ export function textileDiameterRequired(
 
 /**
  * Does a refused Vent take the statics down? Under §19 the statics read the Vent — its speed,
- * direction, profile and `ρ` — wherever it is applied ({@link GateReport.windApplied}), so a Vent
- * or an air the gates refuse cannot be stood in for by another: a Wind Gate breach, or a refused
- * `ρ`, then removes « tout l'aval » like a Solve breach. Without an applied Vent nothing of the
+ * direction, profile and `ρ` — and the passager's gabarit wherever it is applied
+ * ({@link GateReport.windApplied}), so a Vent, an air or a gabarit the gates refuse cannot be stood
+ * in for by another: a Wind Gate breach, or a refused `ρ` or `h_rider`, then removes « tout
+ * l'aval » like a Solve breach. Without an applied Vent nothing of the
  * statics reads either, and each breach keeps its own, narrower consequence.
  */
 export function windTakesStatics(
@@ -300,9 +301,14 @@ export function windTakesStatics(
   return report.windApplied && (!report.passed.wind || report.errors.some(readsStatics));
 }
 
-/** A breach that, under an applied Vent, stands on what the statics read beside the Vent: `ρ`. */
+/**
+ * A breach that, under an applied Vent, stands on what the statics read beside the Vent: `ρ`, and
+ * the passager's gabarit `h_rider`, which sizes the ellipsoid the wind pushes on (§19.5) — a
+ * Clearance-gate field in still air, where only the garde reads it. The other rider field the
+ * windy solve reads, the mass, is a Solve-gate field already.
+ */
 export function readsStatics(error: Pick<BlockingError, "gate" | "field">): boolean {
-  return error.gate === "wind" || error.field === "rho";
+  return error.gate === "wind" || error.field === "rho" || error.field === "hRider";
 }
 
 /** The two fields of the Vent's profile (#120), in rail order. */
