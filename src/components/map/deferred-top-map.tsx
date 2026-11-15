@@ -31,7 +31,7 @@ import { useAppState } from "@/components/app/store.tsx";
 import { MapOverCoupe, plainDrawing, TopViewFrame } from "@/components/statique/top-view.tsx";
 import { placeRider } from "@/lib/chart/scene.ts";
 import { profileCaption, windReading } from "@/lib/map/copy.ts";
-import { topTraces } from "@/lib/map/traces.ts";
+import { loadedLineCaption, topTraces } from "@/lib/map/traces.ts";
 import { vue3dLayers, vue3dPlacement } from "@/lib/map/vue-3d.ts";
 import { profilePreview, windControls } from "@/lib/map/wind-rose.ts";
 import { windBearing } from "@/lib/rail/gates.ts";
@@ -119,6 +119,7 @@ function Unavailable({
   // A withheld Vent is drawn as none, as the live map draws it.
   const wind = windCause === null ? scenario.wind : { ...scenario.wind, speedKmh: 0 };
   const bearing = windBearing({ positions });
+  const rider = solved === null ? null : placeRider(solved, scenario.rider.xD);
   const traces = topTraces({
     placement: vue3dPlacement(
       positions,
@@ -126,7 +127,7 @@ function Unavailable({
       scenario.geometry.source === "trace" ? trace : null,
     ),
     solved,
-    rider: solved === null ? null : placeRider(solved, scenario.rider.xD),
+    rider,
     layers: vue3dLayers(layers, { viewStrip: !locked }),
   });
   const plain = plainDrawing(positions, traces?.span ?? null);
@@ -143,6 +144,7 @@ function Unavailable({
     <TopViewFrame
       caption={
         <MapCaption
+          loaded={loadedLineCaption(solved, rider, scenario.rider.xD)}
           positions={positions}
           profile={preview === null ? null : profileCaption(preview)}
           unavailable

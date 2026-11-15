@@ -21,6 +21,8 @@ import { anchorReading, MAP_COPY } from "@/lib/map/copy.ts";
  *   offered.
  * @param unavailable « fond de carte indisponible » is said; `unoriented` adds why the plain drawing
  *   cannot say where north is.
+ * @param loaded why the passager's position has no loaded line (`loadedLineCaption`), or `null`
+ *   where there is one — said under either view, which then draws none.
  * @param vue3d the Vue 3D's own line, last.
  */
 export function MapCaption({
@@ -30,6 +32,7 @@ export function MapCaption({
   gesture,
   unavailable,
   unoriented,
+  loaded,
   vue3d,
 }: {
   positions: Positions;
@@ -38,6 +41,7 @@ export function MapCaption({
   gesture?: string | null;
   unavailable: boolean;
   unoriented: string | null;
+  loaded?: string | null;
   vue3d?: ReactNode;
 }) {
   return (
@@ -51,6 +55,7 @@ export function MapCaption({
       {profile != null && <span>{profile}</span>}
       {gesture !== undefined && <span>{gesture}</span>}
       {unavailable && <span>{[MAP_COPY.unavailable, unoriented].filter(Boolean).join(" · ")}</span>}
+      {loaded != null && <span>{loaded}</span>}
       {vue3d}
     </>
   );

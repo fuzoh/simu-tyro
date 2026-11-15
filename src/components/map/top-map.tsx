@@ -134,7 +134,7 @@ import {
   TRACES_SOURCE,
   tracesData,
 } from "@/lib/map/style.ts";
-import { type PlanTraces, topTraces } from "@/lib/map/traces.ts";
+import { loadedLineCaption, type PlanTraces, topTraces } from "@/lib/map/traces.ts";
 import { vue3dKeyCommand } from "@/lib/map/vue-3d-camera.ts";
 import {
   embarkBlock,
@@ -230,6 +230,7 @@ export function TopMap({
   // Without A and B there is none, and no Vent bows it — the gates' one check, `windBearing`.
   const bearing = windBearing({ positions: drawn });
   const placed = usePlacedRider(solved);
+  const noLoaded = loadedLineCaption(solved, placed, scenario.rider.xD);
   const scene3d = useVue3dScene(shows3d, frame, profil, solved, placed);
   const ride = rides?.windy ?? null;
   const ride3d = useVue3dRide(shows3d, frame, profil, ride);
@@ -343,6 +344,7 @@ export function TopMap({
       caption={
         <MapCaption
           gesture={gestureLine}
+          loaded={noLoaded}
           positions={drawn}
           profile={shows3d || preview === null ? null : profileCaption(preview)}
           unavailable={!shows3d && unavailable}

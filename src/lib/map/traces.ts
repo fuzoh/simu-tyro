@@ -21,6 +21,9 @@ import type { SceneBase, SceneRider, SpaceLine } from "@/lib/chart/scene.ts";
 import type { Position } from "@/lib/scenario/types.ts";
 import type { TraceEnds } from "@/lib/terrain/trace.ts";
 
+import { noLoadedLine } from "@/lib/chart/copy.ts";
+import { loadedLineHole } from "@/lib/chart/scene.ts";
+
 import type { Vue3dLayers } from "./vue-3d.ts";
 
 import { planFrame, type vue3dPlacement } from "./vue-3d.ts";
@@ -96,4 +99,21 @@ export function topTraces({
   if (!placement.ok) return null;
   const span = spanTraces(scene);
   return span === null ? null : { span, plan: planTraces(span, placement.placement.ends) };
+}
+
+/**
+ * The caption's line where the passager's position has no loaded line, which neither the vue de
+ * dessus nor the Vue 3D then draws: said in words, as the coupe says it — on the Page Terrain the
+ * coupe hides while the 3D is shown, and nothing else would (#118 « ligne chargée indisponible
+ * explicitement »). `null` when there is a loaded line, or no solved line at all.
+ *
+ * @param xD the Scenario's passager position, m — the one `rider` was placed at.
+ */
+export function loadedLineCaption(
+  solved: SceneBase | null,
+  rider: SceneRider | null,
+  xD: number,
+): string | null {
+  if (solved === null || rider !== null) return null;
+  return noLoadedLine(loadedLineHole(solved, xD));
 }

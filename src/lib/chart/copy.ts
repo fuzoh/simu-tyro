@@ -10,6 +10,8 @@ import type { LayerToggles } from "@/lib/session/session.ts";
 import { READ_OUT_SCOPE } from "@/lib/rail/cells.ts";
 import { heading, label } from "@/lib/vocabulary/labels.ts";
 
+import type { LoadedLineHole } from "./scene.ts";
+
 /**
  * § 8's own line for *l'exception géométrique*, centred in **both** empty plots — the one state
  * where there is no shared x domain, so nothing can be drawn against it and nothing can be pointed
@@ -24,6 +26,23 @@ export const NO_SPAN_LINE = "Portée invalide — aucun dessin possible.";
  * enough for the 390 px plot at its 10 px.
  */
 export const NO_LOADED_LINE = "Ligne chargée : le calcul n'a pas convergé à cette position.";
+
+/**
+ * The same place when the slot failed as `outside-model` — the line leaves the span the Vent is
+ * defined over: a configuration the model does not cover, not a calculation that did not converge
+ * (#127 « Distinguer configuration incompatible et non-convergence », Q24).
+ */
+export const NO_LOADED_LINE_OUTSIDE =
+  "Ligne chargée : à cette position la ligne sort de la portée où le vent est défini.";
+
+/**
+ * Why there is no loaded line at the chosen position, from the failure class of the slot it falls
+ * toward (`loadedLineHole`): {@link NO_LOADED_LINE_OUTSIDE} for `outside-model`, else
+ * {@link NO_LOADED_LINE}.
+ */
+export function noLoadedLine(hole: LoadedLineHole | null | undefined): string {
+  return hole === "outside-model" ? NO_LOADED_LINE_OUTSIDE : NO_LOADED_LINE;
+}
 
 /**
  * The peek control's two labels, per mode — § 5's « ×1 vraie échelle », and the **decision 4**

@@ -16,6 +16,7 @@ import {
   COUPE_HOVER,
   LAYER_LABEL,
   NO_LOADED_LINE,
+  NO_LOADED_LINE_OUTSIDE,
   NO_SPAN_LINE,
   PEEK_LABEL,
 } from "@/lib/chart/copy.ts";
@@ -178,6 +179,7 @@ export function statiqueLabelTable(): readonly string[] {
     peekBadgeLabel({ peek: "fit", autofit: 2.4 }),
     NO_SPAN_LINE,
     NO_LOADED_LINE,
+    NO_LOADED_LINE_OUTSIDE,
     DISMISS_LABEL,
     ...Object.values(PROFILE_IMPORT_COPY),
     traceName({ kind: "geoadmin" }),
