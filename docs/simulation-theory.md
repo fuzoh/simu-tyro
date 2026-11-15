@@ -438,8 +438,9 @@ selected safety regime (§10.1), with the combination formula exposed and labell
 ### 8.4 Wind
 
 Design wind speed and lateral corridor: `[PAYWALLED]` (§16). Drag on the cable itself and
-lateral blow-out are **out of scope for v1** (2-D vertical-plane model); record as open
-question, not silently ignored (§16).
+lateral blow-out were **out of scope for v1** (2-D vertical-plane model); §19 is the contract of
+the spatial statics that replaces that model under wind (#127): normal drag on the line, the
+rider's static wind force, the lateral offset in metres and the garde under wind.
 
 **Prescribed wind profile along the line** (issue #120). The entered wind may carry a _profile_:
 how its speed varies between the anchors. It is a **scenario the user prescribes, never a valley
@@ -1066,7 +1067,8 @@ MBL` / `≈ 31 @ 30 % MBL`, but a zip line is strength-sized for shock and rescu
 12. HMPE/PA thermal α magnitudes and creep-rate constants (confirm Vlasblom numbers)
     [§9.1, §9.2].
 13. Lateral wind model (blow-out corridor) — out of v1 scope, needed for EN compliance
-    view [§8.4]. Preparatory evidence and limits, without new coefficients:
+    view [§8.4]. §19 now computes the line's lateral offset under the Scenario's wind with adopted
+    conventions; the normative design wind and corridor stay `[PAYWALLED]`. Preparatory evidence and limits, without new coefficients:
     `docs/references/equilibre spatial vent.md` (2026-11-09; issues #127, #120, #118, #124).
     §18 is the contract of the isolated experiment that compares normal drag alone with an added
     lift and an added axial drag on the line (#134): sensitivity probes, no coefficient adopted.
@@ -1375,3 +1377,568 @@ sensitive to that coefficient at that size; that it does not says so for that si
 supports adopting a coefficient, omitting a force as negligible, or bounding an error on a real
 product: those need measurements the open sources do not provide, and a decision of the
 maintainer.
+
+---
+
+## 19. Spatial quasi-static statics under gravity and wind (#127)
+
+**Status.** The mathematical contract of the production spatial statics, written before its code
+as #127's first acceptance criterion requires. It extends §2–§7 and §11–§12 to a line that leaves
+the vertical plane of A–B under wind; without wind it **is** §4–§7, §11 and §12.2 (§19.16). It
+applies the maintainer's consolidated decisions on #127 (Q1–Q43, the « Agent Brief — moteur
+spatial » comment and the confirmation of the first delivery's scope), on #118 (projections,
+Q16, Q24, Q34) and on #141 (activation of §8.4's profile). Where an earlier note of
+`docs/references/spatial-wind/` proposes otherwise, those decisions prevail. Unlike §18 this is
+the engine, not an experiment: nothing here is read from `experiments/spatial-aero-134/`, whose
+prototype only showed that the method of §19.8 converges on its matrix.
+
+**What it does not claim.** The three aerodynamic numbers of §19.4–§19.5 are **conventions
+adopted by the maintainer** (#127 Q36, Q38, Q39, Q43): reproducible reference values, not product
+measurements, not conservative bounds, not validated. They carry no §0.2 trust tag and are not
+user-editable — #127 Q36 explicitly chose an internal documented value over a new input, which
+is the maintainer's exception to §0.2's binding rule for these three numbers. A numerical
+agreement in §19.17 validates the scheme, never the physics. No safety factor, no Verdict rule
+and no DAF changes here (§19.14).
+
+### 19.1 Scope
+
+- **Quasi-static equilibria, one-way coupling** (#127 §1). For each rider position the line is in
+  static equilibrium under its own weight, the wind on the line and, when loaded, the rider held
+  motionless at the trolley. The rider's weight and static wind force are transmitted whole to
+  the line — the holding is part of the idealisation, the trolley is not a free roller in
+  equilibrium. No line inertia, vibration, oscillation, sway, rotation of the rider (#124 stays
+  out). The descent speed never feeds back into a shape or a tension (§19.15).
+- **One wind for the whole Scenario** (#127 §2): the same field for the pose, every loaded
+  equilibrium and the descent. Horizontal, one direction, speed uniform or modulated by §8.4's
+  profile.
+- **One material law**: §4's constant `EA`, `λ = 1 + T/EA` (#127 §3, #133 out of scope). Steel and
+  textile keep their separate parameter chains.
+- **Line aerodynamics: normal drag alone** (#127 Q35 and the confirmation of the first delivery).
+  The extra lift and the axial drag of §18 are **omitted by decision, not because they are
+  negligible**; §18's sensitivity probes show they can move tensions and garde and supply no
+  coefficient. The vertical component of the projected normal drag is kept (§19.4).
+- **Out of scope**: wake between two members, contraction of the diameter under tension, gusts and
+  forecasts, the lanyard's and the pulley's own wind area (Q41), a rider lift or couple (Q42),
+  surveyed off-axis terrain and 3-D obstacle distances (Q16), a dynamic correction of the line's
+  energy (§19.15).
+
+### 19.2 Frame, coordinates and units
+
+§2's frame with a third axis, the one §18.2 and `windComponents` (`src/lib/sim/wind.ts`) already
+use (#127 brief « Forces et propriétés »; `docs/references/spatial-wind/agent-readiness-solver.md`
+§2):
+
+- `x` horizontal from A toward B, `z` up, **`y` horizontal to the left of the travel A → B**;
+  `(x, y, z)` is right-handed. `A = (0, 0, 0)`, `B = (L, 0, h)`.
+- `S ∈ [0, L₀]` is §2's unstretched material coordinate `s` from A, the sweep variable of §6.2.
+  The stretched arc `σ` is a reading, never an unknown.
+- `F(S)` is the internal force the `S⁺` side exerts on the `S⁻` side, `T = |F|` the tension, and
+  `t = F/T` the unit tangent of the stretched line, oriented from A to B.
+- The line pulls anchor A with `F(0)` and anchor B with `−F(L₀)`: those are the **reactions**.
+- The wind velocity is `u = (u_x, u_y, 0)`, the velocity of the air, pointing where the air goes.
+  At an abscissa `x` it is `windAt(field, x, L, bearing)` (`src/lib/sim/wind-profile.ts`, §8.4):
+  `u_x = along` (> 0 a tail wind), `u_y = across` (> 0 a wind from the right of the travel, which
+  pushes toward `+y`). The meteorological « from » azimuth is converted **once**, by
+  `windComponents`; no reader inverts it again.
+- The engine takes angles, never Positions (`docs/conventions/simulation.md`): the bearing A → B is
+  an input, read outside the engine.
+
+SI throughout: N, m, kg, m/s, kg/m³. Diameters typed in mm are converted to metres where the
+physics reads them. Two lengths per metre are kept apart: `w` and `q₀` are **per unstretched
+metre**, the aerodynamic `f_n` is **per stretched metre** (§19.4).
+
+Without wind, `y ≡ 0` and `F = (H, 0, V(S))` with §2's `V`: the signs are §2's, so §15's fixtures
+read unchanged.
+
+### 19.3 Material equilibrium, extension law and the trolley's jump
+
+On each piece between two point loads:
+
+```
+dF/dS = −q₀(S)
+dr/dS = λ·t = (1 + T/EA)·F/T
+```
+
+with `q₀` the distributed external load per unstretched metre (§19.4) and boundary conditions
+`r(0) = A`, `r(L₀) = B`. A rider held at the material point `S_P` applies the external force
+`P_ext` (§19.5–§19.6) there:
+
+```
+r(S_P⁺) = r(S_P⁻)                    (the node is shared)
+F(S_P⁺) − F(S_P⁻) = −P_ext           (node equilibrium)
+```
+
+With `P_ext = (0, 0, −P)` this is §6.1's `V(s) = V₀ + w·s + P·𝟙[s > s_P]`. A horizontal component
+of `P_ext` makes the matching component of `F` jump too, as §6.1's « H continuity caveat » already
+says; nothing imposes `T⁺ = T⁻` (§6.1, « Trolley ≠ pulley »). Global balance over the line:
+
+```
+F(L₀) − F(0) + ∫₀^L₀ q₀ dS + P_ext = 0
+r_B × F(L₀) + ∫₀^L₀ r × q₀ dS + r_P × P_ext = 0         (moments about A)
+```
+
+These two identities are not used to solve; they are oracles of §19.17.
+
+**Extension law** (#127 §3): `ε = T/EA`, `EA` constant, from the material chain of §13 —
+`deriveSteel` or `deriveTextile` — unchanged. It is the law the engine already codes, not a
+universal textile law (#127, « Recherche technique »). The aerodynamic diameter `d` is the
+declared one, **constant during a calculation**: no contraction under tension (#127 §3: omitted
+and documented, not claimed negligible).
+
+### 19.4 Loads on the line — self-weight and normal drag
+
+```
+q₀ = (0, 0, −w) + λ·f_n
+u_n = u − (u·t)·t
+f_n = ½·ρ·C_D⊥·d·|u_n|·u_n              N per stretched metre
+```
+
+- `w = μ·g`, per unstretched metre, as §2. With two members it is **not** divided (§19.6).
+- `f_n` is the normal drag on the declared diameter `d`, along the component of the wind normal to
+  the local tangent (#127 Q38). It is per metre of **stretched** line; an unstretched element
+  `dS` is `λ·dS` long once stretched, hence the factor `λ` in `q₀` (#127 brief: « conversion vers
+  longueur matérielle explicite »). `|u_n| = 0` gives `f_n = 0` without normalising a null vector.
+- `f_n` is generally **not horizontal**: on a line inclined in a wind that is not along it, `u_n`
+  has a vertical component and that component is kept (#127 Q35). It is the projection of the
+  normal drag, not the extra lift §19.1 omits.
+- `u` is read **at the `x` of each evaluation** — every integration stage of §19.8 — from
+  `windAt`, never as a mean over the span and never as one multiplier on a force (§8.4). The
+  field depends on `x` alone: not on `y`, not on `z`, not on `S`, and it does not move with the
+  deflected line (#127 §3).
+- `ρ` is the Scenario's air density, the same value §12.2's descent reads (`airDensityOf`:
+  the typed value, else §12.2's ISA at the profile's mean altitude, else 1.225 kg/m³). No second
+  density.
+
+| Constant | Value | Class | Source |
+| --- | --- | --- | --- |
+| `C_D⊥`, steel line | `1.2` | adopted convention | #127 Q36, Q38: reproducible cylinder reference, already §18.4's; not a measured 6×19 or IWRC value, not conservative |
+| `C_D⊥`, textile line | `1.2` | adopted convention | #127 Q38: same initial value, **a separate parameter** so the two can evolve apart |
+| `d`, steel | nominal diameter of the steel spec, mm → m | input | §13.1 |
+| `d`, textile | the optional `d` of the textile spec, mm → m | input, **required under wind** | #127 Q37, §19.11 |
+
+**Missing textile diameter** (#127 Q37). When the wind is applied (speed > 0 and a bearing) on a
+textile line whose `d` is absent, every result under wind is **unavailable**, with the diameter
+named as the field to complete. The engine never invents a diameter and never replaces `f_n` by
+zero; the plane line is not shown in its place. Without wind nothing reads `d` and today's
+behaviour stands.
+
+### 19.5 The static rider — ellipsoid, projected area and force
+
+The rider is a solid ellipsoid of fixed orientation, deduced from the existing vertical gabarit
+`h_rider` (§6.3) with no new input (#127 Q23, Q39, Q40):
+
+| Axis | Full dimension | Semi-axis | Direction |
+| --- | --- | --- | --- |
+| height | `0.80·h_rider` | `c = 0.40·h_rider` | vertical `z` |
+| width | `0.25·h_rider` | `b = 0.125·h_rider` | transverse `y` |
+| depth | `0.15·h_rider` | `a = 0.075·h_rider` | along A–B, `x` |
+
+Its bottom is `h_rider` below the trolley, its top `0.20·h_rider` below it, its centre
+`0.60·h_rider` below it, on the trolley's vertical — no lateral offset from the trolley, no sway,
+no rotation (Q40). For `h_rider = 2.10 m`: 1.68 × 0.525 × 0.315 m, centre 1.26 m below the trolley.
+These proportions are an **adopted silhouette convention**, not anthropometry and not an inference
+from the gabarit, which also holds the pulley and the lanyard (Q39). The whole gabarit is still
+what §11 subtracts for the garde (§19.13).
+
+**Projected area.** The area of the ellipsoid's shadow on a plane of unit normal
+`n = (n_x, n_y, n_z)` is `A(n) = π·√(b²c²·n_x² + a²c²·n_y² + a²b²·n_z²)`. The static wind is
+horizontal, `n = u/|u|`:
+
+- head or tail wind (`n = ±e_x`): `A = π·b·c`, the ellipse height × width (Q42);
+- side wind (`n = ±e_y`): `A = π·a·c`, the ellipse height × depth;
+- oblique: the formula, which is the geometric projection Q42 asks for.
+
+For `h_rider = 2.10 m`: `π·0.2625·0.84 = 0.6927 m²` face on, `π·0.1575·0.84 = 0.4156 m²` side on.
+Doubling `h_rider` multiplies every area by 4 (Q39).
+
+**Static force** (#127 Q42, Q43):
+
+```
+F_rider = ½·ρ·C_D·A(u/|u|)·|u|²·(u/|u|) = ½·ρ·C_D·π·c·√(b²·u_x² + a²·u_y²)·u
+```
+
+along the local horizontal wind, with `u = u(x_D)` read at the trolley's own abscissa (the centre
+is on the trolley's vertical and the field does not depend on `z`). The second form divides by no
+speed: `u = 0` gives `F_rider = 0`, with no direction to normalise. No lift, no couple, no own
+area for the lanyard and the pulley (Q41, Q42). The descent speed does not enter (Q12, §19.15).
+
+| Constant | Value | Class | Source |
+| --- | --- | --- | --- |
+| `C_D`, static rider | `1.0` | adopted convention | #127 Q43: reproducible reference on the projected area; **distinct** from the line's 1.2 and from §12.2's descent `C_dA` |
+| ellipsoid proportions | `0.80 / 0.25 / 0.15 · h_rider` | adopted convention | #127 Q39 |
+| placement | bottom at `h_rider`, centre at `0.60·h_rider` below the trolley | adopted convention | #127 Q40 |
+
+The rider's load on the whole line is `P_rider = (F_rider,x, F_rider,y, −m·g)`.
+
+### 19.6 Two identical carrying members
+
+§8.1's `[CONVENTION]` extended to the full rider vector (#127 §4, brief « Deux lignes porteuses
+identiques »): with `n_c` carrying members, assumed to share the same properties, `L₀`, mechanical
+geometry and exposure, **one** member is computed with
+
+```
+P_ext = P_rider / n_c          (half the weight **and** half the static wind force when n_c = 2)
+q₀    = §19.4's, whole          (its own weight and its own distributed wind, never divided)
+```
+
+No wake, no aerodynamic interaction. The sharing is **assumed**: not established by measurement,
+not presented as conservative (§8.1's field trial already saw the lower line carry more than half).
+The existing « one member carries all » case is kept separately: the same member under the whole
+`P_rider`, tensions only, never read by the Verdict. A non-symmetric case is never disguised as
+50/50. The tension de pose is per member (§19.7).
+
+### 19.7 Installation and the five tightness drivers
+
+**One installation, one wind** (#127 §2, brief « Installation et cinq pilotes »). The line is
+posed without the rider under the Scenario's wind, then locked: no slipping, no force regulation.
+A driver resolves the unstretched length `L₀` **once, under that wind**; that `L₀` is kept for
+every loaded equilibrium (§19.12) and every view. Changing the wind describes a new installation:
+with any driver but `L₀`, `L₀` is resolved afresh. `L₀` and a tension are never imposed together.
+Each driver below is read on the **unloaded** spatial line under the Scenario's wind, at the
+**tensioning anchor** `K ∈ {A, B}` (§7, #85) where an anchor is involved:
+
+| Driver | Quantity held at the target | Without wind |
+| --- | --- | --- |
+| Longueur non tendue | `L₀` itself — the fixed input | §7 mode 1 |
+| Tension de pose | `T_K = \|F(0)\|` (K = A) or `\|F(L₀)\|` (K = B): the total tension a dynamometer reads, **per carrying member** | §7's anchor target |
+| Tension horizontale `H` | `H_K = F_x(0)` (K = A) or `F_x(L₀)` (K = B): the component **along the horizontal A–B axis** (#127 Q31) | §7's `H_target` |
+| Flèche à vide | `D = max over the line of (h·x/L − z)`, the greatest **vertical** drop below A–B, never negative (#127 Q30) | §7's `D_target` |
+| Rapport V | `P/H` with §19's `H_K` — mapped to an `H` target outside the engine, the current sharing convention unchanged (#127 Q32) | today's mapping |
+
+- `H_K` is **not** the horizontal norm `√(F_x² + F_y²)` and not the total tension; it is not
+  constant along a line under a horizontal distributed load and nothing assumes it is. Both
+  readings are positive on a usual line whichever side is tensioned: at A the line pulls A toward
+  B (`F_x(0) > 0`), at B it pulls B toward A (reaction `−F(L₀)`, so `F_x(L₀) > 0`).
+- The flèche ignores `y`. The lateral reading is separate (§19.11): the greatest `|y|`, signed,
+  and the **écart maximal à A–B**, `max over x of √((h·x/L − z)² + y²)`, combined at each abscissa
+  then maximised (#127 Q10, Q30) — never two maxima taken at different abscissae combined.
+- A **lifted** line (drop ≤ 0 everywhere, possible under a drag with an upward component) reads
+  `D = 0` and reports its rise above A–B beside it. `D = 0` means « no downward drop », not « the
+  line lies on A–B ».
+- The tension de pose read back is shown whatever the driver (#127 Q33's withdrawal: the user
+  wants to know how to tension, not to know `L₀`). The `L₀` driver remains available and is never
+  imposed as a fallback.
+
+The inversion method and its uniqueness checks are §19.10.
+
+### 19.8 Numerical method
+
+**Choice: shooting from A on the anchor force.** The unknown is `F_A = F(0) ∈ ℝ³`. §19.3's
+system is integrated from `r(0) = A` to `S = L₀`; the residual is the anchor closure
+`R(F_A) = r(L₀) − B`, in metres — §5.3's quantity in three dimensions. Why this method:
+
+- the load depends on the unknown tangent (§19.4) and, under §8.4's profile, on the unknown `x`:
+  the frozen-load reduction to rotated plane catenaries is exact only for a prescribed constant
+  load vector (`agent-readiness-solver.md` §4.1) and would need an outer load iteration whose
+  converged residual must be checked by integration anyway;
+- three unknowns whatever the number of pieces, the trolley's jump applied in passing;
+- the readiness study's option 1 for tangent-dependent loads (`agent-readiness-solver.md` §4.2),
+  and the method the #134 prototype ran on its matrix without a failure on representative cases.
+
+**Integration.** Classical fourth-order Runge–Kutta in `S`, fixed step. The line is cut at the
+rider's node into pieces; each piece of unstretched length `ℓ_i` receives
+`N_i = max(2, 2·round(N·ℓ_i/(2·L₀)))` equal steps — even, so Simpson's rule applies to the
+controls — with **`N = 240`** by default (§19.9). At the node the jump `F⁺ = F⁻ − P_ext(x_D)` is
+applied, with `x_D = x(S_P)` the integrated abscissa of the node: the rider's wind is read where
+the trolley actually is. The wind is evaluated at the `x` of every RK4 stage.
+
+A trial shot is **refused, never clamped** (the line search then shortens the step) when:
+
+- `T` falls below `0.01·|w|` newtons at any stage — the number of §4.3's slack floor
+  (`SOLVER.slackStiffnessFactor`), now on the tension magnitude; no new coefficient;
+- a value is not finite;
+- under an applied wind, a stage's `x` leaves `[0, L]`, where §8.4's field has no value: the engine
+  does not extrapolate it.
+
+**Newton's method.** `R(F_A) = 0` by damped Newton:
+
+- **Jacobian** `J = ∂R/∂F_A` by central finite differences, step `δ = 10⁻⁶·max(|F_A|, 1 N)` per
+  component (a relative step near `ε_machine^(1/3)`, which balances the `O(δ²)` truncation and the
+  `O(ε/δ)` round-off of a central difference). Between two such evaluations, Broyden's rank-one
+  update of the last accepted `J`; a full finite-difference `J` is recomputed at the start of each
+  attempt and whenever a Broyden direction fails §5.1's line search. Along a sweep, the previous
+  position's last `J` is the next position's first. 3×3 linear solve with partial pivoting; a
+  singular `J` ends the attempt.
+- **Line search** §5.1: the step is halved until `‖R‖` decreases, at most 20 halvings
+  (`SOLVER.maxHalvings`); a refused shot counts as no decrease.
+- **Stop**: `‖R‖ ≤ tol(L)` (§19.9) accepts; at most 100 iterations per attempt and 5 attempts
+  (`SOLVER`'s values, unchanged).
+- **Seeds, in order** (continuation, then §5.2): (1) the caller's warm start — the previous sweep
+  position, or the nearest length already solved by the pose inversion; (2) the plane solution of
+  the same span under the weight alone and the vertical part of `P_ext`, `F_A = (H, 0, V₀)`, exact
+  without wind; (3) that seed with the lateral component `F_y = (∫ p_y dS + P_ext,y)/2` estimated
+  on the straight chord — the symmetric share of the lateral load; (4)–(5) §5.2's parabolic and
+  Peyrot–Goulois seeds lifted as `(H, 0, V₀)`. A seed that fails costs one attempt; it never
+  becomes an answer.
+
+**The plane case is the closed form.** When the aerodynamic load is identically nil — no wind
+applied (speed 0, or no bearing because a Position is missing) — `q₀ = (0, 0, −w)` and `P_ext` is
+vertical: §19.3 reduces exactly to §4.1 and §6.1, whose closed form **is** the solution. The engine
+then evaluates §4–§7 as today and reports it in §19.11's spatial result with `y ≡ 0`. This is not
+a fallback: a calculation under wind that fails is never answered by the closed form (Q24, §19.11).
+
+**Sampling is a function, not a stored polyline** (§2 of `src/lib/sim/types.ts`). A state stores
+`F_A` and its inputs; sampling the line re-runs the **same** deterministic shot (same `N`, same
+pieces), so the sampled nodes are bit-identical to the accepted solve. Between two nodes, a reading
+uses the cubic Hermite interpolant on `r` and `dr/dS = λ·t`, both known at the nodes — of the
+integrator's own order. Extrema (flèche, rise, lateral offset, écart, garde) are read on that
+interpolant; at the rider's node, a corner, on the node itself.
+
+### 19.9 Tolerances and resolution
+
+Fixed here, before any result is interpreted (#127 brief, acceptance « tolérances »):
+
+| Quantity | Bar | Why |
+| --- | --- | --- |
+| anchor closure `‖r(L₀) − B‖` | `tol(L) = 10⁻⁶ m` up to 1000 m of span, `10⁻⁶·L` beyond (`residualTolerance`) | §5.3's, extended to the 3-D norm; MoorPy's default |
+| closure of the pose inversion's inner solves | polished to `10⁻³·tol(L)` when Newton still decreases `‖R‖`, accepted at `tol(L)` | a length error `ε` reads `≈ EA·ε/L₀` in tension (§5.3): at `tol(L)` the driver would carry `≈ 0.05 N` of noise on a 150 m steel line, enough to fake a reversal (§19.10) |
+| refinement: `N` against `2N`, every length reported | `10⁻⁵ m`, ×`L/1000` beyond 1000 m | RK4 is of order 4, so the gap is 15/16 of the coarse error; a hundredth of a millimetre, two orders under the display's centimetre — §18.6's bar |
+| refinement: every force reported (each reaction as the norm of its vector gap) | `max(10⁻⁴ N, 10⁻⁹·T_max)` | §18.6's absolute bar, with a relative floor for long, heavily tensioned lines |
+| return to the plane engine, shot without wind against §4–§6 | `4×10⁻⁶` relative on the solved scalars | the solved-scalar tier of `docs/conventions/testing.md` |
+| global force balance, rider jump (controls, §19.17) | `10⁻⁶ N` | §18.6's; Simpson re-integration of `q₀` on the shot's nodes |
+| moment balance about A | `10⁻⁶ N·m` per metre of chord | §18.6's |
+| node continuity | `10⁻⁹ m` | the node is shared |
+
+**Resolution `N = 240`** is the default because §18's prototype met the refinement bars with it on
+spans of 50–435 m, and because the sweep already counts 240 steps (§6.2): the same order of
+cost per line. It is **held** only while the refinement bars pass on §19.17's matrix, which
+includes the longest bench span (1500 m); if a cell fails, `N` is raised and the bar is kept —
+never the reverse. A bar loose enough to make a varying result look flat is forbidden (#127,
+acceptance « ne pas masquer bruit de raffinement »). These are numerical bars; no product accuracy
+follows from them.
+
+**Cost.** One loaded position costs a few shots of `N` RK4 steps (warm start, Broyden). The cost
+of a representative windy sweep is measured on the bench cells and recorded with its resolution in
+`docs/performance/spatial-sweep.md`; the wind-free cells keep §5's closed form and their existing
+budget. Nothing is solved on a cursor move: the rider's position under wind is an index into the
+sweep (§19.12).
+
+### 19.10 Inverting the drivers, and uniqueness
+
+`L₀` is resolved from a target by §7's structure, every evaluation a spatial solve of the unloaded
+line under the Scenario's wind:
+
+1. **Floor.** §5.4's chord bound `L₀ > chord/(1 + strength/EA)` is geometric and does not depend on
+   the wind. The driver is read at the floor; a target beyond that reading is `invalid-input` in
+   the driving field, with **the spatial reading at the floor** as its bound — it changes with the
+   wind, and no wind-free bound is reused.
+2. **Seed and bracket.** The seed is the plane engine's `L₀` for the same target without wind
+   (§7). The bracket grows by doubling the slack from there, as `bracketL0` does, each solve warm
+   from the nearest solved length (continuation).
+3. **Root.** Illinois false position, safeguarded by bisection, to a relative bracket of
+   `10⁻¹⁰` on `L₀` — with §19.9's polished inner solves, the driver's numerical noise is then far
+   under the bracket's effect.
+4. **The tension de pose is not monotone.** As in §7, `T_K(L₀)` falls from the floor, bottoms out on
+   a very slack line and rises again: the search stays on the **taut branch**, from the floor to
+   the minimum located by golden section once a doubled slack reads higher than the step before;
+   a target under the minimum is unreachable (`no-convergence`, « Cible inatteignable »).
+
+**Uniqueness is checked, not assumed** (#127 Q33's clarification; the brief's acceptance on the
+five drivers). The monotonicity of `H` in `L₀` is proven only for vertical loads (§7) and is not
+extrapolated:
+
+- **At run time**, every driver reading taken while bracketing must move in the driver's expected
+  direction — `H_K` falling, `D` rising, `T_K` falling on the taut branch — beyond the driver's
+  noise band (`EA·10⁻³·tol(L)/L₀` for a tension, `10⁻⁵ m` for the flèche). A reversal outside that
+  band is **never resolved by picking a root**: the result is `no-convergence` with the diagnostic
+  « driver not monotone » (§19.11), and Q24 applies.
+- **In the tests**, the driver is scanned densely over `L₀` from the floor to `1.10·chord` on the
+  matrix of §19.17 — steel and textile, level and inclined, wind along, across and oblique, at
+  several speeds — and asserted monotone beyond its noise band; every target is round-tripped
+  direct → inverse. The `1.10·chord` window is a **test window, not an installation limit**: the
+  run-time inversion has no cap (no 10 % rule was adopted). A local round trip proves no global
+  uniqueness, and §18's prototype counters (`crossings`, `secondCrossing`) are not used as root
+  counts (`docs/references/spatial-wind/inversion-followup.md`). If a real reversal shows up in the
+  domain of use, it is reported to the maintainer, not arbitrated in code.
+- **Three situations kept apart** (brief, acceptance on the drivers): `H` against the total tension
+  (two drivers, two readings, never substituted); a flèche of zero on a lifted line against a
+  target of zero (`D = 0` is a floor of the reading, §19.7); an ill-conditioned rapport V — a
+  very small `H` target, where `L₀` moves much for little `H` — against an absent equilibrium. An
+  inner solve that fails is an absent equilibrium (its own error); a bracket that cannot shrink the
+  driver gap below the noise band is « unresolved », reported as such, never as flat.
+
+### 19.11 Result contract and unavailability
+
+**A spatial state** (`SpatialState`, one equilibrium) holds scalars and its echoed inputs, so that
+§19.8's sampling runs on the state alone:
+
+- the method: `closed-form` (§19.8's plane case) or `shooting`;
+- `L, h, L₀, w, EA`, the load (wind field, bearing, `ρ`, `d`, `C_D⊥`), the rider's `S_P`, `P_ext`
+  and the ellipsoid's semi-axes when loaded;
+- `F_A = F(0)` and `F_B = F(L₀)`; the reactions `F_A` on A and `−F_B` on B (N, three components);
+- `T_A = |F_A|`, `T_B = |F_B|`, `T_max` the greatest `|F|` over the nodes, both sides of the rider
+  included; `H_A = F_x(0)`, `H_B = F_x(L₀)`;
+- when loaded, the trolley node `r_D = (x_D, y_D, z_D)` and the two tensions `T⁻`, `T⁺` at it;
+- the closure reached and the iteration count.
+
+Sampling returns, per node, `S, x, y, z, T` (the rider's node twice, `S_P⁻` and `S_P⁺`). The
+unloaded line's readings: the flèche `D` and its `x`, the rise above A–B, the signed lateral
+offset of greatest `|y|` and its `x`, the écart maximal à A–B and its `x` (§19.7).
+
+**Status.** A solve returns either a state or a failure, as a value (`SolveResult`), never a throw
+mid-sweep. Two classes of failure, which the interface keeps distinct (#127 Q24):
+
+| Class | Kind | When | What it says |
+| --- | --- | --- | --- |
+| **incompatible configuration** | `invalid-input` | a non-finite or out-of-domain input, `L₀` under the floor, a target beyond the floor's reading, a textile `d` missing under wind | the configuration is outside what the model accepts, with the field and its bound |
+| | `outside-model` | the converged line, or every attempt, needs §8.4's wind outside `[0, L]` | the line leaves the span where the field is defined; the model does not extrapolate it |
+| **not converged** | `no-convergence` | attempts exhausted (closure reached, iterations, seeds), a driver not monotone, a target unreachable on the taut branch | the calculation did not converge **at this position**; it proves no physical impossibility |
+| | `slack-limit` | every attempt ends refusing on §19.8's tension floor | the line is too slack for the solver |
+
+No failure is replaced by an invented shape, an interpolation, a neighbouring position, or the
+plane model (Q24). A failed pose produces no `L₀`, hence no sweep and no descent — today's rule.
+
+**Projections, for the views** (#118). Every view projects the same coordinates and recomputes
+neither a force nor a shape: the coupe reads `(x, z)`, the vue de dessus `(x, y)`, the 3-D view
+places `(x, y, z)` on the earth by the A → B bearing — `x` along it, `y` to its left, `z` above
+anchor A's altitude — without geodesic interpolation between mechanical nodes. Node order is kept,
+including stretches where `x` decreases. Four traces, each with its own availability: the unloaded
+line, the loaded line at the chosen position (holding its trolley node), the trajectory (§19.12)
+and the straight A–B reference, which no calculation moves. The qualitative Banane is not a
+projection and does not survive the spatial results (#118).
+
+### 19.12 Sweep contract
+
+- The grid is §6.2's `sweepGrid` in `S_D`, unchanged (260 positions by default), on the `L₀` the
+  pose resolved under the Scenario's wind.
+- The march runs from A to B, each position warm-started from the last solved one (§19.8 seed 1).
+  A position that fails is retried once at the end of the march warm-started from the next solved
+  position (reverse continuation) — a full solve to the same bars, not an interpolation.
+- The result keeps **one slot per grid position, in grid order, holes included**: a solved slot
+  holds the position's state scalars (`S_D`, `r_D`, `F_A`, `T_A`, `T_B`, `T_max`, `T⁻`, `T⁺`,
+  `H_A`, `H_B`); a failed slot holds its failure (§19.11). Nothing is compacted
+  (brief, « sans compacter les trous »).
+- `coverage = solved slots / grid length`.
+- The **trajectory** — the lieu du chariot — is the sequence of solved `r_D` in grid order, split
+  into runs at every hole; no segment bridges a hole. It is the locus of successive trolley
+  positions, **not** the shape of one loaded line (#127 §1, #118).
+- Under wind, the rider's chosen position is a **slot of the sweep**: moving the cursor selects a
+  slot and samples its stored state (§19.8), it solves nothing. A hole selected shows no loaded
+  line (§19.11, Q24). Without wind the closed-form placement of §6.1 is unchanged.
+
+### 19.13 Clearance on the extruded terrain
+
+**Terrain** (#127 §5 and #118, Q16): the mechanical ground is §11's profile under A–B extruded
+sideways, `z_terrain(x, y) = z_profil(x)` — no cross-slope, not moved with the line. It is a
+**hypothesis**, not a measurement of the ground actually overflown; the 3-D relief drawn behind
+the scene is not the mechanical ground.
+
+§11's definitions are kept, with the spatial nodes:
+
+```
+h_clear(S; S_D) = z(S; S_D) − z_profil(x(S; S_D)) − h_rider
+h_min = min over solved S_D of  min over S of  h_clear(S; S_D)
+```
+
+read on the loaded line's nodes and its Hermite interpolant (§19.8), including at every terrain
+vertex `x_k` the line passes over. The rider's own garde is `z_D − z_profil(x_D) − h_rider`, at
+the displaced trolley, with the **whole gabarit** subtracted vertically (Q40: the ellipsoid lies
+within it). Rider Contact and Cable Contact keep §11's meaning. §11's Zones d'ancrage apply to
+`x(S)` and to `x_D`; since `x(S)` need not be monotone under wind, an edge `x = z` or `x = L − z`
+is evaluated at **every** crossing found between two nodes, not at the first. This is a vertical
+clearance on an extruded profile: no garde guaranteed on a side slope, no minimum distance to 3-D
+obstacles (#118).
+
+With holes, the minimum is over the solved positions only and is **not** established over the
+traverse (§19.14).
+
+### 19.14 Verdict
+
+The Verdict's rules, safety factors, DAF and departure majoration are **unchanged** (#127 brief,
+acceptance « aucun changement implicite »). It reads the spatial tensions — `T_A`, `T_B`, `T_max`
+per solved slot, and the unloaded `T_A`, `T_B` under wind as `T_vide` — and §19.13's garde.
+**A sweep with `coverage < 1` makes the Verdict indéterminé** (Q24): the maximal tension and the
+minimal garde are not established over the whole traverse. The solved positions stay readable.
+The words say that the calculation did not converge at those positions, never that the case
+cannot exist or is physically impossible.
+
+### 19.15 Descent on the trolley's locus
+
+§12.2's ride runs on the spatial locus (#127 brief « Descente et terrain »): the polyline A, the
+solved `r_D` in grid order, B; it requires `coverage = 1` — **no descent across a hole** (Q24). On
+each segment, `t` is the unit tangent of the locus, and along it:
+
+```
+m·dv/dt = −m·g·t_z − F_friction − F_drag,t
+v_rel,t = v − u(x)·t
+F_drag,t = ½·ρ·C_dA·v_rel,t·|v_rel,t|
+```
+
+- `u(x)` is §19.2's wind **read at the rider's current `x`** by `windAt`, not once per ride;
+  `t_z < 0` downhill. On a locus in the vertical plane (`t_y = 0`) this is §12.2's
+  `v_rel = v − u_∥·cos θ` exactly; with `t_y ≠ 0` the crosswind enters:
+  `v_rel,t − (v − u_x·t_x) = −u_y·t_y`. The « along = 0 hence calm » shortcut no longer holds.
+- `C_dA`, friction laws and their constants are §12.2's, unchanged — not the static ellipsoid's
+  `C_D`, not an isotropic `|u_rel|` law, no centrifugal term (#127 Q12). The steel law's normal
+  force is `N = m·g·√(t_x² + t_y²)`, §12.2's `m·g·cos θ` for the locus's inclination to the
+  horizontal.
+- §12.1's `v/c` reads `T = |F|` at the node (the upstream side), which is `H/cos θ` without wind.
+- The comparison « sans vent » is the same Scenario with its wind set to zero — pose, sweep and ride
+  — not the windy locus ridden in still air.
+
+**Energy limitation** (#127 §1). The ride runs on a locus frozen from successive static
+equilibria. It does not account for the gravitational and elastic exchanges with the deformable
+line; the reduction that would (`docs/references/spatial-wind/quasi-static-energy-review.md`) is
+valid only on the sweep's own equilibria and is **not** added to the equation — no silent
+correction. On a frozen locus without friction or drag the integrator conserves `½mv² + mgz`
+(§19.17). The descent stays an estimation (§12.2); no dynamic peak and no newly validated `v/c`
+threshold follow from it (#124 deferred).
+
+### 19.16 Return to the plane engine without wind
+
+Without wind applied — speed 0, or no bearing — every result is §4–§7, §11 and §12.2's, **bit for
+bit**: the closed form is evaluated (§19.8), `y ≡ 0`, `H_A = H_B = H`, `T_K` is §7's anchor
+tension, `D` is `unloadedSag`, the locus is §6.2's, the ride §12.2's with `u = 0`. §15's fixtures
+and the `[MEASURED]` app fixtures therefore hold unchanged. The shooting integrator, forced on the
+same cases with a nil wind, must agree with them within §19.9's solved-scalar tier: that is the
+check that §19.8's resolution is sufficient, not a second definition.
+
+### 19.17 Controls — oracles that do not come from the code under test
+
+Each control's expected value comes from a closed form, a §15 fixture or an invariant
+(`docs/conventions/testing.md`):
+
+1. **No-wind return**: shooting with a nil wind against F1, Z1–Z5 at `4×10⁻⁶` relative; the plane
+   path against §15 bit for bit.
+2. **Inextensible limit**: `EA → 10¹⁴` against `y = C·cosh(x/C)` in the plane of a constant load,
+   7 significant figures as §15.
+3. **Uniform load vector**: §15's Z1 (`w = 5`) with its load split into a vertical `w = 3` and a
+   constant lateral `p_y = 4` per unstretched metre, no aerodynamics (§18.6 control 6): the line
+   is Z1's catenary tilted by `atan(p_y/w)` about A–B — Z1's `T_A`, `T_max`, a flèche `0.6` and a
+   lateral offset `0.8` of Z1's sag, signed toward `+y`.
+4. **Weightless crossflow** (normal drag alone, level span, pure crosswind): `T` constant and, with
+   `p = ½·ρ·C_D⊥·d·U²`, `Σ = (1 + T/EA)·L₀`: `L = (2T/p)·asinh(p·Σ/(2T))`, lateral offset
+   `(T/p)·(√(1 + (p·Σ/(2T))²) − 1)`, at `10⁻⁸` relative.
+5. **Balances**: global force and moment balance, rider jump, node continuity at §19.9's bars, on
+   loaded inclined cases under oblique wind and a non-uniform profile.
+6. **Mirror**: `u_y → −u_y` gives `y → −y`, the same tensions, flèche and garde.
+7. **Two members**: the shared calculation equals a single member under `P_rider/2` with its whole
+   `q₀`; the « one carries all » case equals a single member under `P_rider`.
+8. **Rider area**: §19.5's face, side and 45° areas computed by hand; doubled `h_rider` ×4; nil wind
+   gives a nil force; a wind nearly along the line gives a force nearly along `x`.
+9. **Refinement**: `N` against `2N` on the bench cells under wind, §19.9's bars.
+10. **Drivers**: direct → inverse round trips on all five, the monotone scans of §19.10, `H_K`
+    distinct from `T_K` under crosswind, a lifted line reading `D = 0`.
+11. **Profile consumed**: a non-uniform profile gives a different line from the uniform wind of the
+    same mid-span speed, and the same line as a uniform wind when `a = 0`.
+12. **Descent**: on a vertical-plane locus §12.2 and Z8 are retrieved; with `t_y ≠ 0`,
+    `v_rel,t − (v − u_x·t_x) = −u_y·t_y`; without friction and drag `½mv² + mgz` is conserved.
+13. **Unavailability**: an injected non-convergence leaves a hole, `coverage < 1`, an indéterminé
+    Verdict and no ride; a textile line without `d` under wind is unavailable on `d`.
+
+Rare failure kinds are injected (`vi.mock`), not hunted, as `solve.test.ts` does.
+
+### 19.18 Limits
+
+- A quasi-static succession of equilibria: no vibration, gust, galloping, rider sway or dynamic
+  tension (#124).
+- Normal drag alone on the line; lift and axial drag omitted by decision (§19.1, §18).
+- Three adopted conventions (`C_D⊥ = 1.2` twice, `C_D = 1.0`, the ellipsoid of §19.5): reproducible,
+  not measured, not conservative.
+- Constant `EA`, constant diameter.
+- Two members share the rider's load 50/50 by assumption, without wake.
+- Extruded terrain: vertical garde only; no off-axis survey, no 3-D obstacle distance.
+- One-way descent on a frozen locus, energy exchanges with the line not accounted.
+- Numerical agreement with closed forms and §15 is a validation of the scheme, not an experimental
+  validation; the results are **not** presented as reliable for sizing beyond what §10's existing
+  framework already says.
