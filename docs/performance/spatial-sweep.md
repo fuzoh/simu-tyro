@@ -51,3 +51,18 @@ Not done in Step A, listed for the maintainer: a forward finite-difference Jacob
 | 150 km/h, tail | 685–691 ms | proposal |
 
 During development, the same call on the shipped 150 m line under 100–250 km/h tail winds took 0,6–1,1 s; from about 200 km/h of tail wind some trial heights leave holes (`outside-model`, § 19.8), which the search reads as a failed trial, never as a ride. No coarse sweep was added (plan, Step B). Under the plan's 1 s per target, except at the gale end; the lever is the sweep's cost (§ 3).
+
+## 5. A drag of the rose des vents (#141 review)
+
+**Date:** 15 November 2026. Same machine and runtime as § 1.
+
+The rose des vents and the profile pad write the Vent at every `pointermove` (#94, #120). Since the statics read the Vent (§19), each Vent re-poses the line under it and re-sweeps it. Measured with a scratch Vitest file (not committed): the shipped steel line, Positions due north, a crosswind of 30–39 km/h whose direction changes at every call as a drag changes it, `deriveUnloaded` then `buildSceneBase` (the windy pose, `sweepRider` and §19.13's clearance) timed together with `performance.now()`, one warm-up then 40 calls, three runs.
+
+| Brins porteurs | p50 | p95 |
+| --- | --: | --: |
+| 1 | 41,0–42,1 ms | 45,0–48,4 ms |
+| 2 | 66,1–67,3 ms | 80,1–80,6 ms |
+
+That is the work one `pointermove` of the drag ran on the main thread, before the rides, the Verdict and the paint. **Change:** `useUnloaded` (`src/components/app/use-unloaded.ts`) reads the Vent, the Positions and `ρ` through `useDeferredValue`. The handle and the fields follow the pointer in an urgent render where the unloaded line and the scene are memo hits; the line, the sweep and everything read off them are recomputed in a background render that React abandons when the next move arrives, so the statics catch up when the pointer slows or stops. The rose still writes the Scenario as the handle moves.
+
+**Not measured:** the gesture itself in a browser — frames, long tasks and latency from the `pointermove` to the redrawn line, as [`rider-drag.md`](rider-drag.md) measures a drag of the passager. `scripts/rider-drag.ts` drives the coupe's handle only; a rose gesture needs its own driver, which this change does not add.

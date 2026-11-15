@@ -596,6 +596,9 @@ the two scales are *deliberately mismatched*, which is the whole point (« v1 bu
   report and the `Résultats` hold through a scrub the same way: both key on `useTraverse()`
   (`src/components/app/use-traverse.ts`), the Scenario without `x_D` memoised on `traverseInputs`'
   fields, and tier one reads the form's text through `sameGatedText`, which ignores `x_D`'s.
+  The Vent, the Positions and `ρ` reach the unloaded line through `useDeferredValue`: under wind
+  they re-pose and re-sweep it, and a drag of the rose writes the Vent at every move
+  ([`spatial-sweep.md`](../performance/spatial-sweep.md) § 5).
 - `visx`'s low-level primitives are the **pre-approved fallback** if the hand-rolled path logic
   becomes unwieldy; it is not a new decision.
 
