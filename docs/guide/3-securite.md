@@ -288,11 +288,14 @@ de vent de dimensionnement de la norme reste payante : le simulateur ne juge que
 **Le profil du vent.** La référence décrit un vent dont la vitesse varie le long de la ligne :
 entière au milieu de la portée, plus faible aux deux ancrages. Deux réglages le fixent : la
 largeur à mi-atténuation (de 10 à 90 % de la portée) et l'atténuation aux ancrages (de 0 à
-100 %). C'est un scénario que l'on prescrit, pas une prévision du vent dans la vallée. **Il n'est
-pas encore proposé** : la lecture de la rose prend une seule vitesse pour toute la ligne. Le simulateur n'accepte donc que le **vent uniforme** (atténuation à 0 %) : il ne
-propose pas encore ces deux réglages, et un lien qui porte un profil non uniforme est refusé —
-avec la commande « Passer au vent uniforme » pour le corriger — plutôt que calculé comme un vent
-uniforme.
+100 %). C'est un scénario que l'on prescrit, pas une prévision du vent dans la vallée. Le calcul
+lit la vitesse **là où elle agit** : en chaque point de la ligne à vide et de la ligne chargée, à
+la position du passager pour sa poussée, puis tout au long de sa descente — jamais une vitesse
+moyenne sur la portée. Plus le vent est atténué aux ancrages, moins la ligne s'écarte de A–B. Les
+deux réglages se saisissent dans le rail, à côté de la vitesse et de la direction, ou sur la vue
+de dessus : le bouton « Profil du vent » ouvre un pavé dont la poignée règle la largeur (vers la
+droite) et l'atténuation (vers le haut), avec l'aperçu de la vitesse de A à B et la commande
+« Vent uniforme », qui remet l'atténuation à 0 % sans toucher au reste du vent.
 
 Référence : [§8.3](../simulation-theory.md#s-8-3), [§8.4](../simulation-theory.md#s-8-4),
 [§19](../simulation-theory.md#s-19).

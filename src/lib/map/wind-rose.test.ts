@@ -399,8 +399,8 @@ describe("which of the Vent's controls a vue de dessus offers (#120)", () => {
   const MAP = { culprits: [], placed: true, locked: false, measuring: false } as const;
   const BOTH = [false, true] as const;
 
-  test("as it ships: the rose's handle, and nothing of the profile", () => {
-    expect(windControls(MAP)).toEqual({ handle: true, pad: false, preview: false });
+  test("as it ships (#141): the rose's handle, the profile's pad and its readings", () => {
+    expect(windControls(MAP)).toEqual({ handle: true, pad: true, preview: true });
   });
 
   describe("the direction handle", () => {

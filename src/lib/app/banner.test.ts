@@ -462,11 +462,12 @@ describe("Statique prints no ride: a ride constant leaves its slot to the Verdic
     });
   });
 
-  test("a profile of the Vent no calculation reads is Statique's too, and the jump lands on it (#120)", () => {
+  test("a profile of the Vent no calculation reads is Statique's too, and the jump lands on it (#120, activation off)", () => {
     const report = evaluateGates({
       scenario: scenario((draft) => {
         draft.wind = { ...draft.wind, speedKmh: 30, widthPct: 30, attenuationPct: 40 };
       }),
+      windProfileActive: false,
     });
     expect(
       banner({
@@ -484,8 +485,11 @@ describe("Statique prints no ride: a ride constant leaves its slot to the Verdic
 });
 
 describe("what the Wind and Ride Gates withhold says why, where it would be read", () => {
-  const reportOf = (patch: (draft: ScenarioDraft) => void, register: "exact" | "terrain") =>
-    evaluateGates({ scenario: scenario(patch), register });
+  const reportOf = (
+    patch: (draft: ScenarioDraft) => void,
+    register: "exact" | "terrain",
+    windProfileActive?: boolean,
+  ) => evaluateGates({ scenario: scenario(patch), register, windProfileActive });
   const negativeWind = (draft: ScenarioDraft) => {
     draft.wind = { ...draft.wind, speedKmh: -60, directionDeg: 0 };
   };
@@ -525,14 +529,14 @@ describe("what the Wind and Ride Gates withhold says why, where it would be read
     expect(rideCause({ report: FIRST_RUN, refusal: REFUSAL })).toBeNull();
   });
 
-  describe("a profile of the Vent that is not uniform, while no calculation reads it (#120)", () => {
+  describe("a profile of the Vent that is not uniform, with the activation off (#120)", () => {
     const attenuated = (draft: ScenarioDraft) => {
       draft.wind = { ...draft.wind, speedKmh: 30, widthPct: 30, attenuationPct: 40 };
     };
 
     test("it withholds the Vent and, through it, the rides — in both registers' same words", () => {
       for (const register of ["exact", "terrain"] as const) {
-        const report = reportOf(attenuated, register);
+        const report = reportOf(attenuated, register, false);
         expect(windCause({ report, register })).toBe(
           "Vent indisponible — atténuation aux ancrages invalide.",
         );
@@ -546,6 +550,7 @@ describe("what the Wind and Ride Gates withhold says why, where it would be read
       const report = evaluateGates({
         scenario: scenario(attenuated),
         issues: [{ field: "windAttenuation", kind: "empty", message: "valeur requise" }],
+        windProfileActive: false,
       });
       const saisie = saisieEnCours(report, "windAttenuation", "40 %");
       expect(saisie).toBeNull();
@@ -563,6 +568,14 @@ describe("what the Wind and Ride Gates withhold says why, where it would be read
       }, "terrain");
       expect(windCause({ report, register: "terrain" })).toBeNull();
       expect(rideCause({ report, refusal: null, register: "terrain" })).toBeNull();
+    });
+
+    test("as the app ships (#141), the same profile is read and withholds nothing", () => {
+      for (const register of ["exact", "terrain"] as const) {
+        const report = reportOf(attenuated, register);
+        expect(windCause({ report, register })).toBeNull();
+        expect(rideCause({ report, refusal: null, register })).toBeNull();
+      }
     });
   });
 
@@ -594,9 +607,11 @@ describe("what the Wind and Ride Gates withhold says why, where it would be read
 
     test("a negative speed is the speed's, a profile no calculation reads its attenuation's", () => {
       expect(windCulprits({ report: reportOf(negativeWind, "terrain") })).toEqual(["windSpeed"]);
-      expect(windCulprits({ report: reportOf(attenuated, "terrain") })).toEqual([
+      expect(windCulprits({ report: reportOf(attenuated, "terrain", false) })).toEqual([
         "windAttenuation",
       ]);
+      // As the app ships (#141) the profile is read: nothing of the Vent is to blame.
+      expect(windCulprits({ report: reportOf(attenuated, "terrain") })).toEqual([]);
     });
 
     test("a width out of its domain is the width's, whether or not the profile is read", () => {
@@ -612,11 +627,15 @@ describe("what the Wind and Ride Gates withhold says why, where it would be read
     });
 
     test("every breach of the Vent is named, in the Rail's order — and no other gate's", () => {
-      const report = reportOf((draft) => {
-        draft.wind = { speedKmh: -60, directionDeg: 0, widthPct: 95, attenuationPct: 40 };
-        draft.dynamics = { ...draft.dynamics, CdA: -0.45 };
-        draft.geometry = { source: "manual", L: -5, h: -18 };
-      }, "exact");
+      const report = reportOf(
+        (draft) => {
+          draft.wind = { speedKmh: -60, directionDeg: 0, widthPct: 95, attenuationPct: 40 };
+          draft.dynamics = { ...draft.dynamics, CdA: -0.45 };
+          draft.geometry = { source: "manual", L: -5, h: -18 };
+        },
+        "exact",
+        false,
+      );
       expect(windCulprits({ report })).toEqual(["windSpeed", "windWidth", "windAttenuation"]);
     });
 
@@ -633,6 +652,7 @@ describe("what the Wind and Ride Gates withhold says why, where it would be read
       const profile = evaluateGates({
         scenario: scenario(attenuated),
         issues: [{ field: "windAttenuation", kind: "empty", message: "valeur requise" }],
+        windProfileActive: false,
       });
       expect(
         windCulprits({

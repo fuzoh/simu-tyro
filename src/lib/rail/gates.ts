@@ -45,12 +45,13 @@
  *   — rather than blowing the other way,
  *   and a negative `C_dA` withholds the ride rather than speeding it up. A Wind breach removes the
  *   ride too, since it reads the Vent.
- * - **A profile of the Vent no reader takes is refused, never read as a uniform wind** (#120). The
- *   rose's reading takes one speed for the whole line. Until the physics
- *   reads the field (`WIND_PROFILE_ACTIVE`), a profile that is not uniform — a link or a Session
- *   brought it — is kept as given and breaches the Wind Gate, with a Fix Action back to the uniform
- *   wind: what would have read the Vent is withheld rather than computed under another one. A
- *   percent outside its domain is refused in either state. And the Scenario's own breach outlasts
+ * - **A profile of the Vent no reader takes is refused, never read as a uniform wind** (#120). Every
+ *   reader takes the field since #141 (`WIND_PROFILE_ACTIVE` on): the statics, the passager's
+ *   equilibrium and the descent read `windAt` where they act (§19). With the switch turned off, a
+ *   profile that is not uniform — a link or a Session brought it — is kept as given and breaches
+ *   the Wind Gate, with a Fix Action back to the uniform wind: what would have read the Vent is
+ *   withheld rather than computed under another one. A percent outside its domain is refused in
+ *   either state. And the Scenario's own breach outlasts
  *   an emptied field: a profile field cleared over a refused value is not « Saisie en cours ».
  * - **§5.4's chord bound is not here.** `L₀ > chord/(1 + T_break/EA)` needs `EA` and `MBF`, so
  *   evaluating it would re-derive physics in the UI. It stays in the engine and surfaces as
@@ -357,8 +358,8 @@ export function isWindProfileFieldShown(
 }
 
 /**
- * The breach of a profile that is not uniform while no reader takes the field (#120), in § 7's
- * fixed template: the rule as a property of the world, and the value echoed in the field's unit.
+ * The breach of a profile that is not uniform while no reader takes the field (#120) — with the
+ * activation switch off, which #141 turned on — in § 7's fixed template: the rule as a property of the world, and the value echoed in the field's unit.
  */
 export function windProfileUnreadMessage(
   attenuation: number,

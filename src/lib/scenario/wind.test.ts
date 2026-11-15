@@ -25,11 +25,11 @@ import {
 const WIND: Wind = { speedKmh: 36, directionDeg: 264, widthPct: 30, attenuationPct: 40 };
 
 describe("the activation's boundary", () => {
-  test("the profile is not consumed by the physics yet: its activation is off", () => {
-    // Turning it on is the coordinated activation of #120 / #127 / #118, and nothing less: every
-    // reader of the Vent must take `windAt` first, and the profile's pad must fit the narrow maps
-    // (`WindProfilePad`'s note). This lock is the reminder.
-    expect(WIND_PROFILE_ACTIVE).toBe(false);
+  test("the profile is consumed by the physics: its activation is on (#141)", () => {
+    // Turned on by #141 once every reader of the Vent takes `windAt` at its own `x` — the pose,
+    // the line and the passager's equilibria, the descent (§19) — and the views project the one
+    // spatial solve (#118). Turning it back off withholds every profile that is not uniform.
+    expect(WIND_PROFILE_ACTIVE).toBe(true);
   });
 });
 

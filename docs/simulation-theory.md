@@ -500,12 +500,15 @@ from what the link carries — `ww=90.4` is 90 % and passes, `wa=0.4` is the uni
 the preparatory note (`docs/references/spatial-wind/wind-profile-contract-followup.md` §3.2)
 evaluated `ww=50.5` as held. The fields and the profile's handle write whole percents only.
 
-**Engine:** `src/lib/sim/wind-profile.ts` evaluates `φ`, `U` and the local wind vector. **No
-reader consumes it yet**: the spatial statics and the ride read the field through `windAt` (§19), but
-until the profile is activated (#141) the app accepts a uniform wind only and
-**refuses a non-uniform profile at the Wind Gate** — it never computes under a uniform wind what a
-link entered as a profile. This shape is the one adopted for #120; it is not to be swapped for
-another curve silently.
+**Engine:** `src/lib/sim/wind-profile.ts` evaluates `φ`, `U` and the local wind vector. **Every
+reader consumes it where it acts** (activated by #141): the line's normal drag at the `x` of
+each integration stage (§19.4), the rider's static force at `x_D` (§19.5), the descent at the
+passager's `x` (§19.15) — never a mean speed over the span. The rose's reading names the
+mid-span speed, a display. The activation is a switch (`WIND_PROFILE_ACTIVE`); turned off, the
+app would accept a uniform wind only and **refuse a non-uniform profile at the Wind Gate** — it
+never computes under a uniform wind what a link entered as a profile. A field read outside
+`[0, L]` is §19.8's `outside-model`, never a clamp of the line. This shape is the one adopted for
+#120; it is not to be swapped for another curve silently.
 
 ---
 
