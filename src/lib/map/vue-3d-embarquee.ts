@@ -7,7 +7,7 @@
  * Rules this module exists to keep:
  *
  * - **The eye moves on the engine's clock, never on one of its own.** A frame's position is the
- *   ride's (`RideSample`: `t`, `x`, `z`, `v`), read between the two samples that bracket the
+ *   ride's (`RideSample`: `t`, `x`, `y`, `z`, `v`), read between the two samples that bracket the
  *   frame's time, linearly — the integrator already records every turning point exactly, so no
  *   speed is invented and no physics is run during the playback. One second on the screen is one
  *   second of the ride.
@@ -17,8 +17,8 @@
  * - **The eye stands inside the gabarit du passager**, {@link VUE_EMBARQUEE}'s 1,6 m above its foot
  *   — an upright body hanging to the bottom of the envelope — and never above the pulley: a gabarit
  *   shorter than that puts the eye at the pulley. A `[CONVENTION]`, a drawing choice; the ride's
- *   point is the pulley's, on the Trajectoire as the Vue 3D draws it, straight (the Banane is the
- *   Ligne à vide's).
+ *   point `(x, y, z)` is the pulley's, on the Trajectoire as the Vue 3D draws it (§19.15): under
+ *   wind the eye follows the trolley's lateral offset, without it the eye stays over A–B.
  * - **The look is the reader's, not the ride's.** The heading turns a full circle and the pitch
  *   within the Vue 3D's own range, by keys, buttons or a drag; neither follows the direction of
  *   travel, so a swing back carries the eye backward with the look held where it was.
@@ -115,7 +115,7 @@ export function embarkBlock(
 /**
  * The ride with the eye placed under each sample, on the line the Vue 3D stands on the earth.
  *
- * @param placement where the Vue 3D stands the engine's frame: the ride's `x` and `z` are in it.
+ * @param placement where the Vue 3D stands the engine's frame: the ride's `x`, `y` and `z` are in it.
  * @param hRider the gabarit du passager, m.
  * @returns `null` for a ride that never leaves the departure — one sample, or no time elapsed.
  */
@@ -135,7 +135,12 @@ export function vue3dRide({
   const plane = localPlane(ends.A, ends.B);
   const { east, north } = plane.metres(ends.B);
   return {
-    samples: ride.samples.map(({ t, x, z, v }) => ({ t, x, v, eye: onEarth(x, z - eyeBelowM) })),
+    samples: ride.samples.map(({ t, x, y = 0, z, v }) => ({
+      t,
+      x,
+      v,
+      eye: onEarth(x, y, z - eyeBelowM),
+    })),
     end: ride.end,
     duration: last.t,
     lineHeadingDeg: headingOf(east, north),

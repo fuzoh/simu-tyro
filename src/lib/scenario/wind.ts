@@ -12,8 +12,8 @@
  * - **Uniform is the attenuation at zero, whatever the width.** The width is kept through it and
  *   has no effect; « Vent uniforme » ({@link uniformWind}) writes the attenuation alone.
  * - **A non-uniform profile is not computed under a uniform wind.** The spatial statics and the
- *   ride on their locus read the field (§19), but the Banane and the rose's reading take one speed
- *   for the whole line. While
+ *   ride on their locus read the field (§19), but the rose's reading takes one speed for the whole
+ *   line. While
  *   {@link WIND_PROFILE_ACTIVE} is off, the gates refuse a profile that is not uniform and its
  *   controls are not offered, so no reader of one speed ever stands in for the field.
  */

@@ -6,18 +6,22 @@
  *
  * Rules this module exists to keep:
  *
- * - **The lines are the engine's, never redrawn.** The Ligne à vide is the solve's own sampled
- *   catenary (`SceneBase.unloadedCable`), the loaded line the exact solve at the Scenario's passager
- *   (`placeRider`) — no parabola, no resampling. Each vertex `(x, z)` of the engine's frame becomes
- *   one point: `x / L` of the way from Position A to Position B, at anchor A's altitude plus `z`.
+ * - **The lines are the engine's, never redrawn** (§19.11, #118). The Ligne à vide
+ *   (`SceneBase.unloadedCable`), the loaded line at the Scenario's passager (`placeRider`, its
+ *   trolley node among its vertices) and the Trajectoire (`SceneBase.trajectory`) are the very
+ *   `(x, y, z)` the coupe and the vue de dessus project — no parabola, no resampling, no shape of
+ *   the view's own. Each vertex becomes one point: `x / L` of the way from Position A to Position B,
+ *   `y` metres to the left of A → B, at anchor A's altitude plus `z` ({@link earthFrame}).
  * - **Anchor A's altitude is the profil's.** The profil's altitude under A plus A's Anchor Height;
  *   B then lands on the profil's altitude under B plus B's Anchor Height through the engine's own
  *   dénivelé. swisstopo's terrain answers within 0,2 m of the profil at the trial's anchors
  *   (prototype #63: 1 415,9 / 1 442,5 m against the CSV's 1 415,7 / 1 442,6 m), so profil altitudes
  *   are drawn as the relief's heights, with no datum shift.
- * - **The Ligne à vide wears the Banane** (#96): its vertices keep their altitude and are pushed
- *   sideways by the drawn bow (`./banane.ts`); the loaded line and the Fils à plomb stay straight —
- *   the bow is the unloaded line's, and says nothing of the line under a passager.
+ * - **Four traces, each available on its own** (§19.11): the Ligne à vide whenever the line
+ *   solved, the loaded line only where the chosen position has one — never a neighbouring slot, an
+ *   interpolation or the plane model in its place — the Trajectoire in runs split at every hole,
+ *   and the Ligne A–B always, which no calculation moves. The wind never moves a vertex here: the
+ *   lateral offset is the engine's `y`, and without wind it is nil.
  * - **No profil, no Vue 3D.** Manual geometry has a span and a dénivelé but no altitude to stand
  *   them on; placing them on the relief would be a rule nobody decided, so the switch says why it
  *   is off instead, as it does without the two Positions. A profil that does not run between the
@@ -33,8 +37,8 @@
  *   résultat » as well.
  */
 
-import type { Polyline, SceneBase, SceneFrame, SceneRider } from "@/lib/chart/scene.ts";
-import type { Positions } from "@/lib/scenario/types.ts";
+import type { SceneBase, SceneFrame, SceneRider, SpaceLine } from "@/lib/chart/scene.ts";
+import type { Position, Positions } from "@/lib/scenario/types.ts";
 import type { LayerToggles } from "@/lib/session/session.ts";
 import type { Trace, TraceEnds } from "@/lib/terrain/trace.ts";
 
@@ -44,7 +48,7 @@ import type { Fond } from "./display.ts";
 import type { Anchor } from "./gesture.ts";
 import type { WmtsLayer } from "./style.ts";
 
-import { bananePoint } from "./banane.ts";
+import { localPlane } from "./measure.ts";
 import { RASTER_FONDS } from "./style.ts";
 
 /**
@@ -158,7 +162,7 @@ export type Vue3dLayers = {
 /**
  * The layers of a Vue 3D with no View Strip beside it — the Page Terrain's, whose coupe, and the
  * strip with it, hides while the 3D is shown: the view draws what it drew before the layers came to
- * it (#95, #96), the Ligne à vide with its Banane and the loaded line.
+ * it (#95, #96), the Ligne à vide and the loaded line.
  */
 const NO_VIEW_STRIP_LAYERS: Vue3dLayers = {
   unloaded: true,
@@ -184,21 +188,18 @@ export type Vue3dScene = {
   readonly fils: { readonly A: FilAPlomb; readonly B: FilAPlomb };
   /** The Ligne A–B, straight from anchor to anchor: it needs no solve. */
   readonly ligneAB: readonly [EarthPoint, EarthPoint];
-  /**
-   * The Ligne à vide — `null` under « Aucun résultat », when the line did not solve, or where the
-   * passager could not be placed: the coupe draws its solved half only with the passager.
-   */
+  /** The Ligne à vide — `null` under « Aucun résultat », when the line did not solve. */
   readonly unloaded: readonly EarthPoint[] | null;
   /**
    * The loaded line at the Scenario's passager, through the passager's own node — `null` under
-   * « Aucun résultat », or where the exact solve at that position refused.
+   * « Aucun résultat », or where there is no loaded line at that position: the solve refused, or
+   * under wind the position falls on a slot that did not converge (§19.12).
    */
   readonly loaded: readonly EarthPoint[] | null;
   /**
-   * The Trajectoire — the passager's node over the whole traverse, one polyline per run as the
-   * coupe splits it (`SceneBase.trajectory`) — or `null` under « Aucun résultat » or with no
-   * passager placed, as the Ligne à vide. Straight like the loaded line it hangs from: the Banane is
-   * the Ligne à vide's.
+   * The Trajectoire — the trolley's node over the whole traverse, one polyline per run as the coupe
+   * splits it (`SceneBase.trajectory`), none across a hole — or `null` under « Aucun résultat ».
+   * It stands without the passager placed, as the Ligne à vide does.
    */
   readonly trajectory: readonly (readonly EarthPoint[])[] | null;
   /**
@@ -212,40 +213,31 @@ export type Vue3dScene = {
  * The scene, from what the coupe already computed.
  *
  * @param solved the solved half, or `null` under « Aucun résultat ».
- * @param rider the passager placed at the Scenario's `x_D`, or `null` — then no engine line stands.
- * @param across the wind's cross component, m/s: the Ligne à vide's bow, nil without it.
+ * @param rider the passager placed at the Scenario's `x_D`, or `null` — then the loaded line alone
+ *   is missing (§19.11).
  */
 export function vue3dScene({
   placement: { ends, frame, bases },
   solved,
   rider,
-  across,
 }: {
   placement: Vue3dPlacement;
   solved: SceneBase | null;
   rider: SceneRider | null;
-  across: number;
 }): Vue3dScene {
   const { L, h, anchors } = frame;
   const topA = bases.zBaseA + anchors.zA;
   const onEarth = earthFrame({ ends, L, topA });
-  const onBanane = earthFrame({ ends, L, topA, across });
   const fil = (x: number, top: number, height: number) =>
-    filAPlomb(onEarth(x, top - height), height);
+    filAPlomb(onEarth(x, 0, top - height), height);
   const fils = { A: fil(0, 0, anchors.zA), B: fil(L, h, anchors.zB) };
   return {
     ends,
     fils,
     ligneAB: [fils.A.anchor, fils.B.anchor],
-    // As on the coupe, the solved half stands only with the passager placed: no Ligne à vide nor
-    // Trajectoire under a loaded line the exact solve at x_D refused.
-    ...(solved === null || rider === null
-      ? { unloaded: null, loaded: null, trajectory: null }
-      : {
-          unloaded: alongLine(onBanane, solved.unloadedCable),
-          loaded: alongLine(onEarth, throughNode(rider.cable, rider.step.xD, rider.step.zD)),
-          trajectory: solved.trajectory.map((run) => alongLine(onEarth, run)),
-        }),
+    unloaded: solved === null ? null : alongLine(onEarth, solved.unloadedCable),
+    loaded: solved === null || rider === null ? null : alongLine(onEarth, rider.cable),
+    trajectory: solved === null ? null : solved.trajectory.map((run) => alongLine(onEarth, run)),
     membersPx: solved?.members.map((member) => member.offsetPx) ?? [0],
   };
 }
@@ -335,52 +327,58 @@ function filAPlomb(foot: EarthPoint, height: number): FilAPlomb {
 }
 
 /**
- * The engine's frame on the earth: `x` metres from A along the ligne A–B, `z` metres above anchor
- * A. Interpolated linearly in degrees: over a span of a few kilometres the error is millimetres.
- * With a cross wind the frame is the Banane's: each point pushed sideways by the drawn bow.
+ * §19.2's frame on the earth, the one projector of the Vue 3D and the vue de dessus (§19.11): `x`
+ * along the ligne A–B — `x / L` of the way from A to B, interpolated linearly in degrees, which over
+ * a span of a few kilometres errs by millimetres — `y` metres to its left, square to it on the
+ * local plane (`localPlane`), and `z` metres above anchor A. With `y` nil a point lies on the
+ * straight ligne A–B exactly as it did before `y` existed.
  */
 export function earthFrame({
   ends,
   L,
   topA,
-  across = 0,
 }: {
   ends: TraceEnds;
   /** Portée, m: `x` runs from 0 at A to `L` at B. */
   L: number;
   /** Anchor A's altitude, m. */
   topA: number;
-  /** The wind's cross component, m/s; the line is straight without it. */
-  across?: number;
-}): (x: number, z: number) => EarthPoint {
-  return (x, z) => ({ ...bananePoint(ends, x / L, across), altitude: topA + z });
-}
-
-function alongLine(onEarth: (x: number, z: number) => EarthPoint, line: Polyline): EarthPoint[] {
-  return Array.from(line.xs, (x, i) => onEarth(x, line.zs[i] ?? Number.NaN));
+}): (x: number, y: number, z: number) => EarthPoint {
+  const onPlan = planFrame({ ends, L });
+  return (x, y, z) => ({ ...onPlan(x, y), altitude: topA + z });
 }
 
 /**
- * The loaded line with the passager's node among its vertices. The engine samples the cable evenly
- * along its length, so the kink under the trolley — the loaded line's own low point — falls between
- * two vertices; the node is the engine's too (`z_D` at `x_D`), and drawing through it puts the low
- * point exactly where the engine computed it.
+ * {@link earthFrame}'s horizontal half: where `(x, y)` of §19.2's frame stands on the map.
  */
-function throughNode(line: Polyline, xD: number, zD: number): Polyline {
-  const at = line.xs.findIndex((x) => x >= xD);
-  if (at === -1) return line;
-  if (line.xs[at] === xD) {
-    const zs = Float64Array.from(line.zs);
-    zs[at] = zD;
-    return { xs: line.xs, zs };
-  }
-  const xs = new Float64Array(line.xs.length + 1);
-  const zs = new Float64Array(line.zs.length + 1);
-  xs.set(line.xs.subarray(0, at));
-  zs.set(line.zs.subarray(0, at));
-  xs[at] = xD;
-  zs[at] = zD;
-  xs.set(line.xs.subarray(at), at + 1);
-  zs.set(line.zs.subarray(at), at + 1);
-  return { xs, zs };
+export function planFrame({
+  ends: { A, B },
+  L,
+}: {
+  ends: TraceEnds;
+  /** Portée, m: `x` runs from 0 at A to `L` at B. */
+  L: number;
+}): (x: number, y: number) => Position {
+  const plane = localPlane(A, B);
+  const { east, north } = plane.metres(B);
+  const d = Math.hypot(east, north);
+  // One metre to the left of the travel, in degrees: the left of (east, north) is (−north, east).
+  // The plane is linear, so this one step scales to any `y`.
+  const left = d === 0 ? { lon: A.lon, lat: A.lat } : plane.position(-north / d, east / d);
+  const leftLon = left.lon - A.lon;
+  const leftLat = left.lat - A.lat;
+  return (x, y) => {
+    const t = x / L;
+    return {
+      lon: A.lon + t * (B.lon - A.lon) + y * leftLon,
+      lat: A.lat + t * (B.lat - A.lat) + y * leftLat,
+    };
+  };
+}
+
+function alongLine(
+  onEarth: (x: number, y: number, z: number) => EarthPoint,
+  line: SpaceLine,
+): EarthPoint[] {
+  return Array.from(line.xs, (x, i) => onEarth(x, line.ys[i] ?? 0, line.zs[i] ?? Number.NaN));
 }

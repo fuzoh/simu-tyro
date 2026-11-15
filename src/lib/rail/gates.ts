@@ -31,21 +31,22 @@
  *   the Vent is projected on — and its absence is not a breach either: see the next rule.
  * - **The Vent needs Positions, and their absence is not an error.** The Vent's direction is
  *   geographic, so without A and B on the map the line has no bearing to project it on. Then the
- *   wind fields are disabled with {@link WIND_UNPLACED}'s reason, the statics, the ride and the Banane
- *   run without wind, and a Vent that arrived in a link or a Session is **kept as given** (ADR-0001) with a
+ *   wind fields are disabled with {@link WIND_UNPLACED}'s reason, the statics and the ride run
+ *   without wind, and a Vent that arrived in a link or a Session is **kept as given** (ADR-0001) with a
  *   notice where the results would have read it. {@link windBearing} is the one check: the fields,
  *   the rose, the rides and the notice all read it, so a link, a Session and a click cannot
  *   disagree. Like an absent régime it is a flag on the report, never an entry on the blocking
  *   list: it hides no result. One wind field is not disabled: the one whose value the gates
  *   refuse, which stays typable so that its repair is on the Page ({@link fieldUnavailable}).
  * - **The passager's ride has two gates of its own**, past the three: the Wind Gate (the Vent, #87)
- *   and the Ride Gate (§12.2's constants, #89 and the ride-gates fix). Their fields reach no
- *   statics number, but ADR-0001 keeps them as they arrive **and** gates them, so a negative wind
- *   speed withholds the Banane, the rose's reading and the ride rather than blowing the other way,
+ *   and the Ride Gate (§12.2's constants, #89 and the ride-gates fix). The Vent's fields reach the
+ *   statics only where it is applied (§19); ADR-0001 keeps them as they arrive **and** gates them,
+ *   so a negative wind speed withholds the rose's reading and the ride — and, applied, the statics
+ *   — rather than blowing the other way,
  *   and a negative `C_dA` withholds the ride rather than speeding it up. A Wind breach removes the
  *   ride too, since it reads the Vent.
  * - **A profile of the Vent no reader takes is refused, never read as a uniform wind** (#120). The
- *   ride, the Banane and the rose's reading take one speed for the whole line. Until the physics
+ *   rose's reading takes one speed for the whole line. Until the physics
  *   reads the field (`WIND_PROFILE_ACTIVE`), a profile that is not uniform — a link or a Session
  *   brought it — is kept as given and breaches the Wind Gate, with a Fix Action back to the uniform
  *   wind: what would have read the Vent is withheld rather than computed under another one. A
@@ -257,7 +258,7 @@ export const WIND_UNPLACED = {
  * The bearing of A → B the Vent is projected on, degrees from north, or `null` when the line has
  * none — **the one check** behind « the Vent needs Positions »: the report's
  * {@link GateReport.windNeedsPositions}, the disabled wind fields, the rose's handle, the rides and
- * the Banane all read it, whichever path the Scenario came by.
+ * the statics all read it, whichever path the Scenario came by.
  */
 export function windBearing({ positions }: Pick<ScenarioDraft, "positions">): number | null {
   return lineBearing(positions);
@@ -710,7 +711,7 @@ export function evaluateGates({
 
   // ── The Vent's profile, as a link or a Session can carry it (#120) ──────────────────────────
   // Out of its domain, or not uniform while nothing reads the field: kept as given (ADR-0001) and
-  // refused here, so the ride, the Banane and the rose are withheld rather than read under a
+  // refused here, so the statics, the ride and the rose are withheld rather than read under a
   // uniform wind. A text the form itself refuses on the same field keeps its own message.
   for (const breach of heldProfile.values()) push(breach);
 

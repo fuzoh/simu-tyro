@@ -84,7 +84,7 @@ export function StatiqueFrame({
         {/* From B2 the frame's two custom properties (`TopViewFrame`): no height cap, so the map
             stays 3 : 2 beside the tiles — the brief's « format conservé » — and seven caption
             lines, one per line the caption can hold in 2D (A, B, the Vent, the gesture, the fond
-            indisponible, the Banane, the Vue 3D). The caption sets this row's height, so the
+            indisponible, the Vent's profile, the Vue 3D). The caption sets this row's height, so the
             narrow map's wrapped lines must land in the Skeleton's space, not push the coupe down:
             ui.md's « Statique's first row ». */}
         <Region

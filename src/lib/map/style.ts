@@ -7,9 +7,11 @@
  *
  * Rules this module exists to keep:
  *
- * - **The ligne A–B and the Banane (#96) are in every style, drawn last.** Changing Fond is a new style, so a line added
- *   to the map beside its style would leave with the old one; built into each style, a switch cannot
- *   lose it. The anchors are markers, which no style owns.
+ * - **The ligne A–B and the computed traces (#118) are in every style, drawn last.** Changing Fond is
+ *   a new style, so a line added to the map beside its style would leave with the old one; built
+ *   into each style, a switch cannot lose it. The anchors are markers, which no style owns. The
+ *   traces are the scene's `(x, y)` (`./traces.ts`): the Ligne à vide dashed as on the coupe, the
+ *   loaded line solid and thinner than the ligne A–B it may lie on, the Trajectoire dotted.
  * - **The plain background is every style's first layer.** A Fond that does not arrive — no
  *   network, outside swisstopo's coverage — then leaves the line on « fond uni », never on nothing.
  * - **The vector Fond's `style.json` is fetched with the injected `fetch`, not given to MapLibre
@@ -29,8 +31,8 @@ import type { Fetch } from "@/lib/terrain/geoadmin.ts";
 
 import type { Fond, MapDisplay } from "./display.ts";
 import type { MeasurePoints } from "./measure.ts";
+import type { PlanTraces } from "./traces.ts";
 
-import { bananePath } from "./banane.ts";
 import { crossLines } from "./measure.ts";
 
 /** A MapLibre style, as `Map.setStyle` takes it. */
@@ -53,8 +55,14 @@ export const SWISSTOPO_COVERAGE = [5.140242, 45.398181, 11.47757, 48.230651] as 
 /** The source the ligne A–B is drawn from. */
 export const LINE_SOURCE = "ligne-ab";
 
-/** The source the Banane (#96) is drawn from: the Ligne à vide bowed by the wind. */
-export const BANANE_SOURCE = "banane";
+/**
+ * The source the computed traces (#118) are drawn from: the Ligne à vide, the loaded line and the
+ * Trajectoire, each feature told apart by its `trace`.
+ */
+export const TRACES_SOURCE = "traces";
+
+/** What a feature of {@link TRACES_SOURCE} is. */
+export type TraceKind = "unloaded" | "loaded" | "trajectory";
 
 /**
  * The source the Mesure (#98) is drawn from: its line, its points and every dotted cross — its
@@ -119,7 +127,7 @@ export function fondAttribution(fond: Fond): string {
 /** Is this source the Fond's own — the one whose tiles decide « fond de carte indisponible »? */
 export function isFondSource(id: string): boolean {
   return (
-    id !== LINE_SOURCE && id !== PENTES_SOURCE && id !== BANANE_SOURCE && id !== MEASURE_SOURCE
+    id !== LINE_SOURCE && id !== PENTES_SOURCE && id !== TRACES_SOURCE && id !== MEASURE_SOURCE
   );
 }
 
@@ -147,23 +155,22 @@ export function lineData({ A, B }: Positions): LineData {
 }
 
 /**
- * The Banane as its source holds it: one bowed line, or nothing while a Position is missing and
- * without a cross wind, where it would only lie under the ligne A–B.
+ * The computed traces as their source holds them: one `LineString` per line, in the scene's vertex
+ * order, its `trace` in its properties — or nothing while there is none to draw (`null`).
  */
-export function bananeData(positions: Positions, across: number): LineData {
-  const path = across === 0 ? null : bananePath(positions, across);
+export function tracesData(traces: PlanTraces | null): LineData {
+  if (traces === null) return { type: "FeatureCollection", features: [] };
+  const lines: { trace: TraceKind; line: readonly Position[] }[] = [];
+  if (traces.unloaded !== null) lines.push({ trace: "unloaded", line: traces.unloaded });
+  for (const run of traces.trajectory) lines.push({ trace: "trajectory", line: run });
+  if (traces.loaded !== null) lines.push({ trace: "loaded", line: traces.loaded });
   return {
     type: "FeatureCollection",
-    features:
-      path === null
-        ? []
-        : [
-            {
-              type: "Feature",
-              properties: {},
-              geometry: { type: "LineString", coordinates: path.map((p) => [p.lon, p.lat]) },
-            },
-          ],
+    features: lines.map(({ trace, line }) => ({
+      type: "Feature",
+      properties: { trace },
+      geometry: { type: "LineString", coordinates: line.map((p) => [p.lon, p.lat]) },
+    })),
   };
 }
 
@@ -284,25 +291,25 @@ export function measureData({
 
 /**
  * The style for one display: plain background, the Fond, the Couche pentes if asked for, then the
- * ligne A–B and the Banane (dashed, as the Ligne à vide is) on top.
+ * ligne A–B and the computed traces on top.
  *
  * @param vector the carte claire's fetched style, or `null` while it is absent — not yet loaded,
  *   or unavailable. The carte claire then draws as the plain background alone.
  * @param positions where the line is drawn now.
- * @param across the wind's cross component, m/s, the Banane's only input.
+ * @param traces the computed traces on the map, or `null` while there are none to draw.
  * @param measure the Mesure, the aperçu and the Repères d'ancrage, drawn above everything else.
  */
 export function mapStyle({
   display,
   vector,
   positions,
-  across,
+  traces,
   measure,
 }: {
   display: MapDisplay;
   vector: MapStyle | null;
   positions: Positions;
-  across: number;
+  traces: PlanTraces | null;
   measure: MeasureDrawing;
 }): MapStyle {
   const fond = fondStyle(display.fond, vector);
@@ -317,7 +324,7 @@ export function mapStyle({
       ...fond.sources,
       ...pentes,
       [LINE_SOURCE]: { type: "geojson", data: lineData(positions) },
-      [BANANE_SOURCE]: { type: "geojson", data: bananeData(positions, across) },
+      [TRACES_SOURCE]: { type: "geojson", data: tracesData(traces) },
       [MEASURE_SOURCE]: { type: "geojson", data: measureData(measure) },
     },
     layers: [
@@ -348,17 +355,16 @@ export function mapStyle({
         paint: { "line-color": LINE_INK, "line-width": 3 },
       },
       {
-        id: `${BANANE_SOURCE}-halo`,
+        id: `${TRACES_SOURCE}-halo`,
         type: "line",
-        source: BANANE_SOURCE,
-        paint: { "line-color": LINE_CASING, "line-width": 6 },
+        source: TRACES_SOURCE,
+        layout: { "line-cap": "round" },
+        paint: { "line-color": LINE_CASING, "line-width": 5 },
       },
-      {
-        id: BANANE_SOURCE,
-        type: "line",
-        source: BANANE_SOURCE,
-        paint: { "line-color": LINE_INK, "line-width": 3, "line-dasharray": [2, 2] },
-      },
+      // The loaded line, the subject, over the two others, as on the coupe.
+      traceLayer("unloaded", { "line-dasharray": [2, 2] }),
+      traceLayer("trajectory", { "line-dasharray": [0, 2] }, { "line-cap": "round" }),
+      traceLayer("loaded", {}),
       {
         id: `${MEASURE_SOURCE}-croix`,
         type: "line",
@@ -387,6 +393,22 @@ export function mapStyle({
         },
       },
     ],
+  };
+}
+
+/** One trace's layer, its own features only: the ink of the ligne A–B, two pixels wide. */
+function traceLayer(
+  trace: TraceKind,
+  paint: { "line-dasharray"?: number[] },
+  layout: { "line-cap"?: "round" } = {},
+): StyleLayer {
+  return {
+    id: `${TRACES_SOURCE}-${trace}`,
+    type: "line",
+    source: TRACES_SOURCE,
+    filter: ["==", ["get", "trace"], trace],
+    layout,
+    paint: { "line-color": LINE_INK, "line-width": 2, ...paint },
   };
 }
 

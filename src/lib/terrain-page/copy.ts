@@ -10,7 +10,13 @@ import { CHOOSE_REGIME_BY_REGISTER, JUMP_LABEL } from "@/lib/app/banner.ts";
 import { DISMISS_LABEL } from "@/lib/app/link-strip.ts";
 import { refusalLabelTable } from "@/lib/app/refusal-copy.ts";
 import { DIAGNOSTIC_ACTION } from "@/lib/app/refusals.ts";
-import { COUPE_HOVER, LAYER_LABEL, NO_SPAN_LINE, PEEK_LABEL } from "@/lib/chart/copy.ts";
+import {
+  COUPE_HOVER,
+  LAYER_LABEL,
+  NO_LOADED_LINE,
+  NO_SPAN_LINE,
+  PEEK_LABEL,
+} from "@/lib/chart/copy.ts";
 import {
   ESTIMATE,
   INCOMPLETE,
@@ -90,6 +96,7 @@ export function terrainLabelTable(): readonly string[] {
     peekBadgeLabel({ peek: "true-scale", autofit: 0.6 }),
     peekBadgeLabel({ peek: "fit", autofit: 2.4 }),
     NO_SPAN_LINE,
+    NO_LOADED_LINE,
     DISMISS_LABEL,
     JUMP_LABEL,
     CHOOSE_REGIME_BY_REGISTER.terrain,

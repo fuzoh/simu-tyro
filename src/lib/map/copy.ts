@@ -57,8 +57,6 @@ export const MAP_COPY = {
   profileSheltered: "↑ plus atténué",
   /** The pad's one command: the attenuation back to zero, and nothing else of the Vent. */
   uniformWind: heading("uniformWind", "terrain"),
-  /** The ambient note under a drawn Banane (#96): a shape, never a distance. */
-  bananeNote: "Banane : allure, pas une distance.",
   /** The switch that puts the Vue 3D in the vue de dessus's place (#95). */
   view3d: "3D",
   /** Its other half on the Page Terrain (#101), where it flips the map and the coupe together. */
@@ -295,15 +293,6 @@ function directReading(directM: number, dz: number): string {
   return `${formatQuantity("L", directM)} (Δz ${sign}${formatQuantity("h", Math.abs(dz))})`;
 }
 
-/**
- * What the Banane is, on hover: drawn rather than computed, its amplitude a `[CONVENTION]` — a
- * drawing choice proportional to the wind's cross component — and no distance behind it.
- */
-export const BANANE_HELP =
-  `La ${label("banana", "terrain")} est dessinée, pas calculée : la ligne à vide s'incurve du côté sous le vent, d'autant plus que le vent souffle en travers. ` +
-  "Le facteur de proportionnalité est un choix de dessin [CONVENTION], jamais une sortie du moteur. " +
-  "Elle donne une allure, pas une distance : aucune valeur chiffrée, ni garde au sol sous vent avec passager, n'en est lue.";
-
 /** Why the switch to the Vue 3D is off, said under the map. */
 export const VUE_3D_BLOCKED = {
   positions: "Vue 3D : placez A et B sur la carte.",
@@ -439,7 +428,6 @@ export function mapLabelTable(): readonly string[] {
     ...Object.values(VUE_3D_BLOCKED),
     ...Object.values(VUE_3D_BLOCKED_READ_ONLY),
     ...Object.values(MEASURE_COPY),
-    BANANE_HELP,
     WIND_UNPLACED.reason,
     WIND_UNPLACED.notice,
     ...[0, 90, 180, 270, 45, 108].map(describeRelative),

@@ -14,14 +14,13 @@ import { TRIAL_ENDS } from "@/lib/terrain/__fixtures__/geoadmin-2026-11-08.ts";
 
 import type { MapDisplay } from "./display.ts";
 import type { CrossThrough, MapStyle, MeasureCollection, MeasureDrawing } from "./style.ts";
+import type { PlanTraces } from "./traces.ts";
 
 import { DEFAULT_MAP_DISPLAY, FONDS } from "./display.ts";
 import {
   fondAttribution,
   fondUnavailable,
   freshHealth,
-  BANANE_SOURCE,
-  bananeData,
   isFondSource,
   LINE_SOURCE,
   MEASURE_SOURCE,
@@ -31,6 +30,8 @@ import {
   loadVectorStyle,
   mapStyle,
   PENTES_SOURCE,
+  TRACES_SOURCE,
+  tracesData,
   VECTOR_STYLE_URL,
 } from "./style.ts";
 
@@ -77,7 +78,7 @@ function rasterTiles(style: MapStyle, source: string): readonly string[] {
   return spec.tiles;
 }
 
-describe("every Fond and the Couche pentes keep the ligne A–B, the Banane and the Mesure", () => {
+describe("every Fond and the Couche pentes keep the ligne A–B, the traces and the Mesure", () => {
   test.each(
     DISPLAYS.flatMap(
       (display) =>
@@ -91,19 +92,21 @@ describe("every Fond and the Couche pentes keep the ligne A–B, the Banane and 
       display,
       vector,
       positions: TRIAL_ENDS,
-      across: 0,
+      traces: null,
       measure: NO_MEASURE,
     });
     const ids = style.layers.map((layer) => layer.id);
 
     // Plain background first — what shows wherever no tile does.
     expect(style.layers[0]).toEqual(expect.objectContaining({ type: "background" }));
-    // The line, the Banane, then the Mesure last, each from the one source that holds it.
-    expect(style.layers.slice(-7).map((layer) => "source" in layer && layer.source)).toEqual([
+    // The line, the traces, then the Mesure last, each from the one source that holds it.
+    expect(style.layers.slice(-9).map((layer) => "source" in layer && layer.source)).toEqual([
       LINE_SOURCE,
       LINE_SOURCE,
-      BANANE_SOURCE,
-      BANANE_SOURCE,
+      TRACES_SOURCE,
+      TRACES_SOURCE,
+      TRACES_SOURCE,
+      TRACES_SOURCE,
       MEASURE_SOURCE,
       MEASURE_SOURCE,
       MEASURE_SOURCE,
@@ -113,30 +116,89 @@ describe("every Fond and the Couche pentes keep the ligne A–B, the Banane and 
       data: lineData(TRIAL_ENDS),
     });
     // The Couche pentes right under them when asked for, absent otherwise.
-    expect(ids.indexOf(PENTES_SOURCE)).toBe(display.pentes ? ids.length - 8 : -1);
+    expect(ids.indexOf(PENTES_SOURCE)).toBe(display.pentes ? ids.length - 10 : -1);
   });
 });
 
-describe("the Banane's source", () => {
-  test("is the bowed line for a cross wind, and carries it into the style", () => {
-    const data = bananeData(TRIAL_ENDS, 8);
-    expect(data).toMatchObject({ features: [{ geometry: { type: "LineString" } }] });
+describe("the computed traces' source (#118)", () => {
+  const A = TRIAL_ENDS.A;
+  const at = (dLon: number, dLat: number) => ({ lon: A.lon + dLon, lat: A.lat + dLat });
+  const traces: PlanTraces = {
+    unloaded: [at(0, 0), at(0.001, 0.0001), at(0.002, 0)],
+    loaded: [at(0, 0), at(0.001, 0.0002), at(0.001, 0.0002), at(0.002, 0)],
+    trajectory: [
+      [at(0.0002, 0), at(0.0004, 0.0001)],
+      [at(0.0012, 0.0001), at(0.0014, 0)],
+    ],
+  };
+
+  test("holds each line as given, in its order, told apart by its trace", () => {
+    const data = tracesData(traces);
+    expect(data).toEqual({
+      type: "FeatureCollection",
+      features: [
+        ["unloaded", traces.unloaded],
+        ["trajectory", traces.trajectory[0]],
+        ["trajectory", traces.trajectory[1]],
+        ["loaded", traces.loaded],
+      ].map(([trace, line]) => ({
+        type: "Feature",
+        properties: { trace },
+        geometry: {
+          type: "LineString",
+          coordinates: (line as { lon: number; lat: number }[]).map((p) => [p.lon, p.lat]),
+        },
+      })),
+    });
     const style = mapStyle({
       display: DEFAULT_MAP_DISPLAY,
       vector: null,
       positions: TRIAL_ENDS,
-      across: 8,
+      traces,
       measure: NO_MEASURE,
     });
-    expect(style.sources[BANANE_SOURCE]).toEqual({ type: "geojson", data });
+    expect(style.sources[TRACES_SOURCE]).toEqual({ type: "geojson", data });
   });
 
-  test("is empty without a cross wind and while a Position is missing", () => {
-    expect(bananeData(TRIAL_ENDS, 0)).toEqual({ type: "FeatureCollection", features: [] });
-    expect(bananeData({ A: TRIAL_ENDS.A, B: null }, 8)).toEqual({
-      type: "FeatureCollection",
-      features: [],
+  test("a trajectory split at a hole is two lines: no feature joins the runs", () => {
+    const runs = tracesData(traces).features.filter(
+      (feature: { properties?: { trace?: string } | null }) =>
+        feature.properties?.trace === "trajectory",
+    );
+    expect(runs).toHaveLength(2);
+  });
+
+  test("a trace that is not available is not drawn; with none, the source is empty", () => {
+    const partial = tracesData({ ...traces, loaded: null, unloaded: null });
+    expect(
+      partial.features.map(
+        (feature: { properties?: { trace?: string } | null }) => feature.properties?.trace,
+      ),
+    ).toEqual(["trajectory", "trajectory"]);
+    expect(tracesData(null)).toEqual({ type: "FeatureCollection", features: [] });
+  });
+
+  test("each trace has its own layer, styled as on the coupe: dashed, dotted, solid", () => {
+    const style = mapStyle({
+      display: DEFAULT_MAP_DISPLAY,
+      vector: null,
+      positions: TRIAL_ENDS,
+      traces,
+      measure: NO_MEASURE,
     });
+    const layer = (trace: string) => style.layers.find((l) => l.id === `traces-${trace}`);
+    for (const trace of ["unloaded", "trajectory", "loaded"]) {
+      expect(layer(trace)).toEqual(
+        expect.objectContaining({ source: TRACES_SOURCE, filter: ["==", ["get", "trace"], trace] }),
+      );
+    }
+    const dash = (trace: string) => {
+      const found = layer(trace);
+      return found?.type === "line" ? found.paint?.["line-dasharray"] : undefined;
+    };
+    expect(dash("unloaded")).toEqual([2, 2]);
+    expect(dash("trajectory")).toEqual([0, 2]);
+    expect(dash("loaded")).toBeUndefined();
   });
 });
 
@@ -146,7 +208,7 @@ describe("the three Fonds de carte", () => {
       display: DEFAULT_MAP_DISPLAY,
       vector: VECTOR,
       positions: TRIAL_ENDS,
-      across: 0,
+      traces: null,
       measure: NO_MEASURE,
     });
     expect(DEFAULT_MAP_DISPLAY.fond).toBe("carte-claire");
@@ -160,17 +222,19 @@ describe("the three Fonds de carte", () => {
     expect(style.zoom).toBeUndefined();
   });
 
-  test("the carte claire without its style is the plain background, the line and the Banane", () => {
+  test("the carte claire without its style is the plain background, the line and the traces", () => {
     const style = mapStyle({
       display: DEFAULT_MAP_DISPLAY,
       vector: null,
       positions: TRIAL_ENDS,
-      across: 0,
+      traces: null,
       measure: NO_MEASURE,
     });
-    expect(Object.keys(style.sources)).toEqual([LINE_SOURCE, BANANE_SOURCE, MEASURE_SOURCE]);
+    expect(Object.keys(style.sources)).toEqual([LINE_SOURCE, TRACES_SOURCE, MEASURE_SOURCE]);
     expect(style.layers.map((layer) => layer.type)).toEqual([
       "background",
+      "line",
+      "line",
       "line",
       "line",
       "line",
@@ -189,7 +253,7 @@ describe("the three Fonds de carte", () => {
       display: { fond, pentes: false, view: "2d", reperes: true },
       vector: VECTOR,
       positions: TRIAL_ENDS,
-      across: 0,
+      traces: null,
       measure: NO_MEASURE,
     });
     expect(rasterTiles(style, "fond")).toEqual([
@@ -201,8 +265,10 @@ describe("the three Fonds de carte", () => {
       "fond",
       "ligne-ab-halo",
       "ligne-ab",
-      "banane-halo",
-      "banane",
+      "traces-halo",
+      "traces-unloaded",
+      "traces-trajectory",
+      "traces-loaded",
       "mesure-croix",
       "mesure-ligne",
       "mesure-points",
@@ -216,7 +282,7 @@ describe("the three Fonds de carte", () => {
       display: { fond: "orthophoto", pentes: true, view: "2d", reperes: true },
       vector: null,
       positions: TRIAL_ENDS,
-      across: 0,
+      traces: null,
       measure: NO_MEASURE,
     });
     expect(rasterTiles(style, PENTES_SOURCE)).toEqual([
@@ -228,7 +294,7 @@ describe("the three Fonds de carte", () => {
     // An overlay: its tiles never decide whether the Fond arrived.
     expect(isFondSource(PENTES_SOURCE)).toBe(false);
     expect(isFondSource(LINE_SOURCE)).toBe(false);
-    expect(isFondSource(BANANE_SOURCE)).toBe(false);
+    expect(isFondSource(TRACES_SOURCE)).toBe(false);
     expect(isFondSource(MEASURE_SOURCE)).toBe(false);
     expect(isFondSource("fond")).toBe(true);
   });
@@ -422,7 +488,7 @@ describe("the Repères d'ancrage: a cross through A and through B, in every mode
       display: DEFAULT_MAP_DISPLAY,
       vector: null,
       positions: TRIAL_ENDS,
-      across: 0,
+      traces: null,
       measure: { ...NO_MEASURE, anchors: TRIAL_ENDS },
     });
     const crosses = style.layers.filter(
@@ -469,7 +535,7 @@ describe("the aperçu survives a change of Fond (#107)", () => {
       display: { ...DEFAULT_MAP_DISPLAY, fond },
       vector: VECTOR,
       positions: TRIAL_ENDS,
-      across: 0,
+      traces: null,
       measure: { ...NO_MEASURE, points: [TRIAL_ENDS.A], preview: POINTER },
     });
     const source = style.sources[MEASURE_SOURCE];

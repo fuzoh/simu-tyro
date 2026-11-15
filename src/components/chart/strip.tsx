@@ -42,7 +42,7 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 
 import { area, line } from "d3-shape";
 
-import type { ChartScene, SceneFrame } from "@/lib/chart/scene.ts";
+import type { DrawnScene, SceneFrame } from "@/lib/chart/scene.ts";
 import type { StripSample as Sample } from "@/lib/chart/strip-curve.ts";
 import type { SharedX } from "@/lib/layout/contract.ts";
 
@@ -65,7 +65,7 @@ import { AnchorZoneBands } from "./anchor-zones.tsx";
  * since `x_D` increases with `s` — and falls back to the arc fraction only at a run of holes that
  * reaches an end of the grid, where there is no neighbour on one side. Ticket 39, item 6.
  */
-function samples(frame: SceneFrame, scene: ChartScene): Sample[] {
+function samples(frame: SceneFrame, scene: DrawnScene): Sample[] {
   const { grid, steps } = scene.traverse;
   const solved: { s: number; x: number }[] = [];
   const out: {
@@ -135,7 +135,7 @@ export function ClearanceStrip({
    * marker go, **the axes and the pointer surface stay**. « It never stops being a pointer surface »
    * is this component's own rule, and the one exception — the geometric one — never reaches here.
    */
-  scene: ChartScene | null;
+  scene: DrawnScene | null;
   x: SharedX;
   /** `clamp(0,16 × W_inner, 96, 200)` — and the whole SVG is the hit surface. */
   height: number;
@@ -244,8 +244,9 @@ export function ClearanceStrip({
       {below !== null && <path className="stroke-destructive fill-none stroke-2" d={below} />}
 
       {/* The rider's own position on its own axis — the one marker this chart needs. Absent with
-          the rest of the solved half, while the track it sits on stays live. */}
-      {scene !== null && (
+          the rest of the solved half, and where the chosen position has no loaded line (§19.11),
+          while the track it sits on stays live. */}
+      {scene?.rider != null && (
         <line
           className={
             clearance && scene.rider.inViolation ? "stroke-destructive" : "stroke-foreground"

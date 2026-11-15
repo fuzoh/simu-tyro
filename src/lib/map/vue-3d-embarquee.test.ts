@@ -111,6 +111,33 @@ describe("the ride placed on the earth", () => {
     });
   });
 
+  test("under wind the eye follows the trolley's lateral offset: y metres to the left of A → B", () => {
+    // §19.15's locus leaves the plane of A–B; the eye hangs under the trolley where it is. On a line
+    // running north the left of the travel is west: 5 m of it is 5 / (N cos φ) degrees of
+    // longitude, N the prime vertical's radius at the line's mid-latitude — written out here.
+    const lateral: Ride = {
+      samples: [
+        { t: 0, x: 0, y: 0, z: 0, v: 0, a: 0 },
+        { t: 10, x: 100, y: 5, z: -10, v: 10, a: 0 },
+      ],
+      end: { kind: "stop", x: 100, t: 10 },
+    };
+    const eye = placed(lateral).samples[1]?.eye;
+    const flat = placed({
+      ...lateral,
+      samples: lateral.samples.map((at) => ({ ...at, y: 0 })),
+    }).samples[1]?.eye;
+    const a = 6_378_137;
+    const f = 1 / 298.257_223_563;
+    const e2 = f * (2 - f);
+    const phi = (((A.lat + B.lat) / 2) * Math.PI) / 180;
+    const eastPerDegree =
+      (a / Math.sqrt(1 - e2 * Math.sin(phi) ** 2)) * Math.cos(phi) * (Math.PI / 180);
+    expect((flat?.lon ?? 0) - (eye?.lon ?? 0)).toBeCloseTo(5 / eastPerDegree, 10);
+    expect(eye?.lat).toBeCloseTo(flat?.lat ?? 0, 12);
+    expect(eye?.altitude).toBe(flat?.altitude);
+  });
+
   test("looks along A → B to start with: due north on a line that runs north", () => {
     expect(placed().lineHeadingDeg).toBeCloseTo(0, 9);
     expect(openEmbarked(placed()).look).toEqual({

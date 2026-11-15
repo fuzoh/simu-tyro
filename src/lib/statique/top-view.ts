@@ -63,3 +63,22 @@ export function topView(positions: Positions, { width, height, pad }: TopViewBox
     unoriented: null,
   };
 }
+
+/**
+ * §19.2's frame on the plain drawing (#118): `x / L` of the way from `A` to `B`, `y` to the left of
+ * the travel at the drawing's own scale along A–B — the drawn length of A–B for the portée `L` — so
+ * the drawing projects the scene's `(x, y)` as the map does, with no shape of its own. With `y`
+ * down, the left of the travel `(dx, dy)` is `(dy, −dx)`.
+ */
+export function onDrawing(
+  A: TopViewPoint,
+  B: TopViewPoint,
+  L: number,
+): (x: number, y: number) => TopViewPoint {
+  const dx = B.x - A.x;
+  const dy = B.y - A.y;
+  return (x, y) => ({
+    x: A.x + (x / L) * dx + (y / L) * dy,
+    y: A.y + (x / L) * dy - (y / L) * dx,
+  });
+}

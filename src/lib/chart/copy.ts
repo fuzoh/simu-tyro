@@ -18,6 +18,14 @@ import { heading, label } from "@/lib/vocabulary/labels.ts";
 export const NO_SPAN_LINE = "Portée invalide — aucun dessin possible.";
 
 /**
+ * The coupe's line where the chosen position has **no loaded line** (§19.11, #118) — under wind, a
+ * slot of the sweep that did not converge. It says the calculation did not converge there, never
+ * that the case cannot exist; the unloaded line and the trajectory stay drawn around it. Short
+ * enough for the 390 px plot at its 10 px.
+ */
+export const NO_LOADED_LINE = "Ligne chargée : le calcul n'a pas convergé à cette position.";
+
+/**
  * The peek control's two labels, per mode — § 5's « ×1 vraie échelle », and the **decision 4**
  * toggle that puts a box-clipped cable back inside the frame. The label names *what pressing it does*, so
  * the mode that no longer shows ×1 no longer says ×1; the disabled control keeps § 5's own words,

@@ -12,7 +12,13 @@ import { CHOOSE_REGIME_BY_REGISTER, JUMP_LABEL } from "@/lib/app/banner.ts";
 import { DISMISS_LABEL } from "@/lib/app/link-strip.ts";
 import { refusalLabelTable } from "@/lib/app/refusal-copy.ts";
 import { DIAGNOSTIC_ACTION } from "@/lib/app/refusals.ts";
-import { COUPE_HOVER, LAYER_LABEL, NO_SPAN_LINE, PEEK_LABEL } from "@/lib/chart/copy.ts";
+import {
+  COUPE_HOVER,
+  LAYER_LABEL,
+  NO_LOADED_LINE,
+  NO_SPAN_LINE,
+  PEEK_LABEL,
+} from "@/lib/chart/copy.ts";
 import { peekBadgeLabel, veBadgeLabel } from "@/lib/layout/contract.ts";
 import { mapLabelTable } from "@/lib/map/copy.ts";
 import { cellLabel, cellsOf, READ_OUT_SCOPE } from "@/lib/rail/cells.ts";
@@ -171,6 +177,7 @@ export function statiqueLabelTable(): readonly string[] {
     peekBadgeLabel({ peek: "true-scale", autofit: 0.6 }),
     peekBadgeLabel({ peek: "fit", autofit: 2.4 }),
     NO_SPAN_LINE,
+    NO_LOADED_LINE,
     DISMISS_LABEL,
     ...Object.values(PROFILE_IMPORT_COPY),
     traceName({ kind: "geoadmin" }),
