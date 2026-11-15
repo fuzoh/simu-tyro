@@ -11,11 +11,11 @@
  *   is always one the engine can evaluate.
  * - **Uniform is the attenuation at zero, whatever the width.** The width is kept through it and
  *   has no effect; « Vent uniforme » ({@link uniformWind}) writes the attenuation alone.
- * - **A non-uniform profile is not computed under a uniform wind.** The spatial statics and the
- *   ride on their locus read the field (§19), but the rose's reading takes one speed for the whole
- *   line. While
- *   {@link WIND_PROFILE_ACTIVE} is off, the gates refuse a profile that is not uniform and its
- *   controls are not offered, so no reader of one speed ever stands in for the field.
+ * - **A non-uniform profile is not computed under a uniform wind.** The spatial statics, the
+ *   passager's equilibrium and the ride on their locus read the field where they act (§19); the
+ *   rose's reading, a display, names the speed at mid-span and the caption the profile. Were
+ *   {@link WIND_PROFILE_ACTIVE} turned off, the gates would refuse a profile that is not uniform and
+ *   its controls would not be offered, so no reader of one speed ever stands in for the field.
  */
 
 import type { WindField, WindProfile } from "@/lib/sim";
@@ -28,23 +28,22 @@ import { meanAltitude } from "@/lib/terrain/trace.ts";
 import type { Wind } from "./types.ts";
 
 /**
- * **Is the Vent's profile consumed by the physics?** Off until the spatial statics (#127) read
- * `windAt` at each point of the line and of the ride, and the views (#118) draw what they read —
- * the coordinated activation of #120 / #127 / #118.
+ * **Is the Vent's profile consumed by the physics?** On since #141: the spatial statics (#127) read
+ * `windAt` at each point of the line, the passager's static force at `x_D` and the descent at the
+ * passager's `x` (§19), and the views (#118) draw the one spatial solve — the coordinated
+ * activation of #120 / #127 / #118. The profile's pad opens on demand, clear of the rose and of the
+ * map's clip, at every width (`WindProfileControl`, `src/components/map/wind-rose.tsx`).
  *
- * While it is off: the profile's fields, its handle on the rose, its preview and « Vent uniforme »
- * are not offered, and a link or a Session that carries a non-uniform profile is kept as given and
- * refused by the Wind Gate, with a Fix Action back to the uniform wind. Turning it on is that
- * activation and nothing less: every reader of the Vent must take the local field first, and the
- * profile's pad must fit the maps it stands on — it does not yet on the narrow ones
- * (`WindProfilePad`, `src/components/map/wind-rose.tsx`, holds the measurements).
+ * Kept as a switch: turned off, the profile's fields, its pad and its preview are not offered, and
+ * a link or a Session that carries a non-uniform profile is kept as given and refused by the Wind
+ * Gate, with a Fix Action back to the uniform wind — never computed as a uniform wind.
  *
  * Typed `boolean` so that both states stay compiled and tested: every function that reads it takes
  * it as a defaulted parameter — the gates' `evaluateGates` and `isWindProfileFieldShown`
  * (`@/lib/rail/gates.ts`) and the vue de dessus's `windControls` (`@/lib/map/wind-rose.ts`), which
  * the live map and its fallback frame both ask. No component reads the constant itself.
  */
-export const WIND_PROFILE_ACTIVE: boolean = false;
+export const WIND_PROFILE_ACTIVE: boolean = true;
 
 /**
  * §8.4's two parameters as they are read: **the whole percents the fields print**, the grain of

@@ -65,6 +65,17 @@ describe("the Rail speaks the exact register", () => {
     expect(DEDUCED_HELP.H).not.toContain("tension totale");
   });
 
+  // #141: the profile is read by every calculation; Avancé's help no longer says the state
+  // before the activation, and says where the speed is read instead.
+  test("the profile's help says it is read where it acts, not that nothing reads it (#141)", () => {
+    for (const id of ["windWidth", "windAttenuation"] as const) {
+      expect(FIELD_HELP[id]).not.toMatch(/ne lit encore|seul le vent uniforme/);
+      expect(FIELD_HELP[id]).toContain("(§19)");
+    }
+    expect(FIELD_HELP.windWidth).toContain("jamais une vitesse moyenne sur la portée");
+    expect(FIELD_HELP.windAttenuation).toContain("moins la ligne s'écarte de A–B");
+  });
+
   // The row's one `ⓘ` is this help: no ride, garde or Verdict on Avancé reads the field.
   test("the target of the farthest point says which Page reads it (#121)", () => {
     expect(FIELD_HELP.reachTarget).toContain(

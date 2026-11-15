@@ -296,10 +296,13 @@ anchors, with no plateau. Two percents set it, the Largeur à mi-atténuation an
 ancrages; the direction is the same along the whole line. It is the same at every height and every
 lateral position, and the line and the passager read the speed where they are — never its mean over
 the span. **A scenario that is typed, never a valley forecast**: no relief and no weather enters
-it. Its shape is `docs/simulation-theory.md` §8.4's. No computation reads it yet: until one does
-its controls are not offered, and a Vent that arrives with a profile that is not uniform is kept
-as given and refused — a Blocking Error on the Wind Gate, with « Passer au vent uniforme » — never
-computed as a uniform wind.
+it. Its shape is `docs/simulation-theory.md` §8.4's. Every computation reads it where it acts
+(#141): the Ligne à vide and the loaded line at each of their points, the passager's static push
+at its position, the descent along the Trajectoire (§19). Its two fields stand beside the Vent's
+others, and on the vue de dessus a « Profil du vent » button opens its pad on demand. It is never
+computed as a uniform wind: were its activation turned off, a Vent that arrives with a profile
+that is not uniform would be kept as given and refused — a Blocking Error on the Wind Gate, with
+« Passer au vent uniforme ».
 _Avoid_: prévision, vent de vallée, plateau, zone centrale exposée, gaussienne, facteur Q
 
 **Largeur à mi-atténuation**:

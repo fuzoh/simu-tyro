@@ -30,8 +30,8 @@
  *   drawn as though it were legal.
  * - **A control is offered only where it may write, and a parked handle only where its drag
  *   mends** ({@link windControls}). Neither handle stands on a map that writes nothing or on a
- *   line without a bearing, and the profile's pad and preview wait for the profile to be read by
- *   the physics (`WIND_PROFILE_ACTIVE`). A Vent the Wind Gate withholds is drawn as none, which
+ *   line without a bearing, and the profile's pad and preview stand only while the profile is read
+ *   by the physics (`WIND_PROFILE_ACTIVE`, on since #141). A Vent the Wind Gate withholds is drawn as none, which
  *   parks the direction handle at the centre: it is offered there only while every breach stands
  *   on the speed or the direction it writes. Under a refused profile a drag from the centre would
  *   write a speed and a direction over the ones the Scenario holds, and lift nothing.
@@ -200,11 +200,13 @@ export type WindControls = {
  * - **The direction handle** stands where the map may write and the line has a bearing. Over a
  *   withheld Vent it waits at the centre, and is offered only while a drag from there lifts what
  *   withholds it: every culprit is the speed or the direction the handle writes (`ws=-5`). Under a
- *   refused profile — one no calculation reads yet, a percent out of its domain — it is not: the
+ *   refused profile — a percent out of its domain, or with the activation off one that is not
+ *   uniform — it is not: the
  *   drag would replace the speed and the direction the Scenario holds and leave the breach
  *   standing. The profile's own field, its Fix Action and its pad repair it.
- * - **The profile's pad** stands on the same maps — one that writes, a line with a bearing — once
- *   the profile is read by the physics, and not while the Mesure holds the map. Its handle stands
+ * - **The profile's pad** is offered on the same maps — one that writes, a line with a bearing —
+ *   while the profile is read by the physics (on since #141), and not while the Mesure holds the
+ *   map. It opens on demand, behind its button (`WindProfileControl`). Its handle stands
  *   on the percents the Scenario holds, withheld or not, so a drag of it overwrites nothing it
  *   does not set, and it stays over a withheld Vent.
  * - **The profile is read out** once it is read by the physics, on a line that has a bearing, and

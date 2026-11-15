@@ -101,15 +101,19 @@ allowed from there.
   does not converge stays a hole: no neighbour fills it, the Verdict is `Indéterminé`, no ride
   crosses it (Q24). The ride « sans vent » is the same Scenario with its Vent at zero — re-posed,
   swept and ridden — not the windy locus ridden in still air.
-- **The Vent's profile is a prescribed scenario, read locally, and refused until it is read**
-  (#120, `docs/simulation-theory.md` §8.4). `windAt(field, x, L, bearing)`
+- **The Vent's profile is a prescribed scenario, read locally, and refused whenever it is not read**
+  (#120, #141, `docs/simulation-theory.md` §8.4). `windAt(field, x, L, bearing)`
   (`src/lib/sim/wind-profile.ts`) is the one entry a spatial reader takes — at its own `x`, for
   each evaluation: never a mean speed over the span, never one multiplier on a force, and nothing
   clamped outside `[0, L]`. The Scenario's two percents become that field in
   `src/lib/scenario/wind.ts` (`windFieldOf`), read at the whole percent they print as. The same
-  module holds `WIND_PROFILE_ACTIVE`, **off until every reader of the Vent takes `windAt`** (#127,
-  #118): meanwhile the profile's controls are not offered, and the Wind Gate refuses a profile
-  that is not uniform — a link or a Session can carry one — rather than compute it under one
-  speed. Turning the flag on while a reader still calls `windComponents` with the entered speed
-  is that silent substitution. The shape is §8.4's: no other curve, parameter or default without
+  module holds `WIND_PROFILE_ACTIVE`, **on since #141**, once every reader of the Vent took
+  `windAt` (#127: the pose, the line's and the passager's equilibria, the descent) and the views
+  projected the one spatial solve (#118). `windComponents` is called with the entered speed only
+  inside `windAt` and for the rose's display. A new reader of the Vent takes `windAt` at its own
+  `x`; one that called `windComponents` with the entered speed would be the silent substitution
+  the switch exists to prevent. Turned off, the profile's controls are not offered and the Wind
+  Gate refuses a profile that is not uniform — a link or a Session can carry one — rather than
+  compute it under one speed; `src/lib/app/surfaces.test.ts` checks, through the real chain, that
+  a non-uniform profile is consumed. The shape is §8.4's: no other curve, parameter or default without
   changing the reference first.

@@ -15,8 +15,8 @@ import { anchorReading, MAP_COPY } from "@/lib/map/copy.ts";
  * @param positions the anchors as drawn — a dragged one where the pointer holds it.
  * @param wind the Vent's line (`windReading`, or why the gates withhold it); `null` hides it, as
  *   under the Vue 3D.
- * @param profile the Vent's profile in words (`profileCaption`), under a map that has no pad for
- *   it (#120); absent or `null` where there is none to say.
+ * @param profile the Vent's profile in words (`profileCaption`, #120) — under every vue de dessus,
+ *   the pad opening on demand (#141); absent or `null` where there is none to say.
  * @param gesture what the next click does or what a release is loading; absent where no gesture is
  *   offered.
  * @param unavailable « fond de carte indisponible » is said; `unoriented` adds why the plain drawing

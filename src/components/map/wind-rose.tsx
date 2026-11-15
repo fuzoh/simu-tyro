@@ -18,24 +18,29 @@
  * - **Without a reference there is no wind and no handle either**: A or B is not on the map, so the
  *   line has no bearing and the Vent can be neither drawn nor set (`windBearing`). The rose draws
  *   the level line, A on the left, and the reading under the map says why.
- * - **The profile has a handle of its own** (#120): {@link WindProfilePad}, a pad beside the rose
- *   whose axes are the screen's — right is wider, up is more attenuated — with the preview of the
- *   speed from A to B and « Vent uniforme ». The same gesture as the rose's, and no key of its own:
- *   the profile's keyboard is its two fields. Its holder mounts it by the same rule
- *   (`windControls`): only on a map that writes, on a line that has a bearing, and only once the
- *   physics reads the profile (`WIND_PROFILE_ACTIVE`).
+ * - **The profile has a handle of its own** (#120): {@link WindProfilePad}, a pad whose axes are
+ *   the screen's — right is wider, up is more attenuated — with the preview of the speed from A to
+ *   B and « Vent uniforme ». The same gesture as the rose's, and no key of its own: the profile's
+ *   keyboard is its two fields. Its holder offers it by the same rule (`windControls`): only on a
+ *   map that writes, on a line that has a bearing, and only while the physics reads the profile
+ *   (`WIND_PROFILE_ACTIVE`, on since #141).
+ * - **The pad opens on demand, off the map** (#141): a « Profil du vent » button on the map opens
+ *   it in a popup hung under the map's frame, or over it where the viewport has no room below
+ *   ({@link WindProfileControl}). It never covers the rose and is never cut by the frame's clip,
+ *   whatever the map's size — 390, 768, 1024 and 1440 px of viewport were driven.
  * - **One gesture, written once** ({@link useHandleDrag}, {@link Handle}): the two handles differ in
  *   what an offset means, never in how the pointer is taken, followed and released.
  */
 
 import type { PointerEvent, RefObject } from "react";
 
+import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { useRef, useState } from "react";
 
 import type { ProfilePreview, RoseOffset, RoseReference } from "@/lib/map/wind-rose.ts";
 import type { Wind } from "@/lib/scenario/types.ts";
 
-import { Button } from "@/components/ui/button.tsx";
+import { Button, buttonVariants } from "@/components/ui/button.tsx";
 import { MAP_COPY, profileReading } from "@/lib/map/copy.ts";
 import {
   handleOffset,
@@ -243,32 +248,75 @@ const PREVIEW_PX = { width: PROFILE_PAD_PX.width, height: 36, margin: 3 } as con
 const READING_PX = 168;
 
 /**
+ * The profile's control on the map (#141): a button that opens {@link WindProfilePad} **on demand**
+ * — the brief's « zone de réglage pouvant apparaître à la sélection de cette poignée » — in a
+ * popup hung under the map's frame.
+ *
+ * Why a popup anchored to the frame, not a box in its corner: the pad is 310 × 182 px, and the
+ * frame clips. In a corner it ran past the 285 × 189 map at 1024 px of viewport and past the
+ * 364 × 242 one at 390, « Vent uniforme » out of reach, and covered the rose's centre at 768
+ * (measured 2026-11-13, `docs/conventions/ui.md`). The popup is portalled, so no clip cuts it;
+ * it stands **under** the frame — over the caption and the coupe — or above it where the viewport
+ * has no room below (Base UI's flip), so it never stands on the map, hence never on the rose.
+ * Closed, the map is the map; the caption carries the profile in words.
+ *
+ * @param frame the map's frame, which the popup hangs from.
+ */
+export function WindProfileControl({
+  frame,
+  wind,
+  preview,
+  onWind,
+}: {
+  frame: RefObject<HTMLElement | null>;
+  wind: Wind;
+  preview: ProfilePreview | null;
+  onWind: (wind: Wind) => void;
+}) {
+  return (
+    <PopoverPrimitive.Root>
+      <PopoverPrimitive.Trigger
+        className={cn(
+          buttonVariants({ variant: "outline", size: "sm" }),
+          "bg-background touch-44 pointer-events-auto",
+        )}
+        type="button"
+      >
+        {MAP_COPY.profile}
+      </PopoverPrimitive.Trigger>
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Positioner
+          align="start"
+          anchor={frame}
+          className="isolate z-50"
+          side="bottom"
+          sideOffset={4}
+        >
+          <PopoverPrimitive.Popup className="outline-hidden">
+            <WindProfilePad onWind={onWind} preview={preview} wind={wind} />
+          </PopoverPrimitive.Popup>
+        </PopoverPrimitive.Positioner>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
+  );
+}
+
+/**
  * The profile's pad (#120): a handle on fixed screen axes — to the right the largeur à
  * mi-atténuation grows, upward the atténuation aux ancrages does — the preview of the speed from A
  * to B, and « Vent uniforme ».
  *
- * A sibling of the map like the rose, and `data-rose` like it, so the line under it is not read
- * through it. Each gesture writes the profile's two percents and keeps the speed and the direction.
- *
- * **Not laid out for every map yet: a precondition of the activation.** The pad stands in a fixed
- * corner of the frame, as large as its content, and the frame clips. Measured with
- * `WIND_PROFILE_ACTIVE` turned on locally (2026-11-13, Statique, the trial line, a profile at
- * 30 % and 40 %): at 1440 × 900 the map is 701 × 467 and the pad, 310 × 182, stands over the
- * rose's outer rings, 33 px short of its centre; at 768 × 1024 (map 422 × 281) it fits and covers
- * that centre, so the direction handle of a light wind is under it; at 1024 × 768 (map 285 × 189)
- * it covers the centre too and runs 33 px
- * past the frame's right edge and 41 px past its bottom, « Vent uniforme » wholly clipped; at
- * 390 × 664 (map 364 × 242) it stacks, 178 × 338, and runs 144 px past the bottom. Before the
- * activation it is to open on demand — the brief's « zone de réglage pouvant apparaître à la
- * sélection de cette poignée » — clear of the rose and of the frame's clip, and to be driven at
- * the three pixel budgets of `docs/conventions/testing.md` and at 1024 px.
+ * `data-rose` like the rose, so the line is never read through it. Each gesture writes the
+ * profile's two percents and keeps the speed and the direction. Its two columns stand side by
+ * side at every width — 310 px wide, it fits the 390 px phone — so it is 182 px tall everywhere;
+ * {@link WindProfileControl} places it.
  *
  * @param wind the Scenario's Vent as it is held — a percent out of its domain parks the handle on
  *   the pad's nearest edge and is rewritten only by a drag.
  * @param preview what the preview draws, or `null` while the gates refuse the Vent: a profile that
  *   is refused is not drawn as though it were legal, and its fields carry the message.
  */
-export function WindProfilePad({
+function WindProfilePad({
   wind,
   preview,
   onWind,
@@ -293,7 +341,7 @@ export function WindProfilePad({
   return (
     <div
       aria-label={MAP_COPY.profile}
-      className="bg-background/90 text-foreground pointer-events-auto absolute top-12 left-2 flex flex-col gap-2 border px-1 py-1 text-xs shadow sm:flex-row sm:gap-3"
+      className="bg-background text-foreground flex flex-row gap-3 border px-1 py-1 text-xs shadow"
       data-rose
       role="group"
     >

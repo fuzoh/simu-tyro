@@ -155,7 +155,7 @@ import { loadVue3d } from "./load-vue-3d.ts";
 import { MapCaption } from "./map-caption.tsx";
 import { useMeasure } from "./use-measure.ts";
 import { EmbarkedControls, Gimbal } from "./vue-3d-gimbal.tsx";
-import { WindProfilePad, WindRose } from "./wind-rose.tsx";
+import { WindProfileControl, WindRose } from "./wind-rose.tsx";
 
 // MapLibre cannot find its worker inside a bundle; Vite hands over the file's URL.
 setWorkerUrl(workerUrl);
@@ -262,10 +262,12 @@ export function TopMap({
   // rose turns by the line's bearing to stand where the wind comes from on that drawing.
   const reference = roseReference(bearing, plain !== null && plain.unoriented !== null);
   const rose = useRef<HTMLDivElement>(null);
+  // The map's box, which the profile's popup hangs from (#141): under it, never on it.
+  const mapBox = useRef<HTMLDivElement>(null);
   // Which of the Vent's controls stand here is one rule's (`windControls`), the fallback frame's
   // too: the rose's handle, and — once the physics reads it — the profile's pad and its preview
-  // (#120), never drawn as legal while the gates withhold the Vent. Under a map without the pad —
-  // the Page Terrain's, the Mesure's — the caption carries the preview's readings.
+  // (#120), never drawn as legal while the gates withhold the Vent. The pad opens on demand (#141),
+  // so the caption carries the preview's readings under every map, with or without it.
   const controls = windControls({
     culprits: windCulprits,
     placed: reference !== null,
@@ -273,6 +275,17 @@ export function TopMap({
     measuring,
   });
   const preview = controls.preview ? profilePreview(scenario.wind, frame?.L ?? null) : null;
+  // The pad opens on demand (#141): closed, the map is the map, and the caption says the profile.
+  const profileControl = controls.pad ? (
+    <WindProfileControl
+      frame={mapBox}
+      onWind={(next) => dispatch({ type: "scénario/modifié", patch: { wind: next } })}
+      preview={preview}
+      // As the Scenario holds it, a withheld Vent included: the handle stands on what a drag would
+      // rewrite.
+      wind={scenario.wind}
+    />
+  ) : null;
   const [project, setProject] = useState<Project | null>(null);
   // The line is read under the pointer only while nothing else is using the pointer on the map.
   // The line the map draws is the portée's own only where the coupe's profil runs between its ends.
@@ -331,7 +344,7 @@ export function TopMap({
         <MapCaption
           gesture={gestureLine}
           positions={drawn}
-          profile={shows3d || controls.pad || preview === null ? null : profileCaption(preview)}
+          profile={shows3d || preview === null ? null : profileCaption(preview)}
           unavailable={!shows3d && unavailable}
           unoriented={plain?.unoriented ?? null}
           vue3d={
@@ -381,7 +394,7 @@ export function TopMap({
             <Attribution text={drapedAttribution(display.fond)} />
           </>
         ) : (
-          <div className="absolute inset-0" {...hover}>
+          <div className="absolute inset-0" ref={mapBox} {...hover}>
             {plain === null ? (
               <>
                 <MapCanvas
@@ -438,13 +451,19 @@ export function TopMap({
                   >
                     {measuring ? MEASURE_COPY.quit : MEASURE_COPY.enter}
                   </Toggle>
+                  {profileControl}
                 </div>
                 {measuring && measure.reading !== null && (
                   <MeasureReadout reading={measure.reading} />
                 )}
               </>
             ) : (
-              plain.figure
+              <>
+                {plain.figure}
+                {profileControl !== null && (
+                  <div className="pointer-events-none absolute top-2 left-2">{profileControl}</div>
+                )}
+              </>
             )}
             <WindRose
               hostRef={rose}
@@ -456,15 +475,6 @@ export function TopMap({
               reference={reference}
               wind={wind}
             />
-            {controls.pad && (
-              <WindProfilePad
-                onWind={(next) => dispatch({ type: "scénario/modifié", patch: { wind: next } })}
-                preview={preview}
-                // As the Scenario holds it, a withheld Vent included: the handle stands on what a
-                // drag would rewrite.
-                wind={scenario.wind}
-              />
-            )}
             <Attribution text={fondAttribution(display.fond)} />
             {read !== null && read.reading !== null && (
               <HoverReadout at={read.at} lines={coupeLines(read.reading, "terrain")} />

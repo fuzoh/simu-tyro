@@ -3,13 +3,13 @@ import { describe, expect, test } from "vitest";
 import type { Ride } from "@/lib/sim";
 import type { Trace } from "@/lib/terrain/trace.ts";
 
-import { ride, ridePath } from "@/lib/sim";
+import { kmhToMs, ride, ridePath, windComponents } from "@/lib/sim";
 
 import type { RiderSweep } from "./traverse.ts";
 import type { ScenarioDraft } from "./types.ts";
 import type { UnloadedLine } from "./unloaded.ts";
 
-import { readDynamics } from "./dynamics.ts";
+import { readDynamics, rideWindOf } from "./dynamics.ts";
 import { FIRST_RUN_RETAINED_TEXTILE, firstRunDefaults } from "./first-run.ts";
 import { sweepRider, sweepRiderOf } from "./traverse.ts";
 import { deriveUnloaded, unloadedInputs } from "./unloaded.ts";
@@ -166,6 +166,67 @@ describe("the windy ride — on the locus the Vent poses (§19.15)", () => {
     // The whole chain re-run in still air — pose, sweep, ride — not the windy locus ridden calm.
     expect(windy(0).calm).toEqual(calm.calm);
     expect(windy(90).calm).toEqual(calm.calm);
+  });
+});
+
+/**
+ * The Vent's profile (#141): the ride reads the field at the passager's own `x`, never the mid-span
+ * speed for the whole line. §8.4 by hand: `V(1 − a)` at either anchor, `V` at mid-span — projected
+ * by the uniform reader `windComponents`, which knows nothing of the profile.
+ */
+describe("the windy ride reads the Vent's profile where the passager is (#141)", () => {
+  const V = kmhToMs(50);
+  const profiled = (attenuationPct: number): UnloadedLine => {
+    const { unloaded } = solved({
+      ...SHIPPED,
+      positions: positionsFor(90),
+      wind: { speedKmh: 50, directionDeg: 30, widthPct: 30, attenuationPct },
+    });
+    return unloaded;
+  };
+
+  test("at the anchors it is the attenuated speed, at mid-span the Vent's", () => {
+    const line = profiled(40);
+    const wind = rideWindOf(line);
+    if (wind === null) throw new Error("the Vent is applied");
+    const { L } = line.span;
+    for (const [x, speed] of [
+      [0, V * 0.6],
+      [L, V * 0.6],
+      [L / 2, V],
+    ] as const) {
+      const { along, across } = windComponents(speed, 30, 90);
+      expect(wind(x).ux).toBeCloseTo(along, 12);
+      expect(wind(x).uy).toBeCloseTo(across, 12);
+    }
+    // Between, softer than mid-span and harder than the anchors, on the same direction.
+    const quarter = wind(L / 4);
+    const norm = Math.hypot(quarter.ux, quarter.uy);
+    expect(norm).toBeGreaterThan(V * 0.6);
+    expect(norm).toBeLessThan(V);
+    expect(quarter.uy / quarter.ux).toBeCloseTo(
+      windComponents(1, 30, 90).across / windComponents(1, 30, 90).along,
+      12,
+    );
+  });
+
+  test("a sample a few ulps past B reads B's wind, not a wind from nowhere", () => {
+    const line = profiled(40);
+    const wind = rideWindOf(line);
+    if (wind === null) throw new Error("the Vent is applied");
+    const { L } = line.span;
+    expect(wind(L * (1 + Number.EPSILON))).toEqual(wind(L));
+    expect(wind(-Number.MIN_VALUE)).toEqual(wind(0));
+  });
+
+  test("an attenuation of 0 % reads the uniform wind everywhere", () => {
+    const line = profiled(0);
+    const wind = rideWindOf(line);
+    if (wind === null) throw new Error("the Vent is applied");
+    const { along, across } = windComponents(V, 30, 90);
+    for (const x of [0, line.span.L / 3, line.span.L]) {
+      expect(wind(x)).toEqual({ ux: along, uy: across });
+    }
   });
 });
 

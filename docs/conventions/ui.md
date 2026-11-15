@@ -500,15 +500,23 @@ arithmetic over the shell, measured by `agent-browser` (`docs/conventions/routin
   is then cut to « Pentes sup… », its whole name in its title — the select gives way first, so
   390 px still reads « Pentes supérieures à 30° » whole. Accepted: the brief puts the switch at
   1024, and the map is the wider of the two from 1106.
-- **The Vent's profile pad does not fit this map, and is not shown yet** (#120): `WindProfilePad`
-  is mounted only once `WIND_PROFILE_ACTIVE` is on. Turned on locally (2026-11-13) it is
-  310 × 182 px in a fixed corner of the frame, which clips: on the 285 × 189 map at 1024 it runs
-  33 px past the right edge and 41 px past the bottom, « Vent uniforme » out of reach; on a
-  390 px phone (map 364 × 242) it stacks to 178 × 338 and runs 144 px past the bottom; at 768 it
-  fits and covers the rose's centre. **Not accepted — a precondition of the activation**: the pad
-  is to open on demand, clear of the rose and of the frame's clip, and to be driven at 390, 768,
-  1024 and 1440 before the flag is turned on. Its box is the map overlays' — `px-1 py-1`, square,
-  `gap-3` between its two columns.
+- **The Vent's profile pad opens on demand, off the map** (#120, #141): a « Profil du vent »
+  button in the map's overlay row (top-left on the plain drawing) opens `WindProfilePad` in a
+  portalled popup anchored to the map's box — under it, or above it where the viewport has no
+  room below — so it never stands on the rose and no frame clips it. Its two columns stand side by
+  side at every width: 310 × 182 px. In a fixed corner of the frame (2026-11-13) it ran past the
+  285 × 189 map at 1024 and past the 364 × 242 one at 390, « Vent uniforme » out of reach, and
+  covered the rose's centre at 768. Driven with `agent-browser` on 2026-11-15, Statique, the trial
+  line, a profile at 30 % and 40 %, the popup opened: at 1440 × 900 under the 701 × 467 map
+  (top 649, map bottom 645); at 1024 × 768 under the 285 × 189 map (bottom 553 of 768); at
+  768 × 1024 and 390 × 664, the map centred in the viewport, above the 422 × 281 and 364 × 242
+  maps (bottoms 590 and 391, map tops 594 and 395) — « Vent uniforme » and the 44 px handle whole
+  in the viewport each time; a drag of the handle wrote `ww` and `wa`, Escape closed it. At every
+  driven width the map leaves more than 186 px — the popup and its offset — on one side of it
+  inside the viewport, at least 216 px (1440 × 900: 900 − 467 over two). **What
+  it costs**: the popup covers the caption and the top of the coupe while it is open; the caption
+  says the profile in words whenever it is not uniform, so the pad stays closed by default. Its
+  box is the map overlays' — `px-1 py-1`, square, `gap-3` between its two columns.
 - **The Skeleton is the same tree** (`StatiqueFrame`), so it lands in the same boxes at every width.
 
 ## Dynamique's proposal
