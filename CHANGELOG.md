@@ -1,5 +1,39 @@
 # Changelog
 
+## [2.1.0](https://github.com/fuzoh/simu-tyro/compare/v2.0.0...v2.1.0) (2026-11-15)
+
+
+### Features
+
+* **chart:** draw the tension along the line on Avancé ([#119](https://github.com/fuzoh/simu-tyro/issues/119)) ([5467082](https://github.com/fuzoh/simu-tyro/commit/546708205d20719cb7b21679a0d263b83aec61d6))
+* **docs:** add a step-by-step guide in French ([#125](https://github.com/fuzoh/simu-tyro/issues/125)) ([5467082](https://github.com/fuzoh/simu-tyro/commit/546708205d20719cb7b21679a0d263b83aec61d6))
+* **dynamique:** propose a height for anchor B from a farthest-point target of 50–93 % ([#121](https://github.com/fuzoh/simu-tyro/issues/121)) ([5467082](https://github.com/fuzoh/simu-tyro/commit/546708205d20719cb7b21679a0d263b83aec61d6))
+* **map:** add the Vue embarquée, the ride seen from the passager's seat ([#126](https://github.com/fuzoh/simu-tyro/issues/126)) ([5467082](https://github.com/fuzoh/simu-tyro/commit/546708205d20719cb7b21679a0d263b83aec61d6))
+* **rail:** separate the two Paramètres columns on wide screens ([#123](https://github.com/fuzoh/simu-tyro/issues/123)) ([5467082](https://github.com/fuzoh/simu-tyro/commit/546708205d20719cb7b21679a0d263b83aec61d6))
+* **ui:** move help, warnings and errors into infobulles on all four Pages ([#122](https://github.com/fuzoh/simu-tyro/issues/122)) ([5467082](https://github.com/fuzoh/simu-tyro/commit/546708205d20719cb7b21679a0d263b83aec61d6))
+
+
+### Performance Improvements
+
+* **app:** load MapLibre off the critical path and stop inlining fonts ([#128](https://github.com/fuzoh/simu-tyro/issues/128)) ([5467082](https://github.com/fuzoh/simu-tyro/commit/546708205d20719cb7b21679a0d263b83aec61d6))
+* **map:** redraw the Vue 3D at every rider position during a drag ([#130](https://github.com/fuzoh/simu-tyro/issues/130)) ([5467082](https://github.com/fuzoh/simu-tyro/commit/546708205d20719cb7b21679a0d263b83aec61d6))
+
+
+### Documentation
+
+* frame spatial wind contracts and decisions ([#135](https://github.com/fuzoh/simu-tyro/issues/135)) ([f0da795](https://github.com/fuzoh/simu-tyro/commit/f0da795e2c461ceea4a245e1153da1771cd7531d))
+* **sim:** archive the lift and axial drag experiment ([#134](https://github.com/fuzoh/simu-tyro/issues/134)) ([5467082](https://github.com/fuzoh/simu-tyro/commit/546708205d20719cb7b21679a0d263b83aec61d6))
+* **sim:** archive verified aerodynamic and energy reviews ([c216fea](https://github.com/fuzoh/simu-tyro/commit/c216feadb7878d2a90af7d6e37540b3600e89e60))
+* **sim:** consolidate spatial wind triage decisions ([#136](https://github.com/fuzoh/simu-tyro/issues/136)) ([f861a4c](https://github.com/fuzoh/simu-tyro/commit/f861a4cef56d97e701ec137d46959a2ec1f0702a))
+* **sim:** document spatial equilibrium research and validation gaps ([147bcab](https://github.com/fuzoh/simu-tyro/commit/147bcab4dd2b847acc1813a4496b2667c1d94b96))
+
+
+### Build System
+
+* **deps-dev:** bump oxfmt ([#138](https://github.com/fuzoh/simu-tyro/issues/138)) ([7ccc854](https://github.com/fuzoh/simu-tyro/commit/7ccc85434ffa22d12fd1fa28563a46c89508ebe5))
+* **deps:** bump dependencies to latest ([#143](https://github.com/fuzoh/simu-tyro/issues/143)) ([86a2a97](https://github.com/fuzoh/simu-tyro/commit/86a2a9729d8515bd8e2583cce76667cc5b8e89b0))
+* **deps:** bump the production-dependencies group with 3 updates ([#137](https://github.com/fuzoh/simu-tyro/issues/137)) ([5458920](https://github.com/fuzoh/simu-tyro/commit/54589200fdafe2a18234886837a03072f3bdd768))
+
 ## [2.0.0](https://github.com/fuzoh/simu-tyro/compare/v1.0.1...v2.0.0) (2026-11-09)
 
 
