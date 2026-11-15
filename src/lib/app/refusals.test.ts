@@ -269,7 +269,38 @@ describe("the cause clauses « Aucun résultat » echoes", () => {
       "tension-impossible": "tension impossible",
       "cible-inatteignable": "cible inatteignable",
       "calcul-impossible": "calcul impossible",
+      "hors-portee-du-vent": "la ligne sort de la portée où le vent est défini",
     });
+  });
+});
+
+describe("§19.11's `outside-model` — the line leaves the span the wind is defined on (#127)", () => {
+  const failure = {
+    stage: "span",
+    error: { kind: "outside-model", reason: "wind-abscissa", x: 151.25 },
+  } as const;
+
+  test("is its own surface, with the plan's copy, and offers the diagnostic", () => {
+    expect(engineRefusal(failure, { tightness: { mode: "length", L0: 165 } })).toEqual({
+      id: "hors-portee-du-vent",
+      message: "⛔ Aucun résultat — la ligne sort de la portée où le vent est défini.",
+      diagnostic: true,
+    });
+  });
+
+  test("puts the kind, the reason and the abscissa in the clipboard, not on screen", () => {
+    const payload = diagnosticPayload({
+      failure,
+      at: "2026-11-15T10:00:00.000Z",
+      build: "dev",
+      scenario: scenario(),
+      span: { L: 150, h: -18, L0: 165 },
+      derived: { w: 5.361164, EA: 6_900_000, strength: 90_740 },
+      address: null,
+    });
+    expect(payload).toMatch(/^kind\s+outside-model$/m);
+    expect(payload).toMatch(/^reason\s+wind-abscissa$/m);
+    expect(payload).toMatch(/^x\s+151[.,]25/m);
   });
 });
 

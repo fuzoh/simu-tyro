@@ -49,8 +49,15 @@ import { SOLVER } from "@/lib/sim";
 import { CONSTRUCTION_TOKEN_BY_ID } from "@/lib/url/scenario.ts";
 import { heading, label } from "@/lib/vocabulary/labels.ts";
 
-/** The three surfaces § 7 names. Three, not two: `no-convergence` has two origins. */
-export type RefusalId = "tension-impossible" | "cible-inatteignable" | "calcul-impossible";
+/**
+ * The three surfaces § 7 names — three, not two: `no-convergence` has two origins — and §19.11's
+ * `outside-model`, an incompatible configuration the spatial engine alone can return (#127).
+ */
+export type RefusalId =
+  | "tension-impossible"
+  | "cible-inatteignable"
+  | "calcul-impossible"
+  | "hors-portee-du-vent";
 
 /**
  * One rendered refusal. **There is no `fixes` field**, and its absence is the decision: the only
@@ -86,6 +93,7 @@ export const REFUSAL_CAUSE: Record<RefusalId, string> = {
   "tension-impossible": lowerFirst(label("tension-impossible", "exact")),
   "cible-inatteignable": lowerFirst(label("cible-inatteignable", "exact")),
   "calcul-impossible": lowerFirst(label("calcul-impossible", "exact")),
+  "hors-portee-du-vent": "la ligne sort de la portée où le vent est défini",
 };
 
 /**
@@ -108,6 +116,15 @@ export function engineRefusal(
 ): EngineRefusal | null {
   if (failure.error === null) return null;
   const { stage, error } = failure;
+  if (error.kind === "outside-model") {
+    // §19.11: a configuration the model does not cover, not a solver that failed — the wind has
+    // no value past the anchors and the engine does not extrapolate it.
+    return {
+      id: "hors-portee-du-vent",
+      message: `⛔ ${label("aucun-resultat", register)} — ${REFUSAL_CAUSE["hors-portee-du-vent"]}.`,
+      diagnostic: true,
+    };
+  }
   if (error.kind === "invalid-input") {
     // §5.4's floor, in whichever quantity `resolveL0` re-emitted it. Every other field is tier
     // one's or a gate's, and this module says nothing about it.
@@ -282,6 +299,8 @@ function errorLines({ error }: EngineError, span: DiagnosticInput["span"]): read
       key("kind", "no-convergence"),
       key("attempts", String(error.attempts)),
       key("residual", error.residual.toExponential(4)),
+      // §19.10–§19.11's diagnostic, which only the spatial engine sets.
+      ...(error.reason === undefined ? [] : [key("reason", error.reason)]),
       // §5.3's tolerance is **L-scaled beyond 1000 m**, so a residual printed without it could not
       // be interpreted — which is exactly why § 7 keeps both off the screen and both in here.
       key("tolerance", toleranceOf(span).toExponential()),
@@ -289,6 +308,9 @@ function errorLines({ error }: EngineError, span: DiagnosticInput["span"]): read
   }
   if (error.kind === "slack-limit") {
     return [key("kind", "slack-limit"), key("hFloored", num(error.hFloored))];
+  }
+  if (error.kind === "outside-model") {
+    return [key("kind", "outside-model"), key("reason", error.reason), key("x", num(error.x))];
   }
   return [
     key("kind", "invalid-input"),

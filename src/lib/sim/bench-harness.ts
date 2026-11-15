@@ -36,9 +36,11 @@
  *   apart would make the CI threshold guard something the human-read bench does not measure.
  */
 
-import type { SpanInput, Terrain } from "./types.ts";
+import type { LineAero, RiderLoad, SpanInput, SpatialSpanInput, Terrain } from "./types.ts";
 
 import { CLEARANCE, evaluateClearance } from "./clearance.ts";
+import { evaluateSpatialClearance } from "./spatial-clearance.ts";
+import { sweepSpatial } from "./spatial-sweep.ts";
 import { sweep } from "./sweep.ts";
 
 /** Runs per cell — the prototype's « bench ×40 ». */
@@ -227,5 +229,109 @@ export function measurePair(cell: BenchCell, n: number, runs: number = BENCH_RUN
     minCoverage = Math.min(minCoverage, run.coverage);
   }
 
+  return { p95: percentile(times, 0.95), p50: percentile(times, 0.5), minCoverage, runs };
+}
+
+// —— §19's windy pair (#127) ——————————————————————————————————————————————————————————————————
+
+/**
+ * The windy pair's criterion, ms — `sweepSpatial` **plus** `evaluateSpatialClearance` at §19.9's
+ * `N = 240` and §6.2's 260 positions, p95 over {@link BENCH_RUNS}. A **budget set from a
+ * measurement** (`docs/performance/spatial-sweep.md`), not the measurement: the worst cell — the
+ * 40 % profile, whose `φ` costs a `pow`, a `sin` and a `cos` at every RK4 stage — measured ≈ 92 ms
+ * p95 in Node on the reference machine, the uniform cells 31–49 ms. It misses #127's 60 ms target
+ * on the profile cell; the plan says to report that, not to coarsen `N`.
+ */
+export const SPATIAL_PAIR_P95_BUDGET_MS = 150;
+
+/** One windy timing scenario — `BenchCell`'s span and ground, under a wind. */
+export type SpatialBenchCell = {
+  readonly key: string;
+  readonly label: string;
+  /** The unloaded member, wind included. */
+  readonly input: SpatialSpanInput;
+  readonly rider: RiderLoad;
+  readonly terrain: Terrain;
+  readonly hRider: number;
+};
+
+/** A steel 12 mm line under §8.4's field: the bench's wind, never a measurement. */
+function windOn(speed: number, from: number, attenuation: number): LineAero {
+  return {
+    field: { speed, from, profile: { width: 50, attenuation } },
+    bearing: 0,
+    rho: 1.225,
+    d: 0.012,
+    CDn: 1.2,
+  };
+}
+
+function spatialCell(
+  key: string,
+  label: string,
+  plane: BenchCell,
+  aero: LineAero,
+): SpatialBenchCell {
+  const { L, h, L0, w, EA } = plane.input;
+  return {
+    key,
+    label,
+    input: { L, h, L0, w, EA, aero, rider: null },
+    rider: { weight: plane.riderP, share: 1, hRider: plane.hRider },
+    terrain: plane.terrain,
+    hRider: plane.hRider,
+  };
+}
+
+/** The first-run line, 150 m — the span the opening screen sweeps, here under wind. */
+const FIRST_RUN: BenchCell = cell(
+  "first-run-150",
+  "150 m first run",
+  { L: 150, h: -18, L0: 151.644, w: 5.361, EA: 6.9e6 },
+  { zA: -12, zB: -30, bumps: [{ at: 0.5, height: 3, width: 0.3 }] },
+);
+
+/**
+ * The three worst-conditioned spans and the first run, under a 15 m/s crosswind on a steel 12 mm
+ * line; and the first run under an oblique wind with a 40 % profile, which reads `φ` at every stage.
+ */
+export const SPATIAL_BENCH_CELLS: readonly SpatialBenchCell[] = [
+  spatialCell("cross-150", "150 m first run, 15 m/s across", FIRST_RUN, windOn(15, 90, 0)),
+  spatialCell(
+    "oblique-150",
+    "150 m first run, 15 m/s at 45° under a 40 % profile",
+    FIRST_RUN,
+    windOn(15, 45, 40),
+  ),
+  ...BENCH_CELLS.map((plane) =>
+    spatialCell(`cross-${plane.key}`, `${plane.label}, 15 m/s across`, plane, windOn(15, 90, 0)),
+  ),
+];
+
+/** One timed windy pair. */
+export function timeSpatialPair(
+  cell: SpatialBenchCell,
+  n: number,
+): { ms: number; coverage: number } {
+  const t0 = performance.now();
+  const swept = sweepSpatial(cell.input, cell.rider, n);
+  evaluateSpatialClearance(swept, cell.terrain, cell.hRider);
+  return { ms: performance.now() - t0, coverage: swept.coverage };
+}
+
+/** {@link measurePair} for a windy cell: one warm-up, then `runs` timed pairs. */
+export function measureSpatialPair(
+  cell: SpatialBenchCell,
+  n: number,
+  runs: number = BENCH_RUNS,
+): PairTiming {
+  timeSpatialPair(cell, n);
+  const times: number[] = [];
+  let minCoverage = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < runs; i++) {
+    const run = timeSpatialPair(cell, n);
+    times.push(run.ms);
+    minCoverage = Math.min(minCoverage, run.coverage);
+  }
   return { p95: percentile(times, 0.95), p50: percentile(times, 0.5), minCoverage, runs };
 }

@@ -86,11 +86,20 @@ function requireWithin(
 export function windProfileShape(xi: number, width: number): number {
   requireWithin("windProfileShape", "xi", xi, { min: 0, max: 1 });
   requireWithin("windProfileShape", "width", width, WIND_PROFILE.width);
+  return shapeOf(xi, exponentOf(width));
+}
+
+/** `p = ln 2 / ln(1/λ)`, with `λ = w/100` — hoisted by {@link WindLine}, so written once. */
+function exponentOf(width: number): number {
+  return Math.LN2 / Math.log(100 / width);
+}
+
+/** `φ(ξ)` for an exponent already computed — the one body {@link WindLine} shares. */
+function shapeOf(xi: number, p: number): number {
   const chi = Math.abs(2 * xi - 1);
   // `cos(π/2)` is 6e-17 and not zero: the two ends of `χ` are stated, not computed.
   if (chi === 0) return 1;
   if (chi === 1) return 0;
-  const p = Math.LN2 / Math.log(100 / width);
   const h = Math.sin((Math.PI / 2) * chi ** p) ** 2;
   return Math.cos((Math.PI / 2) * h) ** 2;
 }
@@ -137,4 +146,70 @@ export function windAt(field: WindField, x: number, L: number, bearing: number):
   }
   requireWithin("windAt", "x", x, { min: 0, max: L });
   return windComponents(windProfileSpeed(field.speed, field.profile, x / L), field.from, bearing);
+}
+
+/**
+ * {@link windAt} for one line, its per-call checks and constant parts hoisted — the reader §19.8's
+ * integrator evaluates at the `x` of every stage (#127), several thousand times per shot.
+ *
+ * **Bit-identical to `windAt(field, x, L, bearing)` for every `x ∈ [0, L]`** (`wind-profile.test.ts`
+ * asserts it with `Object.is`), because it is the same arithmetic in the same order:
+ * `windComponents` is `(−V·cos, V·sin)`, so it is evaluated once at `V = 1` and scaled by the local
+ * speed — a negation and a product, both exact — and §8.4's `V·(1 − α·(1 − φ))` keeps its own
+ * expression, with `p` computed once. A uniform profile (`α = 0`) skips `φ`, whose product with
+ * `α` is `0` anyway. It is still a local read: nothing here is a mean or a span-wide multiplier.
+ */
+export class WindLine {
+  /** The last {@link at}'s components, m/s — `windAt`'s `along` and `across`. */
+  along = 0;
+  across = 0;
+  /** `true` when the profile is uniform: every `x` reads the same components. */
+  readonly uniform: boolean;
+  private readonly speed: number;
+  private readonly alpha: number;
+  private readonly p: number;
+  private readonly unitAlong: number;
+  private readonly unitAcross: number;
+
+  /** @throws RangeError on the inputs `windAt` refuses, `x` aside. */
+  constructor(
+    field: WindField,
+    private readonly L: number,
+    bearing: number,
+  ) {
+    if (!(L > 0 && Number.isFinite(L))) {
+      throw new RangeError(`WindLine: L must be finite and > 0, got ${L}`);
+    }
+    if (!(field.speed >= 0 && Number.isFinite(field.speed))) {
+      throw new RangeError(`WindLine: speed must be finite and ≥ 0, got ${field.speed}`);
+    }
+    requireWithin("WindLine", "attenuation", field.profile.attenuation, WIND_PROFILE.attenuation);
+    requireWithin("WindLine", "width", field.profile.width, WIND_PROFILE.width);
+    const unit = windComponents(1, field.from, bearing);
+    this.unitAlong = unit.along;
+    this.unitAcross = unit.across;
+    this.speed = field.speed;
+    this.alpha = field.profile.attenuation / 100;
+    this.p = exponentOf(field.profile.width);
+    this.uniform = this.alpha === 0;
+    this.at(L / 2);
+  }
+
+  /**
+   * Reads the wind at `x` into {@link along} and {@link across}.
+   *
+   * @throws RangeError when `x ∉ [0, L]`, as `windAt` does — the caller decides what it reads
+   *   outside the span (§19.8 refuses the trial).
+   */
+  at(x: number): void {
+    if (!(x >= 0 && x <= this.L)) {
+      throw new RangeError(`WindLine: x must lie in [0, ${this.L}], got ${x}`);
+    }
+    const V = this.uniform
+      ? this.speed
+      : this.speed * (1 - this.alpha * (1 - shapeOf(x / this.L, this.p)));
+    // `+ 0` turns a `-0` into `0`, as `windComponents` does.
+    this.along = V * this.unitAlong + 0;
+    this.across = V * this.unitAcross + 0;
+  }
 }

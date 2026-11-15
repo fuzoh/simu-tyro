@@ -20,10 +20,14 @@ import {
   BENCH_CELLS,
   BENCH_RUNS,
   PAIR_P95_BUDGET_MS,
+  SPATIAL_BENCH_CELLS,
+  SPATIAL_PAIR_P95_BUDGET_MS,
   measurePair,
+  measureSpatialPair,
   percentile,
 } from "./bench-harness.ts";
 import { CLEARANCE } from "./clearance.ts";
+import { SPATIAL } from "./spatial-solve.ts";
 import { SWEEP, sweepGrid } from "./sweep.ts";
 
 describe("the pair's p95 at 240 steps — § 10 E7b's gate", () => {
@@ -44,6 +48,26 @@ describe("the pair's p95 at 240 steps — § 10 E7b's gate", () => {
       });
     });
   }
+});
+
+describe("the windy pair's p95 at N = 240 — §19.9's measured budget (#127)", () => {
+  for (const cell of SPATIAL_BENCH_CELLS) {
+    const timing = measureSpatialPair(cell, SWEEP.steps, BENCH_RUNS);
+
+    describe(`${cell.key} · ${cell.label}`, () => {
+      test("the windy traverse solves whole, so the timing measures work and not failure", () => {
+        expect(timing.minCoverage).toBe(1);
+      });
+
+      test(`p95 of sweepSpatial() + evaluateSpatialClearance ≤ ${SPATIAL_PAIR_P95_BUDGET_MS} ms`, () => {
+        expect(timing.p95).toBeLessThanOrEqual(SPATIAL_PAIR_P95_BUDGET_MS);
+      });
+    });
+  }
+
+  test("the budget was measured at §19.9's N = 240 — raising N re-opens the measurement", () => {
+    expect(SPATIAL.steps).toBe(240);
+  });
 });
 
 describe("the tripwire the bench arms — « re-run the bench if anything raises 260 × 60 »", () => {
