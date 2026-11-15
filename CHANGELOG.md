@@ -1,5 +1,46 @@
 # Changelog
 
+## [2.2.0](https://github.com/fuzoh/simu-tyro/compare/v2.1.0...v2.2.0) (2026-11-15)
+
+
+### Features
+
+* **map:** project the computed spatial lines in every view ([5253dd6](https://github.com/fuzoh/simu-tyro/commit/5253dd6a88284a4b7e0696e632d053ccb5de6e6f)), closes [#118](https://github.com/fuzoh/simu-tyro/issues/118) [#127](https://github.com/fuzoh/simu-tyro/issues/127)
+* **sim:** add the spatial equilibrium engine under wind ([d58e1a9](https://github.com/fuzoh/simu-tyro/commit/d58e1a9628860d33217a4834f2376222f8c8b2f1)), closes [#127](https://github.com/fuzoh/simu-tyro/issues/127)
+* **sim:** wire the spatial statics into the app under wind ([b48c505](https://github.com/fuzoh/simu-tyro/commit/b48c5055c187c565d13db753aa3075b4da9ef97c)), closes [#127](https://github.com/fuzoh/simu-tyro/issues/127)
+* **wind:** read the wind profile along the line in every calculation ([79c4d2d](https://github.com/fuzoh/simu-tyro/commit/79c4d2dfc5391b7a22e691771a65f9a6fb303ad5)), closes [#141](https://github.com/fuzoh/simu-tyro/issues/141) [#127](https://github.com/fuzoh/simu-tyro/issues/127) [#118](https://github.com/fuzoh/simu-tyro/issues/118)
+
+
+### Bug Fixes
+
+* **chart:** say why a position has no loaded line, in every view ([86a262c](https://github.com/fuzoh/simu-tyro/commit/86a262c4f1758a2d5bc9488b02e36ff642280966))
+* **dynamique:** keep the ride under wind when the still-air comparison fails ([f8cedd2](https://github.com/fuzoh/simu-tyro/commit/f8cedd292f6657fdcfb89e91d73e2a4ef63a249a))
+* **rail:** take the statics down when a refused gabarit is read under wind ([c792510](https://github.com/fuzoh/simu-tyro/commit/c792510c0ac1d603ab487d1a4297e1e901ce46d4))
+* **sim:** accept a nil air density under wind as the field does ([b8bf321](https://github.com/fuzoh/simu-tyro/commit/b8bf321abc1110adf3709b11b2de32f9d345cd09))
+* **sim:** judge the line's interior peak tension in the verdict under wind ([8870bf1](https://github.com/fuzoh/simu-tyro/commit/8870bf1e4e6922efa8c01b7b7f07fd06cb7a0fff))
+
+
+### Performance Improvements
+
+* **map:** defer the windy statics behind a drag of the rose ([16045c4](https://github.com/fuzoh/simu-tyro/commit/16045c4a5af9a48fadb4470ab7bdf85e48717cfa))
+
+
+### Tests
+
+* **app:** fold the windy sweep hole into the surfaces suite ([497bf32](https://github.com/fuzoh/simu-tyro/commit/497bf328a025ac242a519bbf9d9ed15765354291))
+* **rail:** pin that the verdict reads the windy tensions under a crosswind ([221bb88](https://github.com/fuzoh/simu-tyro/commit/221bb88679359ece172979ef8c6f07074036722a))
+
+
+### Documentation
+
+* **sim:** bring the wind docblocks and glossary in line with [#141](https://github.com/fuzoh/simu-tyro/issues/141) ([818cf84](https://github.com/fuzoh/simu-tyro/commit/818cf84b7ded1e4f84836d3a5bbae0299d56c882))
+* **sim:** document the spatial equilibrium contract ([082b0d4](https://github.com/fuzoh/simu-tyro/commit/082b0d4abffa32c48e4b73de448e0d5c170b26c7))
+
+
+### Refactors
+
+* **sim:** drop duplicated helpers and allocations from the spatial engine ([0781d28](https://github.com/fuzoh/simu-tyro/commit/0781d28b0273eb9f09295cb4499067d4e2cb7487))
+
 ## [2.1.0](https://github.com/fuzoh/simu-tyro/compare/v2.0.0...v2.1.0) (2026-11-15)
 
 
