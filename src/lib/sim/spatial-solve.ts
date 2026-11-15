@@ -363,7 +363,8 @@ function refuse(input: SpatialSpanInput): SolveError | null {
     }
     if (!isAeroNil(aero)) {
       if (!(Number.isFinite(aero.d) && aero.d > 0)) return invalid("d", aero.d);
-      if (!(Number.isFinite(aero.rho) && aero.rho > 0)) return invalid("rho", aero.rho);
+      // ρ = 0 is a typed value the field accepts: nil drag, and the shot converges onto the plane.
+      if (!(Number.isFinite(aero.rho) && aero.rho >= 0)) return invalid("rho", aero.rho);
       if (!(Number.isFinite(aero.CDn) && aero.CDn >= 0)) return invalid("CDn", aero.CDn);
       if (!Number.isFinite(aero.bearing)) return invalid("bearing", aero.bearing);
       if (!Number.isFinite(aero.field.from)) return invalid("windFrom", aero.field.from);

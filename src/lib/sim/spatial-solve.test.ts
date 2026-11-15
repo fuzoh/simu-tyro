@@ -235,6 +235,31 @@ describe("§19.17 control 1 — no wind, the shot against §15", () => {
     const off = solveSpatial({ ...LINE, aero: null, rider: { ...RIDER, sP: LINE.L0 } });
     expect(!off.ok && off.error).toMatchObject({ kind: "invalid-input", field: "sP" });
   });
+
+  it("accepts ρ = 0 under wind, which the field accepts: no drag, §15's Z5 in its plane", () => {
+    // `f_n = ½ρC_D⊥d·…` and the rider's drag both vanish with ρ: the shot is the plane line.
+    const { L, h, L0, w, EA, P } = Z5.in;
+    const result = solveSpatial({
+      L,
+      h,
+      L0,
+      w,
+      EA,
+      aero: aeroOf(field(15, 90), 0.012, 0),
+      rider: { sP: Z5.in.sD, weight: P, share: 1, hRider: 2.1 },
+    });
+    if (!result.ok) throw new Error(`ρ = 0 must solve, got ${result.error.kind}`);
+    const state = result.state;
+    expect(rel(state.HA, Z5.out.H)).toBeLessThan(TOLERANCE.solvedScalar);
+    expect(rel(state.FA.z, Z5.out.V0)).toBeLessThan(TOLERANCE.solvedScalar);
+    expect(rel(state.node?.rD.z ?? 0, Z5.out.zD)).toBeLessThan(TOLERANCE.solvedScalar);
+    expect(Math.abs(state.node?.rD.y ?? Number.NaN)).toBeLessThan(1e-9);
+  });
+
+  it("still refuses a negative ρ", () => {
+    const negative = solveSpatial({ ...LINE, aero: aeroOf(field(10, 90), 0.012, -1), rider: null });
+    expect(!negative.ok && negative.error).toMatchObject({ kind: "invalid-input", field: "rho" });
+  });
 });
 
 /** The inextensible level catenary of span `L` and length `L₀`: `2C·sinh(L/2C) = L₀`, by bisection. */
