@@ -1873,6 +1873,11 @@ traverse (§19.14).
 The Verdict's rules, safety factors, DAF and departure majoration are **unchanged** (#127 brief,
 acceptance « aucun changement implicite »). It reads the spatial tensions — `T_A`, `T_B`, `T_max`
 per solved slot, and the unloaded `T_A`, `T_B` under wind as `T_vide` — and §19.13's garde.
+Each end's total-tension cell reads its anchor's `T_A` or `T_B`, except at a slot whose `T_max`
+lies above both: under wind the horizontal part of `P_ext` makes `F` jump at the node, and `T⁺`
+can be the line's peak. That peak is then judged at **both** ends — `η_t ≤ 1` makes it
+conservative for the rope where it sits, and the excess is not attributed to one termination.
+Without wind `T_max = max(T_A, T_B)` and nothing changes.
 **A sweep with `coverage < 1` makes the Verdict indéterminé** (Q24): the maximal tension and the
 minimal garde are not established over the whole traverse. The solved positions stay readable.
 The words say that the calculation did not converge at those positions, never that the case

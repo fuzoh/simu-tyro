@@ -171,6 +171,7 @@ function toSweepStep(state: SpanState, sD: number): SweepStep {
     V0: state.V0,
     TA: state.TA,
     TB: state.TB,
+    Tmax: state.Tmax,
     // §4.1 gives `dz/dx = V/H` pointwise, so the slope at the node is `atan(V/H)`. Read on the
     // **below** side, like `loadNode`'s own `x` and `z`: a trolley sits on a kink, the slope is
     // discontinuous across it, and the two sides differ by the rider's own load. Below is the

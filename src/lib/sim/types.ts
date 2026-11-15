@@ -118,6 +118,13 @@ export type SweepStep = {
   TA: number;
   /** Tension at the far anchor, N. */
   TB: number;
+  /**
+   * The greatest tension along the line, both sides of the rider included, N (§19.11's `T_max`).
+   * `max(TA, TB)` in the plane, where `V(s)` is monotone; under wind the horizontal part of the
+   * rider's force makes `F` jump at the node, and `T⁺` can exceed both anchors' (§19.14). Absent
+   * on a step built by hand, read then as `max(TA, TB)`.
+   */
+  Tmax?: number;
   /** Cable slope at the rider, rad; signed, negative = descending. */
   theta: number;
 };
